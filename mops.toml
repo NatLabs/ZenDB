@@ -1,0 +1,7 @@
+[dependencies]
+base = "0.10.2"
+
+[dev-dependencies]
+test = "1.0.1"
+bench = "1.0.0"
+fuzz = "0.1.0"

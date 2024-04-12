@@ -1,0 +1,60 @@
+name: Makefile CI
+
+on: 
+  push:
+    branches:
+      - main
+  pull_request:
+    branches:
+      - "*"
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+
+    name: Build and test
+    steps:
+      - uses: actions/checkout@v3
+      - uses: actions/setup-node@v3
+        with:
+          node-version: 18
+
+      - name: Cache Node modules
+        uses: actions/cache@v2
+        with:
+          path: ~/.npm
+          key: ${{ runner.os }}-node-${{ hashFiles('**/package-lock.json') }}
+          restore-keys: |
+            ${{ runner.os }}-node-
+
+      - name: Cache mops packages
+        uses: actions/cache@v3
+        with:
+          key: mops-packages-${{ hashFiles('mops.toml') }}
+          path: |
+            ~/.cache/mops
+            ~/mops
+
+      - name: Install dfx
+        uses: dfinity/setup-dfx@main
+      - name: Confirm successful installation
+        run: dfx --version
+    
+      - name: Install dfx cache
+        run: dfx cache install
+
+      - name: Install mops & mocv
+        run: |
+          npm --yes -g i ic-mops
+          mops i
+          mops toolchain init
+          mops toolchain use moc 0.10.4
+
+          # set moc path for dfx to use
+          echo "DFX_MOC_PATH=$(mops toolchain bin moc)" >> $GITHUB_ENV
+    
+      - name: Detect warnings
+        run: make check
+
+      - name: Run Tests
+        run: make test
