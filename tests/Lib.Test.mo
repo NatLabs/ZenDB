@@ -2,6 +2,8 @@
 import Debug "mo:base/Debug";
 import Iter "mo:base/Iter";
 import { test; suite } "mo:test";
+import Candid "mo:serde/Candid";
+import MemoryBTree "../src/memory-buffer/src/MemoryBTree/Base";
 
 import HydraDb "../src";
 
@@ -12,14 +14,11 @@ type User = {
 };
 
 let candify_user = {
-    from_blob = func(blob : Blob) : User {
-        let ?c : ?User = from_candid (blob);
-        c;
-    };
-    to_blob = func(c : User) : Blob {
-        to_candid (c);
-    };
+    from_blob = func(blob : Blob) : User { let ?c : ?User = from_candid (blob); c; };
+    to_blob = func(c : User) : Blob { to_candid (c); };
 };
+
+type Candid = Candid.Candid;
 
 let { QueryBuilder } = HydraDb;
 
@@ -56,18 +55,40 @@ suite(
             ignore HydraDb.put<User>(hydra_db, "users", candify_user, user);
         };
 
-        assert #ok == HydraDb.create_index(hydra_db, "users", [("age")]);
-        assert #ok == HydraDb.create_index(hydra_db, "users", [("name")]);
-        assert #ok == HydraDb.create_index(hydra_db, "users", [("email")]);
+        let #ok(_) = HydraDb.create_index(hydra_db, "users", [("age")]);
+        let #ok(name_index) = HydraDb.create_index(hydra_db, "users", [("name")]);
+        let #ok(_) = HydraDb.create_index(hydra_db, "users", [("email")]);
 
-        let _query = QueryBuilder()
-            // .where("age", #Gt, #Nat(7))
-            // ._or("age", #Lt, #Nat(3))
-            // .where("age", #Gt, #Nat(0))
-            .where("name", #Eq, #Text("nam-do-san"))
+        // let index_data_utils = HydraDb.get_index_data_utils(name_index.key_details);
+        // let entries = MemoryBTree.scan(name_index.data, index_data_utils, ?[("name", #Text("nam-do-san")), (":record_id", #Nat(0))], ?[("name", #Text("nam-do-san")), (":record_id", #Nat(2 ** 64))]);
+
+        // Debug.print(debug_show Iter.toArray(entries));
+
+        Debug.print("Retrieve every user with the name 'nam-do-san'");
+        var _query = QueryBuilder()
+            ._where("name", #Eq, #Text("nam-do-san"))
             .build();
 
-        let result = HydraDb.find<User>(hydra_db, "users", candify_user, _query);
+        var result = HydraDb.find<User>(hydra_db, "users", candify_user, _query);
+        Debug.print(debug_show Iter.toArray(result));
+
+        Debug.print("Retrieve every user between the age of 3 and 7");
+        _query := QueryBuilder()
+            ._where("age", #Gt, #Nat(3))
+            ._and("age", #Lt, #Nat(7))
+            .build();
+
+        result := HydraDb.find<User>(hydra_db, "users", candify_user, _query);
+        Debug.print(debug_show Iter.toArray(result));
+
+        Debug.print("Retrieve every user with the name 'nam-do-san' and age between 3 and 7");
+        _query := QueryBuilder()
+            ._where("age", #Gt, #Nat(3))
+                ._and("age", #Lt, #Nat(7))
+                ._and("name", #Eq, #Text("nam-do-san"))
+            .build();
+
+        result := HydraDb.find<User>(hydra_db, "users", candify_user, _query);
         Debug.print(debug_show Iter.toArray(result));
     },
 );

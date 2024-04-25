@@ -10,6 +10,7 @@ import Iter "mo:base/Iter";
 import Buffer "mo:base/Buffer";
 import Nat "mo:base/Nat";
 import Option "mo:base/Option";
+import Hash "mo:base/Hash";
 
 import Map "mo:map/Map";
 import Serde "mo:serde";
@@ -37,6 +38,7 @@ module {
     public type SingleUtil<A> = BTreeUtils.SingleUtil<A>;
 
     public type Order = Order.Order;
+    public type Hash = Hash.Hash;
 
     public type Schema = {
         #Text;
@@ -217,6 +219,10 @@ module {
         };
     };
 
+    func eq_candid(a : Candid, b : Candid) : Bool {
+        cmp_candid(a, b) == 0;
+    };
+
     func send_error<A, B, C>(res : Result<A, B>) : Result<C, B> {
         switch (res) {
             case (#ok(_)) Debug.trap("send_error: unexpected error type");
@@ -269,41 +275,7 @@ module {
         ?candid;
     };
 
-    public func create_index(hydra_db : HydraDB, collection_name : Text, _index_key_details : [(Text)]) : Result<(), Text> {
-        let ?collection = get_collection(hydra_db, collection_name);
-
-        let index_key_details : [(Text, Direction)] = Array.map<Text, (Text, Direction)>(
-            _index_key_details,
-            func(key : Text) : (Text, Direction) { (key, #Asc) },
-        );
-        // let sorted_index_key_details = Array.sort(index_key_details, func(a : (Text, Direction), b : (Text, Direction)) : Order { Text.compare(a.0, b.0) });
-
-        let index_name = Text.join(
-            "_",
-            Iter.map<(Text, Direction), Text>(
-                index_key_details.vals(),
-                func((name, dir) : (Text, Direction)) : Text {
-                    name # (debug_show dir);
-                },
-            ),
-        );
-
-        let index_data = MemoryBTree.new(?DEFAULT_BTREE_ORDER);
-
-        let btree_main_utils = BTreeUtils.createUtils(BTreeUtils.Nat, BTreeUtils.Blob);
-
-        let record_keys : [Text] = switch (collection.schema) {
-            case (#Record(fields)) {
-                Array.map(
-                    fields,
-                    func((name, _) : (Text, Schema)) : Text {
-                        name;
-                    },
-                );
-            };
-            case (_) return #err("Schema error: schema is not a record");
-        };
-
+    public func get_index_data_utils(index_key_details: [(Text, Direction)]) : BTreeUtils<IndexKeyDetails, Nat>   {
         let index_key_utils : BTreeUtils.SingleUtil<IndexKeyDetails> = {
             blobify = {
                 from_blob = func(b : Blob) : IndexKeyDetails {
@@ -339,6 +311,51 @@ module {
 
         let index_data_utils : BTreeUtils<IndexKeyDetails, Nat> = BTreeUtils.createUtils(index_key_utils, BTreeUtils.Nat);
 
+    };
+
+    
+
+    public func create_index(hydra_db : HydraDB, collection_name : Text, _index_key_details : [(Text)]) : Result<Index, Text> {
+        let ?collection = get_collection(hydra_db, collection_name);
+
+        let index_key_details : [(Text, Direction)] = Array.append(
+            Array.map<Text, (Text, Direction)>(
+                _index_key_details,
+                func(key : Text) : (Text, Direction) { (key, #Asc) },
+            ),
+            [(":record-id", #Asc)],
+        );
+
+        // let sorted_index_key_details = Array.sort(index_key_details, func(a : (Text, Direction), b : (Text, Direction)) : Order { Text.compare(a.0, b.0) });
+
+        let index_name = Text.join(
+            "_",
+            Iter.map<(Text, Direction), Text>(
+                index_key_details.vals(),
+                func((name, dir) : (Text, Direction)) : Text {
+                    name # (debug_show dir);
+                },
+            ),
+        );
+
+        let index_data = MemoryBTree.new(?DEFAULT_BTREE_ORDER);
+
+        let btree_main_utils = BTreeUtils.createUtils(BTreeUtils.Nat, BTreeUtils.Blob);
+
+        let record_keys : [Text] = switch (collection.schema) {
+            case (#Record(fields)) {
+                Array.map(
+                    fields,
+                    func((name, _) : (Text, Schema)) : Text {
+                        name;
+                    },
+                );
+            };
+            case (_) return #err("Schema error: schema is not a record");
+        };
+
+        let index_data_utils = get_index_data_utils(index_key_details);
+
         for ((id, record) in MemoryIdBTree.entries(collection.main, btree_main_utils)) {
             let #ok(candid_values) = Serde.Candid.decode(record, record_keys, null);
             let candid = candid_values[0];
@@ -360,6 +377,8 @@ module {
                 };
             };
 
+            buffer.add((":record-id", #Nat(id)));
+
             let index_key_values = Buffer.toArray(buffer);
             ignore MemoryBTree.insert<IndexKeyDetails, Nat>(index_data, index_data_utils, index_key_values, id);
         };
@@ -372,7 +391,7 @@ module {
 
         ignore Map.put<Text, Index>(collection.indexes, thash, index_name, index);
 
-        #ok(());
+        #ok(index);
     };
 
     public func put<Record>(hydra_db : HydraDB, collection_name : Text, blobify : Candify<Record>, record : Record) : Result<(Nat), Text> {
@@ -402,7 +421,7 @@ module {
         // let candid_with_id = switch(candid){
         //     case (#Record(records)) {
         //         let id = MemoryIdBTree.next_id(collection.main);
-        //         #Record([("_record_id", #Nat(id))] + records);
+        //         #Record([(":record-id", #Nat(id))] + records);
         //     };
         //     case (_) return #err("put(): unexpected candid type");
         // };
@@ -431,42 +450,11 @@ module {
                 };
             };
 
+            buffer.add((":record-id", #Nat(id)));
+
             let index_key_values = Buffer.toArray(buffer);
 
-            let index_key_utils : BTreeUtils.SingleUtil<IndexKeyDetails> = {
-                blobify = {
-                    from_blob = func(b : Blob) : IndexKeyDetails {
-                        let ?res : ?IndexKeyDetails = from_candid (b);
-                        res;
-                    };
-                    to_blob = func(index_key_detail : IndexKeyDetails) : Blob {
-                        to_candid (index_key_detail);
-                    };
-                };
-                cmp = #cmp(
-                    func(a : IndexKeyDetails, b : IndexKeyDetails) : Int8 {
-                        var cmp_result : Int8 = 0;
-
-                        for (i in Iter.range(0, a.size() - 1)) {
-                            let (_, val_a) = a[i];
-                            let (_, val_b) = b[i];
-
-                            let (_, dir) = index.key_details[i];
-
-                            cmp_result := cmp_candid(val_a, val_b);
-
-                            if (cmp_result != 0) {
-                                if (dir == #Desc) return -cmp_result;
-                                return cmp_result;
-                            };
-                        };
-
-                        cmp_result;
-                    }
-                );
-            };
-
-            let index_data_utils : BTreeUtils<IndexKeyDetails, Nat> = BTreeUtils.createUtils(index_key_utils, BTreeUtils.Nat);
+            let index_data_utils = get_index_data_utils(index.key_details);
 
             ignore MemoryBTree.insert<IndexKeyDetails, Nat>(index.data, index_data_utils, index_key_values, id);
         };
@@ -515,40 +503,8 @@ module {
         };
 
         let btree_main_utils = BTreeUtils.createUtils(BTreeUtils.Nat, BTreeUtils.Blob);
-        let index_key_utils : BTreeUtils.SingleUtil<IndexKeyDetails> = {
-            blobify = {
-                from_blob = func(b : Blob) : IndexKeyDetails {
-                    let ?res : ?IndexKeyDetails = from_candid (b);
-                    res;
-                };
-                to_blob = func(index_key_detail : IndexKeyDetails) : Blob {
-                    to_candid (index_key_detail);
-                };
-            };
-            cmp = #cmp(
-                func(a : IndexKeyDetails, b : IndexKeyDetails) : Int8 {
-                    var cmp_result : Int8 = 0;
+        let index_data_utils = get_index_data_utils(index.key_details);
 
-                    for (i in Iter.range(0, a.size() - 1)) {
-                        let (_, val_a) = a[i];
-                        let (_, val_b) = b[i];
-
-                        let (_, dir) = index.key_details[i];
-
-                        cmp_result := cmp_candid(val_a, val_b);
-
-                        if (cmp_result != 0) {
-                            if (dir == #Desc) return -cmp_result;
-                            return cmp_result;
-                        };
-                    };
-
-                    cmp_result;
-                }
-            );
-        };
-
-        let index_data_utils : BTreeUtils<IndexKeyDetails, Nat> = BTreeUtils.createUtils(index_key_utils, BTreeUtils.Nat);
 
         let ?record_id = MemoryBTree.get(index.data, index_data_utils, _query);
         let ?record_candid_blob = MemoryIdBTree.lookupVal(collection.main, btree_main_utils, record_id);
@@ -568,7 +524,7 @@ module {
         };
     };
 
-    public func scan<Record>(hydra_db : HydraDB, collection_name : Text, blobify : Candify<Record>, start_query : [(Text, Candid)], end_query : [(Text, Candid)]) : Iter.Iter<Record> {
+    public func scan<Record>(hydra_db : HydraDB, collection_name : Text, blobify : Candify<Record>, start_query : [(Text, Candid)], end_query : [(Text, Candid)]) : Iter<(Nat, Record)> {
         Debug.print("start_query: " # debug_show start_query);
         Debug.print("end_query: " # debug_show end_query);
 
@@ -577,7 +533,7 @@ module {
         let opt_end_index = get_best_index(collection, end_query);
 
         Debug.print("opt_start_index: " # debug_show Option.map(opt_start_index, func(index : Index) : Text { index.name }));
-        Debug.print("opt_end_index: " # debug_show Option.map(opt_start_index, func(index : Index) : Text { index.name }));
+        Debug.print("opt_end_index: " # debug_show Option.map(opt_end_index, func(index : Index) : Text { index.name }));
 
         let index = switch (opt_start_index, opt_end_index) {
             case (?(start_index), ?(end_index)) {
@@ -589,40 +545,7 @@ module {
         };
 
         let btree_main_utils = BTreeUtils.createUtils(BTreeUtils.Nat, BTreeUtils.Blob);
-        let index_key_utils : BTreeUtils.SingleUtil<IndexKeyDetails> = {
-            blobify = {
-                from_blob = func(b : Blob) : IndexKeyDetails {
-                    let ?res : ?IndexKeyDetails = from_candid (b);
-                    res;
-                };
-                to_blob = func(index_key_detail : IndexKeyDetails) : Blob {
-                    to_candid (index_key_detail);
-                };
-            };
-            cmp = #cmp(
-                func(a : IndexKeyDetails, b : IndexKeyDetails) : Int8 {
-                    var cmp_result : Int8 = 0;
-
-                    for (i in Iter.range(0, a.size() - 1)) {
-                        let (key_a, val_a) = a[i];
-                        let (key_b, val_b) = b[i];
-
-                        let (index_key, dir) = index.key_details[i];
-
-                        cmp_result := cmp_candid(val_a, val_b);
-
-                        if (cmp_result != 0) {
-                            if (dir == #Desc) return -cmp_result;
-                            return cmp_result;
-                        };
-                    };
-
-                    cmp_result;
-                }
-            );
-        };
-
-        let index_data_utils : BTreeUtils<IndexKeyDetails, Nat> = BTreeUtils.createUtils(index_key_utils, BTreeUtils.Nat);
+        let index_data_utils = get_index_data_utils(index.key_details);
 
         func sort_by_key_details(a : (Text, Candid), b : (Text, Candid)) : Order {
             let pos_a = switch(Array.indexOf<(Text, Direction)>((a.0, #Asc), index.key_details, tuple_eq(Text.equal))){
@@ -650,16 +573,15 @@ module {
             let buffer = Buffer.Buffer<(Text, Candid)>(8);
             var j = 0;
 
-            if (j == sorted_start_query.size()) {
-                for (k in Itertools.range(0, min_key_fields.size())) {
+            if (j == (sorted_start_query.size())) {
+                Debug.print("overwritten by min_key_fields");
+                for (k in Itertools.range(0, min_key_fields.size() - 1)) {
                     buffer.add(min_key_fields[k]);
                 };
-            };
-
-            label for_loop for (i in Itertools.range(0, min_key_fields.size())) {
-
+            } else label for_loop for (i in Itertools.range(0, min_key_fields.size() - 1)) {
                 let a = min_key_fields[i];
                 let b = sorted_start_query[j];
+                Debug.print("(a, b): " # debug_show (a, b));
 
                 if (a.0 == b.0) {
                     buffer.add(b);
@@ -668,8 +590,8 @@ module {
                     buffer.add(a);
                 };
 
-                if (j == sorted_start_query.size()) {
-                    for (k in Itertools.range(i + 1, min_key_fields.size())) {
+                if (j == (sorted_start_query.size() )) {
+                    for (k in Itertools.range(i + 1, min_key_fields.size() - 1)) {
                         buffer.add(min_key_fields[k]);
                     };
 
@@ -687,11 +609,11 @@ module {
             let buffer = Buffer.Buffer<(Text, Candid)>(8);
             var j = 0;
 
-            if (j == sorted_end_query.size()) {
-                for (k in Itertools.range(0, max_key_fields.size())) {
+            if (j == (sorted_end_query.size())) {
+                for (k in Itertools.range(0, max_key_fields.size() - 1)) {
                     buffer.add(max_key_fields[k]);
                 };
-            } else label for_loop for (i in Itertools.range(0, max_key_fields.size())) {
+            } else label for_loop for (i in Itertools.range(0, max_key_fields.size() - 1)) {
 
                 let a = max_key_fields[i];
                 let b = sorted_end_query[j];
@@ -703,8 +625,8 @@ module {
                     buffer.add(a);
                 };
 
-                if (j == sorted_end_query.size()) {
-                    for (k in Itertools.range(i + 1, max_key_fields.size())) {
+                if (j == (sorted_end_query.size())) {
+                    for (k in Itertools.range(i + 1, max_key_fields.size() - 1)) {
                         buffer.add(max_key_fields[k]);
                     };
 
@@ -716,7 +638,10 @@ module {
             Buffer.toArray(buffer);
         };
 
-        let record_ids = MemoryBTree.scan(index.data, index_data_utils, ?full_start_query, ?full_end_query);
+        let scan_lower_bound = Array.append(full_start_query, [(":record-id", #Nat(0))]);
+        let scan_upper_bound = Array.append(full_end_query, [(":record-id", #Nat(2 ** 64))]);
+
+        let record_ids = MemoryBTree.scan(index.data, index_data_utils, ?(scan_lower_bound), ?scan_upper_bound);
 
         func get_filter_bounds_index(left : [(Text, Candid)], right : [(Text, Candid)]) : Nat {
             Debug.print("left: " # debug_show left);
@@ -755,29 +680,36 @@ module {
 
         };
 
-        Iter.map<(IndexKeyDetails, Nat), Record>(
+        Iter.map<(IndexKeyDetails, Nat), (Nat, Record)>(
             filtered_records_ids,
-            func((_, id) : (IndexKeyDetails, Nat)) : Record {
-                lookup_record<Record>(collection, blobify, id);
+            func((_, id) : (IndexKeyDetails, Nat)) : (Nat, Record) {
+                let record = lookup_record<Record>(collection, blobify, id);
+                (id, record);
             },
         )
 
         // #ok(record);
     };
 
-    public type HydraQueryLang = {
-        // #Regex : (Text, Text);
-        #Empty;
-        #Not : HydraQueryLang;
-        #Eq : (Text, Candid);
-        #Gt : (Text, Candid);
-        #Lt : (Text, Candid);
-        #And : (HydraQueryLang, HydraQueryLang);
-        #Or : (HydraQueryLang, HydraQueryLang);
+    public type HqlOperators = {
+        #eq : Candid;
+        #gte : Candid;
+        #lte : Candid;
+    };
 
-        #Limit : (Nat, HydraQueryLang);
-        #Skip : (Nat, HydraQueryLang);
-        #BatchSize : (Nat, HydraQueryLang);
+    public type HydraQueryLang = {
+        
+        #Operation : (Text, HqlOperators);
+        #And : Buffer<HydraQueryLang>;
+        #Or : Buffer<HydraQueryLang>;
+
+        // #Limit : (Nat, HydraQueryLang);
+        // #Skip : (Nat, HydraQueryLang);
+        // #BatchSize : (Nat, HydraQueryLang);
+        
+        // #Regex : (Text, Text);
+        // #Not : HydraQueryLang;
+    
         // #In : (Text, [Candid]);
         // #Between : (Text, Candid, Candid);
         // #All : (Text, HydraQueryLang);
@@ -792,42 +724,43 @@ module {
     };
 
     public class QueryBuilder() = self {
-        var _query : HydraQueryLang = #Empty;
+        var _query : HydraQueryLang = #And(Buffer.Buffer<HydraQueryLang>(8));
 
-        public func where(key : Text, op : Operator, value : Candid) : QueryBuilder {
-            switch (op) {
-                case (#Eq) _query := #Eq(key, value);
-                case (#Gt) _query := #Gt(key, value);
-                case (#Lt) _query := #Lt(key, value);
-            };
-
-            self;
+        public func _where(key : Text, op : HqlOperators) : QueryBuilder {
+            return _and(key, op);
         };
 
-        public func _and(key : Text, op : Operator, value : Candid) : QueryBuilder {
-            if (_query == #Empty) {
-                return where(key, op, value);
+        public func _and(key : Text, op : HqlOperators) : QueryBuilder {
+
+            let and_buffer = switch(_query){
+                case (#And(buffer)) buffer;
+                case (#Or(_)) {
+                    let and_buffer = Buffer.Buffer<HydraQueryLang>(8);
+                    and_buffer.add(_query);
+                    _query := #And(and_buffer);
+                    and_buffer;
+                };
+                case (#Operation(_)) Debug.trap("Operation not allowed in this context");
             };
 
-            switch (op) {
-                case (#Eq) _query := #And(_query, #Eq(key, value));
-                case (#Gt) _query := #And(_query, #Gt(key, value));
-                case (#Lt) _query := #And(_query, #Lt(key, value));
-            };
-
-            self;
-        };
-
-        public func _or(key : Text, op : Operator, value : Candid) : QueryBuilder {
-            if (_query == #Empty) {
-                return where(key, op, value);
-            };
+            and_buffer.add(#Operation(key, op));
             
-            switch (op) {
-                case (#Eq) _query := #Or(_query, #Eq(key, value));
-                case (#Gt) _query := #Or(_query, #Gt(key, value));
-                case (#Lt) _query := #Or(_query, #Lt(key, value));
+            self;
+        };
+
+        public func _or(key : Text, op : HqlOperators) : QueryBuilder {
+            let or_buffer = switch(_query){
+                case (#Or(or_buffer)) or_buffer;
+                case (#Operation(_)) Debug.trap("Operation not allowed in this context");
+                case (#And(_)) {
+                    let or_buffer = Buffer.Buffer<HydraQueryLang>(8);
+                    or_buffer.add(_query);
+                    _query := #Or(or_buffer);
+                    or_buffer;
+                };
             };
+
+            or_buffer.add(#Operation(key, op));
 
             self;
         };
@@ -838,59 +771,153 @@ module {
 
     };
 
-    public func find<Record>(hydra_db : HydraDB, collection_name : Text, blobify : Candify<Record>, db_query : HydraQueryLang) : Iter<Record> {
+    public func find<Record>(hydra_db : HydraDB, collection_name : Text, blobify : Candify<Record>, db_query : HydraQueryLang) : Iter<(Nat, Record)> {
         var limit = 1000;
         var batch_size = 100;
         var skip = 0;
 
-        let lower = Buffer.Buffer<(Text, Candid)>(8);
-        let upper = Buffer.Buffer<(Text, Candid)>(8);
+        func eval_op(field: Text, op: HqlOperators, lower: Map<Text, Candid>, upper : Map<Text, Candid>) {
+            switch(op){
+                case (#eq(candid)) {
+                    ignore Map.put(lower, thash, field, candid);
+                    ignore Map.put(upper, thash, field, candid);
+                };
+                case (#gte(candid)) {
+                    ignore Map.put(lower, thash, field, candid);
+                };
+                case (#lte(candid)) {
+                    ignore Map.put(upper, thash, field, candid);
+                };
+            };
+        };
 
-        func evaluate(expr : HydraQueryLang, lower : Buffer<(Text, Candid)>, upper : Buffer<(Text, Candid)>) : ?Iter<Record> {
+        func eval(expr: HydraQueryLang, lower: Map<Text, Candid>, upper : Map<Text, Candid>) : ?Iter<(Nat, Record)>{
+            switch(expr){
+                case(#Operation(field, op)) {
+                    eval_op(field, op, lower, upper);
+                    null;
+                };
+                case (#And(buffer)){
+                    let new_lower = Map.new<Text, Candid>();
+                    let new_upper = Map.new<Text, Candid>();
+
+                    var res = Itertools.empty<(Nat, Record)>();
+
+                    for (expr in buffer.vals()){
+                        switch(eval(expr, new_lower, new_upper)){
+                            case (?iter) res := Itertools.chain(res, iter);
+                            case (_){};
+                        };
+                    };
+
+                    let lower_bound_as_array = Map.toArray(new_lower);
+                    let upper_bound_as_array = Map.toArray(new_upper);
+
+                    ?scan(hydra_db, collection_name, blobify,lower_bound_as_array, upper_bound_as_array);
+                };
+                case (#Or(buffer)){
+                    
+                    var res = Itertools.empty<(Nat, Record)>();
+
+                    for (expr in buffer.vals()){
+                        let new_lower = Map.new<Text, Candid>();
+                        let new_upper = Map.new<Text, Candid>();
+
+                        switch(eval(expr, new_lower, new_upper)){
+                            case (?iter) res := Itertools.chain(res, iter);
+                            case (_){};
+                        };
+                        
+                    };
+
+                    let hash_fn = func((id, record) : (Nat, Record)) : Hash {
+                        Nat32.fromNat(id)
+                    };
+
+                    let is_eq = func(a : (Nat, Record), b : (Nat, Record)) : Bool {
+                        a.0 == b.0
+                    };
+
+                    ?Itertools.unique<(Nat, Record)>(res, hash_fn, is_eq);
+                };
+            };
+        };
+
+
+        func evaluate(expr : HydraQueryLang, lower : Buffer<(Text, Candid)>, upper : Buffer<(Text, Candid)>) : ?Iter<(Nat, Record)> {
             switch (expr) {
-                case (#Empty) { null };
                 // ------------------------------ Comparison ------------------------------
-                case (#Eq(key, candid)) {
-                    lower.add((key, candid));
-                    upper.add((key, candid));
-
-                    null;
-                };
-                case (#Gt(key, candid)) {
-                    lower.add((key, candid));
-
-                    null;
-                };
-                case (#Lt(key, candid)) {
-                    upper.add((key, candid));
-
-                    null;
-                };
-
+                
                 // ------------------------------ Logical ------------------------------
-                case (#Not(expr)) {
-                    // there should be a way to negate the boounds in the scan
-                    // maybe we just filter after the scan
-                    ignore evaluate(expr, lower, upper);
-                    null;
-                };
                 case (#And(expr1, expr2)) {
-                    ignore evaluate(expr1, lower, upper);
-                    ignore evaluate(expr2, lower, upper);
+                    Debug.print("expr1: " # debug_show expr1);
+                    Debug.print("expr2: " # debug_show expr2);
 
-                    ?scan<Record>(hydra_db, collection_name, blobify, Buffer.toArray(lower), Buffer.toArray(upper));
+                    let new_lower = Buffer.clone(lower);
+                    let new_upper = Buffer.clone(upper);
+
+                    let opt_left = evaluate(expr1, lower, upper);
+                    let opt_right = switch(opt_left){
+                        case (null) evaluate(expr2, lower, upper);
+                        case (?left) evaluate(expr2, new_lower, new_upper);
+                    };
+
+                    func union(left: Iter<(Nat, Record)>, right: Iter<(Nat, Record)>) : Iter<(Nat, Record)> {
+                        let merged = Itertools.chain(left, right);
+                        let hash_fn = func((id, record) : (Nat, Record)) : Hash {
+                            Nat32.fromNat(id)
+                        };
+
+                        let is_eq = func(a : (Nat, Record), b : (Nat, Record)) : Bool {
+                            a.0 == b.0
+                        };
+
+                        Itertools.unique<(Nat, Record)>(merged, hash_fn, is_eq);
+                    };
+                    
+                    switch(opt_left, opt_right){
+                        case (null, null) {
+                            ?scan(hydra_db, collection_name, blobify, Buffer.toArray(lower), Buffer.toArray(upper));
+                        };
+                        case (?left, null) {
+                            let right = scan(hydra_db, collection_name, blobify, Buffer.toArray(new_lower), Buffer.toArray(new_upper));
+                            ?union(left, right);
+                        };
+                        case (null, ?right) {
+                            let left = scan(hydra_db, collection_name, blobify, Buffer.toArray(new_lower), Buffer.toArray(new_upper));
+                            ?union(left, right);
+                        };
+                        case (?left, ?right) {
+                            ?union(left, right);
+                        };
+                    };
                 };
                 case (#Or(expr1, expr2)) {
                     // create a union of the two queries
-                    let lower2 = Buffer.clone(lower);
-                    let upper2 = Buffer.clone(upper);
-                    ignore evaluate(expr1, lower, upper);
-                    ignore evaluate(expr2, lower2, upper2);
+                    let new_lower = Buffer.clone(lower);
+                    let new_upper = Buffer.clone(upper);
 
-                    let res1 = scan<Record>(hydra_db, collection_name, blobify, Buffer.toArray(lower), Buffer.toArray(upper));
-                    let res2 = scan<Record>(hydra_db, collection_name, blobify, Buffer.toArray(lower2), Buffer.toArray(upper2));
+                    let opt_left = evaluate(expr1, lower, upper);
+                    let opt_right = evaluate(expr2, new_lower, new_upper);
 
-                    ?Itertools.chain(res1, res2);
+                    switch(opt_left, opt_right){
+                        case(?left, ?right) {
+                            ?Itertools.chain(left, right);
+                        };
+                        case(?left, null){
+                            let right = scan(hydra_db, collection_name, blobify, Buffer.toArray(new_lower), Buffer.toArray(new_upper));
+                            ?Itertools.chain(left, right);
+                        };
+                        case(null, ?right){
+                            let left = scan(hydra_db, collection_name, blobify, Buffer.toArray(lower), Buffer.toArray(upper));
+                            ?Itertools.chain(left, right);
+                        };
+                        case(null, null){
+                            let left = scan(hydra_db, collection_name, blobify, Buffer.toArray(lower), Buffer.toArray(upper));
+                            let right = scan(hydra_db, collection_name, blobify, Buffer.toArray(new_lower), Buffer.toArray(new_upper));
+                            ?Itertools.chain(left, right);
+                        };
+                    };
                 };
 
                 // ------------------------------ Pagination ------------------------------
