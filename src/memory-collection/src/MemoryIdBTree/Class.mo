@@ -88,6 +88,31 @@ module {
         /// Retuens the number of bytes used to store information about the nodes and structure of the BTree
         public func metadataBytes() : Nat = MemoryIdBTree.metadataBytes(state);
 
+
+        /// Functions for Unique Id References to values in the BTree
+
+        /// Get the id associated with a key
+        public func getId(key: K) : ?Nat = MemoryIdBTree.getId(state, btree_utils, key);
+
+        /// Get the next available id that will be assigned to a new value
+        public func nextId() : Nat = MemoryIdBTree.nextId(state);
+
+        /// Get the entry associated with the given id
+        public func lookup(id: Nat) : ?(K, V) = MemoryIdBTree.lookup(state, btree_utils, id);
+
+        /// Get the key associated with the given id
+        public func lookupKey(id: Nat) : ?K = MemoryIdBTree.lookupKey(state, btree_utils, id);
+
+        /// Get the value associated with the given id
+        public func lookupVal(id: Nat) : ?V = MemoryIdBTree.lookupVal(state, btree_utils, id);
+
+        /// Reference a value by its id and increment the reference count
+        /// Values will not be removed from the BTree until the reference count is zero
+        public func reference(id: Nat)  = MemoryIdBTree.reference(state, btree_utils, id);
+
+        /// Get the reference count associated with the given id
+        public func getRefCount(id: Nat) : ?Nat = MemoryIdBTree.getRefCount(state, btree_utils, id);
+
     };
 
     /// 

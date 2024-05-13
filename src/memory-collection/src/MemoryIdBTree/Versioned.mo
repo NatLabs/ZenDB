@@ -139,4 +139,39 @@ module VersionedMemoryIdBTree {
         MemoryIdBTree.metadataBytes(state);
     };
 
+    public func getId<K, V>(btree: VersionedMemoryIdBTree, btree_utils: BTreeUtils<K, V>, key: K) : ?Nat {
+        let state = Migrations.getCurrentVersion(btree);
+        MemoryIdBTree.getId(state, btree_utils, key);
+    };
+
+    public func nextId<K, V>(btree: VersionedMemoryIdBTree) : Nat {
+        let state = Migrations.getCurrentVersion(btree);
+        MemoryIdBTree.nextId(state);
+    };
+
+    public func lookup<K, V>(btree: VersionedMemoryIdBTree, btree_utils: BTreeUtils<K, V>, id: Nat) : ?(K, V) {
+        let state = Migrations.getCurrentVersion(btree);
+        MemoryIdBTree.lookup(state, btree_utils, id);
+    };
+
+    public func lookupKey<K, V>(btree: VersionedMemoryIdBTree, btree_utils: BTreeUtils<K, V>, id: Nat) : ?K {
+        let state = Migrations.getCurrentVersion(btree);
+        MemoryIdBTree.lookupKey(state, btree_utils, id);
+    };
+
+    public func lookupVal<K, V>(btree: VersionedMemoryIdBTree, btree_utils: BTreeUtils<K, V>, id: Nat) : ?V {
+        let state = Migrations.getCurrentVersion(btree);
+        MemoryIdBTree.lookupVal(state, btree_utils, id);
+    };
+
+    public func reference<K, V>(btree: VersionedMemoryIdBTree, btree_utils: BTreeUtils<K, V>, id: Nat)  {
+        let state = Migrations.getCurrentVersion(btree);
+        MemoryIdBTree.reference(state, btree_utils, id);
+    };
+
+    public func getRefCount<K, V>(btree: VersionedMemoryIdBTree, btree_utils: BTreeUtils<K, V>, id: Nat) : ?Nat {
+        let state = Migrations.getCurrentVersion(btree);
+        MemoryIdBTree.getRefCount(state, btree_utils, id);
+    };
+
 };

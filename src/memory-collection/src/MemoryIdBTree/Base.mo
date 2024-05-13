@@ -45,12 +45,13 @@ module {
     public type BTreeUtils<K, V> = T.BTreeUtils<K, V>;
 
     let CACHE_LIMIT = 50_000;
+    let DEFAULT_ORDER = 32;
 
     public func _new_with_options(order : ?Nat, opt_cache_size: ?Nat, is_set : Bool) : MemoryIdBTree {
         let cache_size = Option.get(opt_cache_size, CACHE_LIMIT);
         let btree_map : MemoryIdBTree = {
             is_set;
-            order = Option.get(order, 32);
+            order = Option.get(order, DEFAULT_ORDER);
             var count = 0;
             var root = 0;
             var branch_count = 0;
@@ -182,7 +183,7 @@ module {
     public func insert<K, V>(btree : MemoryIdBTree, btree_utils : BTreeUtils<K, V>, key : K, value : V) : ?V {
         let key_blob = btree_utils.key.to_blob(key);
 
-        let leaf_address = Methods.get_leaf_address(btree, btree_utils, key, ?key_blob);
+        let leaf_address = Methods.get_leaf_address_and_update_path(btree, btree_utils, key, ?key_blob, inc_subtree_size);
         let count = Leaf.get_count(btree, leaf_address);
 
         let int_index = switch (btree_utils.cmp) {
@@ -203,6 +204,8 @@ module {
             let prev_val_blob = MemoryBlock.get_val_blob(btree, id);
             MemoryBlock.replace_val(btree, id, val_blob);
 
+            Methods.update_leaf_to_root(btree, leaf_address, decrement_subtree_size);
+
             return ?btree_utils.val.from_blob(prev_val_blob);
         };
 
@@ -213,10 +216,10 @@ module {
 
         if (count < btree.order) {
             // Debug.print("found leaf with enough space");
-            Leaf.insert(btree, leaf_address, elem_index, key_val_id);
+            Leaf.insert_with_count(btree, leaf_address, elem_index, key_val_id, count);
             update_count(btree, btree.count + 1);
 
-            Methods.update_leaf_to_root(btree, leaf_address, inc_subtree_size);
+            // Methods.update_leaf_to_root(btree, leaf_address, inc_subtree_size);
             return null;
         };
 
@@ -236,14 +239,9 @@ module {
         // assert Leaf.get_count(btree, left_node_address) == (btree.order / 2) + 1;
         // assert Leaf.get_count(btree, right_node_address) == (btree.order / 2);
 
-
         while (Option.isSome(opt_parent)) {
 
             let ?parent_address = opt_parent else Debug.trap("insert: Failed to get parent address");
-
-            // increment parent subtree size by 1 for the new key-value pair
-            let prev_parent_subtree_size = Branch.get_subtree_size(btree, parent_address);
-            Branch.update_subtree_size(btree, parent_address, prev_parent_subtree_size + 1);
 
             let parent_count = Branch.get_count(btree, parent_address);
             // assert MemoryRegion.loadBlob(btree.metadata, parent_address, Branch.MC.MAGIC_SIZE) == Branch.MC.MAGIC;
@@ -252,13 +250,13 @@ module {
             if (parent_count < btree.order) {
                 // Debug.print("found branch with enough space");
                 // Debug.print("parent before insert: " # debug_show Branch.from_memory(btree, parent_address));
-
+                
                 Branch.insert(btree, parent_address, right_index, median_key_id, right_node_address);
                 update_count(btree, btree.count + 1);
 
                 // Debug.print("parent after insert: " # debug_show Branch.from_memory(btree, parent_address));
 
-                Methods.update_branch_to_root(btree, parent_address, inc_subtree_size);
+                // Methods.update_branch_to_root(btree, parent_address, inc_subtree_size);
                 return null;
             };
 
@@ -276,6 +274,7 @@ module {
 
         };
 
+        // Debug.print("new root");
         // new root
         let new_root = Branch.new(btree);
         update_branch_count(btree, btree.branch_count + 1);
@@ -499,7 +498,7 @@ module {
     public func remove<K, V>(btree : MemoryIdBTree, btree_utils : BTreeUtils<K, V>, key : K) : ?V {
         let key_blob = btree_utils.key.to_blob(key);
 
-        let leaf_address = Methods.get_leaf_address(btree, btree_utils, key, ?key_blob);
+        let leaf_address = Methods.get_leaf_address_and_update_path(btree, btree_utils, key, ?key_blob, decrement_subtree_size);
         let count = Leaf.get_count(btree, leaf_address);
 
         let int_index = switch (btree_utils.cmp) {
@@ -509,7 +508,11 @@ module {
             };
         };
 
-        if (int_index < 0) return null;
+        if (int_index < 0) {
+            // key not found, so revert the path to its original state by incrementing the subtree size
+            Methods.update_leaf_to_root(btree, leaf_address, inc_subtree_size);
+            return null;
+        };
 
         let elem_index = Int.abs(int_index);
         
@@ -524,18 +527,8 @@ module {
         Leaf.remove(btree, leaf_address, elem_index); // remove the deleted key-value pair from the leaf
         update_count(btree, btree.count - 1);
 
-        func end_operation(parent: ?Address) : ?V {
-            switch(parent){
-                case(?parent) Methods.update_branch_to_root(btree, parent, decrement_subtree_size);
-                case(null) {};
-            };
-            return ?prev_val;
-        };
-
-        let ?parent_address = Leaf.get_parent(btree, leaf_address) else return end_operation(null); // if parent is null then leaf_node is the root
+        let ?parent_address = Leaf.get_parent(btree, leaf_address) else return ?prev_val; // if parent is null then leaf_node is the root
         var parent = parent_address;
-        Branch.update_subtree_size(btree, parent, Branch.get_subtree_size(btree, parent) - 1);
-
         // Debug.print("Leaf's parent: " # debug_show Branch.from_memory(btree, parent));
 
         let leaf_index = Leaf.get_index(btree, leaf_address);
@@ -549,7 +542,7 @@ module {
         let min_count = btree.order / 2;
         let leaf_count = Leaf.get_count(btree, leaf_address);
 
-        if (leaf_count >= min_count) return end_operation(?parent);
+        if (leaf_count >= min_count) return ?prev_val;
 
         // redistribute entries from larger neighbour to the current leaf below min_count
         let ?neighbour = Branch.get_larger_neighbour(btree, parent, leaf_index) else Debug.trap("remove: neighbour is null");
@@ -569,7 +562,7 @@ module {
             let ?key_id = Leaf.get_kv_id(btree, right, 0) else Debug.trap("remove: key_block is null");
             Branch.put_key_id(btree, parent, right_index - 1, key_id);
 
-            return end_operation(?parent);
+            return ?prev_val;
         };
         
         // Debug.print("merging leaf");
@@ -604,7 +597,7 @@ module {
                 return ?prev_val;
 
             } else {
-                return end_operation(?parent);
+                return ?prev_val;
             };
         };
 
@@ -612,7 +605,6 @@ module {
         let ?branch_parent = Branch.get_parent(btree, branch) else return set_only_child_to_root(parent);
 
         parent := branch_parent;
-        Branch.update_subtree_size(btree, parent, Branch.get_subtree_size(btree, parent) - 1);
 
         while (Branch.get_count(btree, branch) < min_count) {
             // Debug.print("redistribute branch");
@@ -622,7 +614,7 @@ module {
             if (Branch.redistribute(btree, branch)) {
                 // Debug.print("parent after redistribute: " # debug_show Branch.from_memory(btree, parent));
                 // Debug.print("branch after redistribute: " # debug_show Branch.from_memory(btree, branch));
-                return end_operation(?parent);
+                return ?prev_val;
             };
 
             // Debug.print("branch after redistribute: " # debug_show Branch.from_memory(btree, branch));
@@ -646,14 +638,13 @@ module {
             let ?branch_parent = Branch.get_parent(btree, branch) else return set_only_child_to_root(parent);
             
             parent := branch_parent;
-            Branch.update_subtree_size(btree, parent, Branch.get_subtree_size(btree, parent) - 1);
 
             if (Branch.get_count(btree, parent) == 1) {
                 return set_only_child_to_root(parent);
             }
         };
 
-        return end_operation(?parent);
+        return ?prev_val;
     };
 
     public func removeMin<K, V>(btree : MemoryIdBTree, btree_utils : BTreeUtils<K, V>) : ?(K, V) {

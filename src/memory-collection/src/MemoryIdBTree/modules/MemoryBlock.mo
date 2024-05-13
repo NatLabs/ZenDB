@@ -9,7 +9,7 @@ import MemoryRegion "mo:memory-region/MemoryRegion";
 import LruCache "mo:lru-cache";
 import RevIter "mo:itertools/RevIter";
 
-import Migrations "../Migrations";
+import Migrations "../migrations";
 import T "Types";
 
 module MemoryBlock {
@@ -166,7 +166,7 @@ module MemoryBlock {
         let block_address = get_location_from_id(id);
 
         let val_mb_address = MemoryRegion.loadNat64(btree.blocks, block_address + VAL_MEM_BLOCK_ADDRESS_START) |> Nat64.toNat(_);
-        let val_mb_size = MemoryRegion.loadNat16(btree.blocks, block_address + VAL_MEM_BLOCK_SIZE_START) |> Nat16.toNat(_);
+        let val_mb_size = MemoryRegion.loadNat32(btree.blocks, block_address + VAL_MEM_BLOCK_SIZE_START) |> Nat32.toNat(_);
 
         let blob = MemoryRegion.loadBlob(btree.blobs, val_mb_address, val_mb_size);
 

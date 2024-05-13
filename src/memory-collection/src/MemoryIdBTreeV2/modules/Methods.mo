@@ -20,7 +20,7 @@ import BTreeUtils "../BTreeUtils";
 
 module {
     public type Leaf = Migrations.Leaf;
-    type MemoryIdBTree = Migrations.MemoryIdBTree;
+    type MemoryBTree = Migrations.MemoryBTree;
     type MemoryBlock = T.MemoryBlock;
 
     type Address = Nat;
@@ -32,14 +32,14 @@ module {
 
     public type Branch = Migrations.Branch;
 
-    public func get_leaf_address<K, V>(btree : MemoryIdBTree, btree_utils : BTreeUtils<K, V>, key : K, _opt_key_blob : ?Blob) : Nat {
+    public func get_leaf_address<K, V>(btree : MemoryBTree, btree_utils : BTreeUtils<K, V>, key : K, _opt_key_blob : ?Blob) : Nat {
         var curr_address = btree.root;
         var opt_key_blob : ?Blob = _opt_key_blob;
 
         loop {
             switch (Branch.get_node_type(btree, curr_address)) {
                 case (#leaf) {
-                    // assert Leaf.validate(btree, curr_address);
+                    assert Leaf.validate(btree, curr_address);
                     Leaf.add_to_cache(btree, curr_address);
                     return curr_address;
                 };
@@ -47,13 +47,13 @@ module {
                     // load breanch from stable memory
                     // and add it to the cache
                     Branch.add_to_cache(btree, curr_address);
-                    // assert MemoryRegion.loadBlob(btree.metadata, curr_address, Branch.MC.MAGIC_SIZE) == Branch.MC.MAGIC;
+                    assert MemoryRegion.loadBlob(btree.metadata, curr_address, Branch.MC.MAGIC_SIZE) == Branch.MC.MAGIC;
 
                     let count = Branch.get_count(btree, curr_address);
 
                     let int_index = switch (btree_utils.cmp) {
-                        case (#cmp(cmp)) Branch.binary_search<K, V>(btree, btree_utils, curr_address, cmp, key, count - 1);
-                        case (#blob_cmp(cmp)) {
+                        case (#GenCmp(cmp)) Branch.binary_search<K, V>(btree, btree_utils, curr_address, cmp, key, count - 1);
+                        case (#BlobCmp(cmp)) {
 
                             let key_blob = switch (opt_key_blob) {
                                 case (null) {
@@ -76,7 +76,52 @@ module {
         };
     };
 
-    public func get_min_leaf_address(btree : MemoryIdBTree) : Nat {
+    public func get_leaf_address_and_update_path<K, V>(btree : MemoryBTree, btree_utils : BTreeUtils<K, V>, key : K, _opt_key_blob : ?Blob, update : (MemoryBTree, Nat, Nat) -> ()) : Nat {
+        var curr_address = btree.root;
+        var opt_key_blob : ?Blob = _opt_key_blob;
+
+        loop {
+            switch (Branch.get_node_type(btree, curr_address)) {
+                case (#leaf) {
+                    assert Leaf.validate(btree, curr_address);
+                    Leaf.add_to_cache(btree, curr_address);
+                    return curr_address;
+                };
+                case (#branch) {
+                    // load breanch from stable memory
+                    // and add it to the cache
+                    Branch.add_to_cache(btree, curr_address);
+                    assert MemoryRegion.loadBlob(btree.metadata, curr_address, Branch.MC.MAGIC_SIZE) == Branch.MC.MAGIC;
+
+                    let count = Branch.get_count(btree, curr_address);
+
+                    let int_index = switch (btree_utils.cmp) {
+                        case (#GenCmp(cmp)) Branch.binary_search<K, V>(btree, btree_utils, curr_address, cmp, key, count - 1);
+                        case (#BlobCmp(cmp)) {
+
+                            let key_blob = switch (opt_key_blob) {
+                                case (null) {
+                                    let key_blob = btree_utils.key.to_blob(key);
+                                    opt_key_blob := ?key_blob;
+                                    key_blob;
+                                };
+                                case (?key_blob) key_blob;
+                            };
+
+                            Branch.binary_search_blob_seq(btree, curr_address, cmp, key_blob, count - 1);
+                        };
+                    };
+
+                    let child_index = if (int_index >= 0) Int.abs(int_index) + 1 else Int.abs(int_index + 1);
+                    let ?child_address = Branch.get_child(btree, curr_address, child_index) else Debug.trap("get_leaf_node: accessed a null value");
+                    update(btree, curr_address, child_index);
+                    curr_address := child_address;
+                };
+            };
+        };
+    };
+
+    public func get_min_leaf_address(btree : MemoryBTree) : Nat {
         var curr = btree.root;
 
         loop {
@@ -90,7 +135,7 @@ module {
         };
     };
 
-    public func get_max_leaf_address(btree : MemoryIdBTree) : Nat {
+    public func get_max_leaf_address(btree : MemoryBTree) : Nat {
         var curr = btree.root;
 
         loop {
@@ -105,7 +150,7 @@ module {
         };
     };
 
-    public func update_leaf_to_root(btree : MemoryIdBTree, leaf_address : Nat, update : (MemoryIdBTree, Nat, Nat) -> ()) {
+    public func update_leaf_to_root(btree : MemoryBTree, leaf_address : Nat, update : (MemoryBTree, Nat, Nat) -> ()) {
         var parent = Leaf.get_parent(btree, leaf_address);
         var child_index = Leaf.get_index(btree, leaf_address);
 
@@ -122,7 +167,7 @@ module {
         };
     };
 
-    public func update_branch_to_root(btree : MemoryIdBTree, branch_address : Nat, update : (MemoryIdBTree, Nat, Nat) -> ()) {
+    public func update_branch_to_root(btree : MemoryBTree, branch_address : Nat, update : (MemoryBTree, Nat, Nat) -> ()) {
         var parent = Branch.get_parent(btree, branch_address);
         var child_index = Branch.get_index(btree, branch_address);
 
@@ -140,7 +185,7 @@ module {
     };
 
     // Returns the leaf node and rank of the first element in the leaf node
-    public func get_leaf_node_and_index<K, V>(btree : MemoryIdBTree, btree_utils : BTreeUtils<K, V>, key : Blob) : (Address, Nat) {
+    public func get_leaf_node_and_index<K, V>(btree : MemoryBTree, btree_utils : BTreeUtils<K, V>, key : Blob) : (Address, Nat) {
         let node_type = Branch.get_node_type(btree, btree.root);
 
         let branch = switch (node_type) {
@@ -163,7 +208,7 @@ module {
                         
                         // Debug.print("branch child: " # debug_show child);
                         switch(btree_utils.cmp) {
-                            case (#cmp(cmp)) {
+                            case (#GenCmp(cmp)) {
                                 let ds_key = btree_utils.key.from_blob(key);
                                 let ds_search_key = btree_utils.key.from_blob(search_key);
                                 // Debug.print("(key, search_key, res) -> " # debug_show (key, search_key, cmp(ds_key, ds_search_key)));
@@ -172,7 +217,7 @@ module {
                                     return get_node(child, key);
                                 };
                             };
-                            case (#blob_cmp(cmp)) {
+                            case (#BlobCmp(cmp)) {
                                 // Debug.print("(key, search_key, res) -> " # debug_show (key, search_key, cmp(key, search_key)));
                                 if (cmp(key, search_key) >= 0) {
                                     return get_node(child, key);
@@ -188,7 +233,7 @@ module {
                         rank -= Leaf.get_count(btree, child);
 
                         switch(btree_utils.cmp) {
-                            case (#cmp(cmp)) {
+                            case (#GenCmp(cmp)) {
                                 let ds_key = btree_utils.key.from_blob(key);
                                 let ds_search_key = btree_utils.key.from_blob(search_key);
                                 // Debug.print("(key, search_key, res) -> " # debug_show (key, search_key, cmp(ds_key, ds_search_key)));
@@ -196,7 +241,7 @@ module {
                                     return child;
                                 };
                             };
-                            case (#blob_cmp(cmp)) {
+                            case (#BlobCmp(cmp)) {
                                 // Debug.print("(key, search_key, res) -> " # debug_show (key, search_key, cmp(key, search_key)));
                                 if (cmp(key, search_key) >= 0) {
                                     return child;
@@ -227,7 +272,7 @@ module {
         (get_node(branch, key), rank);
     };
 
-    public func get_leaf_node_by_index<K, V>(btree : MemoryIdBTree, rank : Nat) : (Address, Nat) {
+    public func get_leaf_node_by_index<K, V>(btree : MemoryBTree, rank : Nat) : (Address, Nat) {
         let root = switch (Branch.get_node_type(btree, btree.root)) {
             case (#branch) btree.root;
             case (#leaf(_)) return (btree.root, rank);
@@ -276,7 +321,7 @@ module {
 
 
     public func new_blobs_iterator(
-        btree : MemoryIdBTree,
+        btree : MemoryBTree,
         start_leaf : Nat,
         start_index : Nat,
         end_leaf : Nat,
@@ -347,7 +392,7 @@ module {
         RevIter.new(next, nextFromEnd);
     };
 
-    public func key_val_blobs(btree : MemoryIdBTree) : RevIter<(Blob, Blob)> {
+    public func key_val_blobs(btree : MemoryBTree) : RevIter<(Blob, Blob)> {
         let min_leaf = get_min_leaf_address(btree);
         let max_leaf = get_max_leaf_address(btree);
         let max_leaf_count = Leaf.get_count(btree, max_leaf);
@@ -361,7 +406,7 @@ module {
         (key, value);
     };
 
-    public func entries<K, V>(btree : MemoryIdBTree, btree_utils : BTreeUtils<K, V>) : RevIter<(K, V)> {
+    public func entries<K, V>(btree : MemoryBTree, btree_utils : BTreeUtils<K, V>) : RevIter<(K, V)> {
         RevIter.map<(Blob, Blob), (K, V)>(
             key_val_blobs(btree),
             func((key_blob, val_blob) : (Blob, Blob)) : (K, V) {
@@ -370,7 +415,7 @@ module {
         );
     };
 
-    public func keys<K, V>(btree : MemoryIdBTree, btree_utils : BTreeUtils<K, V>) : RevIter<(K)> {
+    public func keys<K, V>(btree : MemoryBTree, btree_utils : BTreeUtils<K, V>) : RevIter<(K)> {
         RevIter.map<(Blob, Blob), (K)>(
             key_val_blobs(btree),
             func((key_blob, _) : (Blob, Blob)) : (K) {
@@ -380,7 +425,7 @@ module {
         );
     };
 
-    public func vals<K, V>(btree : MemoryIdBTree, btree_utils : BTreeUtils<K, V>) : RevIter<(V)> {
+    public func vals<K, V>(btree : MemoryBTree, btree_utils : BTreeUtils<K, V>) : RevIter<(V)> {
         RevIter.map<(Blob, Blob), V>(
             key_val_blobs(btree),
             func((_, val_blob) : (Blob, Blob)) : V {
@@ -391,7 +436,7 @@ module {
     };
 
     public func new_leaf_address_iterator(
-        btree : MemoryIdBTree,
+        btree : MemoryBTree,
         start_leaf : Nat,
         end_leaf : Nat,
     ) : RevIter<Nat> {
@@ -434,14 +479,14 @@ module {
         RevIter.new(next, nextFromEnd);
     };
 
-    public func leaf_addresses(btree : MemoryIdBTree) : RevIter<Nat> {
+    public func leaf_addresses(btree : MemoryBTree) : RevIter<Nat> {
         let min_leaf = get_min_leaf_address(btree);
         let max_leaf = get_max_leaf_address(btree);
 
         new_leaf_address_iterator(btree, min_leaf, max_leaf);
     };
 
-    public func leaf_nodes<K, V>(btree : MemoryIdBTree, btree_utils : BTreeUtils<K, V>) : RevIter<[?(K, V)]> {
+    public func leaf_nodes<K, V>(btree : MemoryBTree, btree_utils : BTreeUtils<K, V>) : RevIter<[?(K, V)]> {
         let min_leaf = get_min_leaf_address(btree);
         let max_leaf = get_max_leaf_address(btree);
 
@@ -464,7 +509,7 @@ module {
         );
     };
 
-    public func node_keys<K, V>(btree : MemoryIdBTree, btree_utils : BTreeUtils<K, V>) : [[(Nat, [?K])]] {
+    public func node_keys<K, V>(btree : MemoryBTree, btree_utils : BTreeUtils<K, V>) : [[(Nat, [?K])]] {
         var nodes = BufferDeque.fromArray<Address>([btree.root]);
         var buffer = Buffer.Buffer<[(Nat, [?K])]>(btree.branch_count);
 
@@ -509,7 +554,7 @@ module {
         Buffer.toArray(buffer);
     };
 
-    public func validate_memory(btree : MemoryIdBTree, btree_utils : BTreeUtils<Nat, Nat >) : Bool {
+    public func validate_memory(btree : MemoryBTree, btree_utils : BTreeUtils<Nat, Nat >) : Bool {
         // LruCache.clear(btree.nodes_cache);
 
         func _validate(address : Nat) : (index : Nat, subtree_size : Nat) {
@@ -543,7 +588,7 @@ module {
                             case (null) {};
                             case (?prev) {
                                 switch (btree_utils.cmp) {
-                                    case (#cmp(cmp)) {
+                                    case (#GenCmp(cmp)) {
                                         let _prev = btree_utils.key.from_blob(prev);
                                         let _key = btree_utils.key.from_blob(key);
                                         // Debug.print("l (prev, key): " # debug_show (_prev, _key));
@@ -557,7 +602,7 @@ module {
                                             assert false;
                                         };
                                     };
-                                    case (#blob_cmp(cmp)) {
+                                    case (#BlobCmp(cmp)) {
                                         if (cmp(prev, key) != -1) {
                                             Debug.print("key mismatch at index: " # debug_show i);
                                             Debug.print("prev: " # debug_show prev);
@@ -606,7 +651,7 @@ module {
                                 case (null) {};
                                 case (?prev) {
                                     switch (btree_utils.cmp) {
-                                        case (#cmp(cmp)) {
+                                        case (#GenCmp(cmp)) {
                                             let _prev = btree_utils.key.from_blob(prev);
                                             let _key = btree_utils.key.from_blob(key);
                                             // Debug.print("b (prev, key): " # debug_show (_prev, _key));
@@ -618,7 +663,7 @@ module {
                                                 assert false;
                                             };
                                         };
-                                        case (#blob_cmp(cmp)) {
+                                        case (#BlobCmp(cmp)) {
                                             if (cmp(prev, key) != -1) {
                                                 Debug.print("key mismatch at index: " # debug_show i);
                                                 Debug.print("prev: " # debug_show prev);
