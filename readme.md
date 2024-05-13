@@ -22,8 +22,8 @@ A single canister document database currently in development.
 - [ ] Transactions
   - [ ] Single document transactions
   - [ ] Document versioning
-- [] Backup and Restore
-  - [] Copy on Write Snapshots
-  - [] External canister Backup and Restore
-  - [] Consistent incremental backups
+- [ ] Backup and Restore
+  - [ ] Copy on Write Snapshots
+  - [ ] External canister Backups
+  - [ ] Consistent incremental backups
 - [ ] Garbage collection of regions from deleted collections
