@@ -1,19 +1,16 @@
 [dependencies]
-base = "0.10.2"
+base = "0.12.1"
 map = "9.0.1"
-serde = "2.2.0"
+serde = "3.1.0"
 itertools = "0.2.1"
+memory-collection = "0.0.2"
+bit-map = "0.1.0"
 
 [dev-dependencies]
-test = "1.0.1"
+test = "2.0.0"
 bench = "1.0.0"
-fuzz = "0.1.0"
-base = "0.11.1"
-itertools = "0.2.1"
-memory-region = "1.1.1"
-lru-cache = "1.0.0"
-buffer-deque = "0.1.0"
+fuzz = "0.2.1"
 
 [toolchain]
 wasmtime = "14.0.4"
-moc = "0.11.1"
+moc = "0.12.1"

@@ -22,23 +22,25 @@ module {
         bench.cols(["HydraDB"]);
         bench.rows([
             "put() no index",
-            "update()",
+            "updateById() 1",
             "create_index()",
             "clear collection data",
             "put() with 1 index",
-            "update()",
+            "updateById() 2",
             "create 2nd index",
             "clear collection data",
             "put() with 2 indexes",
-            "update()",
+            "updateById() 3",
             "create 3rd index",
             "clear collection data",
-            "update()",
             "put() with 3 indexes",
-            // "find(): users named 'nam-do-dan'",
-            // "find(): users between the age of 20 and 35",
-            // "find(): users between the age of 20 and 35 and named 'nam-do-dan'",
-            // "find(): users between the age of 20 and 35 and named 'nam-do-dan' v2",
+            "updateById() 4",
+            "get()",
+            "scan(): all records",
+            "find(): users named 'nam-do-dan'",
+            "find(): users between the age of 20 and 35",
+            "find(): users between the age of 20 and 35 and named 'nam-do-dan'",
+            "find(): users between the age of 20 and 35 and named 'nam-do-dan' v2",
         ]);
 
         type Candid = Candid.Candid;
@@ -47,7 +49,6 @@ module {
         let { QueryBuilder } = HydraDB;
 
         let hydra_db = HydraDB.new();
-
 
         let limit = 1_000;
 
@@ -67,6 +68,7 @@ module {
         type StoreItem = {
             name : Text;
             store : Text;
+            months_in_stock : Nat;
             customer_reviews : [CustomerReview];
             available_sizes : AvailableSizes;
             color_options : [ColorOption];
@@ -90,6 +92,7 @@ module {
         let item_schema : HydraDB.Schema = #Record([
             ("name", #Text),
             ("store", #Text),
+            ("months_in_stock", #Nat),
             ("customer_reviews", #Array(#Record([("username", #Text), ("rating", #Nat), ("comment", #Text)]))),
             ("available_sizes", #Variant([("xs", #Null), ("s", #Null), ("m", #Null), ("l", #Null), ("xl", #Null)])),
             ("color_options", #Array(#Record([("name", #Text), ("hex", #Text)]))),
@@ -97,7 +100,7 @@ module {
             ("in_stock", #Bool),
             (
                 "address",
-                #Quadruple(
+                HydraDB.Schema.Quadruple(
                     #Text, // street
                     #Text, // city
                     #Text, // state
@@ -114,15 +117,16 @@ module {
         let stores = ["h&m", "zara", "gap", "old navy", "forever 21", "uniqlo", "urban outfitters", "american eagle", "aeropostale", "abercrombie & fitch", "hollister", "express"];
         let email_terminator = ["gmail.com", "yahoo.com", "outlook.com"];
 
-        let cs_starter_kid = ["black hoodie", "M1 macbook", "white hoodie", "air forces", "Algorithms textbook", "c the hard way", "Udemy subscription", "Nvidea RTX"];
+        let cs_starter_kit = ["black hoodie", "M1 macbook", "white hoodie", "air forces", "Algorithms textbook", "c the hard way", "Udemy subscription", "Nvidea RTX"];
 
         let available_sizes = [#xs, #s, #m, #l, #xl];
 
         func new_item() : StoreItem {
             let store_name = fuzz.array.randomEntry(stores).1;
             let store_item = {
-                name = fuzz.array.randomEntry(cs_starter_kid).1;
+                name = fuzz.array.randomEntry(cs_starter_kit).1;
                 store = store_name;
+                months_in_stock = fuzz.nat.randomRange(1, 12);
                 customer_reviews = [
                     {
                         username = "user1";
@@ -207,38 +211,54 @@ module {
                         let #ok(_) = HydraDB.put<StoreItem>(hydra_db, "store_items", candify_store_item, item);
                     };
                 };
-                case ("HydraDB", "update()") {
+                case ("HydraDB", "updateById() 1" or "updateById() 2" or "updateById() 3" or "updateById() 4") {
                     for (i in Itertools.range(0, limit)) {
 
-                        let #ok(_) = HydraDB.update<StoreItem>(hydra_db, "store_items", candify_store_item, i, func(prev : StoreItem) : StoreItem { 
-                            { prev with price = prev.price + 1 } 
-                        });
+                        let #ok(_) = HydraDB.updateById<StoreItem>(
+                            hydra_db,
+                            "store_items",
+                            candify_store_item,
+                            i,
+                            func(prev : StoreItem) : StoreItem {
+                                { prev with price = prev.price + 1 };
+                            },
+                        );
                     };
                 };
-                // case ("HydraDB", "find(): users named 'nam-do-dan'") {
-                //     let _query = QueryBuilder()._where("name", #eq(#Text("nam-do-san")));
-                //     let result = HydraDB.find<StoreItem>(hydra_db, "store_items", candify_store_item, _query);
-                //     Debug.print(debug_show Iter.toArray(result));
-                // };
-                // case ("HydraDB", "find(): users between the age of 20 and 35") {
-                //     let _query = QueryBuilder()._where("age", #gte(#Nat(20)))._and("age", #lte(#Nat(35)));
+                case ("HydraDB", "get()") {
+                    for (i in Itertools.range(0, limit)) {
+                        let #ok(item) = HydraDB.get<StoreItem>(hydra_db, "store_items", candify_store_item, i);
+                    };
+                };
+                case ("HydraDB", "scan(): all records") {
+                    let result = HydraDB.scan<StoreItem>(hydra_db, "store_items", candify_store_item, [], []);
+                    Debug.print("results: " # debug_show (Iter.toArray(result)));
+                };
 
-                //     let result = HydraDB.find<StoreItem>(hydra_db, "store_items", candify_store_item, _query);
-                //     Debug.print(debug_show Iter.toArray(result));
-                // };
-                // case ("HydraDB", "find(): users between the age of 20 and 35 and named 'nam-do-dan'") {
-                //     let _query = QueryBuilder()._where("name", #eq(#Text("nam-do-san")))._and("age", #gte(#Nat(20)))._and("age", #lte(#Nat(35)));
+                case ("HydraDB", "find(): users named 'nam-do-dan'") {
+                    let _query = QueryBuilder()._where("name", #eq(#Text("nam-do-san")));
+                    let result = HydraDB.find<StoreItem>(hydra_db, "store_items", candify_store_item, _query);
+                    Debug.print("results: " # debug_show (Iter.toArray(result)));
+                };
+                case ("HydraDB", "find(): users between the age of 20 and 35") {
+                    let _query = QueryBuilder()._where("age", #gte(#Nat(20)))._and("age", #lte(#Nat(35)));
 
-                //     let result = HydraDB.find<StoreItem>(hydra_db, "store_items", candify_store_item, _query);
-                //     Debug.print(debug_show Iter.toArray(result));
-                // };
+                    let result = HydraDB.find<StoreItem>(hydra_db, "store_items", candify_store_item, _query);
+                    Debug.print("results: " # debug_show (Iter.toArray(result)));
+                };
+                case ("HydraDB", "find(): users between the age of 20 and 35 and named 'nam-do-dan'") {
+                    let _query = QueryBuilder()._where("name", #eq(#Text("nam-do-san")))._and("age", #gte(#Nat(20)))._and("age", #lte(#Nat(35)));
 
-                // case ("HydraDB", "find(): users between the age of 20 and 35 and named 'nam-do-dan' v2") {
-                //     let _query = QueryBuilder()._where("email", #eq(#Text("email")))._where("age", #gte(#Nat(20)))._and("age", #lte(#Nat(35)))._and("name", #eq(#Text("nam-do-san")));
+                    let result = HydraDB.find<StoreItem>(hydra_db, "store_items", candify_store_item, _query);
+                    Debug.print("results: " # debug_show (Iter.toArray(result)));
+                };
 
-                //     let result = HydraDB.find<StoreItem>(hydra_db, "store_items", candify_store_item, _query);
-                //     Debug.print(debug_show Iter.toArray(result));
-                // };
+                case ("HydraDB", "find(): users between the age of 20 and 35 and named 'nam-do-dan' v2") {
+                    let _query = QueryBuilder()._where("email", #eq(#Text("email")))._where("age", #gte(#Nat(20)))._and("age", #lte(#Nat(35)))._and("name", #eq(#Text("nam-do-san")));
+
+                    let result = HydraDB.find<StoreItem>(hydra_db, "store_items", candify_store_item, _query);
+                    Debug.print("results: " # debug_show (Iter.toArray(result)));
+                };
 
                 case (_) {
                     Debug.trap("Should be unreachable:\n row = \"" # debug_show row # "\" and col = \"" # debug_show col # "\"");
