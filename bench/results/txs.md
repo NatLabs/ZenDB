@@ -44,36 +44,36 @@ Heap
 | 250 < tx.amt <= 400                             |                      -26_513_832 |               6_167_760 |
 | btype == 1burn and tx.amt >= 750                |                        1_317_780 |               6_152_704 |
 
-#### Pointer Mapping to contiguous range
+#### Introduced `Orchid` to order candid without deserializing in each index
 
 Instructions
 
 |                                                 | zenDB (using index intersection) | zenDB (using full scan) |
 | :---------------------------------------------- | -------------------------------: | ----------------------: |
-| insert                                          |                      422_536_900 |                   2_607 |
-| clear                                           |                           70_377 |                   2_793 |
-| insert with 5 indexes pt.1                      |                    6_170_699_688 |                   3_629 |
-| btype == '1mint'                                |                       13_285_458 |              22_882_509 |
-| btype == '1xfer' or '2xfer'                     |                       29_252_049 |              23_309_323 |
-| principals[0] == tx.to.owner (is recipient)     |                        2_831_166 |              22_688_047 |
-| principals[0..10] == tx.to.owner (is recipient) |                       32_781_326 |              23_574_600 |
-| all txs involving principals[0]                 |                       10_655_333 |              22_843_123 |
-| all txs involving principals[0..10]             |                      102_847_644 |              24_292_787 |
-| 250 < tx.amt <= 400                             |                        9_790_640 |              22_719_930 |
-| btype == 1burn and tx.amt >= 750                |                        4_880_917 |              22_771_904 |
+| insert                                          |                    4_270_673_592 |                   2_607 |
+| clear                                           |                           70_353 |                   2_793 |
+| insert with 5 indexes pt.1                      |                   11_903_341_164 |                   3_629 |
+| btype == '1mint'                                |                       53_425_921 |             228_879_850 |
+| btype == '1xfer' or '2xfer'                     |                      114_472_569 |             233_134_950 |
+| principals[0] == tx.to.owner (is recipient)     |                        3_655_573 |             226_885_225 |
+| principals[0..10] == tx.to.owner (is recipient) |                       36_994_729 |             235_882_893 |
+| all txs involving principals[0]                 |                       11_091_473 |             228_368_504 |
+| all txs involving principals[0..10]             |                      107_673_361 |             243_027_680 |
+| 250 < tx.amt <= 400                             |                      121_804_255 |             226_921_974 |
+| btype == 1burn and tx.amt >= 750                |                        2_214_673 |             227_566_420 |
 
 Heap
 
 |                                                 | zenDB (using index intersection) | zenDB (using full scan) |
 | :---------------------------------------------- | -------------------------------: | ----------------------: |
-| insert                                          |                       20_176_904 |                   8_884 |
-| clear                                           |                           16_412 |                   8_884 |
-| insert with 5 indexes pt.1                      |                      -16_143_328 |                   8_884 |
-| btype == '1mint'                                |                          386_032 |                 629_988 |
-| btype == '1xfer' or '2xfer'                     |                          872_392 |                 634_108 |
-| principals[0] == tx.to.owner (is recipient)     |                          166_584 |                 638_832 |
-| principals[0..10] == tx.to.owner (is recipient) |                        1_778_560 |                 641_148 |
-| all txs involving principals[0]                 |                          606_420 |                 646_932 |
-| all txs involving principals[0..10]             |                        5_843_020 |                 650_288 |
-| 250 < tx.amt <= 400                             |                          302_144 |                 629_800 |
-| btype == 1burn and tx.amt >= 750                |                          195_952 |                 627_680 |
+| insert                                          |                        1_186_560 |                   8_928 |
+| clear                                           |                           16_456 |                   8_928 |
+| insert with 5 indexes pt.1                      |                       10_892_644 |                   8_968 |
+| btype == '1mint'                                |                        1_532_452 |               6_219_316 |
+| btype == '1xfer' or '2xfer'                     |                        3_497_900 |             -25_156_332 |
+| principals[0] == tx.to.owner (is recipient)     |                          129_724 |               6_306_712 |
+| principals[0..10] == tx.to.owner (is recipient) |                        1_194_256 |               6_328_944 |
+| all txs involving principals[0]                 |                          363_268 |               6_385_696 |
+| all txs involving principals[0..10]             |                      -25_730_180 |               6_419_504 |
+| 250 < tx.amt <= 400                             |                        3_595_032 |               6_207_604 |
+| btype == 1burn and tx.amt >= 750                |                           73_052 |               6_192_628 |

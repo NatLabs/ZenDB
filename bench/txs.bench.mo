@@ -152,10 +152,7 @@ module {
         bench.rows([
             "insert",
             "clear",
-            "insert with 5 indexes pt.1",
-            // "insert with 5 indexes pt.2",
-            // "insert with 5 indexes pt.3",
-            // "insert with 5 indexes pt.4",
+            "insert with 5 indexes",
             "btype == '1mint'",
             "btype == '1xfer' or '2xfer'",
             "principals[0] == tx.to.owner (is recipient)",
@@ -166,7 +163,7 @@ module {
             "btype == 1burn and tx.amt >= 750",
         ]);
 
-        let limit = 1_000;
+        let limit = 10_000;
         let fuzz = Fuzz.fromSeed(0x7eadbeef);
 
         let db_sstore = HydraDB.newStableStore();
@@ -232,21 +229,10 @@ module {
                 // re-use the predefined txs
             };
 
-            case ("insert with 5 indexes pt.1") {
+            case ("insert with 5 indexes") {
                 // re-use the predefined txs
             };
 
-            case ("insert with 5 indexes pt.2") {
-                // re-use the predefined txs
-            };
-
-            case ("insert with 5 indexes pt.3") {
-                // re-use the predefined txs
-            };
-
-            case ("insert with 5 indexes pt.4") {
-                // re-use the predefined txs
-            };
             case ("btype == '1mint'") {
                 let db_query = HydraDB.QueryBuilder().Where(
                     "btype",
@@ -333,11 +319,11 @@ module {
 
             case ("btype == 1burn and tx.amt >= 750") {
                 let db_query = HydraDB.QueryBuilder().Where(
-                    "btype",
-                    #eq(#Text("1burn")),
-                ).And(
                     "tx.amt",
                     #gte(#Nat(750)),
+                ).And(
+                    "btype",
+                    #eq(#Text("1burn")),
                 );
 
                 let #ok(matching_txs) = txs.find(db_query);
@@ -364,38 +350,16 @@ module {
                 txs.clear();
             };
 
-            case ("insert with 5 indexes pt.1") {
+            case ("insert with 5 indexes") {
                 let #ok(_) = txs.create_index(["btype", "tx.amt"]);
                 let #ok(_) = txs.create_index(["tx.amt"]);
+                let #ok(_) = txs.create_index(["btype", "ts"]);
+                let #ok(_) = txs.create_index(["ts"]);
                 let #ok(_) = txs.create_index(["tx.from.owner", "tx.from.sub_account"]);
                 let #ok(_) = txs.create_index(["tx.to.owner", "tx.to.sub_account"]);
                 let #ok(_) = txs.create_index(["tx.spender.owner", "tx.spender.sub_account"]);
 
-                for (i in Iter.range(0, Nat.min(2499, limit - 1))) {
-                    let tx = predefined_txs.get(i);
-                    let #ok(_) = txs.insert(tx);
-                };
-            };
-
-            case ("insert with 5 indexes pt.2") {
-
-                for (i in Iter.range(2500, 4999)) {
-                    let tx = predefined_txs.get(i);
-                    let #ok(_) = txs.insert(tx);
-                };
-            };
-
-            case ("insert with 5 indexes pt.3") {
-
-                for (i in Iter.range(5000, 7499)) {
-                    let tx = predefined_txs.get(i);
-                    let #ok(_) = txs.insert(tx);
-                };
-            };
-
-            case ("insert with 5 indexes pt.4") {
-
-                for (i in Iter.range(7500, limit - 1)) {
+                for (i in Iter.range(0, limit - 1)) {
                     let tx = predefined_txs.get(i);
                     let #ok(_) = txs.insert(tx);
                 };
@@ -519,19 +483,7 @@ module {
                 // re-use the predefined txs
             };
 
-            case ("insert with 5 indexes pt.1") {
-                // re-use the predefined txs
-            };
-
-            case ("insert with 5 indexes pt.2") {
-                // re-use the predefined txs
-            };
-
-            case ("insert with 5 indexes pt.3") {
-                // re-use the predefined txs
-            };
-
-            case ("insert with 5 indexes pt.4") {
+            case ("insert with 5 indexes") {
                 // re-use the predefined txs
             };
 

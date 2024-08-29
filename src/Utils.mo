@@ -109,4 +109,56 @@ module {
 
     };
 
+    public class ReusableBuffer<A>(init_capacity : Nat) {
+        var elems : [var ?A] = Array.init(init_capacity, null);
+        var count : Nat = 0;
+
+        public func size() : Nat = count;
+
+        public func add(elem : A) {
+            if (count == elems.size()) {
+                elems := Array.tabulateVar(
+                    elems.size() * 2,
+                    func(i : Nat) : ?A {
+                        if (i < count) {
+                            elems[i];
+                        } else {
+                            null;
+                        };
+                    },
+                );
+            };
+
+            elems[count] := ?elem;
+            count += 1;
+        };
+
+        public func clear() {
+            count := 0;
+        };
+
+        public func get(i : Nat) : A {
+            switch (elems[i]) {
+                case (?elem) elem;
+                case (null) Debug.trap "Index out of bounds";
+            };
+        };
+
+        public func vals() : Iter.Iter<A> {
+            var i = 0;
+
+            object {
+                public func next() : ?A {
+                    if (i < count) {
+                        let res = elems[i];
+                        i += 1;
+                        res;
+                    } else {
+                        null;
+                    };
+                };
+            };
+        };
+    };
+
 };

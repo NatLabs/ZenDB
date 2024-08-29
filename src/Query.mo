@@ -1,31 +1,12 @@
-import Principal "mo:base/Principal";
 import Array "mo:base/Array";
-import Debug "mo:base/Debug";
+
 import Text "mo:base/Text";
-import Char "mo:base/Char";
-import Nat32 "mo:base/Nat32";
-import Result "mo:base/Result";
-import Order "mo:base/Order";
-import Iter "mo:base/Iter";
+
 import Buffer "mo:base/Buffer";
 import Nat "mo:base/Nat";
-import Option "mo:base/Option";
-import Hash "mo:base/Hash";
-import Float "mo:base/Float";
-import Int "mo:base/Int";
 
 import Map "mo:map/Map";
 import Set "mo:map/Set";
-import Serde "mo:serde";
-import Decoder "mo:serde/Candid/Blob/Decoder";
-import Candid "mo:serde/Candid";
-import Itertools "mo:itertools/Iter";
-import RevIter "mo:itertools/RevIter";
-import Tag "mo:candid/Tag";
-
-import MemoryBTree "mo:memory-collection/MemoryBTree/Stable";
-import TypeUtils "mo:memory-collection/TypeUtils";
-import Int8Cmp "mo:memory-collection/TypeUtils/Int8Cmp";
 
 import T "Types";
 
@@ -36,11 +17,34 @@ module {
     public type Operator = T.Operator;
     let { thash; bhash } = Map;
 
+    type StableQuery = {
+        query_search : T.HydraQueryLang;
+        pagination : {
+            cursor : ?(Cursor, PaginationDirection, Nat);
+            limit : ?Nat;
+            skip : ?Nat;
+        };
+        sort_by : ?(Text, T.SortDirection);
+    };
+
+    type Cursor = T.WrapId<T.Candid>;
+
+    type PaginationDirection = {
+        #Forward;
+        #Backward;
+    };
+
     public class QueryBuilder() = self {
 
         var _query : HydraQueryLang = #Operation("dummy_node", #eq(#Null));
         var is_and : Bool = true;
         var buffer = Buffer.Buffer<HydraQueryLang>(8);
+        var pagination_cursor : ?Cursor = null;
+        var pagination_limit : ?Nat = null;
+        var pagination_skip : ?Nat = null; // skip from beginning of the query
+        var _cursor_offset = 0;
+        var _direction : PaginationDirection = #Forward;
+        var sort_by : ?(Text, T.SortDirection) = null; // only support sorting by one field for now
 
         public func Where(key : Text, op : HqlOperators) : QueryBuilder {
             return And(key, op);
@@ -222,10 +226,50 @@ module {
         //     self;
         // };
 
-        public func build() : HydraQueryLang {
+        public func Sort(key : Text, direction : T.SortDirection) : QueryBuilder {
+            sort_by := ?(key, direction);
+            self;
+        };
+
+        public func Pagination(cursor : ?Cursor, limit : Nat) : QueryBuilder {
+            pagination_cursor := cursor;
+            pagination_limit := ?limit;
+            self;
+        };
+
+        public func Cursor(cursor : ?Cursor, direction : PaginationDirection, cursor_offset : Nat) : QueryBuilder {
+            pagination_cursor := cursor;
+            _cursor_offset := cursor_offset;
+            _direction := direction;
+            self;
+        };
+
+        public func Limit(limit : Nat) : QueryBuilder {
+            pagination_limit := ?limit;
+            self;
+        };
+
+        public func Skip(skip : Nat) : QueryBuilder {
+            pagination_skip := ?skip;
+            self;
+        };
+
+        public func build() : StableQuery {
             update_query(true); // input params is no longer relevant
             // Debug.print("Query: " # debug_show _query);
-            _query;
+
+            {
+                query_search = _query;
+                sort_by;
+                pagination = {
+                    cursor = switch (pagination_cursor) {
+                        case (?cursor) ?(cursor, _direction, _cursor_offset);
+                        case (_) null;
+                    };
+                    limit = pagination_limit;
+                    skip = pagination_skip;
+                };
+            };
         };
 
     };

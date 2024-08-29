@@ -13,11 +13,11 @@ import Bench "mo:bench";
 import Fuzz "mo:fuzz";
 import Candid "mo:serde/Candid";
 import Itertools "mo:itertools/Iter";
-import HydraDB "../src";
+import ZenDB "../src";
 import TestUtils "TestUtils";
 
 let fuzz = Fuzz.fromSeed(0x7eadbeef);
-let { QueryBuilder } = HydraDB;
+let { QueryBuilder } = ZenDB;
 
 type Account = {
     owner : Principal;
@@ -43,7 +43,7 @@ let AccountSchema = #Record([
     ("sub_account", #Option(#Blob)),
 ]);
 
-let TxSchema : HydraDB.Schema = #Record([
+let TxSchema : ZenDB.Schema = #Record([
     ("btype", #Text),
     ("phash", #Blob),
     ("ts", #Nat),
@@ -62,12 +62,14 @@ let candify_tx = {
     to_blob = func(c : Tx) : Blob { to_candid (c) };
 };
 
-let db_sstore = HydraDB.newStableStore();
-let db = HydraDB.launch(db_sstore);
+let db_sstore = ZenDB.newStableStore();
+let db = ZenDB.launch(db_sstore);
 
 let #ok(txs) = db.create_collection<Tx>("transactions", TxSchema, candify_tx);
 let #ok(_) = txs.create_index(["btype", "tx.amt"]);
+let #ok(_) = txs.create_index(["btype", "ts"]);
 let #ok(_) = txs.create_index(["tx.amt"]);
+let #ok(_) = txs.create_index(["ts"]);
 let #ok(_) = txs.create_index(["tx.from.owner", "tx.from.sub_account"]);
 let #ok(_) = txs.create_index(["tx.to.owner", "tx.to.sub_account"]);
 let #ok(_) = txs.create_index(["tx.spender.owner", "tx.spender.sub_account"]);
@@ -202,27 +204,22 @@ type Options = {
             max : ?Nat;
         };
     };
+    sort : ?(Text, ZenDB.SortDirection);
     // pagination : {
     //     limit : Nat;
     //     offset : Nat;
     // };
-    // sort : {
-    //     amt : ?{
-    //         #Ascending;
-    //         #Descending;
-    //         #None;
-    //     };
-    // };
 };
 
-func get_txs(options : Options) : [(Nat, Tx)] {
-    let Query = HydraDB.QueryBuilder();
+func options_to_query(options : Options) : ZenDB.QueryBuilder {
+
+    let Query = ZenDB.QueryBuilder();
 
     ignore do ? {
 
         if (options.filter.btype != null) {
             let btypes = options.filter.btype!;
-            let values = Array.map<Text, HydraDB.Candid>(btypes, func(btype : Text) : HydraDB.Candid = #Text(btype));
+            let values = Array.map<Text, ZenDB.Candid>(btypes, func(btype : Text) : ZenDB.Candid = #Text(btype));
 
             ignore Query.Where("btype", #In(values));
         };
@@ -281,7 +278,18 @@ func get_txs(options : Options) : [(Nat, Tx)] {
             };
         };
 
+        if (options.sort != null) {
+            ignore Query.Sort(options.sort!);
+        };
+
     };
+
+    Query;
+
+};
+
+func get_txs(options : Options) : [(Nat, Tx)] {
+    let Query = options_to_query(options);
 
     let query_res = txs.find(Query);
     let #ok(matching_txs) = query_res else Debug.trap("get_txs failed: " # debug_show query_res);
@@ -297,6 +305,7 @@ suite(
             "get_txs() with btype = '1mint'",
             func() {
                 let options = {
+                    sort = null;
                     filter = {
                         btype = ?["1mint"];
                         to = null;
@@ -323,6 +332,7 @@ suite(
             "get_txs() with btype = '1xfer'",
             func() {
                 let options = {
+                    sort = null;
                     filter = {
                         btype = ?["1xfer"];
                         to = null;
@@ -350,6 +360,7 @@ suite(
             "get_txs() with btype = '2approve'",
             func() {
                 let options = {
+                    sort = null;
                     filter = {
                         btype = ?["2approve"];
                         to = null;
@@ -377,6 +388,7 @@ suite(
             "get_txs() with btype  == '1burn' or '1xfer']",
             func() {
                 let options = {
+                    sort = null;
                     filter = {
                         btype = ?["1burn", "1xfer"];
                         to = null;
@@ -405,6 +417,7 @@ suite(
             "get_txs() with principal 'rimrc-piaaa-aaaao-aaljq-cai' as the recipient",
             func() {
                 let options = {
+                    sort = null;
                     filter = {
                         btype = null;
                         to = ?{
@@ -442,6 +455,7 @@ suite(
             "get_txs() with principal 'suaf3-hqaaa-aaaaf-bfyoa-cai' as the sender",
             func() {
                 let options = {
+                    sort = null;
                     filter = {
                         btype = null;
                         to = null;
@@ -480,6 +494,7 @@ suite(
             "get_txs() with principal 'aboy3-giaaa-aaaar-aaaaq-cai' as the spender",
             func() {
                 let options = {
+                    sort = null;
                     filter = {
                         btype = null;
                         to = null;
@@ -518,6 +533,7 @@ suite(
             func() {
 
                 let options = {
+                    sort = null;
                     filter = {
                         btype = null;
                         to = null;
@@ -571,6 +587,7 @@ suite(
             "get_txs() with 'amt' less than 50 and greater than 1",
             func() {
                 let options = {
+                    sort = null;
                     filter = {
                         btype = null;
                         to = null;
@@ -582,6 +599,16 @@ suite(
                             max = ?49;
                         };
                     };
+                };
+
+                let db_query = options_to_query(options);
+
+                switch (txs.getBestIndex(db_query)) {
+                    case (?index) {
+                        Debug.print("query: " # debug_show db_query.build());
+                        Debug.print("best index: " # debug_show (index.name, index.key_details));
+                    };
+                    case (_) ();
                 };
 
                 let result = get_txs(options);
@@ -600,7 +627,7 @@ suite(
         test(
             "get_txs() involving two out of three principals",
             func() {
-                let db_query = HydraDB.QueryBuilder().Where(
+                let db_query = ZenDB.QueryBuilder().Where(
                     "tx.to.owner",
                     #In([#Principal(Principal.fromText("suaf3-hqaaa-aaaaf-bfyoa-cai")), #Principal(Principal.fromText("rimrc-piaaa-aaaao-aaljq-cai"))]),
                 ).Or(
@@ -650,6 +677,7 @@ suite(
             "get_txs() with 'btype' = '1xfer' and 'amt' > 10",
             func() {
                 let options = {
+                    sort = null;
                     filter = {
                         btype = ?["1xfer"];
                         to = null;

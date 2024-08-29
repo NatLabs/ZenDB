@@ -8,14 +8,14 @@ A single canister document database currently in development.
 - [ ] Query Caching
 - [ ] Indexes
   - [x] Single field index
-  - [ ] Multiple field index
+  - [x] Multiple field index (Compound Index)
   - [ ] Multi-key array index
   - [ ] Text index (full text search)
 - [ ] Hydra Query Language
-  - [ ] operators (and, or, not, eq, gte, lte, gt, lt, in, nin)
+  - [x] operators (and, or, not, eq, gte, lte, gt, lt, in, nin)
   - [ ] functions (count, sum, avg, min, max)
   - [ ] modifiers (limit, skip, sort)
-- [ ] Schema 
+- [ ] Schema
   - [x] Schema Validation on insert/update
   - [x] Backwards compatibility on schema changes
   - [ ] Schema Constraints (required, unique, enum, min, max)

@@ -98,14 +98,14 @@ module {
         { _0_ = a; _1_ = b; _2_ = c; _3_ = d };
     };
 
-    public type Direction = {
+    public type SortDirection = {
         #Asc;
         #Desc;
     };
 
     public type Index = {
         name : Text;
-        key_details : [(Text, Direction)];
+        key_details : [(Text, SortDirection)];
         data : MemoryBTree.StableMemoryBTree;
     };
 
@@ -162,8 +162,6 @@ module {
         #False : T;
     };
 
-    type CandidQuery = State<Candid>;
-
     public func newStableStore() : HydraDB {
         let hydra_db = {
             collections = Map.new<Text, StableCollection>();
@@ -175,5 +173,6 @@ module {
     };
 
     public let QueryBuilder = Query.QueryBuilder;
+    public type QueryBuilder = Query.QueryBuilder;
 
 };

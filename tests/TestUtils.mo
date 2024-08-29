@@ -28,4 +28,19 @@ module {
         };
 
     };
+
+    public func validate_sorted_records<A>(data : Buffer.Buffer<A>, records : [(Nat, A)], pred : (Nat, A) -> Bool, sorted : (A, A) -> Bool, print : (A) -> Text) {
+        validate_records<A>(data, records, pred, print);
+
+        if (records.size() == 0) return;
+
+        var prev = records[0].1;
+        for ((id, record) in records.vals()) {
+            if (not sorted(prev, record)) {
+                Debug.print("records are not sorted: " # debug_show (print(prev), print(record)));
+                assert false;
+            };
+            prev := record;
+        };
+    };
 };
