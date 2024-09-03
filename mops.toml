@@ -5,6 +5,7 @@ serde = "3.1.0"
 itertools = "0.2.1"
 memory-collection = "0.0.4"
 bit-map = "0.1.1"
+ledger-types = "1.0.0"
 
 [dev-dependencies]
 test = "2.0.0"

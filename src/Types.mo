@@ -78,8 +78,8 @@ module {
     };
 
     public type SortDirection = {
-        #Asc;
-        #Desc;
+        #Ascending;
+        #Descending;
     };
 
     public type Index = {
@@ -133,6 +133,25 @@ module {
         // #All : (Text, HydraQueryLang);
         // #Intersect : (HydraQueryLang, HydraQueryLang);
         // #Union : (HydraQueryLang, HydraQueryLang);
+    };
+
+    public type Cursor = Nat;
+
+    public type PaginationDirection = {
+        #Forward;
+        #Backward;
+    };
+
+    public type StableQueryPagination = {
+        cursor : ?(Nat, PaginationDirection);
+        limit : ?Nat;
+        skip : ?Nat;
+    };
+
+    public type StableQuery = {
+        query_operations : HydraQueryLang;
+        pagination : StableQueryPagination;
+        sort_by : ?(Text, SortDirection);
     };
 
     public type Operator = {

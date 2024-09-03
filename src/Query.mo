@@ -1,6 +1,7 @@
 import Array "mo:base/Array";
 
 import Text "mo:base/Text";
+import Debug "mo:base/Debug";
 
 import Buffer "mo:base/Buffer";
 import Nat "mo:base/Nat";
@@ -17,22 +18,9 @@ module {
     public type Operator = T.Operator;
     let { thash; bhash } = Map;
 
-    type StableQuery = {
-        query_search : T.HydraQueryLang;
-        pagination : {
-            cursor : ?(Cursor, PaginationDirection, Nat);
-            limit : ?Nat;
-            skip : ?Nat;
-        };
-        sort_by : ?(Text, T.SortDirection);
-    };
-
-    type Cursor = T.WrapId<T.Candid>;
-
-    type PaginationDirection = {
-        #Forward;
-        #Backward;
-    };
+    type StableQuery = T.StableQuery;
+    type Cursor = T.Cursor;
+    type PaginationDirection = T.PaginationDirection;
 
     public class QueryBuilder() = self {
 
@@ -52,11 +40,11 @@ module {
 
         func update_query(new_is_and : Bool) {
 
-            if (buffer.size() > 0) {
-                if (is_and) {
-                    _query := #And(Buffer.toArray(buffer));
-                } else {
-                    _query := #Or(Buffer.toArray(buffer));
+            if (buffer.size() > 1 and is_and != new_is_and) {
+                switch (_query) {
+                    case (#And(_)) if (not new_is_and) _query := #And(Buffer.toArray(buffer));
+                    case (#Or(_)) if (new_is_and) _query := #Or(Buffer.toArray(buffer));
+                    case (_) _query := #And(Buffer.toArray(buffer));
                 };
 
                 buffer.clear();
@@ -162,36 +150,38 @@ module {
                 case (_) {
                     buffer.add(#Operation(key, op));
                 };
-
             };
-
         };
 
         public func And(key : Text, op : HqlOperators) : QueryBuilder {
-
-            let and_buffer = if (is_and) {
-                buffer
-
-            } else {
-                update_query(true);
-                buffer;
-            };
-
+            // Debug.print("is_and: " # debug_show is_and);
+            // Debug.print("query: " # debug_show _query);
+            // Debug.print("buffer: " # debug_show Buffer.toArray(buffer));
+            update_query(true);
+            // Debug.print("is_and: " # debug_show is_and);
+            // Debug.print("query: " # debug_show _query);
+            // Debug.print("buffer: " # debug_show Buffer.toArray(buffer));
             handle_op(key, op);
+            // Debug.print("is_and: " # debug_show is_and);
+            // Debug.print("query: " # debug_show _query);
+            // Debug.print("buffer: " # debug_show Buffer.toArray(buffer));
 
             self;
         };
 
         public func Or(key : Text, op : HqlOperators) : QueryBuilder {
-
-            let or_buffer = if (not is_and) {
-                buffer;
-            } else {
-                update_query(false);
-                buffer;
-            };
-
+            // Debug.print("is_or: " # debug_show (not is_and));
+            // Debug.print("query: " # debug_show _query);
+            // Debug.print("buffer: " # debug_show Buffer.toArray(buffer));
+            update_query(false);
+            // Debug.print("is_or: " # debug_show (not is_and));
+            // Debug.print("query: " # debug_show _query);
+            // Debug.print("buffer: " # debug_show Buffer.toArray(buffer));
             handle_op(key, op);
+            // Debug.print("is_or: " # debug_show (not is_and));
+            // Debug.print("query: " # debug_show _query);
+            // Debug.print("buffer: " # debug_show Buffer.toArray(buffer));
+
             self;
         };
 
@@ -237,9 +227,9 @@ module {
             self;
         };
 
-        public func Cursor(cursor : ?Cursor, direction : PaginationDirection, cursor_offset : Nat) : QueryBuilder {
+        public func Cursor(cursor : ?Cursor, direction : PaginationDirection) : QueryBuilder {
             pagination_cursor := cursor;
-            _cursor_offset := cursor_offset;
+            // _cursor_offset := cursor_offset;
             _direction := direction;
             self;
         };
@@ -255,15 +245,23 @@ module {
         };
 
         public func build() : StableQuery {
-            update_query(true); // input params is no longer relevant
-            // Debug.print("Query: " # debug_show _query);
+            // update_query(true); // input params is no longer relevant
+            let resolved_query = if (buffer.size() == 0) {
+                _query;
+            } else if (is_and) {
+                #And(Buffer.toArray(buffer));
+            } else {
+                #Or(Buffer.toArray(buffer));
+            };
+
+            // Debug.print("Query: " # debug_show resolved_query);
 
             {
-                query_search = _query;
+                query_operations = resolved_query;
                 sort_by;
                 pagination = {
                     cursor = switch (pagination_cursor) {
-                        case (?cursor) ?(cursor, _direction, _cursor_offset);
+                        case (?cursor) ?(cursor, _direction);
                         case (_) null;
                     };
                     limit = pagination_limit;

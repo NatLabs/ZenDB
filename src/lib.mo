@@ -50,6 +50,7 @@ module {
     public type Hash = Hash.Hash;
 
     public type Schema = Candid.CandidType;
+    public type StableQuery = T.StableQuery;
 
     public type RecordPointer = Nat;
     public module Schema {
@@ -99,8 +100,8 @@ module {
     };
 
     public type SortDirection = {
-        #Asc;
-        #Desc;
+        #Ascending;
+        #Descending;
     };
 
     public type Index = {

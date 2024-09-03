@@ -70,8 +70,8 @@ module {
     };
 
     public type SortDirection = {
-        #Asc;
-        #Desc;
+        #Ascending;
+        #Descending;
     };
 
     public type Index = {

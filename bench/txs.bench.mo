@@ -6,6 +6,8 @@ import Text "mo:base/Text";
 import Char "mo:base/Char";
 import Buffer "mo:base/Buffer";
 import Nat "mo:base/Nat";
+import Option "mo:base/Option";
+
 
 import Bench "mo:bench";
 import Fuzz "mo:fuzz";
@@ -132,9 +134,7 @@ module {
                     case (_) { null };
                 };
             };
-
         };
-
     };
 
     public func init() : Bench.Bench {
@@ -144,9 +144,13 @@ module {
         bench.description("Benchmarking the performance with 10k txs");
 
         bench.cols([
-            // "zenDB (using best index)",
-            "zenDB (using index intersection)",
-            "zenDB (using full scan)",
+            // "(best index)",
+            "(full scan, -> array)",
+            "(index intersection, -> array)",
+            // "(sorted by tx.amt, ↑)",
+            // "(sorted by tx.amt, ↓)",
+            // "(pagination limit = 100, -> array",
+            "(pagination limit = 100, -> array"
         ]);
 
         bench.rows([
@@ -157,8 +161,8 @@ module {
             "btype == '1xfer' or '2xfer'",
             "principals[0] == tx.to.owner (is recipient)",
             "principals[0..10] == tx.to.owner (is recipient)",
-            "all txs involving principals[0]",
-            "all txs involving principals[0..10]",
+            // "all txs involving principals[0]",
+            // "all txs involving principals[0..10]",
             "250 < tx.amt <= 400",
             "btype == 1burn and tx.amt >= 750",
         ]);
@@ -199,14 +203,17 @@ module {
 
         bench.runner(
             func(col, row) = switch (row) {
-                case ("zenDB (using best index)") {
+                case ("(best index)") {
                     best_index(txs, col, limit, predefined_txs, principals, candid_principals, principals_0_10);
                 };
-                case ("zenDB (using index intersection)") {
+                case ("(index intersection, -> array)") {
                     index_intersection(txs, col, limit, predefined_txs, principals, candid_principals, principals_0_10);
                 };
-                case ("zenDB (using full scan)") {
+                case ("(full scan, -> array)") {
                     full_scan(txs, col, limit, predefined_txs, principals, candid_principals, principals_0_10);
+                };
+                case ("(pagination limit = 100, -> array") {
+                    paginated_queries(txs, col, limit, predefined_txs, principals, candid_principals, principals_0_10, #Ascending, 100);
                 };
                 case (_) {
                     Debug.trap("Should be unreachable:\n row = \"" # debug_show row # "\" and col = \"" # debug_show col # "\"");
@@ -330,7 +337,7 @@ module {
             };
 
             case (_) {
-                Debug.trap("Should be unreachable:\n row = zenDB (using index intersection) and col = \"" # debug_show section # "\"");
+                Debug.trap("Should be unreachable:\n row = (best index, -> array)  and col = \"" # debug_show section # "\"");
             };
 
         };
@@ -340,29 +347,15 @@ module {
     func index_intersection(txs : HydraDB.Collection<Tx>, section : Text, limit : Nat, predefined_txs : Buffer.Buffer<Tx>, principals : [Principal], candid_principals : [HydraDB.Candid], principals_0_10 : [Principal]) {
         switch (section) {
             case ("insert") {
-                for (i in Iter.range(0, limit - 1)) {
-                    let tx = predefined_txs.get(i);
-                    let #ok(_) = txs.insert(tx);
-                };
+                // re-use the predefined txs
             };
 
             case ("clear") {
-                txs.clear();
+                // re-use the predefined txs
             };
 
             case ("insert with 5 indexes") {
-                let #ok(_) = txs.create_index(["btype", "tx.amt"]);
-                let #ok(_) = txs.create_index(["tx.amt"]);
-                let #ok(_) = txs.create_index(["btype", "ts"]);
-                let #ok(_) = txs.create_index(["ts"]);
-                let #ok(_) = txs.create_index(["tx.from.owner", "tx.from.sub_account"]);
-                let #ok(_) = txs.create_index(["tx.to.owner", "tx.to.sub_account"]);
-                let #ok(_) = txs.create_index(["tx.spender.owner", "tx.spender.sub_account"]);
-
-                for (i in Iter.range(0, limit - 1)) {
-                    let tx = predefined_txs.get(i);
-                    let #ok(_) = txs.insert(tx);
-                };
+                // re-use the predefined txs
             };
 
             case ("btype == '1mint'") {
@@ -466,25 +459,38 @@ module {
             };
 
             case (_) {
-                Debug.trap("Should be unreachable:\n row = zenDB (using index intersection) and col = \"" # debug_show section # "\"");
+                Debug.trap("Should be unreachable:\n row = zenDB (index intersection, -> array) and col = \"" # debug_show section # "\"");
             };
-
         };
-
     };
 
     func full_scan(txs : HydraDB.Collection<Tx>, section : Text, limit : Nat, predefined_txs : Buffer.Buffer<Tx>, principals : [Principal], candid_principals : [HydraDB.Candid], principals_0_10 : [Principal]) {
         switch (section) {
+
             case ("insert") {
-                // re-use the predefined txs
+                for (i in Iter.range(0, limit - 1)) {
+                    let tx = predefined_txs.get(i);
+                    let #ok(_) = txs.insert(tx);
+                };
             };
 
             case ("clear") {
-                // re-use the predefined txs
+                txs.clear();
             };
 
             case ("insert with 5 indexes") {
-                // re-use the predefined txs
+                let #ok(_) = txs.create_index(["btype", "tx.amt"]);
+                let #ok(_) = txs.create_index(["tx.amt"]);
+                let #ok(_) = txs.create_index(["btype", "ts"]);
+                let #ok(_) = txs.create_index(["ts"]);
+                let #ok(_) = txs.create_index(["tx.from.owner", "tx.from.sub_account"]);
+                let #ok(_) = txs.create_index(["tx.to.owner", "tx.to.sub_account"]);
+                let #ok(_) = txs.create_index(["tx.spender.owner", "tx.spender.sub_account"]);
+
+                for (i in Iter.range(0, limit - 1)) {
+                    let tx = predefined_txs.get(i);
+                    let #ok(_) = txs.insert(tx);
+                };
             };
 
             case ("btype == '1mint'") {
@@ -518,12 +524,7 @@ module {
             };
 
             case ("principals[0..10] == tx.to.owner (is recipient)") {
-                let principals_0_10 = Array.tabulate(
-                    10,
-                    func(i : Nat) : Principal {
-                        principals.get(i);
-                    },
-                );
+                let principals_0_10 = Array.take(principals, 10);
 
                 let results = txs.filter(
                     func(tx : Tx) : Bool {
@@ -567,12 +568,7 @@ module {
             };
 
             case ("all txs involving principals[0..10]") {
-                let principals_0_10 = Array.tabulate(
-                    10,
-                    func(i : Nat) : Principal {
-                        principals.get(i);
-                    },
-                );
+                let principals_0_10 = Array.take(principals, 10);
 
                 let results = txs.filter(
                     func(tx : Tx) : Bool {
@@ -619,10 +615,160 @@ module {
             };
 
             case (_) {
-                Debug.trap("Should be unreachable:\n row = zenDB (using index intersection) and col = \"" # debug_show section # "\"");
+                Debug.trap("Should be unreachable:\n row = zenDB (full scan, -> array) and col = \"" # debug_show section # "\"");
             };
 
         };
 
     };
+
+
+  func paginated_queries(txs : HydraDB.Collection<Tx>, section : Text, limit : Nat, predefined_txs : Buffer.Buffer<Tx>, principals : [Principal], candid_principals : [HydraDB.Candid], principals_0_10 : [Principal], sort_direction : HydraDB.SortDirection, pagination_limit : Nat) {
+
+        func paginated_query(db_query : HydraDB.QueryBuilder)  {
+            ignore db_query.Limit(pagination_limit);
+            let #ok(matching_txs) = txs.find(db_query);
+            var records = matching_txs;
+            var opt_cursor : ?Nat = null;
+
+            label pagination while (records.size() > 0){
+                switch(opt_cursor, ?(records[records.size() - 1].0)){
+                    case(?cursor, ?new_cursor) if (cursor == new_cursor) {
+                        // break pagination;
+                        Debug.trap("Cursor is not moving");
+                    }else {
+                        opt_cursor := ?new_cursor;
+                    };
+                    case(null, new_cursor) opt_cursor := new_cursor;
+                    case(_, null) Debug.trap("Should be unreachable");
+
+                };
+
+                ignore db_query
+                    .Cursor(?(records[records.size() - 1].0), #Forward)
+                    .Limit(pagination_limit);
+
+                let #ok(matching_txs) = txs.find(db_query);
+
+                records := matching_txs;
+
+            };
+        };
+
+        switch (section) {
+            case ("insert") {};
+
+            case ("clear") {};
+
+            case ("insert with 5 indexes") {};
+
+            case ("btype == '1mint'") {
+                let db_query = HydraDB.QueryBuilder().Where(
+                    "btype",
+                    #eq(#Text("1mint")),
+                );
+
+                paginated_query(db_query);
+                
+            };
+
+            case ("btype == '1xfer' or '2xfer'") {
+                let db_query = HydraDB.QueryBuilder().Where(
+                    "btype",
+                    #In([#Text("1xfer"), #Text("2xfer")]),
+                );
+
+                paginated_query(db_query);
+            };
+
+            case ("principals[0] == tx.to.owner (is recipient)") {
+                let db_query = HydraDB.QueryBuilder().Where(
+                    "tx.to.owner",
+                    #eq(#Principal(principals.get(0))),
+                );
+
+                paginated_query(db_query);
+            };
+            case ("principals[0..10] == tx.to.owner (is recipient)") {
+                let candid_principals = Array.map<Principal, HydraDB.Candid>(
+                    Iter.toArray(Array.slice<Principal>(principals, 0, 10)),
+                    func(p : Principal) : HydraDB.Candid = #Principal(p),
+                );
+
+                let db_query = HydraDB.QueryBuilder().Where(
+                    "tx.to.owner",
+                    #In(candid_principals),
+                );
+
+                paginated_query(db_query);
+            };
+
+
+            case ("all txs involving principals[0]") {
+                let db_query = HydraDB.QueryBuilder().Where(
+                    "tx.to.owner",
+                    #eq(#Principal(principals.get(0))),
+                ).Or(
+                    "tx.from.owner",
+                    #eq(#Principal(principals.get(0))),
+                ).Or(
+                    "tx.spender.owner",
+                    #eq(#Principal(principals.get(0))),
+                );
+
+                paginated_query(db_query);
+            };
+
+            case ("all txs involving principals[0..10]") {
+                let candid_principals = Array.map<Principal, HydraDB.Candid>(
+                    Iter.toArray(Array.slice(principals, 0, 10)),
+                    func(p : Principal) : HydraDB.Candid = #Principal(p),
+                );
+
+                let db_query = HydraDB.QueryBuilder().Where(
+                    "tx.to.owner",
+                    #In(candid_principals),
+                ).Or(
+                    "tx.from.owner",
+                    #In(candid_principals),
+                ).Or(
+                    "tx.spender.owner",
+                    #In(candid_principals),
+                );
+
+                paginated_query(db_query);
+            };
+
+            case ("250 < tx.amt <= 400") {
+                let db_query = HydraDB.QueryBuilder().Where(
+                    "tx.amt",
+                    #gt(#Nat(250)),
+                ).And(
+                    "tx.amt",
+                    #lte(#Nat(400)),
+                );
+
+                paginated_query(db_query);
+            };
+
+            case ("btype == 1burn and tx.amt >= 750") {
+                let db_query = HydraDB.QueryBuilder().Where(
+                    "btype",
+                    #eq(#Text("1burn")),
+                ).And(
+                    "tx.amt",
+                    #gte(#Nat(750)),
+                );
+
+                paginated_query(db_query);
+            };
+
+            case (_) {
+                Debug.trap("Should be unreachable:\n row = zenDB (pagination limit = 100, -> array) and col = \"" # debug_show section # "\"");
+            };
+
+        };
+
+    };
+   
 };
