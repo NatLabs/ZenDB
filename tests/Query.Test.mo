@@ -11,14 +11,14 @@ import Bench "mo:bench";
 import Fuzz "mo:fuzz";
 import Candid "mo:serde/Candid";
 import Itertools "mo:itertools/Iter";
-import HydraDB "../src";
+import ZenDB "../src";
 import TestUtils "TestUtils";
 
 let fuzz = Fuzz.fromSeed(0x7eadbeef);
-let { QueryBuilder } = HydraDB;
+let { QueryBuilder } = ZenDB;
 
-let sstore = HydraDB.newStableStore();
-let hydra_db = HydraDB.launch(sstore);
+let sstore = ZenDB.newStableStore();
+let hydra_db = ZenDB.launch(sstore);
 
 let limit = 10_000;
 
@@ -53,7 +53,7 @@ type StoreItem = {
     price : Float;
     in_stock : Bool;
     address : Address;
-    // address : HydraDB.Quadruple<Text, Text, Text, Text>;
+    // address : ZenDB.Quadruple<Text, Text, Text, Text>;
     contact : {
         email : Text;
         phone : ?Text;
@@ -68,7 +68,7 @@ let candify_store_item = {
     to_blob = func(c : StoreItem) : Blob { to_candid (c) };
 };
 
-let item_schema : HydraDB.Schema = #Record([
+let item_schema : ZenDB.Schema = #Record([
     ("name", #Text),
     ("store", #Text),
     ("months_in_stock", #Nat),
@@ -89,7 +89,7 @@ let item_schema : HydraDB.Schema = #Record([
     ),
     // (
     //     "address",
-    //     HydraDB.Schema.Quadruple(
+    //     ZenDB.Schema.Quadruple(
     //         #Text, // street
     //         #Text, // city
     //         #Text, // country

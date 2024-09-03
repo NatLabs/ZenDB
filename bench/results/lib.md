@@ -6,7 +6,7 @@ Benchmarking the performance with 1k calls
 
 Instructions
 
-|                       |       HydraDB |
+|                       |         ZenDB |
 | :-------------------- | ------------: |
 | put() no index        | 1_899_187_839 |
 | updateById() 1        | 3_647_231_474 |
@@ -26,7 +26,7 @@ Instructions
 
 Heap
 
-|                       |     HydraDB |
+|                       |       ZenDB |
 | :-------------------- | ----------: |
 | put() no index        |  23_291_128 |
 | updateById() 1        | -25_904_696 |
@@ -48,7 +48,7 @@ Heap
 
 Instructions
 
-|                       |       HydraDB |
+|                       |         ZenDB |
 | :-------------------- | ------------: |
 | put() no index        |   551_368_371 |
 | updateById() 1        |   950_699_496 |
@@ -68,7 +68,7 @@ Instructions
 
 Heap
 
-|                       |     HydraDB |
+|                       |       ZenDB |
 | :-------------------- | ----------: |
 | put() no index        |  24_272_784 |
 | updateById() 1        | -18_899_252 |

@@ -31,7 +31,7 @@ import Int8Cmp "mo:memory-collection/TypeUtils/Int8Cmp";
 module {
     public type BitMap = BitMap.BitMap;
 
-    // public type HydraDB = HydraDB.HydraDB;
+    // public type ZenDB = ZenDB.ZenDB;
 
     public type Candid = Serde.Candid or {
         #Minimum;
@@ -96,7 +96,7 @@ module {
         indexes : Map<Text, Index>;
     };
 
-    public type HydraDB = {
+    public type ZenDB = {
         collections : Map<Text, StableCollection>;
     };
 

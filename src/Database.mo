@@ -88,7 +88,7 @@ module {
         indexes : Map<Text, Index>;
     };
 
-    // public type HydraDB = {
+    // public type ZenDB = {
     //     collections : Map<Text, Collection>;
     // };
 
@@ -96,7 +96,7 @@ module {
 
     public let DEFAULT_BTREE_ORDER = 256;
 
-    public class Database(hydra_db : T.HydraDB) = self {
+    public class Database(hydra_db : T.ZenDB) = self {
 
         public func create_collection<Record>(name : Text, schema : Schema, blobify : T.Candify<Record>) : Result<Collection<Record>, Text> {
 

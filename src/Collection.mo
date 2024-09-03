@@ -2,7 +2,7 @@
 ///
 /// ```motoko
 /// type User = { name: Text, age: Nat };
-/// let hydra_db = HydraDB();
+/// let hydra_db = ZenDB();
 /// let db = hydra_db.getDB("my_db");
 ///
 /// let candify_users = {

@@ -6,7 +6,7 @@ import Nat64 "mo:base/Nat64";
 // import Ledger "mo:ledger-types";
 import MemoryBuffer "mo:memory-collection/MemoryBuffer";
 
-import HydraDB "../src";
+import ZenDB "../src";
 
 actor {
     module Ledger {
@@ -94,8 +94,8 @@ actor {
 
     };
 
-    stable let db_store = HydraDB.newStableStore();
-    let db = HydraDB.launch(db_store);
+    stable let db_store = ZenDB.newStableStore();
+    let db = ZenDB.launch(db_store);
 
     let ledger = actor ("ryjl3-tyaaa-aaaaa-aaaba-cai") : Ledger.Service;
 
@@ -294,7 +294,7 @@ actor {
         ("sub_account", #Option(#Blob)),
     ]);
 
-    let TxSchema : HydraDB.Schema = #Record([
+    let TxSchema : ZenDB.Schema = #Record([
         ("btype", #Text),
         ("phash", #Blob),
         ("ts", #Nat),
@@ -341,13 +341,13 @@ actor {
     };
 
     public func get_txs(options : Options) : async [Block] {
-        let Query = HydraDB.QueryBuilder();
+        let Query = ZenDB.QueryBuilder();
 
         ignore do ? {
 
             if (options.filter.btype != null) {
                 let btypes = options.filter.btype!;
-                let values = Array.map<Text, HydraDB.Candid>(btypes, func(btype : Text) : HydraDB.Candid = #Text(btype));
+                let values = Array.map<Text, ZenDB.Candid>(btypes, func(btype : Text) : ZenDB.Candid = #Text(btype));
 
                 ignore Query.Where("btype", #In(values));
             };

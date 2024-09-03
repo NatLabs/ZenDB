@@ -2,7 +2,7 @@
 
 Instructions
 
-|                                                                      |        HydraDB |
+|                                                                      |          ZenDB |
 | :------------------------------------------------------------------- | -------------: |
 | put() no index                                                       |  4_346_787_546 |
 | create_index()                                                       |  5_455_578_597 |
@@ -19,10 +19,9 @@ Instructions
 | find(): users between the age of 20 and 35 and named 'nam-do-dan'    |    481_958_812 |
 | find(): users between the age of 20 and 35 and named 'nam-do-dan' v2 |    481_959_328 |
 
-
 Heap
 
-|                                                                      |     HydraDB |
+|                                                                      |       ZenDB |
 | :------------------------------------------------------------------- | ----------: |
 | put() no index                                                       |  22_022_328 |
 | create_index()                                                       |  -5_565_608 |

@@ -112,13 +112,13 @@ module {
 
     public type Collection<Record> = Collection.Collection<Record>;
 
-    public type HydraDB = {
+    public type ZenDB = {
         collections : Map<Text, T.StableCollection>;
     };
 
     public let DEFAULT_BTREE_ORDER = 256;
 
-    public func new() : HydraDB {
+    public func new() : ZenDB {
         let hydra_db = {
             collections = Map.new<Text, StableCollection>();
         };
@@ -138,7 +138,7 @@ module {
     // };
     public type StableCollection = T.StableCollection;
 
-    func get_collection(hydra_db : HydraDB, collection_name : Text) : ?StableCollection {
+    func get_collection(hydra_db : ZenDB, collection_name : Text) : ?StableCollection {
         Map.get<Text, StableCollection>(hydra_db.collections, thash, collection_name);
     };
 
@@ -163,13 +163,13 @@ module {
         #False : T;
     };
 
-    public func newStableStore() : HydraDB {
+    public func newStableStore() : ZenDB {
         let hydra_db = {
             collections = Map.new<Text, StableCollection>();
         };
     };
 
-    public func launch(sstore : HydraDB) : Database.Database {
+    public func launch(sstore : ZenDB) : Database.Database {
         Database.Database(sstore);
     };
 

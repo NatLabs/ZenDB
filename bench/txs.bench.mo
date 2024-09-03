@@ -14,10 +14,10 @@ import Fuzz "mo:fuzz";
 import Candid "mo:serde/Candid";
 import Itertools "mo:itertools/Iter";
 
-import HydraDB "../src";
+import ZenDB "../src";
 
 module {
-    let { QueryBuilder } = HydraDB;
+    let { QueryBuilder } = ZenDB;
 
     type Account = {
         owner : Principal;
@@ -43,7 +43,7 @@ module {
         ("sub_account", #Option(#Blob)),
     ]);
 
-    let TxSchema : HydraDB.Schema = #Record([
+    let TxSchema : ZenDB.Schema = #Record([
         ("btype", #Text),
         ("phash", #Blob),
         ("ts", #Nat),
@@ -170,8 +170,8 @@ module {
         let limit = 10_000;
         let fuzz = Fuzz.fromSeed(0x7eadbeef);
 
-        let db_sstore = HydraDB.newStableStore();
-        let db = HydraDB.launch(db_sstore);
+        let db_sstore = ZenDB.newStableStore();
+        let db = ZenDB.launch(db_sstore);
 
         let #ok(txs) = db.create_collection<Tx>("transactions", TxSchema, candify_tx);
 
@@ -182,9 +182,9 @@ module {
             },
         );
 
-        let candid_principals = Array.map<Principal, HydraDB.Candid>(
+        let candid_principals = Array.map<Principal, ZenDB.Candid>(
             Iter.toArray(Array.slice<Principal>(principals, 0, 10)),
-            func(p : Principal) : HydraDB.Candid = #Principal(p),
+            func(p : Principal) : ZenDB.Candid = #Principal(p),
         );
 
         let principals_0_10 = Array.tabulate(
@@ -225,7 +225,7 @@ module {
         bench;
     };
 
-    func best_index(txs : HydraDB.Collection<Tx>, section : Text, limit : Nat, predefined_txs : Buffer.Buffer<Tx>, principals : [Principal], candid_principals : [HydraDB.Candid], principals_0_10 : [Principal]) {
+    func best_index(txs : ZenDB.Collection<Tx>, section : Text, limit : Nat, predefined_txs : Buffer.Buffer<Tx>, principals : [Principal], candid_principals : [ZenDB.Candid], principals_0_10 : [Principal]) {
         switch (section) {
 
             case ("insert") {
@@ -241,7 +241,7 @@ module {
             };
 
             case ("btype == '1mint'") {
-                let db_query = HydraDB.QueryBuilder().Where(
+                let db_query = ZenDB.QueryBuilder().Where(
                     "btype",
                     #eq(#Text("1mint")),
                 );
@@ -250,7 +250,7 @@ module {
             };
 
             case ("btype == '1xfer' or '2xfer'") {
-                let db_query = HydraDB.QueryBuilder().Where(
+                let db_query = ZenDB.QueryBuilder().Where(
                     "btype",
                     #In([#Text("1xfer"), #Text("2xfer")]),
                 );
@@ -259,7 +259,7 @@ module {
             };
 
             case ("principals[0] == tx.to.owner (is recipient)") {
-                let db_query = HydraDB.QueryBuilder().Where(
+                let db_query = ZenDB.QueryBuilder().Where(
                     "tx.to.owner",
                     #eq(#Principal(principals.get(0))),
                 );
@@ -269,7 +269,7 @@ module {
 
             case ("principals[0..10] == tx.to.owner (is recipient)") {
 
-                let db_query = HydraDB.QueryBuilder().Where(
+                let db_query = ZenDB.QueryBuilder().Where(
                     "tx.to.owner",
                     #In(candid_principals),
                 );
@@ -278,7 +278,7 @@ module {
             };
 
             case ("all txs involving principals[0]") {
-                let db_query = HydraDB.QueryBuilder().Where(
+                let db_query = ZenDB.QueryBuilder().Where(
                     "tx.to.owner",
                     #eq(#Principal(principals.get(0))),
                 ).Or(
@@ -293,12 +293,12 @@ module {
             };
 
             case ("all txs involving principals[0..10]") {
-                let candid_principals = Array.map<Principal, HydraDB.Candid>(
+                let candid_principals = Array.map<Principal, ZenDB.Candid>(
                     Iter.toArray(Array.slice(principals, 0, 10)),
-                    func(p : Principal) : HydraDB.Candid = #Principal(p),
+                    func(p : Principal) : ZenDB.Candid = #Principal(p),
                 );
 
-                let db_query = HydraDB.QueryBuilder().Where(
+                let db_query = ZenDB.QueryBuilder().Where(
                     "tx.to.owner",
                     #In(candid_principals),
                 ).Or(
@@ -313,7 +313,7 @@ module {
             };
 
             case ("250 < tx.amt <= 400") {
-                let db_query = HydraDB.QueryBuilder().Where(
+                let db_query = ZenDB.QueryBuilder().Where(
                     "tx.amt",
                     #gt(#Nat(250)),
                 ).And(
@@ -325,7 +325,7 @@ module {
             };
 
             case ("btype == 1burn and tx.amt >= 750") {
-                let db_query = HydraDB.QueryBuilder().Where(
+                let db_query = ZenDB.QueryBuilder().Where(
                     "tx.amt",
                     #gte(#Nat(750)),
                 ).And(
@@ -344,7 +344,7 @@ module {
 
     };
 
-    func index_intersection(txs : HydraDB.Collection<Tx>, section : Text, limit : Nat, predefined_txs : Buffer.Buffer<Tx>, principals : [Principal], candid_principals : [HydraDB.Candid], principals_0_10 : [Principal]) {
+    func index_intersection(txs : ZenDB.Collection<Tx>, section : Text, limit : Nat, predefined_txs : Buffer.Buffer<Tx>, principals : [Principal], candid_principals : [ZenDB.Candid], principals_0_10 : [Principal]) {
         switch (section) {
             case ("insert") {
                 // re-use the predefined txs
@@ -359,7 +359,7 @@ module {
             };
 
             case ("btype == '1mint'") {
-                let db_query = HydraDB.QueryBuilder().Where(
+                let db_query = ZenDB.QueryBuilder().Where(
                     "btype",
                     #eq(#Text("1mint")),
                 );
@@ -368,7 +368,7 @@ module {
             };
 
             case ("btype == '1xfer' or '2xfer'") {
-                let db_query = HydraDB.QueryBuilder().Where(
+                let db_query = ZenDB.QueryBuilder().Where(
                     "btype",
                     #In([#Text("1xfer"), #Text("2xfer")]),
                 );
@@ -377,7 +377,7 @@ module {
             };
 
             case ("principals[0] == tx.to.owner (is recipient)") {
-                let db_query = HydraDB.QueryBuilder().Where(
+                let db_query = ZenDB.QueryBuilder().Where(
                     "tx.to.owner",
                     #eq(#Principal(principals.get(0))),
                 );
@@ -386,12 +386,12 @@ module {
             };
 
             case ("principals[0..10] == tx.to.owner (is recipient)") {
-                let candid_principals = Array.map<Principal, HydraDB.Candid>(
+                let candid_principals = Array.map<Principal, ZenDB.Candid>(
                     Iter.toArray(Array.slice<Principal>(principals, 0, 10)),
-                    func(p : Principal) : HydraDB.Candid = #Principal(p),
+                    func(p : Principal) : ZenDB.Candid = #Principal(p),
                 );
 
-                let db_query = HydraDB.QueryBuilder().Where(
+                let db_query = ZenDB.QueryBuilder().Where(
                     "tx.to.owner",
                     #In(candid_principals),
                 );
@@ -400,7 +400,7 @@ module {
             };
 
             case ("all txs involving principals[0]") {
-                let db_query = HydraDB.QueryBuilder().Where(
+                let db_query = ZenDB.QueryBuilder().Where(
                     "tx.to.owner",
                     #eq(#Principal(principals.get(0))),
                 ).Or(
@@ -415,12 +415,12 @@ module {
             };
 
             case ("all txs involving principals[0..10]") {
-                let candid_principals = Array.map<Principal, HydraDB.Candid>(
+                let candid_principals = Array.map<Principal, ZenDB.Candid>(
                     Iter.toArray(Array.slice(principals, 0, 10)),
-                    func(p : Principal) : HydraDB.Candid = #Principal(p),
+                    func(p : Principal) : ZenDB.Candid = #Principal(p),
                 );
 
-                let db_query = HydraDB.QueryBuilder().Where(
+                let db_query = ZenDB.QueryBuilder().Where(
                     "tx.to.owner",
                     #In(candid_principals),
                 ).Or(
@@ -435,7 +435,7 @@ module {
             };
 
             case ("250 < tx.amt <= 400") {
-                let db_query = HydraDB.QueryBuilder().Where(
+                let db_query = ZenDB.QueryBuilder().Where(
                     "tx.amt",
                     #gt(#Nat(250)),
                 ).And(
@@ -447,7 +447,7 @@ module {
             };
 
             case ("btype == 1burn and tx.amt >= 750") {
-                let db_query = HydraDB.QueryBuilder().Where(
+                let db_query = ZenDB.QueryBuilder().Where(
                     "btype",
                     #eq(#Text("1burn")),
                 ).And(
@@ -464,7 +464,7 @@ module {
         };
     };
 
-    func full_scan(txs : HydraDB.Collection<Tx>, section : Text, limit : Nat, predefined_txs : Buffer.Buffer<Tx>, principals : [Principal], candid_principals : [HydraDB.Candid], principals_0_10 : [Principal]) {
+    func full_scan(txs : ZenDB.Collection<Tx>, section : Text, limit : Nat, predefined_txs : Buffer.Buffer<Tx>, principals : [Principal], candid_principals : [ZenDB.Candid], principals_0_10 : [Principal]) {
         switch (section) {
 
             case ("insert") {
@@ -623,9 +623,9 @@ module {
     };
 
 
-  func paginated_queries(txs : HydraDB.Collection<Tx>, section : Text, limit : Nat, predefined_txs : Buffer.Buffer<Tx>, principals : [Principal], candid_principals : [HydraDB.Candid], principals_0_10 : [Principal], sort_direction : HydraDB.SortDirection, pagination_limit : Nat) {
+  func paginated_queries(txs : ZenDB.Collection<Tx>, section : Text, limit : Nat, predefined_txs : Buffer.Buffer<Tx>, principals : [Principal], candid_principals : [ZenDB.Candid], principals_0_10 : [Principal], sort_direction : ZenDB.SortDirection, pagination_limit : Nat) {
 
-        func paginated_query(db_query : HydraDB.QueryBuilder)  {
+        func paginated_query(db_query : ZenDB.QueryBuilder)  {
             ignore db_query.Limit(pagination_limit);
             let #ok(matching_txs) = txs.find(db_query);
             var records = matching_txs;
@@ -663,7 +663,7 @@ module {
             case ("insert with 5 indexes") {};
 
             case ("btype == '1mint'") {
-                let db_query = HydraDB.QueryBuilder().Where(
+                let db_query = ZenDB.QueryBuilder().Where(
                     "btype",
                     #eq(#Text("1mint")),
                 );
@@ -673,7 +673,7 @@ module {
             };
 
             case ("btype == '1xfer' or '2xfer'") {
-                let db_query = HydraDB.QueryBuilder().Where(
+                let db_query = ZenDB.QueryBuilder().Where(
                     "btype",
                     #In([#Text("1xfer"), #Text("2xfer")]),
                 );
@@ -682,7 +682,7 @@ module {
             };
 
             case ("principals[0] == tx.to.owner (is recipient)") {
-                let db_query = HydraDB.QueryBuilder().Where(
+                let db_query = ZenDB.QueryBuilder().Where(
                     "tx.to.owner",
                     #eq(#Principal(principals.get(0))),
                 );
@@ -690,12 +690,12 @@ module {
                 paginated_query(db_query);
             };
             case ("principals[0..10] == tx.to.owner (is recipient)") {
-                let candid_principals = Array.map<Principal, HydraDB.Candid>(
+                let candid_principals = Array.map<Principal, ZenDB.Candid>(
                     Iter.toArray(Array.slice<Principal>(principals, 0, 10)),
-                    func(p : Principal) : HydraDB.Candid = #Principal(p),
+                    func(p : Principal) : ZenDB.Candid = #Principal(p),
                 );
 
-                let db_query = HydraDB.QueryBuilder().Where(
+                let db_query = ZenDB.QueryBuilder().Where(
                     "tx.to.owner",
                     #In(candid_principals),
                 );
@@ -705,7 +705,7 @@ module {
 
 
             case ("all txs involving principals[0]") {
-                let db_query = HydraDB.QueryBuilder().Where(
+                let db_query = ZenDB.QueryBuilder().Where(
                     "tx.to.owner",
                     #eq(#Principal(principals.get(0))),
                 ).Or(
@@ -720,12 +720,12 @@ module {
             };
 
             case ("all txs involving principals[0..10]") {
-                let candid_principals = Array.map<Principal, HydraDB.Candid>(
+                let candid_principals = Array.map<Principal, ZenDB.Candid>(
                     Iter.toArray(Array.slice(principals, 0, 10)),
-                    func(p : Principal) : HydraDB.Candid = #Principal(p),
+                    func(p : Principal) : ZenDB.Candid = #Principal(p),
                 );
 
-                let db_query = HydraDB.QueryBuilder().Where(
+                let db_query = ZenDB.QueryBuilder().Where(
                     "tx.to.owner",
                     #In(candid_principals),
                 ).Or(
@@ -740,7 +740,7 @@ module {
             };
 
             case ("250 < tx.amt <= 400") {
-                let db_query = HydraDB.QueryBuilder().Where(
+                let db_query = ZenDB.QueryBuilder().Where(
                     "tx.amt",
                     #gt(#Nat(250)),
                 ).And(
@@ -752,7 +752,7 @@ module {
             };
 
             case ("btype == 1burn and tx.amt >= 750") {
-                let db_query = HydraDB.QueryBuilder().Where(
+                let db_query = ZenDB.QueryBuilder().Where(
                     "btype",
                     #eq(#Text("1burn")),
                 ).And(

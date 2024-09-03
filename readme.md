@@ -1,4 +1,4 @@
-## Hydra DB
+## ZenDB
 
 A single canister document database currently in development.
 
@@ -10,11 +10,10 @@ A single canister document database currently in development.
   - [x] Single field index
   - [x] Multiple field index (Compound Index)
   - [ ] Multi-key array index
-  - [ ] Text index (full text search)
 - [ ] Hydra Query Language
   - [x] operators (and, or, not, eq, gte, lte, gt, lt, in, nin)
+  - [x] modifiers (limit, skip, sort)
   - [ ] functions (count, sum, avg, min, max)
-  - [ ] modifiers (limit, skip, sort)
 - [ ] Schema
   - [x] Schema Validation on insert/update
   - [x] Backwards compatibility on schema changes
