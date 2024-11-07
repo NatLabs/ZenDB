@@ -10,7 +10,7 @@ A single canister document database currently in development.
   - [x] Single field index
   - [x] Multiple field index (Compound Index)
   - [ ] Multi-key array index
-- [ ] Hydra Query Language
+- [ ] Zen Query Language
   - [x] operators (and, or, not, eq, gte, lte, gt, lt, in, nin)
   - [x] modifiers (limit, skip, sort)
   - [ ] functions (count, sum, avg, min, max)

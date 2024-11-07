@@ -13,8 +13,8 @@ import T "Types";
 
 module {
 
-    public type HqlOperators = T.HqlOperators;
-    public type HydraQueryLang = T.HydraQueryLang;
+    public type ZqlOperators = T.ZqlOperators;
+    public type ZenQueryLang = T.ZenQueryLang;
     public type Operator = T.Operator;
     let { thash; bhash } = Map;
 
@@ -24,9 +24,9 @@ module {
 
     public class QueryBuilder() = self {
 
-        var _query : HydraQueryLang = #Operation("dummy_node", #eq(#Null));
+        var _query : ZenQueryLang = #Operation("dummy_node", #eq(#Null));
         var is_and : Bool = true;
-        var buffer = Buffer.Buffer<HydraQueryLang>(8);
+        var buffer = Buffer.Buffer<ZenQueryLang>(8);
         var pagination_cursor : ?Cursor = null;
         var pagination_limit : ?Nat = null;
         var pagination_skip : ?Nat = null; // skip from beginning of the query
@@ -34,7 +34,7 @@ module {
         var _direction : PaginationDirection = #Forward;
         var sort_by : ?(Text, T.SortDirection) = null; // only support sorting by one field for now
 
-        public func Where(key : Text, op : HqlOperators) : QueryBuilder {
+        public func Where(key : Text, op : ZqlOperators) : QueryBuilder {
             return And(key, op);
         };
 
@@ -54,7 +54,7 @@ module {
             is_and := new_is_and;
         };
 
-        func handle_not(key : Text, not_op : HqlOperators) {
+        func handle_not(key : Text, not_op : ZqlOperators) {
             switch (not_op) {
                 case (#eq(value)) {
                     // #eq(x) -> #Or([#lt(x), #gt(x)])
@@ -96,7 +96,7 @@ module {
                             #And(
                                 Array.tabulate(
                                     values.size(),
-                                    func(i : Nat) : HydraQueryLang {
+                                    func(i : Nat) : ZenQueryLang {
                                         #Or([#Operation(key, #lt(values.get(i))), #Operation(key, #gt(values.get(i)))]);
                                     },
                                 )
@@ -112,7 +112,7 @@ module {
             };
         };
 
-        func handle_op(key : Text, op : HqlOperators) {
+        func handle_op(key : Text, op : ZqlOperators) {
             switch (op) {
                 case (#In(values)) {
                     if (not is_and) {
@@ -132,7 +132,7 @@ module {
                             #Or(
                                 Array.tabulate(
                                     values.size(),
-                                    func(i : Nat) : HydraQueryLang {
+                                    func(i : Nat) : ZenQueryLang {
                                         #Operation(
                                             key,
                                             #eq(values.get(i) : T.Candid),
@@ -153,7 +153,7 @@ module {
             };
         };
 
-        public func And(key : Text, op : HqlOperators) : QueryBuilder {
+        public func And(key : Text, op : ZqlOperators) : QueryBuilder {
             // Debug.print("is_and: " # debug_show is_and);
             // Debug.print("query: " # debug_show _query);
             // Debug.print("buffer: " # debug_show Buffer.toArray(buffer));
@@ -169,7 +169,7 @@ module {
             self;
         };
 
-        public func Or(key : Text, op : HqlOperators) : QueryBuilder {
+        public func Or(key : Text, op : ZqlOperators) : QueryBuilder {
             // Debug.print("is_or: " # debug_show (not is_and));
             // Debug.print("query: " # debug_show _query);
             // Debug.print("buffer: " # debug_show Buffer.toArray(buffer));
@@ -273,7 +273,7 @@ module {
     };
 
     // validate that all the query fields are defined in the schema
-    public func validate_query(collection : T.StableCollection, hydra_query : T.HydraQueryLang) : T.Result<(), Text> {
+    public func validate_query(collection : T.StableCollection, hydra_query : T.ZenQueryLang) : T.Result<(), Text> {
 
         switch (hydra_query) {
             case (#Operation(field, op)) {

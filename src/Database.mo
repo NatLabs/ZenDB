@@ -158,6 +158,24 @@ module {
             );
         };
 
+        public func get_or_create_collection<Record>(
+            name : Text,
+            schema : Schema,
+            blobify : T.Candify<Record>,
+        ) : Result<Collection<Record>, Text> {
+
+            switch (create_collection(name, schema, blobify)) {
+                case (#ok(collection)) #ok(collection);
+                case (#err(msg)) {
+                    switch (get_collection(name, blobify)) {
+                        case (#ok(collection)) #ok(collection);
+                        case (#err(_)) #err(msg);
+                    };
+                };
+            };
+
+        };
+
     };
 
 };

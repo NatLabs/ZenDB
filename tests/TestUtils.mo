@@ -4,9 +4,12 @@ import Buffer "mo:base/Buffer";
 module {
 
     public func validate_records<A>(data : Buffer.Buffer<A>, records : [(Nat, A)], pred : (Nat, A) -> Bool, print : (A) -> Text) {
+
+        // todo - check that there are no duplicates in records
+
         for ((id, record) in records.vals()) {
             if (not pred(id, record)) {
-                Debug.print("record does not match query predicate: " # debug_show (id, print(record)));
+                Debug.print("record does not match query: " # debug_show (id, print(record)));
                 assert false;
             };
         };

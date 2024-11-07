@@ -53,6 +53,10 @@ module {
     public type StableQuery = T.StableQuery;
 
     public type RecordPointer = Nat;
+
+    public type ZenQueryLang = T.ZenQueryLang;
+    public type ZqlOperators = T.ZqlOperators;
+
     public module Schema {
         public func Tuple(a : Schema, b : Schema) : Schema {
             #Record([

@@ -86,7 +86,7 @@ func new_tx(fuzz : Fuzz.Fuzzer, principals : [Principal]) : Tx {
     let tx : Tx = {
         btype;
         phash = fuzz.blob.randomBlob(32);
-        ts = fuzz.nat.randomRange(0, 1000000);
+        ts = fuzz.nat.randomRange(0, 1000000000);
         fee = switch (btype) {
             case ("1mint" or "2approve" or "1burn") { null };
             case ("1xfer" or "2xfer") { ?20 };
@@ -271,7 +271,8 @@ let #ok(_) = txs.create_index(["tx.spender.owner", "tx.spender.sub_account"]);
 //         fee = ?1;
 //     },
 // ]);
-let limit = 10_000;
+let limit = 50;
+let pagination_limit = 3;
 
 let input_txs = Buffer.fromArray<Tx>(
     Array.tabulate<Tx>(
@@ -408,7 +409,42 @@ func get_txs_from_query(db_query : ZenDB.QueryBuilder) : [(Nat, Tx)] {
 
 };
 
-func paginated_query(db_query : ZenDB.QueryBuilder, pagination_limit : Nat) : [(Nat, Tx)] {
+func skip_limit_paginated_query(db_query : ZenDB.QueryBuilder, pagination_limit : Nat) : [(Nat, Tx)] {
+
+    ignore db_query.Limit(pagination_limit);
+    let #ok(matching_txs) = txs.find(db_query);
+    let bitmap = BitMap.fromIter(Iter.map<(Nat, Tx), Nat>(matching_txs.vals(), func((id, _) : (Nat, Tx)) : Nat = id));
+    let records = Buffer.fromArray<(Nat, Tx)>(matching_txs);
+    var batch_size = records.size();
+
+    label skip_limit_pagination while (batch_size > 0) {
+        ignore db_query.Skip(records.size()).Limit(pagination_limit);
+
+        let #ok(matching_txs) = txs.find(db_query);
+        Debug.print("matching_txs: " # debug_show matching_txs);
+
+        assert matching_txs.size() <= pagination_limit;
+        batch_size := matching_txs.size();
+
+        for ((id, tx) in matching_txs.vals()) {
+            records.add((id, tx));
+
+            if (bitmap.get(id)) {
+                Debug.trap("Duplicate entry for id " # debug_show id);
+            } else {
+                bitmap.set(id, true);
+            };
+        };
+
+    };
+
+    ignore db_query.Skip(0).Limit(10000000000000000000000);
+
+    Buffer.toArray(records);
+
+};
+
+func cursor_paginated_query(db_query : ZenDB.QueryBuilder, pagination_limit : Nat) : [(Nat, Tx)] {
 
     ignore db_query.Limit(pagination_limit);
     let #ok(matching_txs) = txs.find(db_query);
@@ -455,682 +491,517 @@ func paginated_query(db_query : ZenDB.QueryBuilder, pagination_limit : Nat) : [(
     Buffer.toArray(records);
 };
 
-suite(
-    "testing txs db with and without pagination",
-    func() {
-
-        // test(
-        //     "get_txs() with btype = '1mint'",
-        //     func() {
-        //         let db_query = QueryBuilder().Where(
-        //             "btype",
-        //             #eq(#Text("1mint")),
-        //         );
-
-        //         assert db_query.build().query_operations == #And([
-        //             #Operation(
-        //                 "btype",
-        //                 #eq(#Text("1mint")),
-        //             )
-        //         ]);
-
-        //         let results = get_txs_from_query(db_query);
-
-        //         TestUtils.validate_records(
-        //             input_txs,
-        //             results,
-        //             func(id : Nat, tx : Tx) : Bool {
-        //                 tx.btype == "1mint";
-        //             },
-        //             func(tx : Tx) : Text = debug_show tx,
-        //         );
-
-        //         let paginated_results = paginated_query(db_query, 100);
-
-        //         TestUtils.validate_records(
-        //             input_txs,
-        //             paginated_results,
-        //             func(id : Nat, tx : Tx) : Bool {
-        //                 tx.btype == "1mint";
-        //             },
-        //             func(tx : Tx) : Text = debug_show tx,
-        //         );
-        //     },
-        // );
-
-        // test(
-        //     "get_txs() with tx.amt > 0, pagination limit 2",
-        //     func() {
-
-        //         let db_query = QueryBuilder().Where(
-        //             "tx.amt",
-        //             #gte(#Nat(1000)),
-        //         ).Limit(5);
-
-        //         assert db_query.build() == {
-        //             query_operations = #And([
-        //                 #Operation(
-        //                     "tx.amt",
-        //                     #gte(#Nat(1000)),
-        //                 )
-        //             ]);
-        //             sort_by = null;
-        //             pagination = {
-        //                 cursor = null;
-        //                 limit = ?5;
-        //                 skip = null;
-        //             };
-        //         };
-
-        //         var results = get_txs_from_query(db_query);
-
-        //         var i = 0;
-
-        //         label pagination while (results.size() > 0) {
-        //             // Debug.print("results: " # debug_show results);
-
-        //             // TestUtils.validate_records(
-        //             //     input_txs,
-        //             //     results,
-        //             //     func(id : Nat, tx : Tx) : Bool {
-        //             //         tx.tx.amt >= 1000;
-        //             //     },
-        //             //     func(tx : Tx) : Text = debug_show tx,
-        //             // );
-
-        //             let cursor = results[results.size() - 1].0;
-        //             Debug.print("results: " # debug_show (Array.map<(Nat, Tx), Nat>(results, func((id, _) : (Nat, Tx)) : Nat = id)));
-        //             Debug.print("cursor: " # debug_show cursor);
-
-        //             results := get_txs_from_query(db_query.Cursor(?cursor, #Forward));
-
-        //             i += 1;
-
-        //             if (i == 5) {
-        //                 Debug.print("breaking");
-        //                 break pagination;
-        //             };
-
-        //         };
-
-        //     },
-        // );
-
-        // test(
-        //     "get_txs() with btype = '1mint', sort by ('ts', #Ascending)",
-        //     func() {
-
-        //         let db_query = QueryBuilder().Where(
-        //             "btype",
-        //             #eq(#Text("1mint")),
-        //         ).Sort("ts", #Ascending);
-
-        //         assert db_query.build() == {
-        //             query_operations = #And([
-        //                 #Operation(
-        //                     "btype",
-        //                     #eq(#Text("1mint")),
-        //                 )
-        //             ]);
-        //             sort_by = ?("ts", #Ascending);
-        //             pagination = {
-        //                 cursor = null;
-        //                 limit = null;
-        //                 skip = null;
-        //             };
-        //         };
-
-        //         let result = get_txs_from_query(db_query);
-
-        //         TestUtils.validate_sorted_records(
-        //             input_txs,
-        //             result,
-        //             func(id : Nat, tx : Tx) : Bool {
-        //                 tx.btype == "1mint";
-        //             },
-        //             func(tx1 : Tx, tx2 : Tx) : Bool {
-        //                 tx1.ts <= tx2.ts;
-        //             },
-        //             func(tx : Tx) : Text = debug_show tx,
-        //         );
-        //     },
-        // );
-
-        // test(
-        //     "get_txs() with btype = '1xfer', sort by ('tx.amt', #Descending)",
-        //     func() {
-
-        //         let db_query = QueryBuilder().Where(
-        //             "btype",
-        //             #eq(#Text("1xfer")),
-        //         ).Sort("tx.amt", #Descending);
-
-        //         assert db_query.build() == {
-        //             query_operations = #And([
-        //                 #Operation(
-        //                     "btype",
-        //                     #eq(#Text("1xfer")),
-        //                 )
-        //             ]);
-        //             sort_by = ?("tx.amt", #Descending);
-        //             pagination = {
-        //                 cursor = null;
-        //                 limit = null;
-        //                 skip = null;
-        //             };
-        //         };
-
-        //         let result = get_txs_from_query(db_query);
-
-        //         TestUtils.validate_sorted_records(
-        //             input_txs,
-        //             result,
-        //             func(id : Nat, tx : Tx) : Bool {
-        //                 tx.btype == "1xfer";
-        //             },
-        //             func(tx1 : Tx, tx2 : Tx) : Bool {
-        //                 tx1.tx.amt >= tx2.tx.amt;
-        //             },
-        //             func(tx : Tx) : Text = debug_show tx,
-        //         );
-        //     },
-        // );
-
-        // test(
-        //     "get_txs() with btype = '2approve', sort by ('tx.amt', #Ascending)",
-        //     func() {
-
-        //         let db_query = QueryBuilder().Where(
-        //             "btype",
-        //             #eq(#Text("2approve")),
-        //         ).Sort("tx.amt", #Ascending);
-
-        //         assert db_query.build() == {
-        //             query_operations = #And([
-        //                 #Operation(
-        //                     "btype",
-        //                     #eq(#Text("2approve")),
-        //                 )
-        //             ]);
-        //             sort_by = ?("tx.amt", #Ascending);
-        //             pagination = {
-        //                 cursor = null;
-        //                 limit = null;
-        //                 skip = null;
-        //             };
-        //         };
-
-        //         let result = get_txs_from_query(db_query);
-
-        //         TestUtils.validate_sorted_records(
-        //             input_txs,
-        //             result,
-        //             func(id : Nat, tx : Tx) : Bool {
-        //                 tx.btype == "2approve";
-        //             },
-        //             func(tx1 : Tx, tx2 : Tx) : Bool {
-        //                 tx1.tx.amt <= tx2.tx.amt;
-        //             },
-        //             func(tx : Tx) : Text = debug_show tx,
-        //         );
-        //     },
-        // );
-
-        // test(
-        //     "get_txs() with btype  == '1burn' or '1xfer', sort by ('ts', #Descending)",
-        //     func() {
-
-        //         let db_query = QueryBuilder().Where(
-        //             "btype",
-        //             #In([#Text("1burn"), #Text("1xfer")]),
-        //         ).Sort("ts", #Descending);
-
-        //         Debug.print("db_query: " # debug_show db_query.build());
-        //         let result = get_txs_from_query(db_query);
-        //         // Debug.print("result: " # debug_show result);
-
-        //         assert db_query.build() == {
-        //             query_operations = #Or([
-        //                 #Operation(
-        //                     "btype",
-        //                     #eq(#Text("1burn")),
-        //                 ),
-        //                 #Operation(
-        //                     "btype",
-        //                     #eq(#Text("1xfer")),
-        //                 ),
-        //             ]);
-        //             sort_by = ?("ts", #Descending);
-        //             pagination = {
-        //                 cursor = null;
-        //                 limit = null;
-        //                 skip = null;
-        //             };
-        //         };
-
-        //         TestUtils.validate_sorted_records(
-        //             input_txs,
-        //             result,
-        //             func(id : Nat, tx : Tx) : Bool {
-        //                 tx.btype == "1burn" or tx.btype == "1xfer";
-        //             },
-        //             func(tx1 : Tx, tx2 : Tx) : Bool {
-        //                 tx1.ts >= tx2.ts;
-        //             },
-        //             func(tx : Tx) : Text = debug_show tx,
-        //         );
-        //     },
-
-        // );
-
-        // test(
-        //     "get_txs() with the first principal as the recipient, sort by ('ts', #Ascending)",
-        //     func() {
-
-        //         let db_query = QueryBuilder().Where(
-        //             "tx.to.owner",
-        //             #eq(#Principal(principals[0])),
-        //         ).Sort("ts", #Ascending);
-
-        //         assert db_query.build() == {
-        //             query_operations = #And([
-        //                 #Operation(
-        //                     "tx.to.owner",
-        //                     #eq(#Principal(principals[0])),
-        //                 )
-        //             ]);
-        //             sort_by = ?("ts", #Ascending);
-        //             pagination = {
-        //                 cursor = null;
-        //                 limit = null;
-        //                 skip = null;
-        //             };
-        //         };
-
-        //         let result = get_txs_from_query(db_query);
-
-        //         TestUtils.validate_sorted_records(
-        //             input_txs,
-        //             result,
-        //             func(id : Nat, tx : Tx) : Bool {
-        //                 ?true == (
-        //                     do ? {
-        //                         tx.tx.to!.owner == principals[0];
-        //                     }
-        //                 );
-        //             },
-        //             func(tx1 : Tx, tx2 : Tx) : Bool {
-        //                 tx1.ts <= tx2.ts;
-        //             },
-        //             func(tx : Tx) : Text = debug_show tx,
-        //         );
-        //     },
-        // );
-
-        // test(
-        //     "get_txs() with 2nd principal as the sender, sort by ('tx.amt', #Descending)",
-        //     func() {
-
-        //         let db_query = QueryBuilder().Where(
-        //             "tx.from.owner",
-        //             #eq(#Principal(principals[1])),
-        //         ).Sort("tx.amt", #Descending);
-
-        //         assert db_query.build() == {
-        //             query_operations = #And([
-        //                 #Operation(
-        //                     "tx.from.owner",
-        //                     #eq(#Principal(principals[1])),
-        //                 )
-        //             ]);
-        //             sort_by = ?("tx.amt", #Descending);
-        //             pagination = {
-        //                 cursor = null;
-        //                 limit = null;
-        //                 skip = null;
-        //             };
-        //         };
-
-        //         let result = get_txs_from_query(db_query);
-
-        //         TestUtils.validate_sorted_records(
-        //             input_txs,
-        //             result,
-        //             func(id : Nat, tx : Tx) : Bool {
-        //                 ?true == (
-        //                     do ? {
-
-        //                         tx.tx.from!.owner == principals[1];
-
-        //                     }
-        //                 );
-
-        //             },
-        //             func(tx1 : Tx, tx2 : Tx) : Bool {
-        //                 tx1.tx.amt >= tx2.tx.amt;
-        //             },
-        //             func(tx : Tx) : Text = debug_show tx,
-        //         );
-        //     },
-        // );
-
-        // test(
-        //     "get_txs() with 3rd principal as the spender, sort by ('tx.amt', #Ascending)",
-        //     func() {
-
-        //         let db_query = QueryBuilder().Where(
-        //             "tx.spender.owner",
-        //             #eq(#Principal(principals[2])),
-        //         ).Sort("tx.amt", #Ascending);
-
-        //         assert db_query.build() == {
-        //             query_operations = #And([
-        //                 #Operation(
-        //                     "tx.spender.owner",
-        //                     #eq(#Principal(principals[2])),
-        //                 )
-        //             ]);
-        //             sort_by = ?("tx.amt", #Ascending);
-        //             pagination = {
-        //                 cursor = null;
-        //                 limit = null;
-        //                 skip = null;
-        //             };
-        //         };
-
-        //         let result = get_txs_from_query(db_query);
-
-        //         TestUtils.validate_sorted_records(
-        //             input_txs,
-        //             result,
-        //             func(id : Nat, tx : Tx) : Bool {
-        //                 ?true == (
-        //                     do ? {
-
-        //                         tx.tx.spender!.owner == principals[2];
-
-        //                     }
-        //                 );
-
-        //             },
-        //             func(tx1 : Tx, tx2 : Tx) : Bool {
-        //                 tx1.tx.amt <= tx2.tx.amt;
-        //             },
-        //             func(tx : Tx) : Text = debug_show tx,
-        //         );
-        //     },
-        // );
-
-        test(
-            "get_txs() involving the 2nd principal, sort by ('ts', #Ascending)",
-            func() {
-
-                let db_query = QueryBuilder().Where(
-                    "tx.to.owner",
-                    #eq(#Principal(principals[1])),
-                ).Or(
-                    "tx.from.owner",
-                    #eq(#Principal(principals[1])),
-                ).Or(
-                    "tx.spender.owner",
-                    #eq(#Principal(principals[1])),
-                ).Sort("ts", #Ascending);
-
-                Debug.print("db_query: " # debug_show db_query.build());
-
-                assert db_query.build() == {
-                    query_operations = #Or([
-                        #Operation(
-                            "tx.to.owner",
-                            #eq(#Principal(principals[1])),
-                        ),
-                        #Operation(
-                            "tx.from.owner",
-                            #eq(#Principal(principals[1])),
-                        ),
-                        #Operation(
-                            "tx.spender.owner",
-                            #eq(#Principal(principals[1])),
-                        ),
-                    ]);
-                    sort_by = ?("ts", #Ascending);
-                    pagination = {
-                        cursor = null;
-                        limit = null;
-                        skip = null;
+type TestQuery = {
+    query_name : Text;
+    db_query : ZenDB.QueryBuilder;
+    expected_query_resolution : ZenDB.ZenQueryLang;
+    check_if_result_matches_query : (Nat, Tx) -> Bool;
+    display_record : Tx -> Text;
+    sort : [(Text, ZenDB.SortDirection)];
+    check_if_results_are_sorted : (Tx, Tx) -> Bool;
+};
+
+let test_queries : [TestQuery] = [
+    {
+        query_name = "get_txs() with btype = '1mint'";
+        db_query = QueryBuilder().Where(
+            "btype",
+            #eq(#Text("1mint")),
+        );
+        expected_query_resolution = #And([
+            #Operation(
+                "btype",
+                #eq(#Text("1mint")),
+            )
+        ]);
+        check_if_result_matches_query = func(id : Nat, tx : Tx) : Bool {
+            tx.btype == "1mint";
+        };
+        display_record = func(tx : Tx) : Text = debug_show tx;
+        sort = [
+            ("ts", #Ascending),
+        ];
+        check_if_results_are_sorted = func(tx1 : Tx, tx2 : Tx) : Bool {
+            tx1.ts <= tx2.ts;
+        };
+    },
+    {
+        query_name = "get_txs() with tx.amt > 355";
+        db_query = QueryBuilder().Where(
+            "tx.amt",
+            #gte(#Nat(355)),
+        );
+        expected_query_resolution = #And([
+            #Operation(
+                "tx.amt",
+                #gte(#Nat(355)),
+            )
+        ]);
+        check_if_result_matches_query = func(id : Nat, tx : Tx) : Bool {
+            tx.tx.amt >= 355;
+        };
+        display_record = func(tx : Tx) : Text = debug_show tx;
+        sort = [
+            ("ts", #Ascending),
+        ];
+        check_if_results_are_sorted = func(tx1 : Tx, tx2 : Tx) : Bool {
+            tx1.ts <= tx2.ts;
+        };
+    },
+    {
+        query_name = "get_txs() with btype = '1xfer'";
+        db_query = QueryBuilder().Where(
+            "btype",
+            #eq(#Text("1xfer")),
+        );
+        expected_query_resolution = #And([
+            #Operation(
+                "btype",
+                #eq(#Text("1xfer")),
+            )
+        ]);
+        check_if_result_matches_query = func(id : Nat, tx : Tx) : Bool {
+            tx.btype == "1xfer";
+        };
+        display_record = func(tx : Tx) : Text = debug_show tx;
+        sort = [
+            ("ts", #Descending),
+        ];
+        check_if_results_are_sorted = func(tx1 : Tx, tx2 : Tx) : Bool {
+            tx1.ts >= tx2.ts;
+        };
+    },
+    {
+        query_name = "get_txs() with btype = '2approve'";
+        db_query = QueryBuilder().Where(
+            "btype",
+            #eq(#Text("2approve")),
+        );
+        expected_query_resolution = #And([
+            #Operation(
+                "btype",
+                #eq(#Text("2approve")),
+            )
+        ]);
+        check_if_result_matches_query = func(id : Nat, tx : Tx) : Bool {
+            tx.btype == "2approve";
+        };
+        display_record = func(tx : Tx) : Text = debug_show tx;
+        sort = [
+            ("tx.amt", #Ascending),
+        ];
+        check_if_results_are_sorted = func(tx1 : Tx, tx2 : Tx) : Bool {
+            tx1.tx.amt <= tx2.tx.amt;
+        };
+    },
+    {
+        query_name = "get_txs() with btype = '1burn' or '1xfer'";
+        db_query = QueryBuilder().Where(
+            "btype",
+            #In([#Text("1burn"), #Text("1xfer")]),
+        );
+        expected_query_resolution = #Or([
+            #Operation(
+                "btype",
+                #eq(#Text("1burn")),
+            ),
+            #Operation(
+                "btype",
+                #eq(#Text("1xfer")),
+            ),
+        ]);
+        check_if_result_matches_query = func(id : Nat, tx : Tx) : Bool {
+            tx.btype == "1burn" or tx.btype == "1xfer";
+        };
+        display_record = func(tx : Tx) : Text = debug_show tx;
+        sort = [
+            ("ts", #Descending),
+        ];
+        check_if_results_are_sorted = func(tx1 : Tx, tx2 : Tx) : Bool {
+            tx1.ts >= tx2.ts;
+        };
+    },
+    {
+        query_name = "get_txs() with the first principal as the recipient";
+        db_query = QueryBuilder().Where(
+            "tx.to.owner",
+            #eq(#Principal(principals[0])),
+        );
+        expected_query_resolution = #And([
+            #Operation(
+                "tx.to.owner",
+                #eq(#Principal(principals[0])),
+            )
+        ]);
+        check_if_result_matches_query = func(id : Nat, tx : Tx) : Bool {
+            ?true == (
+                do ? {
+                    tx.tx.to!.owner == principals[0];
+                }
+            );
+        };
+        display_record = func(tx : Tx) : Text = debug_show tx;
+        sort = [
+            ("ts", #Ascending),
+        ];
+        check_if_results_are_sorted = func(tx1 : Tx, tx2 : Tx) : Bool {
+            tx1.ts <= tx2.ts;
+        };
+
+    },
+    {
+        query_name = "get_txs() with the 2nd principal as the sender";
+        db_query = QueryBuilder().Where(
+            "tx.from.owner",
+            #eq(#Principal(principals[1])),
+        );
+        expected_query_resolution = #And([
+            #Operation(
+                "tx.from.owner",
+                #eq(#Principal(principals[1])),
+            )
+        ]);
+        check_if_result_matches_query = func(id : Nat, tx : Tx) : Bool {
+            ?true == (
+                do ? {
+                    tx.tx.from!.owner == principals[1];
+                }
+            );
+        };
+        display_record = func(tx : Tx) : Text = debug_show tx;
+        sort = [
+            ("ts", #Ascending),
+        ];
+        check_if_results_are_sorted = func(tx1 : Tx, tx2 : Tx) : Bool {
+            tx1.ts <= tx2.ts;
+        };
+    },
+    {
+        query_name = "get_txs() with the 3rd principal as the spender";
+        db_query = QueryBuilder().Where(
+            "tx.spender.owner",
+            #eq(#Principal(principals[2])),
+        );
+        expected_query_resolution = #And([
+            #Operation(
+                "tx.spender.owner",
+                #eq(#Principal(principals[2])),
+            )
+        ]);
+        check_if_result_matches_query = func(id : Nat, tx : Tx) : Bool {
+            ?true == (
+                do ? {
+                    tx.tx.spender!.owner == principals[2];
+                }
+            );
+        };
+        display_record = func(tx : Tx) : Text = debug_show tx;
+        sort = [
+            ("ts", #Ascending),
+        ];
+        check_if_results_are_sorted = func(tx1 : Tx, tx2 : Tx) : Bool {
+            tx1.ts <= tx2.ts;
+        };
+    },
+    {
+        query_name = "get_txs() involving the 2nd principal, sort by ('ts', #Ascending)";
+        db_query = QueryBuilder().Where(
+            "tx.to.owner",
+            #eq(#Principal(principals[1])),
+        ).Or(
+            "tx.from.owner",
+            #eq(#Principal(principals[1])),
+        ).Or(
+            "tx.spender.owner",
+            #eq(#Principal(principals[1])),
+        ).Sort("ts", #Ascending);
+        expected_query_resolution = #Or([
+            #Operation(
+                "tx.to.owner",
+                #eq(#Principal(principals[1])),
+            ),
+            #Operation(
+                "tx.from.owner",
+                #eq(#Principal(principals[1])),
+            ),
+            #Operation(
+                "tx.spender.owner",
+                #eq(#Principal(principals[1])),
+            ),
+        ]);
+        check_if_result_matches_query = func(id : Nat, tx : Tx) : Bool {
+
+            ?true == (
+                do ? {
+
+                    var account_is_included = false;
+
+                    if (tx.tx.to != null) {
+                        account_is_included := account_is_included or tx.tx.to!.owner == principals[1];
                     };
-                };
+                    if (tx.tx.from != null) {
+                        account_is_included := account_is_included or tx.tx.from!.owner == principals[1];
+                    };
 
-                let result = get_txs_from_query(db_query);
+                    if (tx.tx.spender != null) {
+                        account_is_included := account_is_included or tx.tx.spender!.owner == principals[1];
+                    };
 
-                let check_if_entry_adheres_to_query = func(id : Nat, tx : Tx) : Bool {
+                    account_is_included
 
-                    ?true == (
-                        do ? {
+                }
+            );
 
-                            var account_is_included = false;
+        };
+        display_record = func(tx : Tx) : Text = debug_show tx;
+        sort = [
+            ("ts", #Ascending),
+        ];
+        check_if_results_are_sorted = func(tx1 : Tx, tx2 : Tx) : Bool {
+            tx1.ts <= tx2.ts;
+        };
 
-                            if (tx.tx.to != null) {
-                                account_is_included := account_is_included or tx.tx.to!.owner == principals[1];
-                            };
-                            if (tx.tx.from != null) {
-                                account_is_included := account_is_included or tx.tx.from!.owner == principals[1];
-                            };
+    },
 
-                            if (tx.tx.spender != null) {
-                                account_is_included := account_is_included or tx.tx.spender!.owner == principals[1];
-                            };
+    {
+        query_name = "get_txs() with 'amt' less than 50 and greater than 1";
+        db_query = QueryBuilder().Where(
+            "tx.amt",
+            #gte(#Nat(2)),
+        ).Where(
+            "tx.amt",
+            #lte(#Nat(49)),
+        );
+        expected_query_resolution = #And([
+            #Operation(
+                "tx.amt",
+                #gte(#Nat(2)),
+            ),
+            #Operation(
+                "tx.amt",
+                #lte(#Nat(49)),
+            ),
+        ]);
+        check_if_result_matches_query = func(id : Nat, tx : Tx) : Bool {
+            tx.tx.amt > 1 and tx.tx.amt < 50;
+        };
+        display_record = func(tx : Tx) : Text = debug_show tx;
+        sort = [
+            ("tx.amt", #Ascending),
+        ];
+        check_if_results_are_sorted = func(tx1 : Tx, tx2 : Tx) : Bool {
+            tx1.tx.amt <= tx2.tx.amt;
+        };
+    },
+    {
+        query_name = "get_txs() involving the first 2 principals";
+        db_query = QueryBuilder().Where(
+            "tx.to.owner",
+            #In([#Principal(principals[1]), #Principal(principals[0])]),
+        ).Or(
+            "tx.from.owner",
+            #In([#Principal(principals[1]), #Principal(principals[0])]),
+        ).Or(
+            "tx.spender.owner",
+            #In([#Principal(principals[1]), #Principal(principals[0])]),
+        );
+        expected_query_resolution = #Or([
+            #Operation(
+                "tx.to.owner",
+                #eq(#Principal(principals[1])),
+            ),
+            #Operation(
+                "tx.to.owner",
+                #eq(#Principal(principals[0])),
+            ),
+            #Operation(
+                "tx.from.owner",
+                #eq(#Principal(principals[1])),
+            ),
+            #Operation(
+                "tx.from.owner",
+                #eq(#Principal(principals[0])),
+            ),
+            #Operation(
+                "tx.spender.owner",
+                #eq(#Principal(principals[1])),
+            ),
+            #Operation(
+                "tx.spender.owner",
+                #eq(#Principal(principals[0])),
+            ),
+        ]);
+        check_if_result_matches_query = func(id : Nat, tx : Tx) : Bool {
 
-                            account_is_included
+            ?true == (
+                do ? {
 
-                        }
+                    var account_is_included = false;
+
+                    if (tx.tx.to != null) {
+                        account_is_included := account_is_included or tx.tx.to!.owner == principals[1] or tx.tx.to!.owner == principals[0];
+                    };
+
+                    if (tx.tx.from != null) {
+                        account_is_included := account_is_included or tx.tx.from!.owner == principals[1] or tx.tx.from!.owner == principals[0];
+                    };
+
+                    if (tx.tx.spender != null) {
+                        account_is_included := account_is_included or tx.tx.spender!.owner == principals[1] or tx.tx.spender!.owner == principals[0];
+                    };
+
+                    account_is_included;
+
+                }
+            );
+
+        };
+        display_record = func(tx : Tx) : Text = debug_show tx;
+        sort = [
+            ("ts", #Ascending),
+        ];
+        check_if_results_are_sorted = func(tx1 : Tx, tx2 : Tx) : Bool {
+            tx1.ts <= tx2.ts;
+        };
+    },
+    {
+        query_name = "get_txs() with 'btype' = '1xfer' and 'amt' > 10";
+        db_query = QueryBuilder().Where(
+            "btype",
+            #eq(#Text("1xfer")),
+        ).Where(
+            "tx.amt",
+            #gte(#Nat(11)),
+        );
+        expected_query_resolution = #And([
+            #Operation(
+                "btype",
+                #eq(#Text("1xfer")),
+            ),
+            #Operation(
+                "tx.amt",
+                #gte(#Nat(11)),
+            ),
+        ]);
+        check_if_result_matches_query = func(id : Nat, tx : Tx) : Bool {
+            tx.btype == "1xfer" and tx.tx.amt > 10;
+        };
+        display_record = func(tx : Tx) : Text = debug_show tx;
+        sort = [
+            ("tx.amt", #Ascending),
+        ];
+        check_if_results_are_sorted = func(tx1 : Tx, tx2 : Tx) : Bool {
+            tx1.tx.amt <= tx2.tx.amt;
+        };
+    },
+
+];
+
+suite(
+    "testing txs db with queries",
+    func() {
+        for (q in test_queries.vals()) {
+
+            test(
+                q.query_name,
+                func() {
+                    assert q.db_query.build().query_operations == q.expected_query_resolution;
+
+                    let results = get_txs_from_query(q.db_query);
+
+                    TestUtils.validate_records(
+                        input_txs,
+                        results,
+                        q.check_if_result_matches_query,
+                        func(tx : Tx) : Text = debug_show tx,
                     );
 
-                };
+                },
+            );
 
-                TestUtils.validate_sorted_records(
-                    input_txs,
-                    result,
-                    check_if_entry_adheres_to_query,
-                    func(tx1 : Tx, tx2 : Tx) : Bool {
-                        tx1.ts <= tx2.ts;
-                    },
-                    func(tx : Tx) : Text = debug_show tx,
-                );
+        };
+    },
+);
 
-                let paginated_results = paginated_query(db_query, 100);
+suite(
+    "testing txs db with pagination",
+    func() {
 
-                TestUtils.validate_sorted_records(
-                    input_txs,
-                    paginated_results,
-                    check_if_entry_adheres_to_query,
-                    func(tx1 : Tx, tx2 : Tx) : Bool {
-                        tx1.ts <= tx2.ts;
-                    },
-                    func(tx : Tx) : Text = debug_show tx,
-                );
+        for (q in test_queries.vals()) {
 
-            },
-        );
+            test(
+                q.query_name,
+                func() {
+                    let paginated_results = skip_limit_paginated_query(q.db_query, pagination_limit);
 
-        test(
-            "get_txs() with 'amt' less than 50 and greater than 1, sort by ('tx.amt', #Ascending)",
-            func() {
-                let options = {
-                    sort = ?("tx.amt", #Ascending);
-                    pagination = null;
-                    filter = {
-                        btype = null;
-                        to = null;
-                        from = null;
-                        spender = null;
-                        account = null;
-                        amt = ?{
-                            min = ?2;
-                            max = ?49;
-                        };
+                    TestUtils.validate_records(
+                        input_txs,
+                        paginated_results,
+                        q.check_if_result_matches_query,
+                        func(tx : Tx) : Text = debug_show tx,
+                    );
+                },
+            );
+
+        };
+    },
+);
+
+suite(
+    "testing txs db with sorting",
+    func() {
+
+        for (q in test_queries.vals()) {
+
+            test(
+                q.query_name,
+                func() {
+                    for (sort_condition in q.sort.vals()) {
+                        ignore q.db_query.Sort(sort_condition);
                     };
-                };
 
-                let db_query = options_to_query(options);
-                Debug.print("db_query: " # debug_show db_query.build());
+                    let results = get_txs_from_query(q.db_query);
 
-                assert db_query.build() == {
-                    query_operations = #And([
-                        #Operation(
-                            "tx.amt",
-                            #gte(#Nat(2)),
-                        ),
-                        #Operation(
-                            "tx.amt",
-                            #lte(#Nat(49)),
-                        ),
-                    ]);
-                    sort_by = ?("tx.amt", #Ascending);
-                    pagination = {
-                        cursor = null;
-                        limit = null;
-                        skip = null;
-                    };
-                };
+                    TestUtils.validate_sorted_records(
+                        input_txs,
+                        results,
+                        q.check_if_result_matches_query,
+                        q.check_if_results_are_sorted,
+                        q.display_record,
+                    );
+                },
+            );
 
-                let result = get_txs(options);
-
-                TestUtils.validate_sorted_records(
-                    input_txs,
-                    result,
-                    func(id : Nat, tx : Tx) : Bool {
-                        tx.tx.amt > 1 and tx.tx.amt < 50;
-                    },
-                    func(tx1 : Tx, tx2 : Tx) : Bool {
-                        tx1.tx.amt <= tx2.tx.amt;
-                    },
-                    func(tx : Tx) : Text = debug_show tx,
-                );
-            },
-        );
-
-        test(
-            "get_txs() involving the first 2 principals, sort by ('ts', #Descending)",
-            func() {
-                let db_query = ZenDB.QueryBuilder().Where(
-                    "tx.to.owner",
-                    #In([#Principal(principals[1]), #Principal(principals[0])]),
-                ).Or(
-                    "tx.from.owner",
-                    #In([#Principal(principals[1]), #Principal(principals[0])]),
-                ).Or(
-                    "tx.spender.owner",
-                    #In([#Principal(principals[1]), #Principal(principals[0])]),
-                ).Sort("ts", #Descending);
-
-                assert db_query.build() == {
-                    query_operations = #Or([
-                        #Operation("tx.to.owner", #eq(#Principal(principals[1]))),
-                        #Operation("tx.to.owner", #eq(#Principal(principals[0]))),
-                        #Operation("tx.from.owner", #eq(#Principal(principals[1]))),
-                        #Operation("tx.from.owner", #eq(#Principal(principals[0]))),
-                        #Operation("tx.spender.owner", #eq(#Principal(principals[1]))),
-                        #Operation("tx.spender.owner", #eq(#Principal(principals[0]))),
-                    ]);
-                    sort_by = ?("ts", #Descending);
-                    pagination = {
-                        cursor = null;
-                        limit = null;
-                        skip = null;
-                    };
-                };
-
-                let #ok(result) = txs.find(db_query);
-
-                TestUtils.validate_sorted_records(
-                    input_txs,
-                    result,
-                    func(id : Nat, tx : Tx) : Bool {
-
-                        ?true == (
-                            do ? {
-
-                                var account_is_included = false;
-
-                                if (tx.tx.to != null) {
-                                    account_is_included := account_is_included or tx.tx.to!.owner == principals[1] or tx.tx.to!.owner == principals[0];
-                                };
-
-                                if (tx.tx.from != null) {
-                                    account_is_included := account_is_included or tx.tx.from!.owner == principals[1] or tx.tx.from!.owner == principals[0];
-                                };
-
-                                if (tx.tx.spender != null) {
-                                    account_is_included := account_is_included or tx.tx.spender!.owner == principals[1] or tx.tx.spender!.owner == principals[0];
-                                };
-
-                                account_is_included;
-                            }
-                        );
-                    },
-                    func(tx1 : Tx, tx2 : Tx) : Bool {
-                        tx1.ts >= tx2.ts;
-                    },
-                    func(tx : Tx) : Text = debug_show tx,
-                );
-            },
-        );
-
-        test(
-            "get_txs() with 'btype' = '1xfer' and 'amt' > 10, sort by ('tx.amt', #Ascending)",
-            func() {
-                let options = {
-                    sort = ?("tx.amt", #Ascending);
-                    pagination = null;
-                    filter = {
-                        btype = ?["1xfer"];
-                        to = null;
-                        from = null;
-                        spender = null;
-                        account = null;
-                        amt = ?{
-                            min = ?11;
-                            max = null;
-                        };
-                    };
-                };
-
-                let db_query = options_to_query(options);
-                assert db_query.build() == {
-                    query_operations = #And([
-                        #Operation(
-                            "btype",
-                            #eq(#Text("1xfer")),
-                        ),
-                        #Operation(
-                            "tx.amt",
-                            #gte(#Nat(11)),
-                        ),
-                    ]);
-                    sort_by = ?("tx.amt", #Ascending);
-                    pagination = {
-                        cursor = null;
-                        limit = null;
-                        skip = null;
-                    };
-                };
-
-                let result = get_txs(options);
-
-                TestUtils.validate_sorted_records<Tx>(
-                    input_txs,
-                    result,
-                    func(id : Nat, tx : Tx) : Bool {
-                        tx.btype == "1xfer" and tx.tx.amt > 10;
-                    },
-                    func(tx1 : Tx, tx2 : Tx) : Bool {
-                        tx1.tx.amt <= tx2.tx.amt;
-                    },
-                    func(tx : Tx) : Text = debug_show tx,
-                );
-            },
-        );
+        };
 
     },
 );
+
+// suite(
+//     "testing txs db with sorting and pagination",
+//     func() {
+
+//         for (q in test_queries.vals()) {
+
+//             test(
+//                 q.query_name,
+//                 func() {
+//                     // the sort conditions from the previous suite still apply
+
+//                     let paginated_results = paginated_query(q.db_query, pagination_limit);
+
+//                     TestUtils.validate_sorted_records(
+//                         input_txs,
+//                         paginated_results,
+//                         q.check_if_result_matches_query,
+//                         q.check_if_results_are_sorted,
+//                         q.display_record,
+//                     );
+
+//                 },
+//             );
+
+//         };
+
+//     },
+// );

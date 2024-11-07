@@ -88,7 +88,7 @@ module {
     public type Candid = T.Candid;
     public type SortDirection = T.SortDirection;
     public type State<R> = T.State<R>;
-    public type HydraQueryLang = T.HydraQueryLang;
+    public type ZenQueryLang = T.ZenQueryLang;
 
     public type Candify<A> = {
         from_blob : Blob -> A;
@@ -106,6 +106,7 @@ module {
     public type IndexKeyFields = [(Text, Candid)];
 
     let DEFAULT_BTREE_ORDER = 256;
+    let RECORD_ID_FIELD = ":record-id";
 
     func is_schema_backward_compatible(curr : Schema, new : Schema) : Bool {
         switch (curr, new) {
@@ -181,12 +182,16 @@ module {
         };
     };
 
-    func validate_record(schema : Schema, record : Candid) : Result<(), Text> {
+    func validate_record(main_schema : Schema, main_record : Candid) : Result<(), Text> {
 
         // var var_schema = schema;
         // var var_record = record;
 
         func _validate(schema : Schema, record : Candid) : Result<(), Text> {
+            // Debug.print("unwrapping: ");
+            // Debug.print("schema: " # debug_show (schema));
+            // Debug.print("record: " # debug_show (record));
+
             switch (schema, record) {
                 case (#Empty, #Empty) #ok;
                 case (#Null, #Null) #ok;
@@ -199,6 +204,7 @@ module {
                 case (#Blob, #Blob(_)) #ok;
                 case (#Option(inner), #Null) #ok;
                 case (#Option(inner), record) {
+
                     // it should pass in
                     // the case where you update a schema type to be optional
                     return _validate(inner, record);
@@ -282,12 +288,12 @@ module {
                     };
                 };
 
-                case (a, b) return #err("validate_record(): schema and record mismatch: " # debug_show (a, b));
+                case (a, b) return #err("validate_record(): schema and record mismatch: " # debug_show (a, b) # " in " # debug_show (main_schema, main_record));
             };
         };
 
-        switch (schema) {
-            case (#Record(fields)) _validate(schema, record);
+        switch (main_schema) {
+            case (#Record(fields)) _validate(main_schema, main_record);
             case (_) #err("validate_schema(): schema is not a record");
         };
     };
@@ -476,6 +482,7 @@ module {
         blobify = {
             to_blob = func(candid_values : [Candid]) : Blob {
                 let buffer = Buffer.Buffer<Nat8>(100);
+                buffer.add(candid_values.size() |> Nat8.fromNat(_));
 
                 func encode(buffer : Buffer.Buffer<Nat8>, candid : Candid) {
 
@@ -713,8 +720,88 @@ module {
 
             };
             from_blob = func(blob : Blob) : [Candid] {
-                // Debug.trap("Orchid does not support deserialization");
-                [];
+                let bytes = Blob.toArray(blob);
+
+                let size = bytes[0] |> Nat8.toNat(_);
+
+                var i = 1;
+
+                let buffer = Buffer.Buffer<Candid>(8);
+                //                case (#Nat(n)) {
+                //     buffer.add(CandidTypeCode.Nat);
+                //     var num = n;
+                //     var size : Nat8 = 0;
+
+                //     while (num > 0) {
+                //         num /= 255;
+                //         size += 1;
+                //     };
+
+                //     // buffer.add(Nat8.fromNat(Nat32.toNat(size >> 24)));
+                //     // buffer.add(Nat8.fromNat(Nat32.toNat((size >> 16) & 0xff)));
+                //     // buffer.add(Nat8.fromNat(Nat32.toNat((size >> 8) & 0xff)));
+                //     // nat is limited to (2 ^ (255 * 8)) - 1
+                //     buffer.add(size & 0xff);
+
+                //     num := n;
+
+                //     let bytes = Array.tabulate(
+                //         Nat8.toNat(size),
+                //         func(i : Nat) : Nat8 {
+                //             let tmp = num % 255;
+                //             num /= 255;
+                //             Nat8.fromNat(tmp);
+                //         },
+                //     );
+
+                //     for (i in Itertools.range(0, bytes.size())) {
+                //         buffer.add(bytes[bytes.size() - 1 - i]);
+                //     };
+
+                // };
+
+                func read() : Nat8 {
+                    let byte = bytes[i];
+                    i += 1;
+                    byte;
+                };
+
+                label decoding while (i < bytes.size()) {
+
+                    let type_code = read();
+
+                    if (type_code == CandidTypeCode.Nat) {
+                        let size = read() |> Nat8.toNat(_);
+
+                        var num = 0;
+
+                        for (i in Itertools.range(0, size)) {
+                            let byte = read();
+                            num *= 255;
+                            num += Nat8.toNat(byte);
+                        };
+
+                        buffer.add(#Nat(num));
+
+                    } else if (type_code == CandidTypeCode.Text) {
+                        var text = "";
+
+                        label extracting_text loop {
+
+                            let byte = read();
+                            if (byte == 0) break extracting_text;
+
+                            let char = byte |> Nat8.toNat(_) |> Nat32.fromNat(_) |> Char.fromNat32(_);
+                            text #= Char.toText(char);
+                        };
+
+                        buffer.add(#Text(text));
+
+                    } else break decoding;
+
+                };
+
+                Buffer.toArray(buffer);
             };
         };
         cmp = TypeUtils.MemoryCmp.Default;
@@ -742,7 +829,7 @@ module {
 
         for ((index_key, dir) in index_key_details.vals()) {
             for ((key, value) in records.vals()) {
-                if (key == ":record-id") {
+                if (key == RECORD_ID_FIELD) {
                     buffer.add(#Nat(id));
                 } else if (key == index_key) {
                     buffer.add(value);
@@ -760,12 +847,12 @@ module {
         sorted_in_reverse : Bool;
     };
 
-    func get_best_index(collection : StableCollection, operations : [(Text, T.HqlOperators)], sort_field : ?(Text, T.SortDirection)) : ?BestIndexResult {
+    func get_best_index(collection : StableCollection, operations : [(Text, T.ZqlOperators)], sort_field : ?(Text, T.SortDirection)) : ?BestIndexResult {
         let equal_fields = Set.new<Text>();
         let sort_fields = Buffer.Buffer<(Text, T.SortDirection)>(8);
         let range_fields = Set.new<Text>();
 
-        func fill_field_maps(equal_fields : Set.Set<Text>, sort_fields : Buffer<(Text, T.SortDirection)>, range_fields : Set.Set<Text>, operations : [(Text, T.HqlOperators)], sort_field : ?(Text, T.SortDirection)) {
+        func fill_field_maps(equal_fields : Set.Set<Text>, sort_fields : Buffer<(Text, T.SortDirection)>, range_fields : Set.Set<Text>, operations : [(Text, T.ZqlOperators)], sort_field : ?(Text, T.SortDirection)) {
 
             sort_fields.clear();
 
@@ -799,24 +886,33 @@ module {
         // or a direct opposite in order to return the results without additional sorting
         var is_query_and_index_direction_a_match : ?Bool = null;
 
+        let EQUALITY_SCORE = 3;
+        let SORT_SCORE = 2;
+        let RANGE_SCORE = 1;
+
         for (index in Map.vals(collection.indexes)) {
+
             var index_score = 0;
             var requires_additional_filtering = false;
             var requires_additional_sorting = false;
+            var positions_matching_equality_or_range = Set.new<Nat>();
 
             num_of_sort_fields_evaluated := 0;
+            var index_key_details_position = 0;
 
             label scoring_indexes for ((index_key, direction) in index.key_details.vals()) {
+                index_key_details_position += 1;
 
-                if (index_key == ":record-id") break scoring_indexes;
+                if (index_key == RECORD_ID_FIELD) break scoring_indexes;
 
                 var matches_at_least_one_column = false;
 
                 switch (Set.has(equal_fields, thash, index_key)) {
                     case (true) {
-                        index_score += 3;
+                        index_score += EQUALITY_SCORE;
                         num_of_equal_fields_evaluated += 1;
                         matches_at_least_one_column := true;
+                        Set.add(positions_matching_equality_or_range, nhash, index_key_details_position);
                     };
                     case (false) {};
                 };
@@ -833,25 +929,27 @@ module {
                         switch (is_query_and_index_direction_a_match) {
                             case (null) {
                                 is_query_and_index_direction_a_match := ?(direction == sort_field.1);
-                                index_score += 2;
+                                index_score += SORT_SCORE;
                             };
                             case (?is_a_match) {
                                 if (is_a_match == (direction == sort_field.1)) {
-                                    index_score += 2;
+                                    index_score += SORT_SCORE;
                                 } else {
                                     requires_additional_sorting := true;
                                 };
                             };
                         };
                     };
-
                 };
 
-                switch (Set.remove(range_fields, thash, index_key)) {
+                switch (Set.has(range_fields, thash, index_key)) {
                     case (true) {
-                        index_score += 1;
+                        index_score += RANGE_SCORE;
                         num_of_range_fields_evaluated += 1;
                         matches_at_least_one_column := true;
+
+                        Set.add(positions_matching_equality_or_range, nhash, index_key_details_position);
+
                         break scoring_indexes;
                     };
                     case (false) {};
@@ -863,11 +961,28 @@ module {
 
             };
 
-            if (num_of_range_fields_evaluated < Set.size(range_fields) or num_of_equal_fields_evaluated < Set.size(equal_fields)) {
+            if (
+                num_of_range_fields_evaluated < Set.size(range_fields) or num_of_equal_fields_evaluated < Set.size(equal_fields)
+            ) {
                 requires_additional_filtering := true;
             };
 
-            // Debug.print("index, score: " # debug_show (index.name, index_score));
+            if ((Set.size(positions_matching_equality_or_range) == 0 and operations.size() > 0)) {
+                requires_additional_filtering := true;
+            };
+
+            label searching_for_holes for ((prev, current) in Itertools.slidingTuples(Set.keys(positions_matching_equality_or_range))) {
+                if (current - prev > 1) {
+                    requires_additional_filtering := true;
+                    break searching_for_holes;
+                };
+            };
+
+            Debug.print("index, score: " # debug_show (index.name, index_score));
+            Debug.print("requires_additional_filtering: " # debug_show requires_additional_filtering);
+            Debug.print("requires_additional_sorting: " # debug_show requires_additional_sorting);
+            Debug.print("num, range_size: " # debug_show (num_of_range_fields_evaluated, Set.size(range_fields)));
+            Debug.print("num, equal_size: " # debug_show (num_of_equal_fields_evaluated, Set.size(equal_fields)));
 
             if (index_score > best_score) {
                 best_score := index_score;
@@ -1092,8 +1207,10 @@ module {
                             return (#Minimum);
                         };
 
-                        let key = sorted_start_query[i].0;
-                        let ?(#True(val)) or ?(#False(val)) = sorted_start_query[i].1 else return (#Minimum);
+                        let val = switch (sorted_start_query[i].1) {
+                            case (? #True(val) or ? #False(val)) val;
+                            case (null) #Minimum;
+                        };
 
                         (val);
                     },
@@ -1101,19 +1218,24 @@ module {
             };
             case (?(id, cursor)) {
                 let cursor_map = CandidMap.CandidMap(cursor);
-                Array.tabulate<(Candid)>(
+                Array.tabulate<Candid>(
                     index.key_details.size(),
                     func(i : Nat) : (Candid) {
-                        if (index.key_details[i].0 == ":record-id") {
-                            // ":record-id" is only added in the query if it is a cursor
+                        if (index.key_details[i].0 == RECORD_ID_FIELD) {
+                            // RECORD_ID_FIELD is only added in the query if it is a cursor
                             return #Nat(id + 1);
                         };
 
                         let key = index.key_details[i].0;
-                        let ?val = cursor_map.get(key) else return (#Minimum);
-                        val;
 
-                        // let ?(#True(val)) or ?(#False(val)) = sorted_start_query[i].1 else return (#Minimum);
+                        let val = if (i >= sorted_start_query.size()) {
+                            (#Minimum);
+                        } else switch (sorted_start_query[i].1) {
+                            case (? #True(val) or ? #False(val)) val;
+                            case (null) #Minimum;
+                        };
+
+                        val;
 
                     },
                 );
@@ -1138,10 +1260,12 @@ module {
             );
         };
 
-        // Debug.print("full_start_query: " # debug_show full_start_query);
-        // Debug.print("full_end_query: " # debug_show full_end_query);
+        Debug.print("Index_key_details: " # debug_show index.key_details);
+        Debug.print("full_start_query: " # debug_show full_start_query);
+        Debug.print("full_end_query: " # debug_show full_end_query);
 
         let intervals = memorybtree_scan_interval(index.data, index_data_utils, ?full_start_query, ?full_end_query);
+        Debug.print("scan_intervals: " # debug_show intervals);
         intervals
 
         // let records_iter = MemoryBTree.scan(index.data, index_data_utils, ?full_start_query, ?full_end_query);
@@ -1157,12 +1281,12 @@ module {
 
     };
 
-    func get_best_index_from_query(collection : StableCollection, _query : T.HydraQueryLang, sort_field : ?(Text, T.SortDirection)) : ?Index {
+    func get_best_index_from_query(collection : StableCollection, _query : T.ZenQueryLang, sort_field : ?(Text, T.SortDirection)) : ?Index {
         let db_scan_query = _query;
 
         let index_frequencies = Map.new<Text, Nat>();
 
-        func explore_operations(db_scan_query : T.HydraQueryLang) {
+        func explore_operations(db_scan_query : T.ZenQueryLang) {
 
             switch (db_scan_query) {
                 case (#Operation(field, op)) {
@@ -1170,7 +1294,7 @@ module {
                 };
 
                 case (#And(ops)) {
-                    let operations = Buffer.Buffer<(Text, T.HqlOperators)>(8);
+                    let operations = Buffer.Buffer<(Text, T.ZqlOperators)>(8);
                     for (op in ops.vals()) {
                         switch (op) {
                             case (#Operation(field, op)) operations.add((field, op));
@@ -1287,7 +1411,7 @@ module {
                         (key, #Ascending);
                     },
                 ),
-                [(":record-id", #Ascending)],
+                [(RECORD_ID_FIELD, #Ascending)],
             );
 
             // let sorted_index_key_details = Array.sort(index_key_details, func(a : (Text, SortDirection), b : (Text, SortDirection)) : Order { Text.compare(a.0, b.0) });
@@ -1303,7 +1427,8 @@ module {
             );
 
             switch (Map.get(collection.indexes, thash, index_name)) {
-                case (?_) return #err("Index already exists");
+                // doesn't fail if index already exists, just returns ok, because this is likely to be called in the top level actor block and will be executed multiple times during upgrades
+                case (?_) return #ok();
                 case (null) {};
             };
 
@@ -1328,7 +1453,7 @@ module {
 
                 for ((index_key, dir) in index_key_details.vals()) {
 
-                    if (index_key == ":record-id") {
+                    if (index_key == RECORD_ID_FIELD) {
                         buffer.add(#Nat(id));
                     } else {
                         let ?value = candid_map.get(index_key) else return #err("Couldn't get value for index key: " # debug_show index_key);
@@ -1386,7 +1511,7 @@ module {
 
                 for ((index_key, dir) in index.key_details.vals()) {
 
-                    if (index_key == ":record-id") {
+                    if (index_key == RECORD_ID_FIELD) {
                         buffer.add(#Nat(id));
                     } else {
                         let ?value = candid_map.get(index_key) else return #err("Couldn't get value for index key: " # debug_show index_key);
@@ -1468,14 +1593,69 @@ module {
             (start, end);
         };
 
-        func operation_eval(field : Text, op : T.HqlOperators, lower : Map<Text, T.State<Candid>>, upper : Map<Text, T.State<Candid>>) {
+        func operation_eval_with_pagination(
+            field : Text,
+            op : T.ZqlOperators,
+            lower : Map<Text, T.State<Candid>>,
+            upper : Map<Text, T.State<Candid>>,
+            sort_by_map : Map<Text, T.SortDirection>,
+            cursor_map : CandidMap.CandidMap,
+            pagination_direction : T.PaginationDirection,
+        ) {
+            operation_eval(field, op, lower, upper);
+
+            switch (op) {
+                case (#eq(_)) return;
+                case (_) {};
+            };
+
+            Debug.print("operation_eval_with_pagination: " # debug_show (field, op, pagination_direction));
+
+            Debug.print("cursor_value: " # debug_show cursor_map.get(field));
+
+            if (pagination_direction == #Forward) {
+                switch (cursor_map.get(field)) {
+                    case (?cursor_value) {
+                        let should_replace_lower_bound = switch (op) {
+                            case (#gte(candid_value)) cmp_candid(collection.schema, cursor_value, candid_value) == 1;
+                            case (#gt(candid_value)) cmp_candid(collection.schema, cursor_value, candid_value) == 1;
+                            case (_) false;
+                        };
+
+                        if (should_replace_lower_bound) {
+                            ignore Map.put(lower, thash, field, #True(cursor_value));
+                        };
+
+                        let should_replace_upper_bound = switch (op) {
+                            case (#lte(candid_value)) cmp_candid(collection.schema, cursor_value, candid_value) == -1;
+                            case (#lt(candid_value)) cmp_candid(collection.schema, cursor_value, cursor_value) == -1;
+                            case (_) false;
+                        };
+
+                        if (should_replace_upper_bound) {
+                            ignore Map.put(upper, thash, field, #True(cursor_value));
+                        };
+
+                        Debug.print("should_replace_lower_bound: " # debug_show should_replace_lower_bound);
+                        Debug.print("should_replace_upper_bound: " # debug_show should_replace_upper_bound);
+                    };
+
+                    case (_) {};
+                };
+            };
+
+        };
+
+        func operation_eval(
+            field : Text,
+            op : T.ZqlOperators,
+            lower : Map<Text, T.State<Candid>>,
+            upper : Map<Text, T.State<Candid>>,
+        ) {
             switch (op) {
                 case (#eq(candid)) {
                     ignore Map.put(lower, thash, field, #True(candid));
                     ignore Map.put(upper, thash, field, #True(candid));
-                };
-                case (#In(_) or #Not(_)) {
-                    Debug.trap(debug_show op # " not allowed in this context. Should have been expanded by the query builder");
                 };
                 case (#gte(candid)) {
                     ignore Map.put(lower, thash, field, #True(candid));
@@ -1489,13 +1669,95 @@ module {
                 case (#gt(candid)) {
                     ignore Map.put(lower, thash, field, #False(candid));
                 };
+                case (#In(_) or #Not(_)) {
+                    Debug.trap(debug_show op # " not allowed in this context. Should have been expanded by the query builder");
+                };
             };
         };
 
         type RecordLimits = [(Text, ?State<Candid>)];
         type FieldLimit = (Text, ?State<Candid>);
 
-        func extract_lower_upper_bounds(lower : Map<Text, T.State<Candid>>, upper : Map<Text, T.State<Candid>>) : ([(Text, ?State<Candid>)], [(Text, ?State<Candid>)]) {
+        // update the bounds to shift to the pagination cursor
+        func shift_bounds_to_pagination_cursor(
+            lower : Map<Text, T.State<Candid>>,
+            upper : Map<Text, T.State<Candid>>,
+            operations : [(Text, T.ZqlOperators)],
+            index_key_details : [(Text, T.SortDirection)],
+            cursor_id : Nat,
+            cursor_map : CandidMap.CandidMap,
+            pagination_direction : T.PaginationDirection,
+        ) {
+
+            Debug.print("It should be shifting!!!!");
+
+            let equality_set = Set.new<Text>();
+
+            for ((field, op) in operations.vals()) {
+                switch (op) {
+                    case (#eq(candid)) ignore Set.put(equality_set, thash, field);
+                    case (_) {};
+                };
+            };
+
+            for ((field, sort_direction) in index_key_details.vals()) {
+                if (Set.has(equality_set, thash, field)) {
+                    switch (Map.get(lower, thash, field)) {
+                        case (? #True(val) or ? #False(val)) if (?val != cursor_map.get(field)) {
+                            // can't shift bounds if the equality constraint does not match the cursor
+
+                            return;
+                        };
+                        case (null) Debug.trap("cursor value not found in bounds");
+                    };
+                } else {
+                    if (field == RECORD_ID_FIELD) {
+                        switch (sort_direction) {
+                            case (#Ascending) {
+                                ignore Map.put(lower, thash, field, #True(#Nat(cursor_id + 1)));
+                            };
+                            case (#Descending) {
+                                ignore Map.put(upper, thash, field, #True(#Nat(if (cursor_id > 0) cursor_id - 1 else 0)));
+                            };
+                        };
+                    } else {
+                        switch (cursor_map.get(field)) {
+                            case (?cursor_value) {
+                                let should_replace = switch (sort_direction) {
+                                    case (#Ascending) {
+                                        switch (Map.get(lower, thash, field)) {
+                                            case (? #True(val) or ? #False(val)) cmp_candid(collection.schema, cursor_value, val) == 1;
+                                            case (null) true;
+                                        };
+                                    };
+                                    case (#Descending) {
+                                        switch (Map.get(upper, thash, field)) {
+                                            case (? #True(val) or ? #False(val)) cmp_candid(collection.schema, cursor_value, val) == -1;
+                                            case (null) true;
+                                        };
+                                    };
+                                };
+
+                                if (should_replace) {
+                                    switch (sort_direction) {
+                                        case (#Ascending) {
+                                            ignore Map.put(lower, thash, field, #True(cursor_value));
+                                        };
+                                        case (#Descending) {
+                                            ignore Map.put(upper, thash, field, #True(cursor_value));
+                                        };
+                                    };
+                                };
+                            };
+                            case (null) {};
+                        };
+                    };
+
+                };
+            };
+        };
+
+        func extract_lower_and_upper_bounds(lower : Map<Text, T.State<Candid>>, upper : Map<Text, T.State<Candid>>) : ([(Text, ?State<Candid>)], [(Text, ?State<Candid>)]) {
             let lower_bound_size = Map.size(lower);
             let upper_bound_size = Map.size(upper);
 
@@ -1527,7 +1789,7 @@ module {
 
         };
 
-        // func best_index_interval_eval(expr : HydraQueryLang, sort_column : ?(Text, T.SortDirection)) : EvalResult {
+        // func best_index_interval_eval(expr : ZenQueryLang, sort_column : ?(Text, T.SortDirection)) : EvalResult {
 
         //     let best_index = get_best_index_from_query(collection, expr, sort_column);
 
@@ -1546,7 +1808,7 @@ module {
 
         //             var is_sorted = false;
         //             var requires_sorting : Bool = Option.isSome(sort_column);
-        //             var operations = Buffer.Buffer<(Text, T.HqlOperators)>(8);
+        //             var operations = Buffer.Buffer<(Text, T.ZqlOperators)>(8);
 
         //             var nested_or_operations = 0;
 
@@ -1582,7 +1844,7 @@ module {
         //             };
 
         //             if (nested_or_operations < and_operations.size()) {
-        //                 let (lower_bound_as_array, upper_bound_as_array) = extract_lower_upper_bounds(new_lower, new_upper);
+        //                 let (lower_bound_as_array, upper_bound_as_array) = extract_lower_and_upper_bounds(new_lower, new_upper);
 
         //                 switch (best_index) {
         //                     case (?best_index_result) {
@@ -1762,9 +2024,9 @@ module {
             intervals : Buffer.Buffer<(Nat, Nat)>;
         };
 
-        func index_intersection_eval(expr : HydraQueryLang, sort_column : ?(Text, T.SortDirection), pagination : T.StableQueryPagination, cursor_record : ?(Nat, Candid.Candid)) : EvalResult {
-            // pagination - we can't prematurely limit the number of records returned by a single
-            // operation in the query because merging the results of the limited results may lead
+        func index_intersection_eval(expr : ZenQueryLang, sort_column : ?(Text, T.SortDirection), pagination : T.StableQueryPagination, cursor_record : ?(Nat, Candid.Candid), cursor_map : CandidMap.CandidMap) : EvalResult {
+            //! pagination - we can't prematurely limit the number of records returned by a single
+            // operation in the query because merging (which includes deduplicating record ids in #Or ops and filtering records with ids not present in all the #And subqueries) the limited results may lead
             // to less than the desired number of records.
 
             func add_interval(intervals_by_index : Map<Text, IndexDetails>, index : Text, interval : (Nat, Nat), is_reversed : Bool) {
@@ -1803,6 +2065,17 @@ module {
                 case (null) func(_ : Nat, _ : Nat) : Order = #equal; // never called because requires_sorting is false
             };
 
+            // map is ordered by insertion, so we can loop through
+            // in the order the operations were added
+            let sort_by_map = Map.new<Text, T.SortDirection>();
+
+            switch (sort_column) {
+                case (?(field, direction)) ignore Map.put(sort_by_map, thash, field, direction);
+                case (null) {};
+            };
+
+            ignore Map.put(sort_by_map, thash, RECORD_ID_FIELD, #Ascending);
+
             switch (expr) {
                 case (#Operation(field, op)) {
                     Debug.trap("Operation not allowed in this context");
@@ -1822,9 +2095,8 @@ module {
                     let sorted_records_from_iter = Buffer.Buffer<Nat>(8);
                     let full_scan_bounds = Buffer.Buffer<([(Text, ?State<Candid>)], [(Text, ?State<Candid>)])>(8);
 
-                    var is_sorted = false;
-                    var requires_sorting : Bool = Option.isSome(sort_column);
-                    var operations = Buffer.Buffer<(Text, T.HqlOperators)>(8);
+                    var requires_sorting : Bool = true;
+                    var operations = Buffer.Buffer<(Text, T.ZqlOperators)>(8);
 
                     var nested_or_operations = 0;
 
@@ -1852,6 +2124,7 @@ module {
                                 };
 
                                 operations.add(field, op);
+
                                 operation_eval(field, op, new_lower, new_upper);
                             };
                             case (#And(_)) {
@@ -1861,7 +2134,7 @@ module {
 
                                 nested_or_operations += 1;
 
-                                let eval_result = index_intersection_eval(nested_expr, sort_column, pagination, cursor_record);
+                                let eval_result = index_intersection_eval(nested_expr, sort_column, pagination, cursor_record, cursor_map);
                                 switch (eval_result) {
                                     case (#Empty) return #Empty; // return early if we encounter an empty set
                                     case (#Ids(iter)) {
@@ -1891,7 +2164,6 @@ module {
 
                     if (nested_or_operations < and_operations.size()) {
                         // if there where #Operation types in the and_operations
-                        let (lower_bound_as_array, upper_bound_as_array) = extract_lower_upper_bounds(new_lower, new_upper);
 
                         switch (get_best_index(collection, Buffer.toArray(operations), sort_column)) {
                             case (?best_index_result) {
@@ -1900,23 +2172,46 @@ module {
                                 let requires_additional_sorting = best_index_result.requires_additional_sorting;
                                 let sorted_in_reverse = best_index_result.sorted_in_reverse;
 
+                                let operations_array = Buffer.toArray(operations);
+
+                                // switch (pagination.cursor, cursor_record) {
+                                //     case (?(cursor_id, pagination_direction), ?(_, cursor_record)) {
+
+                                //         let sort_columns = switch (sort_column) {
+                                //             case (null) [(RECORD_ID_FIELD, #Ascending)];
+                                //             case (?sort_column) [sort_column, (RECORD_ID_FIELD, #Ascending)];
+                                //         };
+
+                                //         shift_bounds_to_pagination_cursor(new_lower, new_upper, operations_array, index.key_details, cursor_id, cursor_map, pagination_direction);
+                                //     };
+                                //     case (_, _) {};
+                                // };
+
+                                let (lower_bound_as_array, upper_bound_as_array) = extract_lower_and_upper_bounds(new_lower, new_upper);
+
+                                Debug.print("lower bound: " # debug_show (lower_bound_as_array));
+                                Debug.print("upper bound: " # debug_show (upper_bound_as_array));
+
                                 var interval = scan(collection, index, blobify, lower_bound_as_array, upper_bound_as_array, cursor_record);
 
-                                // Debug.print("best interval: " # debug_show ({ index = index.name; requires_additional_filtering; requires_additional_sorting; sorted_in_reverse; interval }));
+                                Debug.print("best interval: " # debug_show ({ index = index.name; requires_additional_filtering; requires_additional_sorting; sorted_in_reverse; interval }));
+                                Debug.print("index entries: " # debug_show (Iter.toArray(MemoryBTree.keys(index.data, get_index_data_utils(collection, index.key_details)))));
 
-                                if (requires_additional_filtering) {
-                                    var record_ids_in_interval = record_ids_from_index_interval(index, interval);
-
-                                    if (sorted_in_reverse) record_ids_in_interval := record_ids_in_interval.rev();
-
-                                    let filtered_ids = multi_filter(collection, record_ids_in_interval, Buffer.fromArray([(lower_bound_as_array, upper_bound_as_array)]));
-                                    let bitmap = BitMap.fromIter(filtered_ids);
-                                    bitmaps.add(bitmap);
+                                if (not requires_additional_sorting and not requires_additional_filtering) {
+                                    add_interval(intervals_by_index, index.name, interval, sorted_in_reverse);
                                 } else {
-                                    if (requires_additional_sorting) {
-                                        var record_ids = MemoryBTree.rangeVals(index.data, get_index_data_utils(collection, index.key_details), interval.0, interval.1);
-                                        if (sorted_in_reverse) record_ids := record_ids.rev();
 
+                                    var record_ids : Iter<Nat> = if (sorted_in_reverse) {
+                                        MemoryBTree.rangeVals(index.data, get_index_data_utils(collection, index.key_details), interval.0, interval.1).rev();
+                                    } else {
+                                        MemoryBTree.rangeVals(index.data, get_index_data_utils(collection, index.key_details), interval.0, interval.1);
+                                    };
+
+                                    if (requires_additional_filtering) {
+                                        record_ids := multi_filter(collection, record_ids, Buffer.fromArray([(lower_bound_as_array, upper_bound_as_array)]));
+                                    };
+
+                                    if (requires_additional_sorting) {
                                         for (id in record_ids) {
                                             sorted_records_from_iter.add(id);
                                         };
@@ -1926,15 +2221,18 @@ module {
                                         // Debug.print("about to sort");
 
                                         sorted_records_from_iter.sort(sort_records_by_field_cmp);
+                                        record_ids := sorted_records_from_iter.vals();
 
-                                        iterators.add(sorted_records_from_iter.vals());
-
-                                    } else {
-                                        add_interval(intervals_by_index, index.name, interval, sorted_in_reverse);
                                     };
+
+                                    iterators.add(record_ids);
+
                                 };
+
                             };
                             case (null) {
+                                let (lower_bound_as_array, upper_bound_as_array) = extract_lower_and_upper_bounds(new_lower, new_upper);
+
                                 full_scan_bounds.add((lower_bound_as_array, upper_bound_as_array));
                             };
                         };
@@ -2107,10 +2405,24 @@ module {
                     };
 
                     if (iterators.size() > 0) {
+                        var fill_sorted_records_from_iter = if (sorted_records_from_iter.size() > 0) {
+                            false;
+                        } else { true };
 
-                        for (iter in iterators.vals()) {
+                        for (_iter in iterators.vals()) {
+                            let iter = if (fill_sorted_records_from_iter) {
+                                for (id in _iter) {
+                                    sorted_records_from_iter.add(id);
+                                };
+                                sorted_records_from_iter.vals();
+                            } else { _iter };
+
                             let bitmap = BitMap.fromIter(iter);
                             bitmaps.add(bitmap);
+
+                            if (sorted_records_from_iter.size() > 0) {
+                                fill_sorted_records_from_iter := false;
+                            };
                         };
 
                     };
@@ -2139,7 +2451,7 @@ module {
                     let intervals_by_index = Map.new<Text, IndexDetails>();
                     let full_scan_bounds = Buffer.Buffer<([(Text, ?State<Candid>)], [(Text, ?State<Candid>)])>(8);
 
-                    let requires_sorting : Bool = Option.isSome(sort_column);
+                    let requires_sorting : Bool = true;
                     let iterators = Buffer.Buffer<Iter<Nat>>(8);
 
                     label resolving_or_operations for (expr in buffer.vals()) {
@@ -2149,7 +2461,6 @@ module {
                         switch (expr) {
                             case (#Operation(field, op)) {
                                 operation_eval(field, op, new_lower, new_upper);
-                                let (lower_bound_as_array, upper_bound_as_array) = extract_lower_upper_bounds(new_lower, new_upper);
 
                                 let opt_index = get_best_index(collection, [(field, op)], sort_column);
 
@@ -2160,35 +2471,69 @@ module {
                                         let requires_additional_sorting = best_index_info.requires_additional_sorting;
                                         let sorted_in_reverse = best_index_info.sorted_in_reverse;
 
-                                        assert requires_additional_filtering == false;
+                                        // assert requires_additional_filtering == false;
+
+                                        switch (pagination.cursor, cursor_record) {
+                                            case (?(cursor_id, pagination_direction), ?(_, cursor_record)) {
+
+                                                let sort_columns = switch (sort_column) {
+                                                    case (null) [(RECORD_ID_FIELD, #Ascending)];
+                                                    case (?sort_column) [sort_column, (RECORD_ID_FIELD, #Ascending)];
+                                                };
+
+                                                shift_bounds_to_pagination_cursor(new_lower, new_upper, [(field, op)], index.key_details, cursor_id, cursor_map, pagination_direction);
+                                            };
+                                            case (_, _) {};
+                                        };
+
+                                        let (lower_bound_as_array, upper_bound_as_array) = extract_lower_and_upper_bounds(new_lower, new_upper);
 
                                         let interval = scan(collection, index, blobify, lower_bound_as_array, upper_bound_as_array, cursor_record);
 
-                                        // Debug.print("best interval: " # debug_show ({ index = index.name; requires_additional_filtering; requires_additional_sorting; sorted_in_reverse; interval }));
+                                        Debug.print("best interval: " # debug_show ({ index = index.name; requires_additional_filtering; requires_additional_sorting; sorted_in_reverse; interval }));
+                                        Debug.print("index entries: " # debug_show (Iter.toArray(MemoryBTree.keys(index.data, get_index_data_utils(collection, index.key_details)))));
 
-                                        if (requires_additional_sorting) {
-                                            let record_ids = MemoryBTree.rangeVals(index.data, get_index_data_utils(collection, index.key_details), interval.0, interval.1);
-                                            let buffer = Buffer.Buffer<Nat>(8);
-                                            for (id in record_ids) {
-                                                buffer.add(id);
+                                        if (not requires_additional_filtering and not requires_additional_sorting) {
+                                            add_interval(intervals_by_index, index.name, interval, sorted_in_reverse);
+
+                                        } else {
+                                            var record_ids : Iter<Nat> = if (sorted_in_reverse) {
+                                                MemoryBTree.rangeVals(index.data, get_index_data_utils(collection, index.key_details), interval.0, interval.1).rev();
+                                            } else {
+                                                MemoryBTree.rangeVals(index.data, get_index_data_utils(collection, index.key_details), interval.0, interval.1);
                                             };
 
-                                            buffer.sort(sort_records_by_field_cmp);
-                                            iterators.add(buffer.vals());
+                                            if (requires_additional_filtering) {
+                                                record_ids := multi_filter(collection, record_ids, Buffer.fromArray([(lower_bound_as_array, upper_bound_as_array)]));
+                                            };
 
-                                            // let bitmap = BitMap.fromIter(record_ids);
-                                            // bitmaps.add(bitmap);
-                                        } else {
-                                            add_interval(intervals_by_index, index.name, interval, sorted_in_reverse);
+                                            if (requires_additional_sorting) {
+
+                                                let buffer = Buffer.Buffer<Nat>(8);
+
+                                                for (id in record_ids) {
+                                                    buffer.add(id);
+                                                };
+
+                                                buffer.sort(sort_records_by_field_cmp);
+                                                record_ids := buffer.vals();
+
+                                            };
+
+                                            iterators.add(record_ids);
+
                                         };
+
                                     };
                                     case (null) {
+                                        let (lower_bound_as_array, upper_bound_as_array) = extract_lower_and_upper_bounds(new_lower, new_upper);
+
                                         full_scan_bounds.add((lower_bound_as_array, upper_bound_as_array));
                                         continue resolving_or_operations;
                                     };
                                 };
                             };
-                            case (#And(_)) switch (index_intersection_eval(expr, sort_column, pagination, cursor_record)) {
+                            case (#And(_)) switch (index_intersection_eval(expr, sort_column, pagination, cursor_record, cursor_map)) {
                                 case (#Empty) {}; // do nothing if empty set
                                 case (#Ids(iter)) {
                                     if (requires_sorting) {
@@ -2352,12 +2697,14 @@ module {
             let sort_by = stable_query.sort_by;
             let pagination = stable_query.pagination;
 
-            let cursor_record = switch (pagination.cursor) {
+            let (opt_cursor, cursor_map) = switch (pagination.cursor) {
                 case (?(id, pagination_direction)) switch (lookup_candid_record(collection, id)) {
-                    case (?record) ?(id, record);
-                    case (null) null;
+                    case (?record) {
+                        (?(id, record), CandidMap.CandidMap(record));
+                    };
+                    case (null) (null, CandidMap.CandidMap(#Record([])));
                 };
-                case (null) null;
+                case (null) (null, CandidMap.CandidMap(#Record([])));
             };
 
             switch (Query.validate_query(collection, stable_query.query_operations)) {
@@ -2375,25 +2722,25 @@ module {
                 case (null) 2 ** 64;
             };
 
-            // Debug.print("pagination: " # debug_show pagination);
-            // Debug.print("cursor_record: " # debug_show cursor_record);
+            Debug.print("pagination: " # debug_show pagination);
+            Debug.print("cursor_record: " # debug_show (opt_cursor));
 
-            var iter = switch (index_intersection_eval(query_operations, sort_by, pagination, cursor_record)) {
+            var iter = switch (index_intersection_eval(query_operations, sort_by, pagination, opt_cursor, cursor_map)) {
                 case (#Empty) {
-                    // Debug.print("#Empty");
+                    Debug.print("#Empty");
                     return #ok(#Empty);
                 };
                 case (#BitMap(bitmap)) {
-                    // Debug.print("#BitMap");
+                    Debug.print("#BitMap");
                     bitmap.vals();
                 };
                 case (#Ids(iter)) {
-                    // Debug.print("#Ids");
+                    Debug.print("#Ids");
                     iter;
                 };
                 case (#Interval(index_name, _intervals, is_reversed)) {
 
-                    // Debug.print("#Interval " # debug_show (index_name, _intervals, is_reversed));
+                    Debug.print("#Interval " # debug_show (index_name, _intervals, is_reversed));
                     let ?index = Map.get(collection.indexes, thash, index_name) else Debug.trap("Unreachable: IndexMap not found for index: " # index_name);
                     let index_data_utils = get_index_data_utils(collection, index.key_details);
 
@@ -2403,40 +2750,40 @@ module {
                         _intervals;
                     };
 
-                    // Debug.print("(skip, limit): " # debug_show (skip, limit));
+                    Debug.print("(skip, limit): " # debug_show (skip, limit));
                     var interval_length = 0;
                     var prev_interval_length = 0;
 
-                    let intervals_in_pagination = Itertools.mapFilter(
-                        ordered_intervals.vals(),
-                        func(interval : (Nat, Nat)) : ?(Nat, Nat) {
-                            interval_length := interval.1 - interval.0;
+                    // let intervals_in_pagination = Itertools.mapFilter(
+                    //     ordered_intervals.vals(),
+                    //     func(interval : (Nat, Nat)) : ?(Nat, Nat) {
+                    //         interval_length := interval.1 - interval.0;
 
-                            if (interval_length <= limit) {
-                                prev_interval_length := interval_length;
-                                return ?interval;
-                            };
+                    //         if (interval_length <= limit) {
+                    //             prev_interval_length := interval_length;
+                    //             return ?interval;
+                    //         };
 
-                            // skip should be handled in index_intersection_eval
-                            // ! - note: might change to relative skip, where skip is added to cursor position, making the prev_interval_length the start check
-                            // if (interval.1 > skip and interval.0 < skip + limit) return ?interval;
-                            // if (interval.0 >= skip + limit) return null;
-                            // if (interval.1 <= skip) return null;
+                    //         // skip should be handled in index_intersection_eval
+                    //         // ! - note: might change to relative skip, where skip is added to cursor position, making the prev_interval_length the start check
+                    //         // if (interval.1 > skip and interval.0 < skip + limit) return ?interval;
+                    //         // if (interval.0 >= skip + limit) return null;
+                    //         // if (interval.1 <= skip) return null;
 
-                            if (prev_interval_length > limit) return null;
+                    //         if (prev_interval_length > limit) return null;
 
-                            let length_within_limit = limit - prev_interval_length;
-                            prev_interval_length := interval_length;
+                    //         let length_within_limit = limit - prev_interval_length;
+                    //         prev_interval_length := interval_length;
 
-                            let start = interval.0;
+                    //         let start = interval.0;
 
-                            ?(start, start + length_within_limit);
-                        },
-                    );
+                    //         ?(start, start + length_within_limit);
+                    //     },
+                    // );
 
                     let record_ids_from_returned_intervals = Itertools.flatten(
                         Iter.map(
-                            intervals_in_pagination,
+                            ordered_intervals.vals(),
                             func(interval : (Nat, Nat)) : Iter<(Nat)> {
                                 let record_ids = MemoryBTree.rangeVals(index.data, index_data_utils, interval.0, interval.1);
 
@@ -2453,21 +2800,22 @@ module {
                 };
             };
 
-            // let arr = Iter.toArray(iter);
-            // Debug.print("record ids: " # debug_show arr);
-            // iter := arr.vals();
-
             let iter_with_offset = Itertools.skip(iter, skip);
+            Debug.print("skip: " # debug_show skip);
 
-            let eval_result = switch (pagination.limit) {
+            var paginated_iter = switch (pagination.limit) {
                 case (?limit) {
                     let iter_with_limit = Itertools.take(iter_with_offset, limit);
-                    #Ids(iter_with_limit);
+                    (iter_with_limit);
                 };
-                case (null) #Ids(iter_with_offset);
+                case (null) (iter_with_offset);
             };
 
-            #ok(eval_result);
+            let arr = Iter.toArray(paginated_iter);
+            Debug.print("record ids: " # debug_show arr);
+            paginated_iter := arr.vals();
+
+            #ok(#Ids(paginated_iter));
         };
 
         func internal_find(query_builder : QueryBuilder) : Result<Iter<Nat>, Text> {

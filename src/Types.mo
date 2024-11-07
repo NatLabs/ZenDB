@@ -102,7 +102,7 @@ module {
 
     public type IndexKeyFields = [(Text, Candid)];
 
-    public type HqlOperators = {
+    public type ZqlOperators = {
         #eq : Candid;
         #gte : Candid;
         #lte : Candid;
@@ -111,28 +111,28 @@ module {
         // #exists : Text;
         #In : [Candid];
 
-        #Not : HqlOperators;
+        #Not : ZqlOperators;
 
     };
 
-    public type HydraQueryLang = {
+    public type ZenQueryLang = {
 
-        #Operation : (Text, HqlOperators);
-        #And : [HydraQueryLang];
-        #Or : [HydraQueryLang];
+        #Operation : (Text, ZqlOperators);
+        #And : [ZenQueryLang];
+        #Or : [ZenQueryLang];
 
-        // #Limit : (Nat, HydraQueryLang);
-        // #Skip : (Nat, HydraQueryLang);
-        // #BatchSize : (Nat, HydraQueryLang);
+        // #Limit : (Nat, ZenQueryLang);
+        // #Skip : (Nat, ZenQueryLang);
+        // #BatchSize : (Nat, ZenQueryLang);
 
         // #Regex : (Text, Text);
-        // #Not : HydraQueryLang;
+        // #Not : ZenQueryLang;
 
         // #In : (Text, [Candid]);
         // #Between : (Text, Candid, Candid);
-        // #All : (Text, HydraQueryLang);
-        // #Intersect : (HydraQueryLang, HydraQueryLang);
-        // #Union : (HydraQueryLang, HydraQueryLang);
+        // #All : (Text, ZenQueryLang);
+        // #Intersect : (ZenQueryLang, ZenQueryLang);
+        // #Union : (ZenQueryLang, ZenQueryLang);
     };
 
     public type Cursor = Nat;
@@ -149,7 +149,7 @@ module {
     };
 
     public type StableQuery = {
-        query_operations : HydraQueryLang;
+        query_operations : ZenQueryLang;
         pagination : StableQueryPagination;
         sort_by : ?(Text, SortDirection);
     };

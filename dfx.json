@@ -1,15 +1,22 @@
 {
-    "version": 1,
-    "defaults": {
-        "build": {
-            "packtool": "mops sources",
-            "args": ""
-        }
-    },
-    "networks": {
-        "local": {
-            "bind": "127.0.0.1:8000",
-            "type": "ephemeral"
-        }
+  "version": 1,
+  "canisters": {
+    "icp-txs-db": {
+      "type": "motoko",
+      "main": "example/icp-txs-db/main.mo",
+      "args": ""
     }
+  },
+  "defaults": {
+    "build": {
+      "packtool": "mops sources",
+      "args": ""
+    }
+  },
+  "networks": {
+    "local": {
+      "bind": "127.0.0.1:4943",
+      "type": "ephemeral"
+    }
+  }
 }
