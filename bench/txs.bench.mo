@@ -150,7 +150,7 @@ module {
             // "(sorted by tx.amt, ↑)",
             // "(sorted by tx.amt, ↓)",
             // "(pagination limit = 100, -> array",
-            "(pagination limit = 100, -> array"
+            // "(pagination limit = 100, -> array"
         ]);
 
         bench.rows([

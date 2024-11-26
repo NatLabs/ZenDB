@@ -109,6 +109,15 @@ module {
 
     };
 
+    public func buffer_add_all<A>(buffer : Buffer.Buffer<A>, iter : Iter.Iter<A>) {
+        for (elem in iter) { buffer.add(elem) };
+    };
+
+    // add all elements from an iterator to a bufferlike object that has the add method
+    public func buffer_like_add_all<A>(buffer : { add : (A) -> () }, iter : Iter.Iter<A>) {
+        for (elem in iter) { buffer.add(elem) };
+    };
+
     public class ReusableBuffer<A>(init_capacity : Nat) {
         var elems : [var ?A] = Array.init(init_capacity, null);
         var count : Nat = 0;

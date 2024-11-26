@@ -28,7 +28,7 @@ import MemoryBTree "mo:memory-collection/MemoryBTree/Stable";
 import TypeUtils "mo:memory-collection/TypeUtils";
 import Int8Cmp "mo:memory-collection/TypeUtils/Int8Cmp";
 
-module {
+module T {
     public type BitMap = BitMap.BitMap;
 
     // public type ZenDB = ZenDB.ZenDB;
@@ -37,6 +37,8 @@ module {
         #Minimum;
         #Maximum;
     };
+
+    public type Interval = (Nat, Nat);
 
     public type Candify<A> = {
         from_blob : Blob -> A;
@@ -101,6 +103,10 @@ module {
     };
 
     public type IndexKeyFields = [(Text, Candid)];
+
+    public type FieldLimit = (Text, ?State<Candid>);
+    public type RecordLimits = [(Text, ?State<Candid>)];
+    public type Bounds = (RecordLimits, RecordLimits);
 
     public type ZqlOperators = {
         #eq : Candid;
@@ -168,4 +174,62 @@ module {
     };
 
     public type CandidQuery = State<Candid>;
+
+    public type FullScanDetails = {
+        requires_additional_sorting : Bool;
+        requires_additional_filtering : Bool;
+        scan_bounds : T.Bounds;
+        filter_bounds : T.Bounds;
+    };
+
+    public type IndexScanDetails = {
+        index : T.Index;
+        requires_additional_sorting : Bool;
+        requires_additional_filtering : Bool;
+        sorted_in_reverse : Bool;
+        interval : (Nat, Nat);
+        scan_bounds : T.Bounds;
+        filter_bounds : T.Bounds;
+        simple_operations : [(Text, T.ZqlOperators)];
+    };
+
+    public type ScanDetails = {
+        #IndexScan : IndexScanDetails;
+        #FullScan : FullScanDetails;
+    };
+
+    public type QueryPlan = {
+        is_and_operation : Bool;
+        subplans : [QueryPlan]; // result of nested #And/#Or operations
+        simple_operations : [(Text, T.ZqlOperators)];
+        scans : [ScanDetails]; // scan results from simple #Operation
+    };
+
+    public type MemoryCollectionStats = {
+        metadata_bytes : Nat;
+        actual_data_bytes : Nat;
+    };
+
+    public type IndexStats = {
+        columns : [Text];
+        stable_memory : MemoryCollectionStats;
+    };
+
+    public type CollectionStats = {
+        records : Nat;
+        indexes : [IndexStats];
+
+        main_btree_index : {
+            stable_memory : MemoryCollectionStats;
+        };
+
+    };
+
+    public type EvalResult = {
+        #Empty;
+        #Ids : Iter<Nat>;
+        #BitMap : T.BitMap;
+        #Interval : (index : Text, interval : [(Nat, Nat)], is_reversed : Bool);
+    };
+
 };

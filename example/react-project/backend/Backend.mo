@@ -1,4 +1,8 @@
+import Prim "mo:prim";
+
 import Array "mo:base/Array";
+import Iter "mo:base/Iter";
+import IC "mo:base/ExperimentalInternetComputer";
 import Principal "mo:base/Principal";
 import Debug "mo:base/Debug";
 import Nat64 "mo:base/Nat64";
@@ -11,51 +15,15 @@ import Itertools "mo:itertools/Iter";
 
 import Ledger "ledger";
 import ZenDB "../../../src";
+import T "Types";
+import BlockUtils "BlockUtils";
 
 actor class Backend() {
-    stable var counter = 0;
-
-    // Get the current count
-    public query func get() : async Nat {
-        counter;
-    };
-
-    // Increment the count by one
-    public func inc() : async () {
-        counter += 1;
-    };
-
-    // Add `n` to the current count
-    public func add(n : Nat) : async () {
-        counter += n;
-    };
-    // public type Account = {
-    //     owner : Principal;
-    //     sub_account : ?Blob; // null == [0...0]
-    // };
-
-    public type Tx = {
-        amt : ?Nat;
-        from : ?Blob;
-        to : ?Blob;
-        spender : ?Blob;
-        memo : ?Blob;
-        expires_at : ?Nat;
-        expected_allowance : ?Nat;
-    };
-
-    public type Block = {
-        btype : Text;
-        phash : ?Blob;
-        ts : Nat;
-        fee : ?Nat;
-        tx : Tx;
-    };
-
-    stable let stored_blocks = Vector.new<Block>();
-    stable var blocks_stored_in_db = 0;
+    type Block = T.Block;
+    type Tx = T.Tx;
 
     stable let db_sstore = ZenDB.new();
+    // Debug.print("db_sstore: " # debug_show (db_sstore));
     let db = ZenDB.launch(db_sstore);
 
     let ledger : Ledger.Service = actor ("ryjl3-tyaaa-aaaaa-aaaba-cai");
@@ -65,211 +33,8 @@ actor class Backend() {
     //     { owner = account; sub_account = null };
     // };
 
-    func tokens_to_nat(tokens : Ledger.Tokens) : Nat {
-        Nat64.toNat(tokens.e8s);
-    };
-
-    func convert_ledger_block(ledger_block : Ledger.CandidBlock) : Block {
-        let { parent_hash; timestamp; transaction } = ledger_block;
-
-        let block : Block = switch (transaction.operation) {
-            case (? #Approve(approve)) {
-                {
-                    btype = "2approve";
-                    phash = parent_hash;
-                    ts = Nat64.toNat(transaction.created_at_time.timestamp_nanos);
-                    fee = ?tokens_to_nat(approve.fee);
-                    tx = {
-
-                        from = ?(approve.from);
-                        to = null;
-                        spender = ?(approve.spender);
-                        memo = transaction.icrc1_memo;
-                        expected_allowance = switch (approve.expected_allowance) {
-                            case (null) null;
-                            case (?expected_allowance) ?tokens_to_nat(expected_allowance);
-                        };
-                        amt = ?tokens_to_nat(approve.allowance);
-                        expires_at = switch (approve.expires_at) {
-                            case (?expires_at) ?Nat64.toNat(expires_at.timestamp_nanos);
-                            case (null) null;
-                        };
-                    };
-                };
-            };
-
-            case (? #Burn(burn)) {
-                switch (burn.spender) {
-                    case (?spender) {
-                        {
-                            btype = "2xfer";
-                            phash = parent_hash;
-                            ts = Nat64.toNat(transaction.created_at_time.timestamp_nanos);
-                            fee = null;
-                            tx = {
-
-                                from = ?(burn.from);
-                                to = null;
-                                spender = ?(spender);
-                                memo = transaction.icrc1_memo;
-                                amt = ?tokens_to_nat(burn.amount);
-                                expected_allowance = null;
-                                expires_at = null;
-                            };
-                        };
-                    };
-
-                    case (null) {
-                        {
-                            btype = "1burn";
-                            phash = parent_hash;
-                            ts = Nat64.toNat(transaction.created_at_time.timestamp_nanos);
-                            fee = null;
-                            tx = {
-
-                                from = ?(burn.from);
-                                to = null;
-                                spender = null;
-                                memo = transaction.icrc1_memo;
-                                amt = ?tokens_to_nat(burn.amount);
-                                expected_allowance = null;
-                                expires_at = null;
-                            };
-                        };
-                    };
-                };
-            };
-            case (? #Mint(mint)) {
-                {
-                    btype = "1mint";
-                    phash = parent_hash;
-                    fee = null;
-                    ts = Nat64.toNat(transaction.created_at_time.timestamp_nanos);
-                    tx = {
-                        from = null;
-                        to = ?(mint.to);
-                        spender = null;
-                        memo = transaction.icrc1_memo;
-                        amt = ?tokens_to_nat(mint.amount);
-                        expected_allowance = null;
-                        expires_at = null;
-                    };
-                };
-            };
-            case (? #Transfer(transfer)) {
-                switch (transfer.spender) {
-                    case (?spender) {
-                        {
-                            btype = "2xfer";
-                            phash = parent_hash;
-                            fee = ?tokens_to_nat(transfer.fee);
-                            ts = Nat64.toNat(transaction.created_at_time.timestamp_nanos);
-                            tx = {
-
-                                from = ?(transfer.from);
-                                to = ?(transfer.to);
-                                spender = ?(spender);
-                                memo = transaction.icrc1_memo;
-                                amt = ?tokens_to_nat(transfer.amount);
-                                expected_allowance = null;
-                                expires_at = null;
-                            };
-                        };
-                    };
-                    case (null) {
-                        {
-                            btype = "1xfer";
-                            phash = parent_hash;
-                            fee = ?tokens_to_nat(transfer.fee);
-                            ts = Nat64.toNat(transaction.created_at_time.timestamp_nanos);
-                            tx = {
-                                from = ?(transfer.from);
-                                to = ?(transfer.to);
-                                spender = null;
-                                memo = transaction.icrc1_memo;
-                                amt = ?tokens_to_nat(transfer.amount);
-                                expected_allowance = null;
-                                expires_at = null;
-                            };
-                        };
-                    };
-                };
-            };
-            case (null) Debug.trap("unexpected operation: " # debug_show transaction);
-        };
-
-        block;
-    };
-
     let Billion = 1_000_000_000;
     let Trillion = 1_000_000_000_000;
-
-    let MAX_BATCH_TXS_IN_RESPONSE = 2_000;
-
-    public func sync_blocks(length : Nat) : async () {
-        Debug.print("Attempting to sync " # debug_show length # " blocks");
-
-        let start = Vector.size(stored_blocks);
-
-        Debug.print("starting from block " # debug_show start);
-
-        let query_blocks_response = await ledger.query_blocks({
-            start = Nat64.fromNat(start);
-            length = Nat64.fromNat(length);
-        });
-
-        Debug.print("retrieved query_blocks_response " # debug_show { query_blocks_response with archived_blocks = [] });
-
-        if (query_blocks_response.archived_blocks.size() > 0) {
-            Debug.print("retrieving archived blocks ");
-
-            for (rq in query_blocks_response.archived_blocks.vals()) {
-
-                assert Nat64.toNat(rq.start) == Vector.size(stored_blocks);
-
-                let batches = (Nat64.toNat(rq.length) + (MAX_BATCH_TXS_IN_RESPONSE - 1)) / MAX_BATCH_TXS_IN_RESPONSE;
-                Debug.print(
-                    debug_show {
-                        start = rq.start;
-                        length = rq.length;
-                        batches = batches;
-                    }
-                );
-
-                let parallel = Buffer.Buffer<async Ledger.Result_4>(batches);
-
-                for (i in Itertools.range(0, batches)) {
-                    parallel.add(
-                        rq.callback({
-                            start = rq.start + Nat64.fromNat(i * MAX_BATCH_TXS_IN_RESPONSE);
-                            length = rq.length - Nat64.fromNat(i * MAX_BATCH_TXS_IN_RESPONSE);
-                        })
-                    );
-                };
-
-                for ((i, async_call) in Itertools.enumerate(parallel.vals())) {
-                    Debug.print("retrieving archived blocks batch " # debug_show i);
-
-                    let res = await async_call;
-                    let #Ok({ blocks = queried_blocks }) = res else Debug.trap("failed to retrieve archived blocks: " # debug_show res);
-
-                    for (block in queried_blocks.vals()) {
-                        let converted_block = convert_ledger_block(block);
-                        Vector.add(stored_blocks, converted_block);
-                    };
-
-                    Debug.print("Added " # debug_show queried_blocks.size() # " archived blocks to stored_blocks");
-                    Debug.print("stored_blocks size: " # debug_show Vector.size(stored_blocks));
-                };
-            };
-        };
-
-        for (block in query_blocks_response.blocks.vals()) {
-            let converted_block = convert_ledger_block(block);
-            Vector.add(stored_blocks, converted_block);
-        };
-
-    };
 
     // let AccountSchema = #Record([
     //     ("owner", #Principal),
@@ -281,9 +46,18 @@ actor class Backend() {
         ("phash", #Option(#Blob)),
         ("ts", #Nat),
         ("fee", #Option(#Nat)),
+        ("tx_index", #Nat),
         (
             "tx",
-            #Record([("amt", #Option(#Nat)), ("from", #Option(#Blob)), ("to", #Option(#Blob)), ("spender", #Option(#Blob)), ("memo", #Option(#Blob)), ("expires_at", #Option(#Nat)), ("expected_allowance", #Option(#Nat))]),
+            #Record([
+                ("amt", #Option(#Nat)),
+                ("from", #Option(#Blob)),
+                ("to", #Option(#Blob)),
+                ("spender", #Option(#Blob)),
+                ("memo", #Option(#Blob)),
+                ("expires_at", #Option(#Nat)),
+                ("expected_allowance", #Option(#Nat)),
+            ]),
         ),
     ]);
 
@@ -299,37 +73,42 @@ actor class Backend() {
         };
     };
 
-    let #ok(txs) = db.get_or_create_collection<Block>("_t_xs", BlockSchema, CandifyBlock);
-    // blocks_stored_in_db := 0;
-    let #ok(_) = txs.create_index(["btype", "tx.amt"]);
+    let #ok(txs) = db.get_or_create_collection<Block>("_t_x_s", BlockSchema, CandifyBlock);
+
+    // because of the way indexes are selected, the order of the fields in the index matters
+    // but also if there are more than one index selected as the best index,
+    // you should define them in the order of importance
+
+    // the first two are defined first so if all the indexes are equal for the query,
+    // the first two indexes which starting with fields we use for sorting can be used
+    // to avoid sorting internally in the db which is really slow and inefficient
+    let #ok(_) = txs.create_index(["ts"]);
     let #ok(_) = txs.create_index(["tx.amt"]);
-    let #ok(_) = txs.create_index(["tx.from"]);
-    let #ok(_) = txs.create_index(["tx.to"]);
-    let #ok(_) = txs.create_index(["tx.spender"]);
 
-    system func postupgrade() {
+    let #ok(_) = txs.create_index(["btype", "tx.amt"]);
+    let #ok(_) = txs.create_index(["btype", "ts"]);
 
+    let #ok(_) = txs.create_index(["tx.from", "btype"]);
+    let #ok(_) = txs.create_index(["tx.to", "btype"]);
+
+    public func upload_blocks(blocks : [Block]) : async () {
+        for (block in blocks.vals()) {
+            switch (txs.insert_with_id(block.tx_index, block)) {
+                case (#ok(_)) ();
+                case (#err(err)) Debug.trap("failed to insert block into txs db: " # debug_show (block) # " \n" # err);
+            };
+        };
     };
 
     public func sync_blocks_to_db(length : Nat) : async () {
-        Debug.print("Attempting to sync " # debug_show length # " blocks");
-        Debug.print("stored_blocks size: " # debug_show Vector.size(stored_blocks));
-        Debug.print("blocks_stored_in_db: " # debug_show blocks_stored_in_db);
+        await* BlockUtils.sync_blocks_from_ledger_to_db(ledger, txs, length);
+    };
 
-        if (blocks_stored_in_db >= Vector.size(stored_blocks) or length == 0) return;
+    public func pull_blocks(start : Nat, length : Nat) : async [Block] {
+        await* BlockUtils.pull_blocks_from_ledger(ledger, start, length);
+    };
 
-        let end = Nat.min(blocks_stored_in_db + length, Vector.size(stored_blocks));
-
-        for (i in Itertools.range(blocks_stored_in_db, end)) {
-            let block = Vector.get(stored_blocks, i);
-
-            Debug.print("about to store block index " # debug_show i # ": " # debug_show block);
-            let #ok(_) = txs.insert(block);
-        };
-
-        blocks_stored_in_db := end;
-
-        Debug.print(debug_show { blocks_stored_in_db });
+    system func postupgrade() {
 
     };
 
@@ -343,22 +122,33 @@ actor class Backend() {
                 min : ?Nat;
                 max : ?Nat;
             };
+            ts : ?{
+                min : ?Nat;
+                max : ?Nat;
+            };
         };
-        // pagination : {
-        //     limit : Nat;
-        //     offset : Nat;
-        // };
-        // sort : {
-        //     amt : ?{
-        //         #Ascending;
-        //         #Descending;
-        //         #None;
-        //     };
-        // };
+
+        sort : [(Text, { #Ascending; #Descending })];
+
+        pagination : {
+            limit : Nat;
+            offset : Nat;
+        };
+
+        count : Bool;
     };
 
-    public func get_txs(options : Options) : async [Block] {
+    type GetTxsResponse = {
+        blocks : [Block];
+        total : Nat;
+        instructions : Nat;
+    };
+
+    func convert_options_to_db_query(options : Options) : ZenDB.QueryBuilder {
+
         let Query = ZenDB.QueryBuilder();
+        ignore Query.Limit(options.pagination.limit);
+        ignore Query.Skip(options.pagination.offset);
 
         ignore do ? {
 
@@ -372,19 +162,16 @@ actor class Backend() {
             if (options.filter.to != null) {
                 let to = options.filter.to!;
                 ignore Query.Where("tx.to", #eq(#Option(#Blob(to))));
-
             };
 
             if (options.filter.from != null) {
                 let from = options.filter.from!;
                 ignore Query.Where("tx.from", #eq(#Option(#Blob(from))));
-
             };
 
             if (options.filter.spender != null) {
                 let spender = options.filter.spender!;
                 ignore Query.Where("tx.spender", #eq(#Option(#Blob(spender))));
-
             };
 
             if (options.filter.amt != null) {
@@ -404,83 +191,174 @@ actor class Backend() {
                 };
             };
 
+            if (options.filter.ts != null) {
+                let ts = options.filter.ts!;
+                switch (ts.min) {
+                    case (?min) {
+                        ignore Query.Where("ts", #gte(#Nat(min)));
+                    };
+                    case (null) ();
+                };
+
+                switch (ts.max) {
+                    case (?max) {
+                        ignore Query.Where("ts", #lte(#Nat(max)));
+                    };
+                    case (null) ();
+                };
+            };
+
+            if (options.sort.size() > 0) {
+                let (sort_field, sort_direction) = options.sort[0];
+                ignore Query.Sort(
+                    sort_field,
+                    sort_direction,
+                );
+            };
         };
 
-        let query_res = txs.find(Query);
-        let #ok(matching_txs) = query_res else Debug.trap("get_txs failed: " # debug_show query_res);
+        Query;
 
-        Array.map<(Nat, Block), Block>(
+    };
+
+    public query func get_txs(options : Options) : async GetTxsResponse {
+        Debug.print("get_txs called with options: " # debug_show options);
+
+        let db_query = convert_options_to_db_query(options);
+
+        var blocks : [Block] = [];
+        var total : Nat = txs.size();
+
+        let instructions = IC.countInstructions(
+            func() {
+
+                if (options.count) {
+                    let #ok(total_matching_txs) = txs.count(db_query) else Debug.trap("txs.count failed");
+
+                    total := total_matching_txs;
+                };
+
+                let query_res = txs.find(db_query);
+
+                Debug.print("successfully got total matching txs: " # debug_show total_matching_txs);
+
+                let #ok(matching_txs) = query_res else Debug.trap("get_txs failed: " # debug_show query_res);
+                Debug.print("successfully got matching txs: " # debug_show options);
+
+                blocks := Array.map<(Nat, Block), Block>(
+                    matching_txs,
+                    func(id : Nat, tx : Block) : Block = tx,
+                );
+
+                Debug.print("get_txs returning " # debug_show { blocks = blocks.size(); total = total_matching_txs });
+
+            }
+        );
+
+        { blocks; total; instructions = Nat64.toNat(instructions) };
+
+    };
+
+    public func get_async_txs(options : Options) : async GetTxsResponse {
+        Debug.print("get_async_txs called with options: " # debug_show options);
+
+        let db_query = convert_options_to_db_query(options);
+
+        let performance_start = IC.performanceCounter(1);
+        func instructions() : Nat {
+            Nat64.toNat(IC.performanceCounter(1) - performance_start);
+        };
+
+        let blocks_buffer = Buffer.Buffer<(Nat, Block)>(8);
+
+        let query_res = await* txs.async_find(db_query, blocks_buffer);
+
+        let total = if (options.count) {
+            let #ok(total) = txs.count(db_query) else Debug.trap("txs.count failed");
+            Debug.print("successfully got total matching txs: " # debug_show total);
+            total;
+        } else { txs.size() };
+
+        let #ok(_) = query_res else Debug.trap("get_txs failed: " # debug_show query_res);
+        Debug.print("successfully got matching txs: " # debug_show options);
+
+        let blocks = Iter.toArray(
+            Iter.map<(Nat, Block), Block>(
+                blocks_buffer.vals(),
+                func(id : Nat, tx : Block) : Block = tx,
+            )
+        );
+
+        Debug.print("get_async_txs returning " # debug_show { blocks = blocks.size(); total });
+
+        { blocks; total; instructions = instructions() };
+
+    };
+
+    public func clear() : async () {
+        txs.clear();
+    };
+
+    type CanisterStats = {
+        heap_size : Nat;
+        stable_memory_size : Nat;
+        db_stats : ZenDB.CollectionStats;
+    };
+
+    public query func get_stats() : async CanisterStats {
+        {
+            heap_size = Prim.rts_heap_size();
+            stable_memory_size = Prim.rts_stable_memory_size();
+            db_stats = txs.stats();
+        };
+    };
+
+    let LEDGER_DECIMALS = 8; // decimals will be handled in the frontend before the request is made
+
+    public query func get_txs_from_tx_index_range(start : Nat, length : Nat) : async [Block] {
+        let Query = ZenDB.QueryBuilder().Where("tx_index", #gte(#Nat(start))).And("tx_index", #lt(#Nat(start + length)));
+
+        let query_res = txs.find(Query);
+        let #ok(matching_txs) = query_res else Debug.trap("get_txs_from_tx_index_range failed: " # debug_show query_res);
+        let blocks = Array.map<(Nat, Block), Block>(
             matching_txs,
             func(id : Nat, tx : Block) : Block = tx,
         );
 
-    };
-
-    public func get_txs_dummy_values(options : Options) : async [Block] {
-
-        [
-            {
-                btype = "1mint";
-                phash = null;
-                ts = 1;
-                fee = null;
-                tx = {
-                    from = null;
-                    to : ?Blob = ?"AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA=";
-                    spender = null;
-                    memo = null;
-                    amt = ?100;
-                    expires_at = null;
-                    expected_allowance = null;
-                };
-            },
-            {
-                btype = "2xfer";
-                phash = null;
-                ts = 2;
-                fee = ?1;
-                tx = {
-                    from : ?Blob = ?("AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA=");
-                    to : ?Blob = ?("AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA=");
-                    spender : ?Blob = ?("AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA=");
-                    memo = null;
-                    amt = ?100;
-                    expires_at = null;
-                    expected_allowance = null;
-                };
-            },
-            {
-                btype = "1burn";
-                phash = null;
-                ts = 3;
-                fee = null;
-                tx = {
-                    from : ?Blob = ?("AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA=");
-                    to = null;
-                    spender = null;
-                    memo = null;
-                    amt = ?100;
-                    expires_at = null;
-                    expected_allowance = null;
-                };
-            },
-            {
-                btype = "2approve";
-                phash = null;
-                ts = 4;
-                fee = ?1;
-                tx = {
-                    from : ?Blob = ?("AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA=");
-                    to = null;
-                    spender : ?Blob = ?("AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA=");
-                    memo = null;
-                    amt = ?100;
-                    expires_at = ?5;
-                    expected_allowance = ?100;
-                };
-            },
-        ]
+        blocks;
 
     };
+
+    public query func get_txs_in_range(start : Nat, length : Nat) : async [Block] {
+        assert start + length <= txs.size();
+
+        Array.tabulate(
+            length,
+            func(i : Nat) : Block {
+                let #ok(block) = (txs.get(start + i)) else Debug.trap("failed to get block from txs db: " # debug_show (start + i));
+                block;
+            },
+        );
+    };
+
+    public query func get_db_size() : async Nat {
+        txs.size();
+    };
+
+    type DBStats = {
+        size : Nat;
+        indexes : [Text];
+
+        heap : Nat;
+        stable_memory : Nat;
+    };
+
+    // public query func get_db_stats() : async {
+
+    // };
+
+    // public query func get_txs_in_range(start : Nat, length : Nat) : async [Block] {
+    //     txs.filter(func(block : Block) : Bool = block.tx_index >= start and block.tx_index < start + length);
+    // };
 
 };

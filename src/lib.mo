@@ -180,4 +180,6 @@ module {
     public let QueryBuilder = Query.QueryBuilder;
     public type QueryBuilder = Query.QueryBuilder;
 
+    public type CollectionStats = T.CollectionStats;
+
 };

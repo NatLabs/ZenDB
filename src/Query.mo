@@ -4,6 +4,7 @@ import Text "mo:base/Text";
 import Debug "mo:base/Debug";
 
 import Buffer "mo:base/Buffer";
+import Option "mo:base/Option";
 import Nat "mo:base/Nat";
 
 import Map "mo:map/Map";
@@ -24,7 +25,7 @@ module {
 
     public class QueryBuilder() = self {
 
-        var _query : ZenQueryLang = #Operation("dummy_node", #eq(#Null));
+        var opt_nested_query : ?ZenQueryLang = null;
         var is_and : Bool = true;
         var buffer = Buffer.Buffer<ZenQueryLang>(8);
         var pagination_cursor : ?Cursor = null;
@@ -39,16 +40,35 @@ module {
         };
 
         func update_query(new_is_and : Bool) {
+            let old_is_and = is_and;
 
-            if (buffer.size() > 1 and is_and != new_is_and) {
-                switch (_query) {
-                    case (#And(_)) if (not new_is_and) _query := #And(Buffer.toArray(buffer));
-                    case (#Or(_)) if (new_is_and) _query := #Or(Buffer.toArray(buffer));
-                    case (_) _query := #And(Buffer.toArray(buffer));
+            if (buffer.size() > 0 and old_is_and != new_is_and) {
+                Debug.print("(old_is_and, new_is_and): " # debug_show (old_is_and, new_is_and));
+                Debug.print("old nested query: " # debug_show opt_nested_query);
+                switch (opt_nested_query) {
+                    case (null) {
+                        if (buffer.size() == 1) {
+                            opt_nested_query := ?(buffer.get(0));
+                        } else if (old_is_and) {
+                            opt_nested_query := ?(#And(Buffer.toArray(buffer)));
+                        } else {
+                            opt_nested_query := ?(#Or(Buffer.toArray(buffer)));
+                        };
+                    };
+                    case (?nested_query) {
+                        buffer.insert(0, nested_query);
+
+                        if (old_is_and) {
+                            opt_nested_query := ?(#And(Buffer.toArray(buffer)));
+                        } else {
+                            opt_nested_query := ?(#Or(Buffer.toArray(buffer)));
+                        };
+                    };
                 };
 
+                Debug.print("new nested query: " # debug_show opt_nested_query);
+
                 buffer.clear();
-                buffer.add(_query);
             };
 
             is_and := new_is_and;
@@ -115,34 +135,10 @@ module {
         func handle_op(key : Text, op : ZqlOperators) {
             switch (op) {
                 case (#In(values)) {
-                    if (not is_and) {
-                        for (value in values.vals()) {
-                            buffer.add(#Operation(key, #eq(value : T.Candid)));
-                        };
-                    } else if (buffer.size() == 0) {
-
-                        // replace the and_buffer with an or_buffer
-                        is_and := false;
-                        for (value in values.vals()) {
-                            buffer.add(#Operation(key, #eq(value : T.Candid)));
-                        };
-
-                    } else {
-                        buffer.add(
-                            #Or(
-                                Array.tabulate(
-                                    values.size(),
-                                    func(i : Nat) : ZenQueryLang {
-                                        #Operation(
-                                            key,
-                                            #eq(values.get(i) : T.Candid),
-                                        );
-                                    },
-                                )
-                            )
-                        );
+                    update_query(false);
+                    for (value in values.vals()) {
+                        buffer.add(#Operation(key, #eq(value : T.Candid)));
                     };
-
                 };
                 case (#Not(not_op)) {
                     handle_not(key, not_op);
@@ -154,33 +150,16 @@ module {
         };
 
         public func And(key : Text, op : ZqlOperators) : QueryBuilder {
-            // Debug.print("is_and: " # debug_show is_and);
-            // Debug.print("query: " # debug_show _query);
-            // Debug.print("buffer: " # debug_show Buffer.toArray(buffer));
+
             update_query(true);
-            // Debug.print("is_and: " # debug_show is_and);
-            // Debug.print("query: " # debug_show _query);
-            // Debug.print("buffer: " # debug_show Buffer.toArray(buffer));
             handle_op(key, op);
-            // Debug.print("is_and: " # debug_show is_and);
-            // Debug.print("query: " # debug_show _query);
-            // Debug.print("buffer: " # debug_show Buffer.toArray(buffer));
 
             self;
         };
 
         public func Or(key : Text, op : ZqlOperators) : QueryBuilder {
-            // Debug.print("is_or: " # debug_show (not is_and));
-            // Debug.print("query: " # debug_show _query);
-            // Debug.print("buffer: " # debug_show Buffer.toArray(buffer));
             update_query(false);
-            // Debug.print("is_or: " # debug_show (not is_and));
-            // Debug.print("query: " # debug_show _query);
-            // Debug.print("buffer: " # debug_show Buffer.toArray(buffer));
             handle_op(key, op);
-            // Debug.print("is_or: " # debug_show (not is_and));
-            // Debug.print("query: " # debug_show _query);
-            // Debug.print("buffer: " # debug_show Buffer.toArray(buffer));
 
             self;
         };
@@ -245,13 +224,12 @@ module {
         };
 
         public func build() : StableQuery {
-            // update_query(true); // input params is no longer relevant
-            let resolved_query = if (buffer.size() == 0) {
-                _query;
-            } else if (is_and) {
-                #And(Buffer.toArray(buffer));
-            } else {
-                #Or(Buffer.toArray(buffer));
+            update_query(not is_and); // flushes buffer because the state is switched
+
+            let resolved_query = switch (opt_nested_query) {
+                case (null) #And([]);
+                case (? #Operation(op)) #And([#Operation(op)]);
+                case (?nested_query) nested_query;
             };
 
             // Debug.print("Query: " # debug_show resolved_query);

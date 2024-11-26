@@ -6,18 +6,8 @@ import viteLogo from './assets/vite.svg';
 import { useQueryCall, useUpdateCall } from '@ic-reactor/react';
 import { TxsTable } from './pages/TxsTable';
 import { QueryClient, QueryClientProvider } from 'react-query';
-function App() {
-    const { data: count, call: refetchCount } = useQueryCall({
-        functionName: 'get',
-    });
 
-    const { call: increment, loading } = useUpdateCall({
-        functionName: 'inc',
-        onSuccess: () => {
-            refetchCount();
-        },
-    });
-    console.log({ count });
+function App() {
     const queryClient = new QueryClient();
     return (
         // <div className="App">

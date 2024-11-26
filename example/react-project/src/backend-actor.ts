@@ -1,6 +1,7 @@
 // actor.ts
 import { canisterId, idlFactory, createActor } from "./declarations/backend"
 import { createReactor } from "@ic-reactor/react"
+export type * from "./declarations/backend/backend.did"
 
 export const backend = createActor(canisterId)
 

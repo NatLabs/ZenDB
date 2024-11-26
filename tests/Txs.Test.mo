@@ -905,7 +905,11 @@ suite(
             test(
                 q.query_name,
                 func() {
-                    assert q.db_query.build().query_operations == q.expected_query_resolution;
+                    let actual_query_resolution = q.db_query.build().query_operations;
+                    let expected_query_resolution = q.expected_query_resolution;
+                    Debug.print("actual_query_resolution: " # debug_show actual_query_resolution);
+                    Debug.print("expected_query_resolution: " # debug_show expected_query_resolution);
+                    assert actual_query_resolution == expected_query_resolution;
 
                     let results = get_txs_from_query(q.db_query);
 
