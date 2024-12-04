@@ -21,10 +21,12 @@
         "antd": "^5.21.6",
         "buffer": "^6.0.3",
         "chronify": "^1.1.0",
+        "dayjs": "^1.11.13",
         "react": "^18.2.0",
         "react-dom": "^18.2.0",
         "react-query": "^3.39.3",
-        "uint8array-tools": "^0.0.9"
+        "uint8array-tools": "^0.0.9",
+        "wouter": "^3.3.5"
     },
     "devDependencies": {
         "@testing-library/jest-dom": "^5.16.5",

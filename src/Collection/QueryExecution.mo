@@ -11,17 +11,6 @@ import Buffer "mo:base/Buffer";
 import Nat "mo:base/Nat";
 import Option "mo:base/Option";
 import Hash "mo:base/Hash";
-import Float "mo:base/Float";
-import Int "mo:base/Int";
-import Int32 "mo:base/Int32";
-import Blob "mo:base/Blob";
-import Nat64 "mo:base/Nat64";
-import Int16 "mo:base/Int16";
-import Int64 "mo:base/Int64";
-import Int8 "mo:base/Int8";
-import Nat16 "mo:base/Nat16";
-import Nat8 "mo:base/Nat8";
-import InternetComputer "mo:base/ExperimentalInternetComputer";
 
 import Map "mo:map/Map";
 import Set "mo:map/Set";
@@ -43,13 +32,14 @@ import Utils "../Utils";
 import CandidMap "../CandidMap";
 import ByteUtils "../ByteUtils";
 import LegacyCandidMap "../LegacyCandidMap";
+import C "../Constants";
 
 import Index "Index";
 import Orchid "Orchid";
 import Schema "Schema";
 import CollectionUtils "Utils";
 import QueryPlan "QueryPlan";
-import C "Constants";
+import Intervals "Intervals";
 
 module {
     public type Map<K, V> = Map.Map<K, V>;
@@ -96,12 +86,24 @@ module {
     // avoids sorting
     public func get_unique_record_ids_from_query_plan(
         collection : T.StableCollection,
+        // only accepts bitmaps directly created from an index scan
+        bitmap_cache : Map<Text, BitMap.BitMap>,
         query_plan : T.QueryPlan,
     ) : EvalResult {
 
         if (query_plan.scans.size() == 1 and query_plan.subplans.size() == 0) {
             switch (query_plan.scans[0]) {
-                case (#IndexScan({ index; requires_additional_filtering; requires_additional_sorting; sorted_in_reverse; interval; scan_bounds; filter_bounds })) {
+                case (#IndexScan(index_scan_details)) {
+                    let {
+                        index;
+                        requires_additional_filtering;
+                        requires_additional_sorting;
+                        sorted_in_reverse;
+                        interval;
+                        scan_bounds;
+                        filter_bounds;
+                    } = index_scan_details;
+                    Debug.print("subplan index_scan_details: " # debug_show { index_scan_details with index = null });
                     if (not requires_additional_filtering and not requires_additional_sorting) {
                         return #Interval(index.name, [interval], sorted_in_reverse);
                     };
@@ -136,22 +138,42 @@ module {
                     } = index_scan_details;
                     let index_data_utils = CollectionUtils.get_index_data_utils(collection, index.key_details);
 
+                    Debug.print("scan index_scan_details: " # debug_show { index_scan_details with index = null });
+
                     if (requires_additional_filtering) {
-                        let record_ids = MemoryBTree.rangeVals(index.data, index_data_utils, interval.0, interval.1);
 
-                        CollectionUtils.multi_filter(collection, record_ids, Buffer.fromArray([filter_bounds]));
+                        // index based filtering improves the worst case scenario of filtering intervas
+                        // by using intersecting bitmaps with record ids instead of accessing the
+                        // values in the main btree and filtering them
+                        //
+                        // while the improvement are undeniable for full scans,
+                        // its not always the case, as loading the other indexes records
+                        // into bitmaps can be more expensive than filtering the main btree
+                        //
+                        // todo - add a heuristic to determine when to use index based filtering
+                        // can return the intervals from the indexes and compare them before
+                        // loading them into bitmaps
 
-                        // let { bitmap; opt_filter_bounds } = index_based_interval_filtering(collection, index_scan_details, null);
+                        // let { intervals_by_index; opt_filter_bounds } = get_index_based_filtering_intervals(collection, filter_bounds, index_scan_details.simple_operations);
 
-                        // switch (opt_filter_bounds) {
-                        //     case (?filter_bounds) {
-                        //         CollectionUtils.multi_filter(collection, bitmap.vals(), Buffer.fromArray([filter_bounds]));
-                        //     };
-                        //     case (null) {
-                        //         bitmaps.add(bitmap);
-                        //         continue evaluating_query_plan;
-                        //     };
-                        // };
+                        switch (index_based_interval_filtering(collection, bitmap_cache, index_scan_details)) {
+                            case (?{ bitmap; opt_filter_bounds }) switch (opt_filter_bounds) {
+                                case (?filter_bounds) {
+                                    CollectionUtils.multi_filter(collection, bitmap.vals(), Buffer.fromArray([filter_bounds]));
+                                };
+                                case (null) {
+                                    bitmaps.add(bitmap);
+                                    continue evaluating_query_plan;
+                                };
+                            };
+                            case (null) {
+                                Debug.print("could not use index based filtering");
+
+                                let record_ids = CollectionUtils.record_ids_from_index_intervals(collection, index.name, [interval], false);
+                                CollectionUtils.multi_filter(collection, record_ids, Buffer.fromArray([filter_bounds]));
+                            };
+                        };
+
                     } else {
                         add_interval(intervals_by_index, index.name, interval, false);
                         continue evaluating_query_plan;
@@ -167,7 +189,8 @@ module {
         };
 
         for (or_operation_subplan in query_plan.subplans.vals()) {
-            let eval_result = get_unique_record_ids_from_query_plan(collection, or_operation_subplan);
+            Debug.print("or_operation_subplan: " # debug_show (or_operation_subplan.simple_operations));
+            let eval_result = get_unique_record_ids_from_query_plan(collection, bitmap_cache, or_operation_subplan);
 
             switch (eval_result) {
                 case (#Empty) if (query_plan.is_and_operation) {
@@ -189,9 +212,18 @@ module {
         };
 
         for ((index_name, interval_details) in Map.entries(intervals_by_index)) {
+            Debug.print(
+                "before (index_name, index_details): " # debug_show (
+                    index_name,
+                    {
+                        sorted_in_reverse = interval_details.sorted_in_reverse;
+                        intervals = Buffer.toArray(interval_details.intervals);
+                    },
+                )
+            );
 
             if (query_plan.is_and_operation) {
-                switch (intervals_intersect(interval_details.intervals)) {
+                switch (Intervals.intervals_intersect(interval_details.intervals)) {
                     case (?interval) {
                         interval_details.intervals.clear();
                         interval_details.intervals.add(interval);
@@ -199,8 +231,18 @@ module {
                     case (null) ignore Map.remove(intervals_by_index, thash, index_name);
                 };
             } else {
-                intervals_union(interval_details.intervals);
+                Intervals.intervals_union(interval_details.intervals);
             };
+
+            Debug.print(
+                "after (index_name, index_details): " # debug_show (
+                    index_name,
+                    {
+                        sorted_in_reverse = interval_details.sorted_in_reverse;
+                        intervals = Buffer.toArray(interval_details.intervals);
+                    },
+                )
+            );
 
         };
 
@@ -212,12 +254,10 @@ module {
                     assert interval_details.intervals.size() == 1;
                 };
 
-                let index_data_utils = CollectionUtils.get_index_data_utils(collection, index.key_details);
-
                 let bitmap = BitMap.BitMap(1024);
 
                 for (interval in interval_details.intervals.vals()) {
-                    var record_ids = MemoryBTree.rangeVals(index.data, index_data_utils, interval.0, interval.1);
+                    let record_ids = CollectionUtils.record_ids_from_index_intervals(collection, index.name, [interval], false);
 
                     for (id in record_ids) {
                         bitmap.set(id, true);
@@ -238,7 +278,9 @@ module {
             return #Interval(index_name, Buffer.toArray(interval_details.intervals), sorted_in_reverse);
         };
 
-        let resolved_bitmap = if (query_plan.is_and_operation) {
+        let resolved_bitmap = if (bitmaps.size() == 1) {
+            bitmaps.get(0);
+        } else if (query_plan.is_and_operation) {
             BitMap.multiIntersect(bitmaps.vals());
         } else {
             BitMap.multiUnion(bitmaps.vals());
@@ -276,72 +318,13 @@ module {
         details.intervals.add(interval);
     };
 
-    // Returns the range that is common to all intervals
-    public func intervals_intersect(intervals : Buffer.Buffer<(Nat, Nat)>) : ?(Nat, Nat) {
-
-        var start = intervals.get(0).0;
-        var end = intervals.get(0).1;
-
-        var i = 1;
-
-        while (i < intervals.size()) {
-            start := Nat.max(start, intervals.get(i).0);
-            end := Nat.min(end, intervals.get(i).1);
-        };
-
-        if (end < start) return null;
-
-        ?(start, end);
-    };
-
-    // merges adjacent or overlapping intervals
-    // - done in place
-    public func intervals_union(intervals : Buffer.Buffer<(Nat, Nat)>) {
-
-        func tuple_sort(a : (Nat, Nat), b : (Nat, Nat)) : Order {
-            Nat.compare(a.0, b.0);
-        };
-
-        intervals.sort(tuple_sort);
-
-        var start = intervals.get(0).0;
-        var end = intervals.get(0).1;
-
-        var scan = 1;
-        var insert = 0;
-
-        while (scan < intervals.size()) {
-
-            let interval = intervals.get(scan);
-            let l = interval.0;
-            let r = interval.1;
-
-            if (l <= end) {
-                end := r;
-            } else {
-                intervals.put(insert, (start, end));
-                insert += 1;
-                start := l;
-                end := r;
-            };
-
-            scan += 1;
-        };
-
-        intervals.put(insert, (start, end));
-
-        for (_ in Itertools.range(insert + 1, intervals.size())) {
-            ignore intervals.removeLast();
-        };
-
-    };
-
     type IndexIntervalFilterDetails = {
         intervals_map : Map<Text, Buffer.Buffer<(Nat, Nat)>>;
         opt_filter_bounds : ?T.Bounds;
     };
 
     public func get_index_based_filtering_intervals(collection : T.StableCollection, filter_bounds : T.Bounds, operations : [(Text, T.ZqlOperators)]) : IndexIntervalFilterDetails {
+        Debug.print("get_index_based_filtering_intervals");
 
         var prev = filter_bounds;
         var curr = filter_bounds;
@@ -353,8 +336,10 @@ module {
             let fields = Set.new<Text>();
 
             for ((field, _) in curr.0.vals()) {
-                ignore Set.add(fields, thash, field);
+                Set.add(fields, thash, field);
             };
+
+            Debug.print("unique fields: " # debug_show Set.toArray(fields));
 
             let filter_operations = Buffer.Buffer<(Text, T.ZqlOperators)>(8);
 
@@ -363,6 +348,8 @@ module {
                     filter_operations.add(field, value);
                 };
             };
+
+            Debug.print("filter_operations: " # debug_show Buffer.toArray(filter_operations));
 
             let { index; fully_covered_equality_and_range_fields } = switch (Index.get_best_index(collection, Buffer.toArray(filter_operations), null)) {
                 case (null) {
@@ -373,6 +360,8 @@ module {
                 };
                 case (?best_index_details) { best_index_details };
             };
+
+            Debug.print("chosed index: " # debug_show (index.key_details));
 
             let lower_map = Map.new<Text, T.State<Candid>>();
 
@@ -396,9 +385,14 @@ module {
                 };
             };
 
-            let (scan_bounds, filter_bounds) = QueryPlan.extract_scan_and_filter_bounds(lower_map, upper_map, ?index.key_details, ?fully_covered_equality_and_range_fields);
+            let (scan_bounds, filter_bounds) = Index.extract_scan_and_filter_bounds(lower_map, upper_map, ?index.key_details, ?fully_covered_equality_and_range_fields);
 
-            let interval = QueryPlan.scan(collection, index, scan_bounds.0, scan_bounds.1, null);
+            Debug.print("scan_bounds: " # debug_show scan_bounds);
+            Debug.print("filter_bounds: " # debug_show filter_bounds);
+
+            let interval = Index.scan(collection, index, scan_bounds.0, scan_bounds.1, null);
+
+            Debug.print("interval: " # debug_show interval);
 
             switch (Map.get(intervals_map, thash, index.name)) {
                 case (?intervals) {
@@ -408,6 +402,17 @@ module {
                     ignore Map.put(intervals_map, thash, index.name, Buffer.fromArray<(Nat, Nat)>([interval]));
                 };
             };
+
+            Debug.print(
+                "intervals_map: " # debug_show Array.map<(Text, Buffer.Buffer<(Nat, Nat)>), (Text, [(Nat, Nat)])>(
+                    Map.toArray<Text, Buffer.Buffer<(Nat, Nat)>>(intervals_map),
+                    func(
+                        (index_name, intervals) : (Text, Buffer.Buffer<(Nat, Nat)>)
+                    ) : (Text, [(Nat, Nat)]) {
+                        (index_name, Buffer.toArray(intervals));
+                    },
+                )
+            );
 
             prev := curr;
             curr := filter_bounds;
@@ -424,17 +429,23 @@ module {
     func retrieve_all_index_interval_iterators(
         collection : T.StableCollection,
         index_intervals : Map<Text, Buffer.Buffer<(Nat, Nat)>>,
+        sorted_in_reverse : Bool,
+        combine_intervals_in_same_index : Bool,
     ) : Buffer<Iter<Nat>> {
         let iterators = Buffer.Buffer<Iter<Nat>>(8);
 
         for ((index_name, intervals) in Map.entries(index_intervals)) {
-            let ?index = Map.get(collection.indexes, thash, index_name) else Debug.trap("Unreachable: IndexMap not found for index: " # index_name);
+            if (combine_intervals_in_same_index) {
 
-            let index_data_utils = CollectionUtils.get_index_data_utils(collection, index.key_details);
-
-            for (interval in intervals.vals()) {
-                let record_ids = CollectionUtils.record_ids_from_index_interval(collection, index, interval);
+                let record_ids = CollectionUtils.record_ids_from_index_intervals(collection, index_name, Buffer.toArray(intervals), sorted_in_reverse);
                 iterators.add(record_ids);
+
+            } else {
+                for (interval in intervals.vals()) {
+
+                    let record_ids = CollectionUtils.record_ids_from_index_intervals(collection, index_name, [interval], sorted_in_reverse);
+                    iterators.add(record_ids);
+                };
             };
         };
 
@@ -449,12 +460,12 @@ module {
 
     public func index_based_interval_filtering(
         collection : T.StableCollection,
+        bitmap_cache : Map<Text, BitMap.BitMap>,
         index_scan_details : T.IndexScanDetails,
-        sort_column : ?(Text, T.SortDirection),
-    ) : IndexBasedFilteringResult {
+    ) : ?IndexBasedFilteringResult {
 
         Debug.print("index_based_interval_filtering");
-        // Debug.print("index_scan_details: " # debug_show { index_scan_details with index = index_scan_details.index.name });
+        // Debug.print("index_scan_details: " # debug_show { index_scan_details with index = null });
         // Debug.print("sort_column: " # debug_show sort_column);
 
         let {
@@ -464,6 +475,8 @@ module {
             filter_bounds;
             simple_operations = operations;
         } = index_scan_details;
+
+        let original_interval_count = interval.1 - interval.0;
 
         let { intervals_map; opt_filter_bounds } = get_index_based_filtering_intervals(collection, filter_bounds, operations);
 
@@ -478,8 +491,28 @@ module {
             )
         );
 
+        var filtering_intervals_count = 0;
+
+        for ((index_name, intervals) in Map.entries(intervals_map)) {
+            let cnt = Intervals.count(intervals);
+
+            if (cnt > filtering_intervals_count) {
+                filtering_intervals_count := cnt;
+            };
+        };
+
+        Debug.print("filtering_intervals_count: " # debug_show filtering_intervals_count);
+        Debug.print("original_interval_count: " # debug_show original_interval_count);
+
+        if (filtering_intervals_count > (original_interval_count * 10)) {
+            Debug.print("filtering_intervals_count > original_interval_count");
+            Debug.print(debug_show (filtering_intervals_count) # " > " # debug_show (original_interval_count) # " * 2");
+            return null;
+        };
+
         switch (Map.get(intervals_map, thash, index.name)) {
             case (?intervals) {
+                Debug.trap("QueryExecution.index_based_interval_filtering: this is interesting, why would the filtering index be the same as the scanning index?");
                 intervals.add(interval);
             };
             case (null) {
@@ -504,7 +537,7 @@ module {
         );
 
         for ((index_name, intervals) in Map.entries(intervals_map)) {
-            switch (intervals_intersect(intervals)) {
+            switch (Intervals.intervals_intersect(intervals)) {
                 case (?interval) {
                     intervals.clear();
                     intervals.add(interval);
@@ -524,13 +557,24 @@ module {
             )
         );
 
-        let index_interval_iterators = retrieve_all_index_interval_iterators(collection, intervals_map);
-
-        Debug.print("index_interval_iterators: " # debug_show index_interval_iterators.size());
-
         let bitmaps = Buffer.Buffer<T.BitMap>(8);
-        for (interval_range in index_interval_iterators.vals()) {
-            let bitmap = BitMap.fromIter(interval_range);
+
+        for ((index_name, intervals) in Map.entries(intervals_map)) {
+            let interval = intervals.get(0);
+
+            let interval_cache_key = index_name # debug_show (Buffer.toArray(intervals));
+
+            let bitmap = switch (Map.get(bitmap_cache, thash, interval_cache_key)) {
+                case (?bitmap) { bitmap };
+                case (null) {
+                    let record_ids = CollectionUtils.record_ids_from_index_intervals(collection, index_name, [interval], false);
+                    let bitmap = BitMap.fromIter(record_ids);
+
+                    ignore Map.put(bitmap_cache, thash, interval_cache_key, bitmap);
+                    bitmap;
+                };
+            };
+
             bitmaps.add(bitmap);
         };
 
@@ -548,7 +592,7 @@ module {
 
         Debug.print("intersected bitmap size: " # debug_show bitmap.size());
 
-        { bitmap; opt_filter_bounds };
+        ?{ bitmap; opt_filter_bounds };
 
     };
 
@@ -603,13 +647,7 @@ module {
 
                 if (requires_additional_sorting or requires_additional_filtering) {
 
-                    let index_data_utils = CollectionUtils.get_index_data_utils(collection, index.key_details);
-
-                    var record_ids : Iter<Nat> = if (sorted_in_reverse) {
-                        MemoryBTree.rangeVals(index.data, index_data_utils, interval.0, interval.1).rev();
-                    } else {
-                        MemoryBTree.rangeVals(index.data, index_data_utils, interval.0, interval.1);
-                    };
+                    var record_ids : Iter<Nat> = CollectionUtils.record_ids_from_index_intervals(collection, index.name, [interval], sorted_in_reverse);
 
                     if (requires_additional_filtering) {
                         // let { bitmap; opt_filter_bounds } = index_based_interval_filtering(collection, index_scan_details, opt_sort_column);
@@ -688,7 +726,7 @@ module {
         for ((index_name, interval_details) in Map.entries(intervals_by_index)) {
             // Debug.print("index_name: " # debug_show index_name);
             // Debug.print("interval_details: " # debug_show Buffer.toArray(interval_details.intervals));
-            switch (intervals_intersect(interval_details.intervals)) {
+            switch (Intervals.intervals_intersect(interval_details.intervals)) {
                 case (?interval) {
                     interval_details.intervals.clear();
                     interval_details.intervals.add(interval);
@@ -727,13 +765,11 @@ module {
             let interval = interval_details.intervals.get(0); // #And operations only have one interval
             let ?index = Map.get(collection.indexes, thash, index_name) else Debug.trap("Unreachable: IndexMap not found for index: " # index_name);
 
-            let index_data_utils = CollectionUtils.get_index_data_utils(collection, index.key_details);
-            var record_ids = MemoryBTree.rangeVals(index.data, index_data_utils, interval.0, interval.1);
+            let sorted_in_reverse = Option.get(interval_details.sorted_in_reverse, false);
+
+            let record_ids = CollectionUtils.record_ids_from_index_intervals(collection, index.name, [interval], sorted_in_reverse);
 
             if (requires_sorting and sorted_records_from_iter.size() == 0) {
-                if ((interval_details.sorted_in_reverse == ?true)) {
-                    record_ids := record_ids.rev();
-                };
 
                 for (id in record_ids) {
                     sorted_records_from_iter.add(id);
@@ -761,30 +797,6 @@ module {
 
         if (full_scan_details_buffer.size() > 0) {
             Debug.print("requires full scan");
-
-            // add cursor_record to full_scan_details_buffer if it exists
-            // switch (cursor_record) {
-            //     case (?(id, cursor)) {
-            //         let cursor_map = CandidMap.fromCandid(cursor);
-
-            //         for ((i, (lower_bound, upper_bound)) in Itertools.enumerate(full_scan_details.vals())) {
-            //             let cursor_bound = Array.tabulate<(Text, ?State<Candid>)>(
-            //                 lower_bound.size(),
-            //                 func(i : Nat) : (Text, ?State<Candid>) {
-            //                     let (field, _) = lower_bound.get(i);
-            //                     let ?new_state = cursor_map.get(field) else Debug.trap("Cursor record doesn't have field: " # field);
-            //                     (field, ?(#False(new_state)));
-            //                 },
-            //             );
-
-            //             full_scan_details_buffer.put(i, (cursor_bound, upper_bound));
-
-            //         };
-
-            //     };
-            //     case (null) {};
-
-            // };
 
             var smallest_interval_index = "";
             var smallest_interval_start = 0;
@@ -822,8 +834,8 @@ module {
                     full_scan_filter_bounds,
                 );
             } else {
-                let ?index = Map.get(collection.indexes, thash, smallest_interval_index) else Debug.trap("Unreachable: IndexMap not found for index: " # smallest_interval_index);
-                let record_ids_in_interval = CollectionUtils.record_ids_from_index_interval(collection, index, (smallest_interval_start, smallest_interval_end));
+                let record_ids_in_interval = CollectionUtils.record_ids_from_index_intervals(collection, smallest_interval_index, [(smallest_interval_start, smallest_interval_end)], false);
+
                 let filtered_ids = CollectionUtils.multi_filter(collection, record_ids_in_interval, full_scan_filter_bounds);
             };
 
@@ -948,38 +960,9 @@ module {
                     add_interval(intervals_by_index, index.name, interval, sorted_in_reverse);
 
                 } else {
-                    var record_ids : Iter<Nat> = if (sorted_in_reverse) {
-                        MemoryBTree.rangeVals(index.data, CollectionUtils.get_index_data_utils(collection, index.key_details), interval.0, interval.1).rev();
-                    } else {
-                        MemoryBTree.rangeVals(index.data, CollectionUtils.get_index_data_utils(collection, index.key_details), interval.0, interval.1);
-                    };
+                    var record_ids : Iter<Nat> = CollectionUtils.record_ids_from_index_intervals(collection, index.name, [interval], sorted_in_reverse);
 
                     if (requires_additional_filtering) {
-                        // let { bitmap; opt_filter_bounds } = index_based_interval_filtering(collection, index_scan_details, opt_sort_column);
-
-                        // switch (opt_filter_bounds) {
-                        //     case (?filter_bounds) {
-                        //         record_ids := CollectionUtils.multi_filter(collection, bitmap.vals(), Buffer.fromArray([filter_bounds]));
-                        //     };
-                        //     case (null) if (requires_sorting or requires_additional_sorting) {
-
-                        //         let record_ids_copy = record_ids;
-
-                        //         // Itertools.takeIf
-                        //         record_ids := object {
-                        //             public func next() : ?Nat {
-                        //                 for (id in record_ids_copy) {
-                        //                     if (bitmap.get(id)) return ?id;
-                        //                 };
-                        //                 return null;
-                        //             };
-                        //         };
-
-                        //     } else {
-                        //         bitmaps.add(bitmap);
-                        //     };
-                        // };
-
                         record_ids := CollectionUtils.multi_filter(collection, record_ids, Buffer.fromArray([filter_bounds]));
                     };
 
@@ -1053,7 +1036,7 @@ module {
             let should_call_union = not requires_additional_sorting_between_intervals(collection, index_name, interval_details.intervals, opt_sort_column);
 
             if (should_call_union) {
-                intervals_union(interval_details.intervals);
+                Intervals.intervals_union(interval_details.intervals);
             };
         };
 
@@ -1091,11 +1074,11 @@ module {
 
             for (interval in interval_details.intervals.vals()) {
 
-                var record_ids = MemoryBTree.rangeVals(index.data, index_data_utils, interval.0, interval.1);
+                let sorted_in_reverse = Option.get(interval_details.sorted_in_reverse, false);
+
+                let record_ids = CollectionUtils.record_ids_from_index_intervals(collection, index_name, [interval], sorted_in_reverse);
 
                 if (requires_sorting) {
-                    if ((interval_details.sorted_in_reverse == ?true)) record_ids := record_ids.rev();
-
                     iterators.add(record_ids);
                 } else {
                     let bitmap = BitMap.fromIter(record_ids);
@@ -1106,41 +1089,6 @@ module {
         };
 
         if (full_scan_details_buffer.size() > 0) {
-            // add cursor_record to full_scan_details if it exists
-            // switch (cursor_record) {
-            //     case (?(id, cursor)) {
-            //         let cursor_map = CandidMap.fromCandid(cursor);
-
-            //         for ((i, (lower_bound, upper_bound)) in Itertools.enumerate(full_scan_details_buffer.vals())) {
-            //             let cursor_bound = Array.tabulate<(Text, ?State<Candid>)>(
-            //                 lower_bound.size(),
-            //                 func(i : Nat) : (Text, ?State<Candid>) {
-            //                     let lower_bound_tuple = lower_bound.get(i);
-            //                     let (field, prev) = lower_bound_tuple;
-            //                     let ?new_state = cursor_map.get(field) else Debug.trap("Cursor record doesn't have field: " # field);
-
-            //                     switch (prev) {
-            //                         case (?True(prev_state) or ?False(prev_state)) {
-            //                             if (Schema.cmp_candid(new_state, prev_state) == 1) {
-            //                                 (field, ?(#False(new_state)));
-            //                             } else {
-            //                                 lower_bound_tuple;
-            //                             };
-            //                         };
-            //                         case (null) lower_bound_tuple;
-            //                     };
-
-            //                 },
-            //             );
-
-            //             full_scan_details_buffer.put(i, (cursor_bound, upper_bound));
-
-            //         };
-
-            //     };
-            //     case (null) {};
-
-            // };
 
             let full_scan_filter_bounds = Buffer.Buffer<T.Bounds>(full_scan_details_buffer.size());
 
@@ -1149,7 +1097,8 @@ module {
             };
 
             let main_btree_utils = CollectionUtils.get_main_btree_utils();
-            let filtered_ids = CollectionUtils.multi_filter(collection, MemoryBTree.keys(collection.main, main_btree_utils), full_scan_filter_bounds);
+            let record_ids = MemoryBTree.keys(collection.main, main_btree_utils);
+            let filtered_ids = CollectionUtils.multi_filter(collection, record_ids, full_scan_filter_bounds);
 
             if (requires_sorting) {
                 let buffer = Buffer.Buffer<Nat>(8);
@@ -1167,19 +1116,14 @@ module {
 
         };
 
-        if (requires_sorting) {
-            assert bitmaps.size() == 0;
+        func deduplicate_record_ids_iter(
+            record_ids_iter : Iter<Nat>
+        ) : Iter<Nat> {
+            let dedup_bitmap = BitMap.BitMap(1024);
 
-            if (iterators.size() == 0) return #Empty;
-
-            Debug.print("Running kmerge on " # debug_show iterators.size() # " iterators");
-            let merged_iterators = Itertools.kmerge<Nat>(Buffer.toArray(iterators), sort_records_by_field_cmp);
-
-            let deduped_iter = object {
-                let dedup_bitmap = BitMap.BitMap(1024);
-
+            object {
                 public func next() : ?Nat {
-                    loop switch (merged_iterators.next()) {
+                    loop switch (record_ids_iter.next()) {
                         case (null) return null;
                         case (?id) {
                             if (not dedup_bitmap.get(id)) {
@@ -1189,8 +1133,18 @@ module {
                         };
                     };
                 };
-
             };
+        };
+
+        if (requires_sorting) {
+            assert bitmaps.size() == 0;
+
+            if (iterators.size() == 0) return #Empty;
+
+            Debug.print("Running kmerge on " # debug_show iterators.size() # " iterators");
+            let merged_iterators = Itertools.kmerge<Nat>(Buffer.toArray(iterators), sort_records_by_field_cmp);
+
+            let deduped_iter = deduplicate_record_ids_iter(merged_iterators);
 
             return #Ids(deduped_iter);
 

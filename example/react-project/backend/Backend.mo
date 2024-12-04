@@ -9,6 +9,7 @@ import Nat64 "mo:base/Nat64";
 import Nat "mo:base/Nat";
 import Cycles "mo:base/ExperimentalCycles";
 import Buffer "mo:base/Buffer";
+import Option "mo:base/Option";
 
 import Vector "mo:vector";
 import Itertools "mo:itertools/Iter";
@@ -88,8 +89,11 @@ actor class Backend() {
     let #ok(_) = txs.create_index(["btype", "tx.amt"]);
     let #ok(_) = txs.create_index(["btype", "ts"]);
 
-    let #ok(_) = txs.create_index(["tx.from", "btype"]);
-    let #ok(_) = txs.create_index(["tx.to", "btype"]);
+    let #ok(_) = txs.create_index(["tx.from", "btype", "ts"]);
+    let #ok(_) = txs.create_index(["tx.from", "btype", "tx.amt"]);
+
+    let #ok(_) = txs.create_index(["tx.to", "btype", "ts"]);
+    let #ok(_) = txs.create_index(["tx.to", "btype", "tx.amt"]);
 
     public func upload_blocks(blocks : [Block]) : async () {
         for (block in blocks.vals()) {
@@ -106,6 +110,17 @@ actor class Backend() {
 
     public func pull_blocks(start : Nat, length : Nat) : async [Block] {
         await* BlockUtils.pull_blocks_from_ledger(ledger, start, length);
+    };
+
+    public func pull_blocks_into_db(start : Nat, length : Nat) : async () {
+        let blocks = await* BlockUtils.pull_blocks_from_ledger(ledger, start, length);
+
+        for (block in blocks.vals()) {
+            switch (txs.insert_with_id(block.tx_index, block)) {
+                case (#ok(_)) ();
+                case (#err(err)) Debug.trap("failed to insert block into txs db: " # debug_show (block) # " \n" # err);
+            };
+        };
     };
 
     system func postupgrade() {
@@ -140,7 +155,7 @@ actor class Backend() {
 
     type GetTxsResponse = {
         blocks : [Block];
-        total : Nat;
+        total : ?Nat;
         instructions : Nat;
     };
 
@@ -227,20 +242,12 @@ actor class Backend() {
         let db_query = convert_options_to_db_query(options);
 
         var blocks : [Block] = [];
-        var total : Nat = txs.size();
+        var total : ?Nat = null;
 
         let instructions = IC.countInstructions(
             func() {
 
-                if (options.count) {
-                    let #ok(total_matching_txs) = txs.count(db_query) else Debug.trap("txs.count failed");
-
-                    total := total_matching_txs;
-                };
-
                 let query_res = txs.find(db_query);
-
-                Debug.print("successfully got total matching txs: " # debug_show total_matching_txs);
 
                 let #ok(matching_txs) = query_res else Debug.trap("get_txs failed: " # debug_show query_res);
                 Debug.print("successfully got matching txs: " # debug_show options);
@@ -250,7 +257,15 @@ actor class Backend() {
                     func(id : Nat, tx : Block) : Block = tx,
                 );
 
-                Debug.print("get_txs returning " # debug_show { blocks = blocks.size(); total = total_matching_txs });
+                if (options.count) {
+                    let #ok(total_matching_txs) = txs.count(db_query) else Debug.trap("txs.count failed");
+
+                    total := ?total_matching_txs;
+
+                    Debug.print("successfully got total matching txs: " # debug_show total);
+                };
+
+                Debug.print("get_txs returning " # debug_show { blocks = blocks.size(); total });
 
             }
         );
@@ -276,8 +291,8 @@ actor class Backend() {
         let total = if (options.count) {
             let #ok(total) = txs.count(db_query) else Debug.trap("txs.count failed");
             Debug.print("successfully got total matching txs: " # debug_show total);
-            total;
-        } else { txs.size() };
+            ?total;
+        } else { null };
 
         let #ok(_) = query_res else Debug.trap("get_txs failed: " # debug_show query_res);
         Debug.print("successfully got matching txs: " # debug_show options);
@@ -301,15 +316,26 @@ actor class Backend() {
 
     type CanisterStats = {
         heap_size : Nat;
+        memory_size : Nat;
         stable_memory_size : Nat;
         db_stats : ZenDB.CollectionStats;
     };
 
     public query func get_stats() : async CanisterStats {
+        let db_stats = txs.stats();
+
+        let main_btree_sm = db_stats.main_btree_index.stable_memory;
+        var total_db_stable_memory_size = main_btree_sm.metadata_bytes + main_btree_sm.actual_data_bytes;
+
+        for (index_stats in db_stats.indexes.vals()) {
+            total_db_stable_memory_size += index_stats.stable_memory.metadata_bytes + index_stats.stable_memory.actual_data_bytes;
+        };
+
         {
             heap_size = Prim.rts_heap_size();
-            stable_memory_size = Prim.rts_stable_memory_size();
-            db_stats = txs.stats();
+            memory_size = Prim.rts_memory_size();
+            stable_memory_size = total_db_stable_memory_size;
+            db_stats;
         };
     };
 

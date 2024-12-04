@@ -19,10 +19,13 @@ import {
     Pagination,
     Switch,
     Alert,
+    Collapse,
 } from 'antd';
 import { useQuery } from 'react-query';
-import { chronify } from 'chronify';
 import type { SelectProps } from 'antd';
+import { queryClient } from '../utils/react-query-client';
+import { useSearch, useLocation } from 'wouter';
+import dayjs from 'dayjs';
 
 const { RangePicker } = DatePicker;
 type TagRender = SelectProps['tagRender'];
@@ -60,21 +63,6 @@ const tagRender: TagRender = (props) => {
 
 const { Paragraph, Text } = Typography;
 
-const dataSource = [
-    {
-        key: '1',
-        name: 'Mike',
-        age: 32,
-        address: '10 Downing Street',
-    },
-    {
-        key: '2',
-        name: 'John',
-        age: 42,
-        address: '10 Downing Street',
-    },
-];
-
 const number_with_comma = (n: string) => {
     let [whole, decimal] = n.split('.');
     let whole_with_comma = whole.replace(/\B(?=(\d{3})+(?!\d))/g, ',');
@@ -91,9 +79,12 @@ const render_address = (from: Uint8Array | number[]) => {
     );
 };
 
+const format_with_icp_decimals = (amt: bigint) => Number(amt / 10n ** 8n);
+
 const render_icp = (amt: bigint) =>
-    number_with_comma((amt ? Number(BigInt(amt) / 10n ** 8n) : 0).toFixed(8)) +
-    ' ICP';
+    number_with_comma(
+        (amt ? format_with_icp_decimals(BigInt(amt)) : 0).toFixed(8),
+    ) + ' ICP';
 
 const columns = [
     { title: 'Block Type', dataIndex: 'btype', key: 'btype' },
@@ -115,7 +106,9 @@ const columns = [
         dataIndex: 'ts',
         key: 'ts',
         render: (ts: bigint) =>
-            new Date(Number(ts / (1000n * 1000n))).toLocaleString(),
+            dayjs(Number(ts / (1000n * 1000n))).format(
+                'YYYY-MM-DD, hh:mm:ss A',
+            ),
     },
     {
         title: 'Sender',
@@ -165,7 +158,34 @@ type TxsQuery = {
 };
 
 export const TxsTable = () => {
-    const [txs_query, set_txs_query] = useState<Options>({
+    const [performance_state, set_performance_state] = useState({
+        instructions: 0,
+        time: 0,
+    });
+
+    const search_string = useSearch();
+    const search_params = new URLSearchParams(search_string);
+    const [use_update_method, set_use_update_method] = useState(
+        search_params.get('use_update_method') === 'true',
+    );
+
+    let options_json_parser_helper = (key: string, value: string) => {
+        return typeof value === 'string' && value.match(/^\d+$/)
+            ? BigInt(value)
+            : value;
+    };
+
+    let query = JSON.parse(
+        search_params.get('query') || '{}',
+        options_json_parser_helper,
+    );
+
+    console.log({ query });
+
+    let opt_hex_to_uint8_array = (opt_hex: [] | string[]) =>
+        opt_hex.length ? [new Uint8Array(Buffer.from(opt_hex[0], 'hex'))] : [];
+
+    let empty_query: Options = {
         filter: {
             btype: [],
             to: [],
@@ -179,21 +199,57 @@ export const TxsTable = () => {
             limit: 10n,
             offset: 0n,
         },
-        count : true
-    });
+        count: true,
+    };
 
-    const [pagination, set_pagination] = useState({
-        current: 1,
-        page_size: 10,
-        total: 0,
-    });
+    const [txs_query, set_txs_query] = useState<Options>(
+        'count' in query
+            ? {
+                  ...query,
+                  filter: {
+                      ...query?.filter,
+                      to: opt_hex_to_uint8_array(query?.filter?.to),
+                      from: opt_hex_to_uint8_array(query?.filter?.from),
+                      spender: opt_hex_to_uint8_array(query?.filter?.spender),
+                  },
+              }
+            : empty_query,
+    );
 
-    const [enable_sorting, set_enable_sorting] = useState(false);
-    const [performance_state, set_performance_state] = useState({
-        instructions: 0,
-        time: 0,
-    });
-    const [use_async, set_use_async] = useState(false);
+    const [use_count, set_use_count] = useState(query.count || true);
+    const [sorting, set_sorting] = useState(
+        query.sort?.length
+            ? {
+                  field: query.sort[0][0],
+                  direction:
+                      'Ascending' in query.sort[0][1]
+                          ? 'Ascending'
+                          : 'Descending',
+                  enabled: true,
+              }
+            : {
+                  field: 'ts',
+                  direction: 'Ascending' as 'Ascending' | 'Descending',
+                  enabled: false,
+              },
+    );
+
+    const [pagination, set_pagination] = useState(
+        query?.pagination
+            ? {
+                  current: Number(
+                      query.pagination.offset / query.pagination.limit,
+                  ),
+                  page_size: Number(query.pagination.limit || 10n),
+              }
+            : {
+                  current: 1,
+                  page_size: 10,
+                  total: 0,
+              },
+    );
+
+    const [location, set_location] = useLocation();
 
     const {
         data: blocks,
@@ -202,19 +258,26 @@ export const TxsTable = () => {
         isError: is_table_request_failed,
         error: table_request_error,
     } = useQuery(
-        ['get_txs', use_async],
+        ['get_txs', search_string],
         async () => {
-            console.log(txs_query);
+            let query = txs_query;
+
+            console.log(query);
             const start_time = performance.now();
 
-            const res = await (use_async
-                ? backend.get_async_txs(txs_query)
-                : backend.get_txs(txs_query));
+            const res = await (use_update_method
+                ? backend.get_async_txs(query)
+                : backend.get_txs(query));
 
             const end_time = performance.now();
 
             set_pagination((prev) => {
-                prev.total = Number(res.total);
+                if (res.total.length) {
+                    prev.total = Number(res.total);
+                } else {
+                    prev.total = null;
+                }
+
                 return prev;
             });
 
@@ -269,13 +332,6 @@ export const TxsTable = () => {
         },
     );
 
-    const set_current_page = (page: number) => {
-        set_pagination((prev) => {
-            prev.current = page;
-            return prev;
-        });
-    };
-
     const handle_pagination_change = async (
         page: number,
         page_size: number,
@@ -287,29 +343,53 @@ export const TxsTable = () => {
             };
             return prev;
         });
+
         set_pagination((prev) => {
             prev.current = page;
             prev.page_size = page_size;
             return prev;
         });
-        await refetch_get_txs().then(() => {});
+
+        let query = txs_query;
+
+        if (sorting.enabled) {
+            query.sort = [
+                [
+                    sorting.field,
+                    sorting.direction === 'Ascending'
+                        ? { Ascending: null }
+                        : { Descending: null },
+                ],
+            ];
+        } else {
+            query.sort = [];
+        }
+
+        query.count = use_count;
+
+        set_location(
+            `?use_update_method=${use_update_method}&query=${JSON.stringify(
+                txs_query,
+                (key, value) =>
+                    typeof value === 'bigint'
+                        ? value.toString()
+                        : value instanceof Uint8Array
+                        ? Buffer.from(value).toString('hex')
+                        : value, // return everything else unchanged
+            )
+                .replace(' ', '')
+                .replace('\n', '')}`,
+        );
+
+        // await refetch_get_txs();
     };
 
     const handle_address_change =
         (field: 'to' | 'from' | 'spender') =>
         (e: React.ChangeEvent<HTMLInputElement>) => {
-            console.log({
-                e,
-                target: e.target,
-                currentTarget: e.currentTarget,
-                value: e.target.value,
-            });
-
             const address: string = e?.target?.value || '';
 
             const uint8_array = new Uint8Array(Buffer.from(address, 'hex'));
-
-            console.log({ address, uint8_array });
 
             set_txs_query((prev) => {
                 if (address === '') {
@@ -325,11 +405,9 @@ export const TxsTable = () => {
     let ICP_LEDGER_DECIMALS = 8;
 
     const handle_amt_filter_change =
-        (field: 'min' | 'max'): InputNumberProps['onChange'] =>
-        (value) => {
-            let num = Number(value);
-
-            console.log({ field, num });
+        (field: 'min' | 'max') => (e: React.ChangeEvent<HTMLInputElement>) => {
+            let value = e?.target?.value;
+            let num = value === '' ? NaN : Number(value);
 
             set_txs_query((prev) => {
                 prev.filter.amt = [
@@ -382,32 +460,17 @@ export const TxsTable = () => {
     };
 
     const handle_sort_field_change = (value: string) => {
-        set_txs_query((prev) => {
-            if (enable_sorting) {
-                if (prev.sort.length === 0) {
-                    prev.sort = [[value, { Ascending: null }]];
-                } else {
-                    prev.sort[0][0] = value;
-                }
-            }
-
-            return prev;
-        });
+        set_sorting((prev) => ({
+            ...prev,
+            field: value,
+        }));
     };
 
     const handle_sort_direction_change = (e: any) => {
         let value = e.target.value;
 
-        set_txs_query((prev) => {
-            if (enable_sorting) {
-                if (prev.sort.length > 0) {
-                    prev.sort[0][1] =
-                        value == 'Ascending'
-                            ? { Ascending: null }
-                            : { Descending: null };
-                }
-            }
-
+        set_sorting((prev) => {
+            prev.direction = value;
             return prev;
         });
     };
@@ -416,18 +479,176 @@ export const TxsTable = () => {
 
     const format_bytes = (bytes: number | bigint) => {
         let formatted = number_formatter
-            .format(bytes) // too lazy to write a function to format bytes
+            .format(bytes)
             .replace('B', 'G') // -> replace Billion with Giga
             .replace('T', 'P'); // -> replace Trillion with Peta
 
         return formatted + 'B';
     };
 
+    let heap_size = format_bytes(stats?.heap_size || 0);
+    let stable_memory_size = format_bytes(stats?.stable_memory_size || 0);
+    let total_records = number_formatter.format(stats?.db_stats.records || 0);
+
     return (
         <Space size="large" direction="vertical">
             <Typography.Title level={2}>
                 ZenDB test - Indexing ICP transaction
             </Typography.Title>
+            <Collapse
+                style={{ padding: 0 }}
+                items={[
+                    {
+                        key: '1',
+                        label: (
+                            <Flex justify="space-between">
+                                <Typography.Title
+                                    level={5}
+                                    style={{ margin: 0 }}
+                                >
+                                    Txs Collection Stats
+                                </Typography.Title>
+
+                                <Flex wrap={'wrap'} gap={15}>
+                                    <Typography.Text>
+                                        Heap Size: {heap_size}{' '}
+                                    </Typography.Text>
+                                    <Typography.Text>
+                                        Stable Memory: {stable_memory_size}{' '}
+                                    </Typography.Text>
+                                    <Typography.Text>
+                                        Total Records: {total_records}
+                                    </Typography.Text>
+                                </Flex>
+                            </Flex>
+                        ),
+                        children: (
+                            <Card
+                                style={{ margin: 0 }}
+                                bordered={false}
+                                actions={[
+                                    <Button
+                                        onClick={async (e) =>
+                                            await refetch_get_stats()
+                                        }
+                                    >
+                                        Fetch Stats
+                                    </Button>,
+                                ]}
+                            >
+                                <Space direction="vertical">
+                                    <Typography.Text>
+                                        A summary of txs collection's memory
+                                        usage.
+                                    </Typography.Text>
+
+                                    <Typography.Paragraph>
+                                        Each card displays the indexed fields
+                                        and memory usage of each index in the
+                                        collection. The indexes use a stable
+                                        memory B-tree to store their index
+                                        fields and pointers to the records. The
+                                        B-tree has some memory overhead for
+                                        storing metadata (internal nodes, leaf
+                                        nodes, and pointers), while the rest is
+                                        index data. The main index stores the
+                                        records and a default ':id' created by
+                                        the system. The other B-trees are
+                                        user-created indexes to speed up
+                                        queries. Each index is created on a
+                                        specific set of fields in a specific
+                                        order.
+                                    </Typography.Paragraph>
+
+                                    <Typography.Paragraph>
+                                        The following indexes were chosen as the
+                                        best fit for the queries on this
+                                        collection. The ':id' field is
+                                        automatically added by the system to all
+                                        indexes to support indexing duplicate
+                                        values (records with the same value for
+                                        the indexed field). The fields 'ts' and
+                                        'tx.amt' are included in most indexes to
+                                        minimize the need for in-memory sorting,
+                                        which is quite expensive. This, however,
+                                        must be manually added by the user.
+                                    </Typography.Paragraph>
+
+                                    <Flex gap={5} wrap={'wrap'}>
+                                        <Card
+                                            size="small"
+                                            title="main index: [:id]"
+                                            style={{ minWidth: 300 }}
+                                            hoverable
+                                        >
+                                            <Space direction="vertical">
+                                                <Typography.Text>
+                                                    B-tree Metadata:{' '}
+                                                    {format_bytes(
+                                                        stats?.db_stats
+                                                            ?.main_btree_index
+                                                            .stable_memory
+                                                            .metadata_bytes ||
+                                                            0,
+                                                    )}
+                                                </Typography.Text>
+
+                                                <Typography.Text>
+                                                    Index Data Size:{' '}
+                                                    {format_bytes(
+                                                        stats?.db_stats
+                                                            ?.main_btree_index
+                                                            .stable_memory
+                                                            .actual_data_bytes ||
+                                                            0,
+                                                    )}
+                                                </Typography.Text>
+                                            </Space>
+                                        </Card>
+
+                                        {stats?.db_stats?.indexes.map(
+                                            (index, i) => (
+                                                <Card
+                                                    size="small"
+                                                    key={i}
+                                                    title={
+                                                        'index: [' +
+                                                        index.columns.join(
+                                                            ', ',
+                                                        ) +
+                                                        ']'
+                                                    }
+                                                    style={{ minWidth: 300 }}
+                                                >
+                                                    <Space direction="vertical">
+                                                        <Typography.Text>
+                                                            B-tree Metadata:{' '}
+                                                            {format_bytes(
+                                                                index
+                                                                    .stable_memory
+                                                                    .metadata_bytes,
+                                                            )}
+                                                        </Typography.Text>
+
+                                                        <Typography.Text>
+                                                            Index Data Size:{' '}
+                                                            {format_bytes(
+                                                                index
+                                                                    .stable_memory
+                                                                    .actual_data_bytes,
+                                                            )}
+                                                        </Typography.Text>
+                                                    </Space>
+                                                </Card>
+                                            ),
+                                        )}
+                                    </Flex>
+                                </Space>
+                            </Card>
+                        ),
+                    },
+                ]}
+            />
             <Card
                 actions={[
                     <Button
@@ -441,89 +662,6 @@ export const TxsTable = () => {
                     </Button>,
                 ]}
             >
-                <Card
-                    title="Txs Collection Stats"
-                    actions={[
-                        <Button
-                            onClick={async (e) => await refetch_get_stats()}
-                        >
-                            Fetch Stats
-                        </Button>,
-                    ]}
-                >
-                    <Space direction="vertical">
-                        <Typography.Text>
-                            Displays the stats for the transactions collection
-                            in zenDB
-                        </Typography.Text>
-                        <Typography.Text>
-                            Heap Size: {format_bytes(stats?.heap_size || 0)}
-                        </Typography.Text>
-                        <Typography.Text>
-                            Stable Memory Size:{' '}
-                            {format_bytes(stats?.stable_memory_size || 0)}
-                        </Typography.Text>
-                        <Typography.Text>
-                            Total txs records:{' '}
-                            {number_formatter.format(
-                                stats?.db_stats.records || 0,
-                            )}
-                        </Typography.Text>
-                    </Space>
-
-                    <Flex gap={5} wrap={'wrap'}>
-                        <Card
-                            title="Main BTree Stats"
-                            style={{ minWidth: 250 }}
-                        >
-                            <Space direction="vertical">
-                                <Typography.Text>
-                                    Metadata Bytes:{' '}
-                                    {format_bytes(
-                                        stats?.db_stats?.main_btree_index
-                                            .stable_memory.metadata_bytes || 0,
-                                    )}
-                                </Typography.Text>
-
-                                <Typography.Text>
-                                    Actual Data Bytes:{' '}
-                                    {format_bytes(
-                                        stats?.db_stats?.main_btree_index
-                                            .stable_memory.actual_data_bytes ||
-                                            0,
-                                    )}
-                                </Typography.Text>
-                            </Space>
-                        </Card>
-
-                        {stats?.db_stats?.indexes.map((index, i) => (
-                            <Card
-                                key={i}
-                                title={
-                                    'index: [' + index.columns.join(', ') + ']'
-                                }
-                                style={{ minWidth: 250 }}
-                            >
-                                <Space direction="vertical">
-                                    <Typography.Text>
-                                        Metadata Bytes:{' '}
-                                        {format_bytes(
-                                            index.stable_memory.metadata_bytes,
-                                        )}
-                                    </Typography.Text>
-
-                                    <Typography.Text>
-                                        Actual Data Bytes:{' '}
-                                        {format_bytes(
-                                            index.stable_memory
-                                                .actual_data_bytes,
-                                        )}
-                                    </Typography.Text>
-                                </Space>
-                            </Card>
-                        ))}
-                    </Flex>
-                </Card>
                 <Flex>
                     <Card title="Filter Options" style={{ minWidth: 600 }}>
                         <Space direction="vertical">
@@ -532,25 +670,49 @@ export const TxsTable = () => {
                                 allowClear={true}
                                 addonBefore="Sender"
                                 placeholder="Enter sender address"
+                                defaultValue={query?.filter?.from?.[0] || ''}
                                 onChange={handle_address_change('from')}
                             />
                             <Input
                                 allowClear={true}
                                 addonBefore="Recipient"
                                 placeholder="Enter recipient address"
+                                defaultValue={query?.filter?.to?.[0] || ''}
                                 onChange={handle_address_change('to')}
                             />
 
                             <Text>Amount</Text>
-                            <Flex>
-                                <InputNumber
+                            <Flex gap={10} style={{ width: '100%' }}>
+                                <Input
+                                    allowClear={true}
                                     addonBefore="Min"
                                     placeholder="Enter Min Amount"
+                                    defaultValue={
+                                        query?.filter?.amt?.[0]?.min?.[0]
+                                            ? format_with_icp_decimals(
+                                                  BigInt(
+                                                      query?.filter?.amt?.[0]
+                                                          ?.min?.[0],
+                                                  ) || 0n,
+                                              ).toFixed(0)
+                                            : ''
+                                    }
                                     onChange={handle_amt_filter_change('min')}
                                 />
-                                <InputNumber
+                                <Input
+                                    allowClear={true}
                                     addonBefore="Max"
                                     placeholder="Enter Max Amount"
+                                    defaultValue={
+                                        query?.filter?.amt?.[0]?.max?.[0]
+                                            ? format_with_icp_decimals(
+                                                  BigInt(
+                                                      query?.filter?.amt?.[0]
+                                                          ?.max?.[0],
+                                                  ) || 0n,
+                                              ).toFixed(0)
+                                            : ''
+                                    }
                                     onChange={handle_amt_filter_change('max')}
                                 />
                             </Flex>
@@ -559,46 +721,77 @@ export const TxsTable = () => {
                                 allowClear={true}
                                 mode="multiple"
                                 tagRender={tagRender}
-                                defaultValue={[]}
+                                defaultValue={
+                                    txs_query?.filter?.btype?.[0] || []
+                                }
                                 style={{ width: '100%' }}
                                 options={block_types}
                                 onChange={select_block_types}
                             />
-                            <Space size={'small'} direction="vertical">
-                                <Typography.Text>Date/Time</Typography.Text>
-                                <RangePicker
-                                    showTime
-                                    onChange={handle_date_change}
-                                />
-                            </Space>
+
+                            <Typography.Text>Date/Time</Typography.Text>
+                            <RangePicker
+                                showTime
+                                onChange={handle_date_change}
+                                defaultValue={
+                                    query?.filter?.ts?.[0]?.min?.[0] &&
+                                    query?.filter?.ts?.[0]?.max?.[0]
+                                        ? [
+                                              dayjs(
+                                                  new Date(
+                                                      Number(
+                                                          query?.filter?.ts?.[0]
+                                                              ?.min?.[0],
+                                                      ) / 1000000,
+                                                  ),
+                                              ),
+                                              dayjs(
+                                                  new Date(
+                                                      Number(
+                                                          query?.filter?.ts?.[0]
+                                                              ?.max?.[0],
+                                                      ) / 1000000,
+                                                  ),
+                                              ),
+                                          ]
+                                        : []
+                                }
+                            />
                         </Space>
                     </Card>
 
-                    <Flex vertical>
+                    <Flex wrap>
                         <Card
-                            title="Sort Options"
-                            style={{ width: 300 }}
-                            actions={[
-                                <Switch
-                                    checkedChildren="Disable Sorting"
-                                    unCheckedChildren="Enable Sorting"
-                                    defaultChecked={false}
-                                    onChange={(checked) => {
-                                        set_enable_sorting(checked);
-                                        if (!checked) {
-                                            set_txs_query((prev) => {
-                                                prev.sort = [];
-                                                return prev;
-                                            });
+                            // title="Sort Options"
+
+                            title={
+                                <Flex justify="space-between">
+                                    <Typography.Title
+                                        level={5}
+                                        style={{ margin: 0 }}
+                                    >
+                                        Sorting
+                                    </Typography.Title>
+                                    <Switch
+                                        checkedChildren="Enabled"
+                                        unCheckedChildren="Disabled"
+                                        defaultChecked={
+                                            query.sort?.length ? true : false
                                         }
-                                    }}
-                                />,
-                            ]}
+                                        onChange={(checked) => {
+                                            set_sorting((prev) => ({
+                                                ...prev,
+                                                enabled: checked,
+                                            }));
+                                        }}
+                                    />
+                                </Flex>
+                            }
                         >
                             <Space>
                                 <Select
-                                    defaultValue="time"
                                     style={{ width: 120 }}
+                                    defaultValue={query.sort?.[0]?.[0] || 'ts'}
                                     onChange={handle_sort_field_change}
                                 >
                                     <Select.Option value="ts">
@@ -609,7 +802,7 @@ export const TxsTable = () => {
                                     </Select.Option>
                                 </Select>
                                 <Radio.Group
-                                    defaultValue="desc"
+                                    defaultValue="Ascending"
                                     onChange={handle_sort_direction_change}
                                 >
                                     <Radio value="Ascending">Ascending</Radio>
@@ -617,50 +810,89 @@ export const TxsTable = () => {
                                 </Radio.Group>
                             </Space>
                         </Card>
-
-                        <Card title="Use update method">
+                        <Card
+                            title={
+                                <Flex justify="space-between">
+                                    <Typography.Title
+                                        level={5}
+                                        style={{ margin: 0 }}
+                                    >
+                                        Count Query
+                                    </Typography.Title>
+                                    <Switch
+                                        checkedChildren="Enabled"
+                                        unCheckedChildren="Disabled"
+                                        value={use_count}
+                                        onChange={(checked) =>
+                                            set_use_count(checked)
+                                        }
+                                    />
+                                </Flex>
+                            }
+                        >
                             <Space direction="vertical">
-                                <Typography.Text>
-                                    Some queries require more computation than
-                                    is allowed for a single query call with the
-                                    limit of 5B instructions. You can switch to
-                                    an update call to fetch the data. This will
-                                    allow you to query data with a limit of 40B
-                                    instructions. The downside to this
-                                    additional computation is that the update
-                                    calls are slower than the query calls.
-                                </Typography.Text>
+                                <Typography.Paragraph>
+                                    We perform two database queries: one for the
+                                    paginated data and another for the total
+                                    record count matching the query. Counting
+                                    all records can be resource-intensive if the
+                                    query isn't fully covered by a single index,
+                                    as it may require additional in-memory
+                                    operations like sorting, filtering, or
+                                    merging results from multiple indexes.
+                                    Disabling the count query allows fetching
+                                    data from page 1 up to the page where it
+                                    exceeds the instruction limit.
+                                </Typography.Paragraph>
+                            </Space>
+                        </Card>
 
-                                <Switch
-                                    onChange={(checked) => {
-                                        set_use_async(checked);
-                                    }}
-                                    value={use_async}
-                                    checkedChildren="Use Async"
-                                    unCheckedChildren="Use Sync"
-                                />
+                        <Card
+                            title={
+                                <Flex justify="space-between">
+                                    <Typography.Title
+                                        level={5}
+                                        style={{ margin: 0 }}
+                                    >
+                                        Use update method
+                                    </Typography.Title>
+                                    <Switch
+                                        onChange={(checked) => {
+                                            set_use_update_method(checked);
+                                        }}
+                                        value={use_update_method}
+                                        checkedChildren="Enabled"
+                                        unCheckedChildren="Disabled"
+                                    />
+                                </Flex>
+                            }
+                        >
+                            <Space direction="vertical">
+                                <Typography.Paragraph>
+                                    Some queries require more computation than
+                                    the 5 billion instructions allowed for a
+                                    single query call. You can switch to an
+                                    update call, which increases the limit to 40
+                                    billion instructions. However, update calls
+                                    will be slower than query calls.
+                                </Typography.Paragraph>
                             </Space>
                         </Card>
                     </Flex>
                 </Flex>
             </Card>
 
-            <Space direction="vertical" style={{ width: '100%' }}>
-                {is_table_request_failed && (
-                    <Alert
-                        message="Table Request Failed"
-                        showIcon
-                        description={(table_request_error as any)?.message}
-                        type="error"
-                        // closable
-                        action={
-                            <Button size="small" danger>
-                                Detail
-                            </Button>
-                        }
-                    />
-                )}
+            {is_table_request_failed && (
+                <Alert
+                    message="Table Request Failed"
+                    showIcon
+                    description={(table_request_error as any)?.message}
+                    type="error"
+                    // closable
+                />
+            )}
 
+            <Space direction="vertical" style={{ width: '100%' }}>
                 <Table
                     title={() => (
                         <Flex justify="space-between" align="center">
@@ -705,7 +937,11 @@ export const TxsTable = () => {
                                     Total Transactions:{' '}
                                 </Typography.Text>
                                 <Typography.Text strong>
-                                    {number_formatter.format(pagination.total)}
+                                    {pagination.total === null
+                                        ? '???'
+                                        : number_formatter.format(
+                                              pagination.total,
+                                          )}
                                 </Typography.Text>
                             </span>
                         </Flex>
@@ -718,7 +954,9 @@ export const TxsTable = () => {
                 <Pagination
                     showQuickJumper
                     current={pagination.current}
-                    total={pagination.total}
+                    total={Number(
+                        pagination.total || stats?.db_stats.records || 0,
+                    )}
                     pageSize={pagination.page_size}
                     onChange={handle_pagination_change}
                 />

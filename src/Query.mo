@@ -77,7 +77,7 @@ module {
         func handle_not(key : Text, not_op : ZqlOperators) {
             switch (not_op) {
                 case (#eq(value)) {
-                    // #eq(x) -> #Or([#lt(x), #gt(x)])
+                    // #Not(#eq(x)) -> #Or([#lt(x), #gt(x)])
 
                     if (not is_and) {
                         buffer.add(#Operation(key, #lt(value)));
@@ -96,7 +96,7 @@ module {
                     buffer.add(#Operation(key, #lte(value)));
                 };
                 case (#lte(value)) {
-                    // #Note(#lte(x)) -> #gt(x)
+                    // #Not(#lte(x)) -> #gt(x)
                     buffer.add(#Operation(key, #gt(value)));
                 };
                 case (#gte(value)) {

@@ -22,6 +22,7 @@ import Candid "mo:serde/Candid";
 import Itertools "mo:itertools/Iter";
 import RevIter "mo:itertools/RevIter";
 import Tag "mo:candid/Tag";
+import Vector "mo:vector";
 
 import MemoryBTree "mo:memory-collection/MemoryBTree/Stable";
 import TypeUtils "mo:memory-collection/TypeUtils";
@@ -87,48 +88,33 @@ module {
         // };
     };
 
-    public type Tuple<A, B> = { _0_ : A; _1_ : B };
-    public func Tuple<A, B>(a : A, b : B) : Tuple<A, B> {
-        { _0_ = a; _1_ = b };
+    public type Tuple<A, B> = T.Tuple<A, B>;
+    public func Tuple<A, B>(a : A, b : B) : T.Tuple<A, B> = { _0_ = a; _1_ = b };
+
+    public type Triple<A, B, C> = T.Triple<A, B, C>;
+    public func Triple<A, B, C>(a : A, b : B, c : C) : T.Triple<A, B, C> = {
+        _0_ = a;
+        _1_ = b;
+        _2_ = c;
     };
 
-    public type Triple<A, B, C> = { _0_ : A; _1_ : B; _2_ : C };
-    public func Triple<A, B, C>(a : A, b : B, c : C) : Triple<A, B, C> {
-        { _0_ = a; _1_ = b; _2_ = c };
+    public type Quadruple<A, B, C, D> = T.Quadruple<A, B, C, D>;
+    public func Quadruple<A, B, C, D>(a : A, b : B, c : C, d : D) : Quadruple<A, B, C, D> = {
+        _0_ = a;
+        _1_ = b;
+        _2_ = c;
+        _3_ = d;
     };
 
-    public type Quadruple<A, B, C, D> = { _0_ : A; _1_ : B; _2_ : C; _3_ : D };
+    public type SortDirection = T.SortDirection;
 
-    public func Quadruple<A, B, C, D>(a : A, b : B, c : C, d : D) : Quadruple<A, B, C, D> {
-        { _0_ = a; _1_ = b; _2_ = c; _3_ = d };
-    };
-
-    public type SortDirection = {
-        #Ascending;
-        #Descending;
-    };
-
-    public type Index = {
-        name : Text;
-        key_details : [(Text, SortDirection)];
-        data : MemoryBTree.StableMemoryBTree;
-    };
+    public type Index = T.Index;
 
     public type Collection<Record> = Collection.Collection<Record>;
 
-    public type ZenDB = {
-        collections : Map<Text, T.StableCollection>;
-    };
+    public type ZenDB = T.ZenDB;
 
     public let DEFAULT_BTREE_ORDER = 256;
-
-    public func new() : ZenDB {
-        let hydra_db = {
-            collections = Map.new<Text, StableCollection>();
-        };
-
-        hydra_db;
-    };
 
     public type Candid = Serde.Candid;
 
@@ -170,7 +156,12 @@ module {
     public func newStableStore() : ZenDB {
         let hydra_db = {
             collections = Map.new<Text, StableCollection>();
+            freed_btrees = Vector.new<MemoryBTree.StableMemoryBTree>();
         };
+    };
+
+    public func new() : ZenDB {
+        newStableStore();
     };
 
     public func launch(sstore : ZenDB) : Database.Database {
@@ -181,5 +172,7 @@ module {
     public type QueryBuilder = Query.QueryBuilder;
 
     public type CollectionStats = T.CollectionStats;
+    public type IndexStats = T.IndexStats;
+    public type MemoryStats = T.MemoryStats;
 
 };

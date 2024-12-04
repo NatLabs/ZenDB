@@ -5,14 +5,17 @@ import reactLogo from './assets/react.svg';
 import viteLogo from './assets/vite.svg';
 import { useQueryCall, useUpdateCall } from '@ic-reactor/react';
 import { TxsTable } from './pages/TxsTable';
-import { QueryClient, QueryClientProvider } from 'react-query';
+import { QueryClientProvider } from 'react-query';
+import { queryClient } from './utils/react-query-client';
+import { Switch, Route } from 'wouter';
 
 function App() {
-    const queryClient = new QueryClient();
     return (
         // <div className="App">
         <QueryClientProvider client={queryClient}>
-            <TxsTable />
+            <Switch>
+                <Route path="/" component={TxsTable} />
+            </Switch>
         </QueryClientProvider>
     );
 }

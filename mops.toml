@@ -9,6 +9,7 @@ ledger-types = "1.0.0"
 account = "1.0.1"
 bitbuffer = "1.2.0"
 xtended-numbers = "0.3.1"
+vector = "0.4.1"
 
 [dev-dependencies]
 test = "2.0.0"

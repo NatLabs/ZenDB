@@ -23,6 +23,7 @@ import Itertools "mo:itertools/Iter";
 import RevIter "mo:itertools/RevIter";
 import Tag "mo:candid/Tag";
 import BitMap "mo:bit-map";
+import Vector "mo:vector";
 
 import MemoryBTree "mo:memory-collection/MemoryBTree/Stable";
 import TypeUtils "mo:memory-collection/TypeUtils";
@@ -96,10 +97,15 @@ module T {
         schema_keys_set : Set<Text>;
         main : MemoryBTree.StableMemoryBTree;
         indexes : Map<Text, Index>;
+
+        // reference to the freed btrees to the same variable in
+        // the ZenDB database record
+        freed_btrees : Vector.Vector<MemoryBTree.StableMemoryBTree>;
     };
 
     public type ZenDB = {
         collections : Map<Text, StableCollection>;
+        freed_btrees : Vector.Vector<MemoryBTree.StableMemoryBTree>;
     };
 
     public type IndexKeyFields = [(Text, Candid)];
@@ -205,14 +211,14 @@ module T {
         scans : [ScanDetails]; // scan results from simple #Operation
     };
 
-    public type MemoryCollectionStats = {
+    public type MemoryStats = {
         metadata_bytes : Nat;
         actual_data_bytes : Nat;
     };
 
     public type IndexStats = {
         columns : [Text];
-        stable_memory : MemoryCollectionStats;
+        stable_memory : MemoryStats;
     };
 
     public type CollectionStats = {
@@ -220,7 +226,7 @@ module T {
         indexes : [IndexStats];
 
         main_btree_index : {
-            stable_memory : MemoryCollectionStats;
+            stable_memory : MemoryStats;
         };
 
     };
@@ -230,6 +236,16 @@ module T {
         #Ids : Iter<Nat>;
         #BitMap : T.BitMap;
         #Interval : (index : Text, interval : [(Nat, Nat)], is_reversed : Bool);
+    };
+
+    public type BestIndexResult = {
+        index : T.Index;
+        requires_additional_sorting : Bool;
+        requires_additional_filtering : Bool;
+        sorted_in_reverse : Bool;
+        fully_covered_equality_and_range_fields : Set.Set<Text>;
+        score : Float;
+
     };
 
 };

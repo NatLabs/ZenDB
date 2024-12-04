@@ -33,6 +33,37 @@ import T "Types";
 
 module {
     type Order = Order.Order;
+
+    public func log2(n : Float) : Float {
+        Float.log(n) / Float.log(2);
+    };
+
+    public func buffer_concat_freeze<A>(buffers : [Buffer.Buffer<A>]) : [A] {
+        var i = 0;
+        var total_size = 0;
+        while (i < buffers.size()) {
+            total_size += buffers[i].size();
+            i += 1;
+        };
+
+        var buffer_index = 0;
+        var acc_size = 0;
+
+        Array.tabulate(
+            total_size,
+            func(i : Nat) : A {
+                if ((i + 1) % (buffers[0].size() + 1) == 0) {
+                    acc_size += buffers[buffer_index].size();
+                    buffer_index += 1;
+                };
+
+                buffers[buffer_index].get(i - acc_size);
+
+            },
+        );
+
+    };
+
     public func extract_schema_keys(schema : T.Schema) : [Text] {
         let buffer = Buffer.Buffer<Text>(8);
 

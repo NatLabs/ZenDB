@@ -44,10 +44,9 @@ import CandidMap "../CandidMap";
 import ByteUtils "../ByteUtils";
 import LegacyCandidMap "../LegacyCandidMap";
 
-import Index "Index";
 import Orchid "Orchid";
 import Schema "Schema";
-import C "Constants";
+import C "../Constants";
 
 module CollectionUtils {
 
@@ -77,6 +76,8 @@ module CollectionUtils {
     public type StableCollection = T.StableCollection;
 
     public type IndexKeyFields = T.IndexKeyFields;
+
+    public let { thash; bhash } = Map;
 
     public func get_index_data_utils(collection : StableCollection, index_key_details : [(Text, SortDirection)]) : MemoryBTree.BTreeUtils<[Candid], RecordPointer> {
 
@@ -216,10 +217,52 @@ module CollectionUtils {
 
     };
 
-    public func record_ids_from_index_interval(collection : StableCollection, index : Index, interval : (Nat, Nat)) : RevIter<Nat> {
+    public func record_ids_from_index_intervals(collection : StableCollection, index_name : Text, _intervals : [(Nat, Nat)], sorted_in_reverse : Bool) : Iter<Nat> {
+
+        let intervals = if (sorted_in_reverse) {
+            Array.reverse(_intervals);
+        } else {
+            _intervals;
+        };
+
+        if (index_name == C.RECORD_ID_FIELD) {
+            let main_btree_utils = get_main_btree_utils();
+
+            let record_ids = Itertools.flatten(
+                Iter.map(
+                    intervals.vals(),
+                    func(interval : (Nat, Nat)) : Iter<(Nat)> {
+                        let record_ids = MemoryBTree.rangeKeys(collection.main, main_btree_utils, interval.0, interval.1);
+
+                        if (sorted_in_reverse) {
+                            return record_ids.rev();
+                        };
+
+                        record_ids;
+                    },
+                )
+            );
+
+            return record_ids;
+        };
+
+        let ?index = Map.get(collection.indexes, thash, index_name) else Debug.trap("Unreachable: IndexMap not found for index: " # index_name);
+
         let index_data_utils = CollectionUtils.get_index_data_utils(collection, index.key_details);
-        let record_ids = MemoryBTree.rangeVals(index.data, index_data_utils, interval.0, interval.1);
-        record_ids;
+
+        Itertools.flatten(
+            Iter.map(
+                intervals.vals(),
+                func(interval : (Nat, Nat)) : Iter<(Nat)> {
+                    let record_ids = MemoryBTree.rangeVals(index.data, index_data_utils, interval.0, interval.1);
+
+                    if (sorted_in_reverse) {
+                        return record_ids.rev();
+                    };
+                    record_ids;
+                },
+            )
+        );
     };
 
     public func multi_filter(
@@ -241,6 +284,51 @@ module CollectionUtils {
                 result;
             },
         );
+    };
+
+    func get_nested_candid_field(_candid_record : Candid, key : Text) : ?Candid {
+        let nested_field_keys = Text.split(key, #text("."));
+
+        var candid_record = _candid_record;
+
+        for (key in nested_field_keys) {
+            let #Record(record_fields) or #Option(#Record(record_fields)) = candid_record else return null;
+
+            let ?found_field = Array.find<(Text, Candid)>(
+                record_fields,
+                func((variant_name, _) : (Text, Candid)) : Bool {
+                    variant_name == key;
+                },
+            ) else return null;
+
+            candid_record := found_field.1;
+
+            // return #Null if the nested field was terminated early
+            if (candid_record == #Null) return ? #Null;
+        };
+
+        return ?candid_record;
+    };
+
+    func get_nested_candid_type(_schema : Schema, key : Text) : ?Schema {
+        let nested_field_keys = Text.split(key, #text("."));
+
+        var schema = _schema;
+
+        for (key in nested_field_keys) {
+            let #Record(record_fields) or #Option(#Record(record_fields)) = schema else return null;
+
+            let ?found_field = Array.find<(Text, Schema)>(
+                record_fields,
+                func((variant_name, _) : (Text, Schema)) : Bool {
+                    variant_name == key;
+                },
+            ) else return null;
+
+            schema := found_field.1;
+        };
+
+        return ?schema;
     };
 
 };
