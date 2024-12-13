@@ -1,5 +1,8 @@
 ## ZenDB
 
+
+> Very much still in development, Highly volatile API
+
 A single canister document database inspired by mongodb and implemented in motoko.
 
 ### Getting started

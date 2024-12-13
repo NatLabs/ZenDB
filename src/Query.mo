@@ -43,8 +43,8 @@ module {
             let old_is_and = is_and;
 
             if (buffer.size() > 0 and old_is_and != new_is_and) {
-                Debug.print("(old_is_and, new_is_and): " # debug_show (old_is_and, new_is_and));
-                Debug.print("old nested query: " # debug_show opt_nested_query);
+                // Debug.print("(old_is_and, new_is_and): " # debug_show (old_is_and, new_is_and));
+                // Debug.print("old nested query: " # debug_show opt_nested_query);
                 switch (opt_nested_query) {
                     case (null) {
                         if (buffer.size() == 1) {
@@ -66,7 +66,7 @@ module {
                     };
                 };
 
-                Debug.print("new nested query: " # debug_show opt_nested_query);
+                // Debug.print("new nested query: " # debug_show opt_nested_query);
 
                 buffer.clear();
             };

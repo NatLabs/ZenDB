@@ -24,6 +24,7 @@ import RevIter "mo:itertools/RevIter";
 import Tag "mo:candid/Tag";
 import BitMap "mo:bit-map";
 import Vector "mo:vector";
+import Ids "mo:incremental-ids";
 
 import MemoryBTree "mo:memory-collection/MemoryBTree/Stable";
 import TypeUtils "mo:memory-collection/TypeUtils";
@@ -63,7 +64,10 @@ module T {
 
     public type Schema = Candid.CandidType;
 
-    public type RecordPointer = Nat;
+    public type RecordId = Nat;
+    // public type RecordId = Blob;
+    public type CandidRecord = [(Text, Candid)];
+    public type CandidBlob = Blob;
 
     public type Tuple<A, B> = { _0_ : A; _1_ : B };
     public func Tuple<A, B>(a : A, b : B) : Tuple<A, B> {
@@ -92,6 +96,7 @@ module T {
     };
 
     public type StableCollection = {
+        ids : Ids.Generator;
         var schema : Schema;
         schema_keys : [Text];
         schema_keys_set : Set<Text>;
@@ -104,6 +109,7 @@ module T {
     };
 
     public type ZenDB = {
+        id_store : Ids.Ids;
         collections : Map<Text, StableCollection>;
         freed_btrees : Vector.Vector<MemoryBTree.StableMemoryBTree>;
     };

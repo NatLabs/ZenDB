@@ -76,7 +76,6 @@ module {
 
     public type Schema = Candid.CandidType;
 
-    public type RecordPointer = Nat;
     public type Index = T.Index;
     public type Candid = T.Candid;
     public type SortDirection = T.SortDirection;
@@ -127,13 +126,7 @@ module {
         };
 
         public func update_schema(schema : Schema) : Result<(), Text> {
-
-            let is_compatible = Schema.is_schema_backward_compatible(collection.schema, schema);
-            if (not is_compatible) return #err("Schema is not backward compatible");
-
-            collection.schema := schema;
-            // Debug.print("Schema Updated: Ensure to update your Record type as well.");
-            #ok;
+            StableCollection.update_schema(collection, schema);
         };
 
         public func create_index(index_key_details : [(Text)]) : Result<(), Text> {
@@ -151,65 +144,7 @@ module {
         public func put_with_id(id : Nat, record : Record) : Result<(), Text> {
 
             let candid_blob = blobify.to_blob(record);
-            let candid = CollectionUtils.decode_candid_blob(collection, candid_blob);
-
-            switch (candid) {
-                case (#Record(_)) {};
-                case (_) return #err("Values inserted into the collection must be #Records");
-            };
-
-            // Debug.print("validate: " # debug_show (collection.schema) #debug_show (candid));
-            Utils.assert_result(Schema.validate_record(collection.schema, candid));
-
-            let candid_map = CandidMap.fromCandid(candid);
-            let main_btree_value = (candid_blob, candid_map.encoded_bytes());
-
-            // if this fails, it means the id already exists
-            // insert() - should to used to update existing records
-            //
-            // also note that although we have already inserted the value into the main btree
-            // the inserted value will be discarded because the call fails
-            // meaning the canister state will not be updated
-            // at least that's what I think - need to confirm
-            let opt_prev = MemoryBTree.insert<Nat, (Blob, [Nat8])>(collection.main, main_btree_utils, id, main_btree_value);
-
-            switch (opt_prev) {
-                case (null) {};
-                case (?prev) {
-                    ignore MemoryBTree.insert<Nat, (Blob, [Nat8])>(collection.main, main_btree_utils, id, prev);
-                    return #err("Record with id (" # debug_show id # ") already exists");
-                };
-            };
-
-            // should change getId to getPointer
-            // let ?ref_pointer = MemoryBTree.getId(collection.main, main_btree_utils, id);
-            // assert MemoryBTree.getId(collection.main, main_btree_utils, id) == ?id;
-
-            if (Map.size(collection.indexes) == 0) return #ok();
-
-            for (index in Map.vals(collection.indexes)) {
-
-                let buffer = Buffer.Buffer<Candid>(8);
-
-                for ((index_key, dir) in index.key_details.vals()) {
-
-                    if (index_key == C.RECORD_ID_FIELD) {
-                        buffer.add(#Nat(id));
-                    } else {
-                        let ?value = candid_map.get(index_key) else return #err("Couldn't get value for index key: " # debug_show index_key);
-
-                        buffer.add(value);
-                    };
-
-                };
-
-                let index_key_values = Buffer.toArray(buffer);
-
-                let index_data_utils = CollectionUtils.get_index_data_utils(collection, index.key_details);
-                ignore MemoryBTree.insert(index.data, index_data_utils, index_key_values, id);
-            };
-
-            #ok();
+            StableCollection.put_with_id(collection, main_btree_utils, id, candid_blob);
 
         };
 
@@ -218,21 +153,18 @@ module {
         };
 
         public func put(record : Record) : Result<(Nat), Text> {
-            let id = MemoryBTree.size(collection.main);
-
-            switch (put_with_id(id, record)) {
-                case (#err(msg)) return #err(msg);
-                case (#ok(_)) {};
-            };
-
-            #ok(id);
+            let candid_blob = blobify.to_blob(record);
+            StableCollection.put(collection, main_btree_utils, candid_blob);
         };
 
         public func get(id : Nat) : Result<Record, Text> {
-
-            let record = CollectionUtils.lookup_record(collection, blobify, id);
-
-            #ok(record);
+            switch (StableCollection.get(collection, main_btree_utils, id)) {
+                case (#err(err)) return #err(err);
+                case (#ok(record_details)) {
+                    let record = blobify.from_blob(record_details);
+                    #ok(record);
+                };
+            };
         };
 
         type RecordLimits = [(Text, ?State<Candid>)];
@@ -268,75 +200,47 @@ module {
             };
         };
 
-        func async_skip_helper(iter : Iter<Nat>, skip : Nat) : async (Nat) {
-            let performance_start = InternetComputer.performanceCounter(0);
+        // func async_skip_helper(iter : Iter<Nat>, skip : Nat) : async (Nat) {
+        //     let performance_start = InternetComputer.performanceCounter(0);
 
-            func instructions() : Nat64 {
-                InternetComputer.performanceCounter(0) - performance_start;
-            };
+        //     func instructions() : Nat64 {
+        //         InternetComputer.performanceCounter(0) - performance_start;
+        //     };
 
-            var i = 0;
-            while ((instructions() + 10_000_000 < MAX_UPDATE_INSTRUCTIONS) and i < skip) {
-                ignore iter.next();
-                i += 1;
-            };
+        //     var i = 0;
+        //     while ((instructions() + 10_000_000 < MAX_UPDATE_INSTRUCTIONS) and i < skip) {
+        //         ignore iter.next();
+        //         i += 1;
+        //     };
 
-            i;
-        };
+        //     i;
+        // };
 
-        func async_skip(iter : Iter<Nat>, skip : Nat, performance_start : Nat64) : async* () {
+        // func async_skip(iter : Iter<Nat>, skip : Nat, performance_start : Nat64) : async* () {
 
-            var skipped = 0;
-            Debug.print("starting async_skip: " # debug_show skip);
-            while (skipped < skip) {
-                skipped += await async_skip_helper(iter, skip - skipped);
-                Debug.print("skipped: " # debug_show skipped);
-            };
+        //     var skipped = 0;
+        //     // Debug.print("starting async_skip: " # debug_show skip);
+        //     while (skipped < skip) {
+        //         skipped += await async_skip_helper(iter, skip - skipped);
+        //         // Debug.print("skipped: " # debug_show skipped);
+        //     };
 
-        };
+        // };
 
-        public func async_find(query_builder : QueryBuilder, buffer : Buffer<T.WrapId<Record>>) : async* Result<(), Text> {
-            switch (find_iter(query_builder)) {
-                case (#err(err)) #err(err);
-                case (#ok(records)) {
-                    for (record in records) {
-                        buffer.add(record);
-                    };
-                    #ok(());
-                };
-            };
-        };
+        // public func async_find(query_builder : QueryBuilder, buffer : Buffer<T.WrapId<Record>>) : async* Result<(), Text> {
+        //     switch (find_iter(query_builder)) {
+        //         case (#err(err)) #err(err);
+        //         case (#ok(records)) {
+        //             for (record in records) {
+        //                 buffer.add(record);
+        //             };
+        //             #ok(());
+        //         };
+        //     };
+        // };
 
         public func stats() : T.CollectionStats {
-            let main_btree_index = {
-                stable_memory = {
-                    metadata_bytes = MemoryBTree.metadataBytes(collection.main);
-                    actual_data_bytes = MemoryBTree.bytes(collection.main);
-                };
-            };
-
-            let indexes : [T.IndexStats] = Iter.toArray(
-                Iter.map<(Text, Index), T.IndexStats>(
-                    Map.entries(collection.indexes),
-                    func((index_name, index) : (Text, Index)) : T.IndexStats {
-                        let columns : [Text] = Array.map<(Text, Any), Text>(
-                            index.key_details,
-                            func((key, direction) : (Text, Any)) : Text = key,
-                        );
-
-                        let stable_memory : T.MemoryStats = {
-                            metadata_bytes = MemoryBTree.metadataBytes(index.data);
-                            actual_data_bytes = MemoryBTree.bytes(index.data);
-                        };
-
-                        { columns; stable_memory };
-
-                    },
-                )
-            );
-
-            { indexes; main_btree_index; records = size() };
-
+            StableCollection.stats(collection);
         };
 
         // public func getBestIndex(db_query : QueryBuilder) : ?Index { };
@@ -344,71 +248,43 @@ module {
         /// Returns the total number of records that match the query.
         /// This ignores the limit and skip parameters.
         public func count(query_builder : QueryBuilder) : Result<Nat, Text> {
-            let stable_query = query_builder.build();
-
-            let query_plan = QueryPlan.create_query_plan(
-                collection,
-                stable_query.query_operations,
-                null,
-                null,
-                CandidMap.fromCandid(#Record([])),
-            );
-
-            let count = switch (QueryExecution.get_unique_record_ids_from_query_plan(collection, Map.new(), query_plan)) {
-                case (#Empty) 0;
-                case (#BitMap(bitmap)) bitmap.size();
-                case (#Ids(iter)) Iter.size(iter);
-                case (#Interval(_index_name, intervals, _sorted_in_reverse)) {
-                    Debug.print("count intervals: " # debug_show intervals);
-
-                    var i = 0;
-                    var sum = 0;
-                    while (i < intervals.size()) {
-                        sum += intervals.get(i).1 - intervals.get(i).0;
-                        i := i + 1;
-                    };
-
-                    sum;
-                };
-            };
-
-            #ok(count);
+            StableCollection.count(collection, query_builder);
         };
 
-        func async_count_iter_helper(iter : Iter<Nat>) : async (Nat) {
-            let performance_start = InternetComputer.performanceCounter(0);
-            func instructions() : Nat64 {
-                InternetComputer.performanceCounter(0) - performance_start;
-            };
+        // func async_count_iter_helper(iter : Iter<Nat>) : async (Nat) {
+        //     let performance_start = InternetComputer.performanceCounter(0);
+        //     func instructions() : Nat64 {
+        //         InternetComputer.performanceCounter(0) - performance_start;
+        //     };
 
-            var count = 0;
+        //     var count = 0;
 
-            label counting_iter while (instructions() + 10_000_000 < MAX_QUERY_INSTRUCTIONS) {
-                switch (iter.next()) {
-                    case (?id) count += 1;
-                    case (null) break counting_iter;
-                };
-            };
+        //     label counting_iter while (instructions() + 10_000_000 < MAX_QUERY_INSTRUCTIONS) {
+        //         switch (iter.next()) {
+        //             case (?id) count += 1;
+        //             case (null) break counting_iter;
+        //         };
+        //     };
 
-            count;
+        //     count;
 
-        };
+        // };
 
-        func async_count_iter(iter : Iter<Nat>) : async* (Nat) {
-            let peekable_iter = Itertools.peekable(iter);
+        // func async_count_iter(iter : Iter<Nat>) : async* (Nat) {
+        //     let peekable_iter = Itertools.peekable(iter);
 
-            var count = 0;
-            while (Option.isSome(peekable_iter.peek())) {
-                count += await async_count_iter_helper(peekable_iter);
-            };
+        //     var count = 0;
+        //     while (Option.isSome(peekable_iter.peek())) {
+        //         count += await async_count_iter_helper(peekable_iter);
+        //     };
 
-            count
+        //     count
 
-        };
+        // };
 
-        public func async_count(query_builder : QueryBuilder) : async* Result<Nat, Text> {
-            count(query_builder);
-        };
+        // public func async_count(query_builder : QueryBuilder) : async* Result<Nat, Text> {
+        //     count(query_builder);
+        // };
 
         public func updateById(id : Nat, update_fn : (Record) -> Record) : Result<(), Text> {
 
@@ -462,22 +338,13 @@ module {
         };
 
         public func deleteById(id : Nat) : Result<Record, Text> {
-
-            let ?prev_record_details = MemoryBTree.remove(collection.main, main_btree_utils, id);
-            let prev_candid = CollectionUtils.decode_candid_blob(collection, prev_record_details.0);
-
-            let #Record(prev_records) = prev_candid else return #err("Couldn't get records");
-            // Debug.print("prev_records: " # debug_show prev_records);
-            for (index in Map.vals(collection.indexes)) {
-
-                let prev_index_key_values = CollectionUtils.get_index_columns(collection, index.key_details, id, prev_records);
-                let index_data_utils : BTreeUtils<[Candid], RecordPointer> = CollectionUtils.get_index_data_utils(collection, index.key_details);
-
-                assert ?id == MemoryBTree.remove<[Candid], RecordPointer>(index.data, index_data_utils, prev_index_key_values);
+            switch (StableCollection.delete_by_id(collection, main_btree_utils, id)) {
+                case (#err(err)) return #err(err);
+                case (#ok(record_details)) {
+                    let record = blobify.from_blob(record_details);
+                    #ok(record);
+                };
             };
-
-            let prev_record = blobify.from_blob(prev_record_details.0);
-            #ok(prev_record);
         };
 
         public func delete(query_builder : QueryBuilder) : Result<[Record], Text> {

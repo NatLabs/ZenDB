@@ -275,7 +275,7 @@ export const TxsTable = () => {
                 if (res.total.length) {
                     prev.total = Number(res.total);
                 } else {
-                    prev.total = null;
+                    prev.total = undefined;
                 }
 
                 return prev;
@@ -754,7 +754,7 @@ export const TxsTable = () => {
                                                   ),
                                               ),
                                           ]
-                                        : []
+                                        : [null, null]
                                 }
                             />
                         </Space>
@@ -937,10 +937,11 @@ export const TxsTable = () => {
                                     Total Transactions:{' '}
                                 </Typography.Text>
                                 <Typography.Text strong>
-                                    {pagination.total === null
+                                    {pagination?.total == null ||
+                                    pagination?.total == undefined
                                         ? '???'
                                         : number_formatter.format(
-                                              pagination.total,
+                                              Number(pagination.total),
                                           )}
                                 </Typography.Text>
                             </span>

@@ -271,20 +271,23 @@ module BlockUtils {
 
                 let parallel = Buffer.Buffer<async Ledger.Result_4>(batches);
 
-                for (i in Itertools.range(0, batches)) {
-                    parallel.add(
-                        rq.callback({
-                            start = rq.start + Nat64.fromNat(i * MAX_BATCH_TXS_IN_RESPONSE);
-                            length = rq.length - Nat64.fromNat(i * MAX_BATCH_TXS_IN_RESPONSE);
-                        })
-                    );
-                };
+                // for (i in Itertools.range(0, batches)) {
+                //     parallel.add(
+                //         rq.callback({
+                //             start = rq.start + Nat64.fromNat(i * MAX_BATCH_TXS_IN_RESPONSE);
+                //             length = rq.length - Nat64.fromNat(i * MAX_BATCH_TXS_IN_RESPONSE);
+                //         })
+                //     );
+                // };
 
-                for ((i, async_call) in Itertools.enumerate(parallel.vals())) {
+                for (i in Itertools.range(0, batches)) {
                     assert (Nat64.toNat(rq.start) + (i * MAX_BATCH_TXS_IN_RESPONSE)) == start + buffer.size();
                     Debug.print("retrieving archived blocks batch " # debug_show i);
 
-                    let res = await async_call;
+                    let res = await rq.callback({
+                        start = rq.start + Nat64.fromNat(i * MAX_BATCH_TXS_IN_RESPONSE);
+                        length = rq.length - Nat64.fromNat(i * MAX_BATCH_TXS_IN_RESPONSE);
+                    });
                     let #Ok({ blocks = queried_blocks }) = res else Debug.trap("failed to retrieve archived blocks: " # debug_show res);
 
                     for ((j, block) in Itertools.enumerate(queried_blocks.vals())) {

@@ -137,7 +137,7 @@ module {
 
         let best_index_result = switch (Index.get_best_index(collection, Buffer.toArray(operations), sort_column)) {
             case (null) {
-                Debug.print("no index found so adding to full scan bounds");
+                // Debug.print("no index found so adding to full scan bounds");
                 let (scan_bounds, filter_bounds) = Index.convert_simple_operations_to_scan_and_filter_bounds(true, Buffer.toArray(simple_operations), null, null);
 
                 return {
@@ -167,17 +167,17 @@ module {
 
         let (scan_bounds, filter_bounds) = Index.convert_simple_operations_to_scan_and_filter_bounds(true, Buffer.toArray(simple_operations), ?index.key_details, ?best_index_result.fully_covered_equality_and_range_fields);
 
-        Debug.print("scan lower bound: " # debug_show (scan_bounds.0));
-        Debug.print("scan upper bound: " # debug_show (scan_bounds.1));
+        // Debug.print("scan lower bound: " # debug_show (scan_bounds.0));
+        // Debug.print("scan upper bound: " # debug_show (scan_bounds.1));
 
         var interval = Index.scan(collection, index, scan_bounds.0, scan_bounds.1, cursor_record);
 
-        Debug.print("best interval: " # debug_show ({ index = index.name; requires_additional_filtering; requires_additional_sorting; sorted_in_reverse; interval }));
+        // Debug.print("best interval: " # debug_show ({ index = index.name; requires_additional_filtering; requires_additional_sorting; sorted_in_reverse; interval }));
         // Debug.print("index entries: " # debug_show (Iter.toArray(MemoryBTree.keys(index.data, get_index_data_utils(collection, index.key_details)))));
 
-        Debug.print("interval: " # debug_show interval);
-        Debug.print("requires_additional_filtering: " # debug_show requires_additional_filtering);
-        Debug.print("requires_additional_sorting: " # debug_show requires_additional_sorting);
+        // Debug.print("interval: " # debug_show interval);
+        // Debug.print("requires_additional_filtering: " # debug_show requires_additional_filtering);
+        // Debug.print("requires_additional_sorting: " # debug_show requires_additional_sorting);
 
         if (requires_additional_filtering) {
             // we need to do index interval intersection with the filter bounds
@@ -254,10 +254,10 @@ module {
 
                             let interval = Index.scan(collection, index, scan_bounds.0, scan_bounds.1, cursor_record);
 
-                            Debug.print("best interval: " # debug_show ({ index = index.name; requires_additional_filtering; requires_additional_sorting; sorted_in_reverse; interval }));
-                            Debug.print("interval: " # debug_show interval);
-                            Debug.print("requires_additional_filtering: " # debug_show requires_additional_filtering);
-                            Debug.print("requires_additional_sorting: " # debug_show requires_additional_sorting);
+                            // Debug.print("best interval: " # debug_show ({ index = index.name; requires_additional_filtering; requires_additional_sorting; sorted_in_reverse; interval }));
+                            // Debug.print("interval: " # debug_show interval);
+                            // Debug.print("requires_additional_filtering: " # debug_show requires_additional_filtering);
+                            // Debug.print("requires_additional_sorting: " # debug_show requires_additional_sorting);
 
                             let scan_details : ScanDetails = #IndexScan({
                                 index;

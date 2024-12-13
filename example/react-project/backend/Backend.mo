@@ -10,6 +10,7 @@ import Nat "mo:base/Nat";
 import Cycles "mo:base/ExperimentalCycles";
 import Buffer "mo:base/Buffer";
 import Option "mo:base/Option";
+import Time "mo:base/Time";
 
 import Vector "mo:vector";
 import Itertools "mo:itertools/Iter";
@@ -279,14 +280,14 @@ actor class Backend() {
 
         let db_query = convert_options_to_db_query(options);
 
-        let performance_start = IC.performanceCounter(1);
+        let performance_start = IC.performanceCounter(0);
         func instructions() : Nat {
-            Nat64.toNat(IC.performanceCounter(1) - performance_start);
+            Nat64.toNat(IC.performanceCounter(0) - performance_start);
         };
 
         let blocks_buffer = Buffer.Buffer<(Nat, Block)>(8);
 
-        let query_res = await* txs.async_find(db_query, blocks_buffer);
+        let #ok(matching_txs) = txs.find(db_query);
 
         let total = if (options.count) {
             let #ok(total) = txs.count(db_query) else Debug.trap("txs.count failed");
@@ -294,14 +295,11 @@ actor class Backend() {
             ?total;
         } else { null };
 
-        let #ok(_) = query_res else Debug.trap("get_txs failed: " # debug_show query_res);
         Debug.print("successfully got matching txs: " # debug_show options);
 
-        let blocks = Iter.toArray(
-            Iter.map<(Nat, Block), Block>(
-                blocks_buffer.vals(),
-                func(id : Nat, tx : Block) : Block = tx,
-            )
+        let blocks = Array.map<(Nat, Block), Block>(
+            matching_txs,
+            func(id : Nat, tx : Block) : Block = tx,
         );
 
         Debug.print("get_async_txs returning " # debug_show { blocks = blocks.size(); total });
@@ -319,6 +317,22 @@ actor class Backend() {
         memory_size : Nat;
         stable_memory_size : Nat;
         db_stats : ZenDB.CollectionStats;
+    };
+
+    public query func get_time() : async Int {
+        Time.now();
+    };
+
+    var lock = 0;
+
+    public func read_and_update() : async Nat {
+        let val = lock;
+        lock += 1;
+        val;
+    };
+
+    public func reset_lock() : async () {
+        lock := 0;
     };
 
     public query func get_stats() : async CanisterStats {

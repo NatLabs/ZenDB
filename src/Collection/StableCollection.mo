@@ -33,12 +33,13 @@ import RevIter "mo:itertools/RevIter";
 import Tag "mo:candid/Tag";
 import BitMap "mo:bit-map";
 import Vector "mo:vector";
+import Ids "mo:incremental-ids";
 
 import MemoryBTree "mo:memory-collection/MemoryBTree/Stable";
 import TypeUtils "mo:memory-collection/TypeUtils";
 import Int8Cmp "mo:memory-collection/TypeUtils/Int8Cmp";
 
-import T "../Types";
+import ZT "../Types";
 import Query "../Query";
 import Utils "../Utils";
 import CandidMap "../CandidMap";
@@ -75,21 +76,33 @@ module {
 
     public type Schema = Candid.CandidType;
 
-    public type RecordPointer = Nat;
-    public type Index = T.Index;
-    public type Candid = T.Candid;
-    public type SortDirection = T.SortDirection;
-    public type State<R> = T.State<R>;
-    public type ZenQueryLang = T.ZenQueryLang;
+    public type RecordId = ZT.RecordId;
+    public type Index = ZT.Index;
+    public type Candid = ZT.Candid;
+    public type SortDirection = ZT.SortDirection;
+    public type State<R> = ZT.State<R>;
+    public type ZenQueryLang = ZT.ZenQueryLang;
 
-    public type Candify<A> = T.Candify<A>;
+    public type Candify<A> = ZT.Candify<A>;
 
-    public type StableCollection = T.StableCollection;
+    public type StableCollection = ZT.StableCollection;
 
-    public type IndexKeyFields = T.IndexKeyFields;
-    type EvalResult = T.EvalResult;
+    public type IndexKeyFields = ZT.IndexKeyFields;
+    type EvalResult = ZT.EvalResult;
 
-    let DEFAULT_BTREE_ORDER = 256;
+    public func size(collection : StableCollection) : Nat {
+        MemoryBTree.size(collection.main);
+    };
+
+    public func update_schema(collection : StableCollection, schema : ZT.Schema) : Result<(), Text> {
+
+        let is_compatible = Schema.is_schema_backward_compatible(collection.schema, schema);
+        if (not is_compatible) return #err("Schema is not backward compatible");
+
+        collection.schema := schema;
+        // Debug.print("Schema Updated: Ensure to update your Record type as well.");
+        #ok;
+    };
 
     public func create_index(
         collection : StableCollection,
@@ -127,7 +140,7 @@ module {
 
         let index_data : MemoryBTree.StableMemoryBTree = switch (Vector.removeLast(collection.freed_btrees)) {
             case (?btree) btree;
-            case (null) MemoryBTree.new(?DEFAULT_BTREE_ORDER);
+            case (null) MemoryBTree.new(?C.DEFAULT_BTREE_ORDER);
         };
 
         let index_data_utils = CollectionUtils.get_index_data_utils(collection, index_key_details);
@@ -209,19 +222,19 @@ module {
 
         let iter = switch (eval) {
             case (#Empty) {
-                Debug.print("#Empty");
+                // Debug.print("#Empty");
                 return Itertools.empty<Nat>();
             };
             case (#BitMap(bitmap)) {
-                Debug.print("#BitMap");
+                // Debug.print("#BitMap");
                 bitmap.vals();
             };
             case (#Ids(iter)) {
-                Debug.print("#Ids");
+                // Debug.print("#Ids");
                 iter;
             };
             case (#Interval(index_name, _intervals, sorted_in_reverse)) {
-                Debug.print("#Interval");
+                // Debug.print("#Interval");
 
                 if (sorted_in_reverse) {
                     return Intervals.extract_intervals_in_pagination_range_for_reversed_intervals(collection, skip, opt_limit, index_name, _intervals, sorted_in_reverse);
@@ -234,7 +247,7 @@ module {
         };
 
         let iter_with_offset = Itertools.skip(iter, skip);
-        Debug.print("skip: " # debug_show skip);
+        // Debug.print("skip: " # debug_show skip);
 
         var paginated_iter = switch (opt_limit) {
             case (?limit) {
@@ -248,8 +261,119 @@ module {
 
     };
 
+    public func insert_with_id(collection : StableCollection, main_btree_utils : BTreeUtils<Nat, (Blob, [Nat8])>, id : Nat, candid_blob : ZT.CandidBlob) : Result<(), Text> {
+        put_with_id(collection, main_btree_utils, id, candid_blob);
+    };
+
+    public func put_with_id(
+        collection : StableCollection,
+        main_btree_utils : BTreeUtils<Nat, (Blob, [Nat8])>,
+        id : Nat,
+        candid_blob : ZT.CandidBlob,
+    ) : Result<(), Text> {
+
+        let candid = CollectionUtils.decode_candid_blob(collection, candid_blob);
+
+        switch (candid) {
+            case (#Record(_)) {};
+            case (_) return #err("Values inserted into the collection must be #Records");
+        };
+
+        // Debug.print("validate: " # debug_show (collection.schema) #debug_show (candid));
+        Utils.assert_result(Schema.validate_record(collection.schema, candid));
+
+        let candid_map = CandidMap.fromCandid(candid);
+        let main_btree_value = (candid_blob, candid_map.encoded_bytes());
+
+        // if this fails, it means the id already exists
+        // insert() - should to used to update existing records
+        //
+        // also note that although we have already inserted the value into the main btree
+        // the inserted value will be discarded because the call fails
+        // meaning the canister state will not be updated
+        // at least that's what I think - need to confirm
+        let opt_prev = MemoryBTree.insert<Nat, (Blob, [Nat8])>(collection.main, main_btree_utils, id, main_btree_value);
+
+        switch (opt_prev) {
+            case (null) {};
+            case (?prev) {
+                ignore MemoryBTree.insert<Nat, (Blob, [Nat8])>(collection.main, main_btree_utils, id, prev);
+                return #err("Record with id (" # debug_show id # ") already exists");
+            };
+        };
+
+        // should change getId to getPointer
+        // let ?ref_pointer = MemoryBTree.getId(collection.main, main_btree_utils, id);
+        // assert MemoryBTree.getId(collection.main, main_btree_utils, id) == ?id;
+
+        if (Map.size(collection.indexes) == 0) return #ok();
+
+        for (index in Map.vals(collection.indexes)) {
+
+            let buffer = Buffer.Buffer<Candid>(8);
+
+            for ((index_key, dir) in index.key_details.vals()) {
+
+                if (index_key == C.RECORD_ID_FIELD) {
+                    buffer.add(#Nat(id));
+                } else {
+                    let ?value = candid_map.get(index_key) else return #err("Couldn't get value for index key: " # debug_show index_key);
+
+                    buffer.add(value);
+                };
+
+            };
+
+            let index_key_values = Buffer.toArray(buffer);
+
+            let index_data_utils = CollectionUtils.get_index_data_utils(collection, index.key_details);
+            ignore MemoryBTree.insert(index.data, index_data_utils, index_key_values, id);
+        };
+
+        #ok();
+    };
+
+    public func insert(collection : StableCollection, main_btree_utils : BTreeUtils<Nat, (Blob, [Nat8])>, candid_blob : ZT.CandidBlob) : Result<Nat, Text> {
+        put(collection, main_btree_utils, candid_blob);
+    };
+
+    public func put(collection : StableCollection, main_btree_utils : BTreeUtils<Nat, (Blob, [Nat8])>, candid_blob : ZT.CandidBlob) : Result<Nat, Text> {
+        let id = Ids.Gen.next(collection.ids);
+
+        switch (put_with_id(collection, main_btree_utils, id, candid_blob)) {
+            case (#err(msg)) return #err(msg);
+            case (#ok(_)) {};
+        };
+
+        #ok(id);
+    };
+
+    public func get(
+        collection : StableCollection,
+        main_btree_utils : BTreeUtils<Nat, (Blob, [Nat8])>,
+        id : Nat,
+    ) : Result<ZT.CandidBlob, Text> {
+        let ?record_details = MemoryBTree.get(collection.main, main_btree_utils, id) else return #err("Record not found");
+        #ok(record_details.0);
+    };
+
+    public func find(
+        collection : StableCollection,
+        main_btree_utils : BTreeUtils<Nat, (Blob, [Nat8])>,
+        query_builder : QueryBuilder,
+    ) : Result<[(ZT.WrapId<ZT.CandidBlob>)], Text> {
+        switch (internal_find(collection, query_builder)) {
+            case (#err(err)) return #err(err);
+            case (#ok(record_ids_iter)) {
+                let candid_blob_iter = id_to_candid_blob_iter(collection, record_ids_iter);
+                let candid_blobs = Iter.toArray(candid_blob_iter);
+                #ok(candid_blobs);
+            };
+        };
+    };
+
     /// Evaluates a query and returns an iterator of record ids.
-    public func evaluate_query(collection : StableCollection, stable_query : T.StableQuery) : Result<Iter<Nat>, Text> {
+    public func evaluate_query(collection : StableCollection, stable_query : ZT.StableQuery) : Result<Iter<Nat>, Text> {
 
         let query_operations = stable_query.query_operations;
         let sort_by = stable_query.sort_by;
@@ -270,11 +394,11 @@ module {
             case (#ok(_)) ();
         };
 
-        Debug.print("stable_query: " # debug_show stable_query);
-        Debug.print("pagination: " # debug_show pagination);
-        Debug.print("cursor_record: " # debug_show (opt_cursor));
+        // Debug.print("stable_query: " # debug_show stable_query);
+        // Debug.print("pagination: " # debug_show pagination);
+        // Debug.print("cursor_record: " # debug_show (opt_cursor));
 
-        let query_plan : T.QueryPlan = QueryPlan.create_query_plan(
+        let query_plan : ZT.QueryPlan = QueryPlan.create_query_plan(
             collection,
             query_operations,
             sort_by,
@@ -313,16 +437,25 @@ module {
         );
     };
 
-    public func find_iter<Record>(
+    public func id_to_candid_blob_iter<Record>(collection : StableCollection, iter : Iter<Nat>) : Iter<(Nat, ZT.CandidBlob)> {
+        Iter.map<Nat, (Nat, ZT.CandidBlob)>(
+            iter,
+            func(id : Nat) : (Nat, ZT.CandidBlob) {
+                let candid_blob = CollectionUtils.lookup_candid_blob(collection, id);
+                (id, candid_blob);
+            },
+        );
+    };
+
+    public func find_iter(
         collection : StableCollection,
-        blobify : Candify<Record>,
         main_btree_utils : BTreeUtils<Nat, (Blob, [Nat8])>,
         query_builder : QueryBuilder,
-    ) : Result<Iter<T.WrapId<Record>>, Text> {
+    ) : Result<Iter<ZT.WrapId<ZT.CandidBlob>>, Text> {
         switch (internal_find(collection, query_builder)) {
             case (#err(err)) return #err(err);
             case (#ok(record_ids_iter)) {
-                let record_iter = id_to_record_iter(collection, blobify, record_ids_iter);
+                let record_iter = id_to_candid_blob_iter(collection, record_ids_iter);
                 #ok(record_iter);
             };
         };
@@ -330,7 +463,7 @@ module {
 
     public func get_sort_records_by_field_cmp(
         collection : StableCollection,
-        sort_field : (Text, T.SortDirection),
+        sort_field : (Text, ZT.SortDirection),
     ) : (Nat, Nat) -> Order {
 
         let deserialized_records_map = Map.new<Nat, [Nat8]>();
@@ -390,6 +523,92 @@ module {
             order_variant;
         };
         sort_records_by_field_cmp;
+    };
+
+    public func stats(collection : StableCollection) : ZT.CollectionStats {
+        let main_btree_index = {
+            stable_memory = {
+                metadata_bytes = MemoryBTree.metadataBytes(collection.main);
+                actual_data_bytes = MemoryBTree.bytes(collection.main);
+            };
+        };
+
+        let indexes : [ZT.IndexStats] = Iter.toArray(
+            Iter.map<(Text, Index), ZT.IndexStats>(
+                Map.entries(collection.indexes),
+                func((index_name, index) : (Text, Index)) : ZT.IndexStats {
+                    let columns : [Text] = Array.map<(Text, Any), Text>(
+                        index.key_details,
+                        func((key, direction) : (Text, Any)) : Text = key,
+                    );
+
+                    let stable_memory : ZT.MemoryStats = {
+                        metadata_bytes = MemoryBTree.metadataBytes(index.data);
+                        actual_data_bytes = MemoryBTree.bytes(index.data);
+                    };
+
+                    { columns; stable_memory };
+
+                },
+            )
+        );
+
+        { indexes; main_btree_index; records = size(collection) };
+    };
+
+    public func count(collection : StableCollection, query_builder : QueryBuilder) : Result<Nat, Text> {
+        let stable_query = query_builder.build();
+
+        let query_plan = QueryPlan.create_query_plan(
+            collection,
+            stable_query.query_operations,
+            null,
+            null,
+            CandidMap.fromCandid(#Record([])),
+        );
+
+        let count = switch (QueryExecution.get_unique_record_ids_from_query_plan(collection, Map.new(), query_plan)) {
+            case (#Empty) 0;
+            case (#BitMap(bitmap)) bitmap.size();
+            case (#Ids(iter)) Iter.size(iter);
+            case (#Interval(_index_name, intervals, _sorted_in_reverse)) {
+                // Debug.print("count intervals: " # debug_show intervals);
+
+                var i = 0;
+                var sum = 0;
+                while (i < intervals.size()) {
+                    sum += intervals.get(i).1 - intervals.get(i).0;
+                    i := i + 1;
+                };
+
+                sum;
+            };
+        };
+
+        #ok(count);
+
+    };
+
+    public func delete_by_id(collection : StableCollection, main_btree_utils : BTreeUtils<Nat, (Blob, [Nat8])>, id : Nat) : Result<(ZT.CandidBlob), Text> {
+
+        let ?prev_record_details = MemoryBTree.remove(collection.main, main_btree_utils, id);
+        let prev_candid = CollectionUtils.decode_candid_blob(collection, prev_record_details.0);
+
+        let #Record(prev_records) = prev_candid else return #err("Couldn't get records");
+        // Debug.print("prev_records: " # debug_show prev_records);
+        for (index in Map.vals(collection.indexes)) {
+
+            let prev_index_key_values = CollectionUtils.get_index_columns(collection, index.key_details, id, prev_records);
+            let index_data_utils : BTreeUtils<[Candid], RecordId> = CollectionUtils.get_index_data_utils(collection, index.key_details);
+
+            assert ?id == MemoryBTree.remove<[Candid], RecordId>(index.data, index_data_utils, prev_index_key_values);
+        };
+
+        let candid_blob = prev_record_details.0;
+
+        Ids.Gen.release(collection.ids, id);
+
+        #ok(candid_blob);
     };
 
 };

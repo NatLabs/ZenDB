@@ -162,6 +162,18 @@ module {
 
     };
 
+    public func from_int32_LE(i : Int32) : [Nat8] {
+        let nat32 = Int32.toNat32(i);
+
+        [
+            Nat8.fromNat(Nat32.toNat(nat32 & 0xff)),
+            Nat8.fromNat(Nat32.toNat((nat32 >> 8) & 0xff)),
+            Nat8.fromNat(Nat32.toNat((nat32 >> 16) & 0xff)),
+            Nat8.fromNat(Nat32.toNat((nat32 >> 24) & 0xff)),
+        ];
+
+    };
+
     public func from_int64(i : Int64) : [Nat8] {
         let nat64 = Int64.toNat64(i);
 
@@ -182,14 +194,14 @@ module {
         [n];
     };
 
-    public func from_nat16(n : Nat16) : [Nat8] {
+    public func from_nat16_be(n : Nat16) : [Nat8] {
         [
             Nat16.toNat8(n >> 8),
             Nat16.toNat8(n),
         ];
     };
 
-    public func from_nat32(n : Nat32) : [Nat8] {
+    public func from_nat32_be(n : Nat32) : [Nat8] {
         [
             Nat8.fromNat(Nat32.toNat((n >> 24) & 0xff)),
             Nat8.fromNat(Nat32.toNat((n >> 16) & 0xff)),
@@ -198,7 +210,7 @@ module {
         ];
     };
 
-    public func from_nat64(n : Nat64) : [Nat8] {
+    public func from_nat64_be(n : Nat64) : [Nat8] {
         [
             Nat8.fromNat(Nat64.toNat((n >> 56) & 0xff)),
             Nat8.fromNat(Nat64.toNat((n >> 48) & 0xff)),

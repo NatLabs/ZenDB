@@ -58,7 +58,6 @@ module {
 
     public type Schema = Candid.CandidType;
 
-    public type RecordPointer = Nat;
     public type Index = T.Index;
     public type Candid = T.Candid;
     public type SortDirection = T.SortDirection;
@@ -143,7 +142,7 @@ module {
     // tries to skip the number of records requested within the instruction limit
     // returns the number of records skipped
     public func extract_intervals_in_pagination_range(collection : StableCollection, skip : Nat, opt_limit : ?Nat, index_name : Text, intervals : [(Nat, Nat)], sorted_in_reverse : Bool) : Iter<Nat> {
-        Debug.print("skip, opt_limit: " # debug_show (skip, opt_limit));
+        // Debug.print("skip, opt_limit: " # debug_show (skip, opt_limit));
 
         var skipped = 0;
         var prev = 0;
@@ -172,7 +171,7 @@ module {
 
         let new_intervals_first_start = intervals.get(i).0 + remaining_skip;
 
-        Debug.print("old_intervals: " # debug_show intervals);
+        // Debug.print("old_intervals: " # debug_show intervals);
 
         let new_intervals = Array.tabulate<(Nat, Nat)>(
             intervals.size() - i,
@@ -189,7 +188,7 @@ module {
             return Itertools.empty<(Nat)>();
         };
 
-        Debug.print("new_intervals: " # debug_show new_intervals);
+        // Debug.print("new_intervals: " # debug_show new_intervals);
 
         let limit = switch (opt_limit) {
             case (null) {
@@ -218,8 +217,8 @@ module {
 
         let remaining_limit = limit - prev;
 
-        Debug.print("remaining_limit: " # debug_show remaining_limit);
-        Debug.print("i: " # debug_show i);
+        // Debug.print("remaining_limit: " # debug_show remaining_limit);
+        // Debug.print("i: " # debug_show i);
 
         if (i == intervals.size()) {
             return CollectionUtils.record_ids_from_index_intervals(collection, index_name, new_intervals, sorted_in_reverse);
@@ -239,7 +238,7 @@ module {
             },
         );
 
-        Debug.print("even_newer_intervals: " # debug_show even_newer_intervals);
+        // Debug.print("even_newer_intervals: " # debug_show even_newer_intervals);
 
         return CollectionUtils.record_ids_from_index_intervals(collection, index_name, even_newer_intervals, sorted_in_reverse);
 
@@ -253,15 +252,15 @@ module {
         intervals : [(Nat, Nat)],
         sorted_in_reverse : Bool,
     ) : Iter<Nat> {
-        Debug.print("extract_intervals_in_pagination_range_for_reversed_intervals");
-        Debug.print("skip, opt_limit: " # debug_show (skip, opt_limit));
+        // Debug.print("extract_intervals_in_pagination_range_for_reversed_intervals");
+        // Debug.print("skip, opt_limit: " # debug_show (skip, opt_limit));
 
         var skipped = 0;
         var prev = 0;
 
         var i = intervals.size();
 
-        Debug.print("old_intervals: " # debug_show intervals);
+        // Debug.print("old_intervals: " # debug_show intervals);
 
         //! calculate the total size and use it as the max bound when calculating the remaining skip
         label searching_for_skip_index while (i > 0) {
@@ -284,9 +283,9 @@ module {
             return Itertools.empty<Nat>();
         };
 
-        Debug.print("skipped: " # debug_show skipped);
-        Debug.print("prev: " # debug_show prev);
-        Debug.print("i: " # debug_show i);
+        // Debug.print("skipped: " # debug_show skipped);
+        // Debug.print("prev: " # debug_show prev);
+        // Debug.print("i: " # debug_show i);
 
         let remaining_skip = skip - prev;
 
@@ -303,7 +302,7 @@ module {
             },
         );
 
-        Debug.print("new_intervals: " # debug_show new_intervals);
+        // Debug.print("new_intervals: " # debug_show new_intervals);
 
         let limit = switch (opt_limit) {
             case (null) {
@@ -332,24 +331,29 @@ module {
             i -= 1;
         };
 
-        Debug.print("i: " # debug_show i);
+        // Debug.print("i: " # debug_show i);
 
         if (i == 0) {
             return CollectionUtils.record_ids_from_index_intervals(collection, index_name, new_intervals, sorted_in_reverse);
         };
 
         let remaining_limit = limit - prev;
-        Debug.print("remaining_limit: " # debug_show remaining_limit);
+        // Debug.print("remaining_limit: " # debug_show remaining_limit);
 
         let even_newer_intervals = Array.tabulate<(Nat, Nat)>(
             new_intervals.size() - i + 1,
             func(j : Nat) : (Nat, Nat) {
                 if (j == (new_intervals.size() - i)) {
+                    let updated_start_interval = if (new_intervals.get(j).1 < remaining_limit) {
+                        0;
+                    } else {
+                        new_intervals.get(j).1 - remaining_limit;
+                    };
 
                     (
                         Nat.max(
                             new_intervals.get(j).0,
-                            new_intervals.get(j).1 - remaining_limit,
+                            updated_start_interval,
                         ),
                         new_intervals.get(j).1,
                     );
@@ -359,7 +363,7 @@ module {
             },
         );
 
-        Debug.print("even_newer_intervals: " # debug_show even_newer_intervals);
+        // Debug.print("even_newer_intervals: " # debug_show even_newer_intervals);
 
         return CollectionUtils.record_ids_from_index_intervals(collection, index_name, even_newer_intervals, sorted_in_reverse);
 

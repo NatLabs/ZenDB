@@ -31,6 +31,7 @@ import Collection "../Collection";
 import Utils "../Utils";
 import T "../Types";
 
+import StableDatabase "StableDatabase";
 module {
 
     public type Candify<T> = T.Candify<T>;
@@ -43,43 +44,6 @@ module {
     public type Iter<A> = Iter.Iter<A>;
     public type RevIter<A> = RevIter.RevIter<A>;
 
-    // public type MemoryBTree = MemoryBTree.VersionedMemoryBTree;
-    public type BTreeUtils<K, V> = MemoryBTree.BTreeUtils<K, V>;
-    public type TypeUtils<A> = TypeUtils.TypeUtils<A>;
-
-    public type Order = Order.Order;
-    public type Hash = Hash.Hash;
-
-    public type Schema = Candid.CandidType;
-
-    public type RecordPointer = Nat;
-
-    public type Tuple<A, B> = { _0_ : A; _1_ : B };
-    public func Tuple<A, B>(a : A, b : B) : Tuple<A, B> {
-        { _0_ = a; _1_ = b };
-    };
-
-    public type Triple<A, B, C> = { _0_ : A; _1_ : B; _2_ : C };
-    public func Triple<A, B, C>(a : A, b : B, c : C) : Triple<A, B, C> {
-        { _0_ = a; _1_ = b; _2_ = c };
-    };
-
-    public type Quadruple<A, B, C, D> = { _0_ : A; _1_ : B; _2_ : C; _3_ : D };
-    public func Quadruple<A, B, C, D>(a : A, b : B, c : C, d : D) : Quadruple<A, B, C, D> {
-        { _0_ = a; _1_ = b; _2_ = c; _3_ = d };
-    };
-
-    public type SortDirection = {
-        #Ascending;
-        #Descending;
-    };
-
-    public type Index = {
-        name : Text;
-        key_details : [(Text, SortDirection)];
-        data : MemoryBTree.StableMemoryBTree;
-    };
-
     public type StableCollection = T.StableCollection;
 
     // public type ZenDB = {
@@ -88,74 +52,45 @@ module {
 
     public type Collection<Record> = Collection.Collection<Record>;
 
-    public let DEFAULT_BTREE_ORDER = 256;
+    public class Database(zendb : T.ZenDB) = self {
 
-    public class Database(hydra_db : T.ZenDB) = self {
-
-        public func create_collection<Record>(name : Text, schema : Schema, blobify : T.Candify<Record>) : Result<Collection<Record>, Text> {
-
-            switch (Map.get<Text, StableCollection>(hydra_db.collections, thash, name)) {
-                case (?collection) {
-                    if (collection.schema != schema) {
-                        return #err("Schema error: collection already exists with different schema");
-                    };
-
-                    return #ok(
+        public func create_collection<Record>(name : Text, schema : T.Schema, blobify : T.Candify<Record>) : Result<Collection<Record>, Text> {
+            switch (StableDatabase.create_collection(zendb, name, schema)) {
+                case (#ok(stable_collection)) {
+                    #ok(
                         Collection.Collection<Record>(
                             name,
-                            collection,
+                            stable_collection,
                             blobify,
                         )
                     );
                 };
-                case (null) ();
+                case (#err(msg)) #err(msg);
             };
-
-            let #Record(_) = schema else return #err("Schema error: schema type is not a record");
-
-            let schema_keys = Utils.extract_schema_keys(schema);
-
-            let stable_collection = {
-                var schema = schema;
-                schema_keys;
-                schema_keys_set = Set.fromIter(schema_keys.vals(), thash);
-                main = MemoryBTree.new(?DEFAULT_BTREE_ORDER);
-                indexes = Map.new<Text, Index>();
-                freed_btrees = hydra_db.freed_btrees;
-            };
-
-            ignore Map.put<Text, StableCollection>(hydra_db.collections, thash, name, stable_collection);
-
-            #ok(
-                Collection.Collection<Record>(
-                    name,
-                    stable_collection,
-                    blobify,
-                )
-            );
         };
 
         public func get_collection<Record>(
             name : Text,
             blobify : T.Candify<Record>,
         ) : Result<Collection<Record>, Text> {
-            let stable_collection = switch (Map.get<Text, StableCollection>(hydra_db.collections, thash, name)) {
-                case (?collection) (collection);
-                case (null) return #err("Collection not found");
-            };
 
-            #ok(
-                Collection.Collection<Record>(
-                    name,
-                    stable_collection,
-                    blobify,
-                )
-            );
+            switch (StableDatabase.get_collection(zendb, name)) {
+                case (#ok(stable_collection)) {
+                    #ok(
+                        Collection.Collection<Record>(
+                            name,
+                            stable_collection,
+                            blobify,
+                        )
+                    );
+                };
+                case (#err(msg)) #err(msg);
+            };
         };
 
         public func get_or_create_collection<Record>(
             name : Text,
-            schema : Schema,
+            schema : T.Schema,
             blobify : T.Candify<Record>,
         ) : Result<Collection<Record>, Text> {
 
