@@ -5,6 +5,10 @@
       "type": "motoko",
       "main": "example/icp-txs-db/main.mo",
       "args": "--max-stable-pages 300000"
+    },
+    "canister-db": {
+      "type": "motoko",
+      "main": "src/CanisterDB/CanisterDB.mo"
     }
   },
   "defaults": {

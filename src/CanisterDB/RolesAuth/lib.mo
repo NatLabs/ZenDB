@@ -12,9 +12,10 @@ import StableRolesAuth "StableRolesAuth";
 module Roles {
 
     type Role = StableRolesAuth.Role;
+    type InputRole = StableRolesAuth.InputRole;
     type StableRolesAuth = StableRolesAuth.StableRolesAuth;
 
-    public func init_stable_store(roles : [Role]) : StableRolesAuth {
+    public func init_stable_store(roles : [InputRole]) : StableRolesAuth {
         let stable_roles_auth = StableRolesAuth.init(roles);
         stable_roles_auth;
     };
@@ -70,6 +71,8 @@ module Roles {
                 Debug.trap(on_missing_permissions(caller, permission));
             };
         };
+
+        public func shiiit() {};
 
         public func allow_rs<A>(caller : Principal, permission : Text, fn : () -> Result.Result<A, Text>) : Result.Result<A, Text> {
             if (user_has_permission(caller, permission)) {

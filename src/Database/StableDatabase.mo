@@ -65,6 +65,7 @@ module {
         let schema_keys = Utils.extract_schema_keys(schema);
 
         let stable_collection = {
+            name;
             ids = Ids.create(zendb.id_store, name);
             var schema = schema;
             schema_keys;

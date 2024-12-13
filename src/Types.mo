@@ -33,8 +33,6 @@ import Int8Cmp "mo:memory-collection/TypeUtils/Int8Cmp";
 module T {
     public type BitMap = BitMap.BitMap;
 
-    // public type ZenDB = ZenDB.ZenDB;
-
     public type Candid = Serde.Candid or {
         #Minimum;
         #Maximum;
@@ -96,6 +94,7 @@ module T {
     };
 
     public type StableCollection = {
+        name : Text;
         ids : Ids.Generator;
         var schema : Schema;
         schema_keys : [Text];
@@ -252,6 +251,12 @@ module T {
         fully_covered_equality_and_range_fields : Set.Set<Text>;
         score : Float;
 
+    };
+
+    public type CrossCanisterRecordsCursor = {
+        collection_name : Text;
+        collection_query : T.StableQuery;
+        results : T.Result<[(T.RecordId, T.CandidBlob)], Text>;
     };
 
 };

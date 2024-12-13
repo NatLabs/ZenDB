@@ -16,6 +16,11 @@ module Roles {
     type Vector<A> = Vector.Vector<A>;
     type Result<A, B> = Result.Result<A, B>;
 
+    public type InputRole = {
+        name : Text;
+        permissions : [Text];
+    };
+
     public type Role = {
         name : Text;
         permissions : Set<Text>;
@@ -35,11 +40,18 @@ module Roles {
         };
     };
 
-    public func init(init_roles : [Role]) : StableRolesAuth {
+    public func init(init_roles : [InputRole]) : StableRolesAuth {
         let roles = Roles.new();
 
         for (role in init_roles.vals()) {
-            add_role(roles, role);
+
+            add_role(
+                roles,
+                {
+                    name = role.name;
+                    permissions = Set.fromIter<Text>(role.permissions.vals(), thash);
+                },
+            );
         };
 
         roles;
