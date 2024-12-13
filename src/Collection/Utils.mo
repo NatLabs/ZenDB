@@ -64,7 +64,6 @@ module CollectionUtils {
 
     public type Schema = Candid.CandidType;
 
-    public type RecordPointer = Nat;
     public type Index = T.Index;
     public type Candid = T.Candid;
     public type SortDirection = T.SortDirection;
@@ -79,7 +78,10 @@ module CollectionUtils {
 
     public let { thash; bhash } = Map;
 
-    public func get_index_data_utils(collection : StableCollection, index_key_details : [(Text, SortDirection)]) : MemoryBTree.BTreeUtils<[Candid], RecordPointer> {
+    public func get_index_data_utils(
+        collection : StableCollection,
+        index_key_details : [(Text, SortDirection)],
+    ) : MemoryBTree.BTreeUtils<[Candid], T.RecordId> {
 
         let key_utils = get_index_key_utils(collection, index_key_details);
         let value_utils = TypeUtils.Nat;
@@ -159,6 +161,11 @@ module CollectionUtils {
         let ?record_details = MemoryBTree.get(collection.main, get_main_btree_utils(), id);
         let record = blobify.from_blob(record_details.0);
         record;
+    };
+
+    public func lookup_candid_blob(collection : StableCollection, id : Nat) : Blob {
+        let ?record_details = MemoryBTree.get(collection.main, get_main_btree_utils(), id);
+        record_details.0;
     };
 
     public func decode_candid_blob(collection : StableCollection, candid_blob : Blob) : Candid.Candid {

@@ -13,6 +13,7 @@ import Bench "mo:bench";
 import Fuzz "mo:fuzz";
 import Candid "mo:serde/Candid";
 import Itertools "mo:itertools/Iter";
+import BitMap "mo:bit-map";
 
 import ZenDB "../src";
 
@@ -149,8 +150,7 @@ module {
             "(index intersection, -> array)",
             // "(sorted by tx.amt, ↑)",
             // "(sorted by tx.amt, ↓)",
-            // "(pagination limit = 100, -> array",
-            // "(pagination limit = 100, -> array"
+            // "(skip_limit_pagination limit = 100, -> array"
         ]);
 
         bench.rows([
@@ -212,7 +212,7 @@ module {
                 case ("(full scan, -> array)") {
                     full_scan(txs, col, limit, predefined_txs, principals, candid_principals, principals_0_10);
                 };
-                case ("(pagination limit = 100, -> array") {
+                case ("(skip_limit_pagination limit = 100, -> array") {
                     paginated_queries(txs, col, limit, predefined_txs, principals, candid_principals, principals_0_10, #Ascending, 100);
                 };
                 case (_) {
@@ -625,27 +625,16 @@ module {
 
   func paginated_queries(txs : ZenDB.Collection<Tx>, section : Text, limit : Nat, predefined_txs : Buffer.Buffer<Tx>, principals : [Principal], candid_principals : [ZenDB.Candid], principals_0_10 : [Principal], sort_direction : ZenDB.SortDirection, pagination_limit : Nat) {
 
-        func paginated_query(db_query : ZenDB.QueryBuilder)  {
+        func skip_limit_paginated_query(db_query : ZenDB.QueryBuilder)  {
             ignore db_query.Limit(pagination_limit);
             let #ok(matching_txs) = txs.find(db_query);
             var records = matching_txs;
+            var skip = 0;
             var opt_cursor : ?Nat = null;
 
             label pagination while (records.size() > 0){
-                switch(opt_cursor, ?(records[records.size() - 1].0)){
-                    case(?cursor, ?new_cursor) if (cursor == new_cursor) {
-                        // break pagination;
-                        Debug.trap("Cursor is not moving");
-                    }else {
-                        opt_cursor := ?new_cursor;
-                    };
-                    case(null, new_cursor) opt_cursor := new_cursor;
-                    case(_, null) Debug.trap("Should be unreachable");
-
-                };
-
                 ignore db_query
-                    .Cursor(?(records[records.size() - 1].0), #Forward)
+                    .Skip(skip)
                     .Limit(pagination_limit);
 
                 let #ok(matching_txs) = txs.find(db_query);
@@ -653,6 +642,41 @@ module {
                 records := matching_txs;
 
             };
+
+            skip += records.size();
+        };
+
+        func skip_limit_skip_limit_paginated_query(db_query : ZenDB.QueryBuilder, pagination_limit : Nat) : [(Nat, Tx)] {
+
+            ignore db_query.Limit(pagination_limit);
+            let #ok(matching_txs) = txs.find(db_query);
+            let bitmap = BitMap.fromIter(Iter.map<(Nat, Tx), Nat>(matching_txs.vals(), func((id, _) : (Nat, Tx)) : Nat = id));
+            let records = Buffer.fromArray<(Nat, Tx)>(matching_txs);
+            var batch_size = records.size();
+
+            label skip_limit_pagination while (batch_size > 0) {
+                ignore db_query.Skip(records.size()).Limit(pagination_limit);
+
+                let #ok(matching_txs) = txs.find(db_query);
+                // Debug.print("matching_txs: " # debug_show matching_txs);
+
+                assert matching_txs.size() <= pagination_limit;
+                batch_size := matching_txs.size();
+
+                for ((id, tx) in matching_txs.vals()) {
+                    records.add((id, tx));
+
+                    if (bitmap.get(id)) {
+                        Debug.trap("Duplicate entry for id " # debug_show id);
+                    } else {
+                        bitmap.set(id, true);
+                    };
+                };
+
+            };
+
+            Buffer.toArray(records);
+
         };
 
         switch (section) {
@@ -668,7 +692,7 @@ module {
                     #eq(#Text("1mint")),
                 );
 
-                paginated_query(db_query);
+                skip_limit_paginated_query(db_query);
                 
             };
 
@@ -678,7 +702,7 @@ module {
                     #In([#Text("1xfer"), #Text("2xfer")]),
                 );
 
-                paginated_query(db_query);
+                skip_limit_paginated_query(db_query);
             };
 
             case ("principals[0] == tx.to.owner (is recipient)") {
@@ -687,7 +711,7 @@ module {
                     #eq(#Principal(principals.get(0))),
                 );
 
-                paginated_query(db_query);
+                skip_limit_paginated_query(db_query);
             };
             case ("principals[0..10] == tx.to.owner (is recipient)") {
                 let candid_principals = Array.map<Principal, ZenDB.Candid>(
@@ -700,7 +724,7 @@ module {
                     #In(candid_principals),
                 );
 
-                paginated_query(db_query);
+                skip_limit_paginated_query(db_query);
             };
 
 
@@ -716,7 +740,7 @@ module {
                     #eq(#Principal(principals.get(0))),
                 );
 
-                paginated_query(db_query);
+                skip_limit_paginated_query(db_query);
             };
 
             case ("all txs involving principals[0..10]") {
@@ -736,7 +760,7 @@ module {
                     #In(candid_principals),
                 );
 
-                paginated_query(db_query);
+                skip_limit_paginated_query(db_query);
             };
 
             case ("250 < tx.amt <= 400") {
@@ -748,7 +772,7 @@ module {
                     #lte(#Nat(400)),
                 );
 
-                paginated_query(db_query);
+                skip_limit_paginated_query(db_query);
             };
 
             case ("btype == 1burn and tx.amt >= 750") {
@@ -760,11 +784,11 @@ module {
                     #gte(#Nat(750)),
                 );
 
-                paginated_query(db_query);
+                skip_limit_paginated_query(db_query);
             };
 
             case (_) {
-                Debug.trap("Should be unreachable:\n row = zenDB (pagination limit = 100, -> array) and col = \"" # debug_show section # "\"");
+                Debug.trap("Should be unreachable:\n row = zenDB (skip_limit_pagination limit = 100, -> array) and col = \"" # debug_show section # "\"");
             };
 
         };

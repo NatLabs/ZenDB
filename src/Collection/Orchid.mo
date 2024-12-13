@@ -24,6 +24,7 @@ import Candid "mo:serde/Candid";
 import Itertools "mo:itertools/Iter";
 
 import T "../Types";
+import ByteUtils "../ByteUtils";
 
 module {
     type Candid = T.Candid;
@@ -62,6 +63,8 @@ module {
         // custom types
         Blob : Nat8 = 0x5f;
         Null : Nat8 = 0x60;
+        Minimum : Nat8 = 0;
+        Maximum : Nat8 = 255;
 
     };
 
@@ -83,6 +86,9 @@ module {
 
             };
             from_blob = func(blob : Blob) : [Candid] {
+                // we don't need to decode the index keys because we are only interested in the index values
+                return [];
+
                 let bytes = Blob.toArray(blob);
 
                 let size = bytes[0] |> Nat8.toNat(_);
@@ -169,13 +175,12 @@ module {
         };
         cmp = TypeUtils.MemoryCmp.Default;
 
-        hash = func(a : Candid, b : Candid) : Nat64 = Debug.trap("Orchid does not support hashing");
     };
 
     func encode(buffer : Buffer.Buffer<Nat8>, candid : Candid) {
 
         switch (candid) {
-            case (#Minimum) buffer.add(0);
+            case (#Minimum) buffer.add(OrchidTypeCode.Minimum);
             case (#Array(_) or #Record(_) or #Map(_) or #Variant(_) or #Tuple(_)) Debug.trap("Orchid does not support compound types: " # debug_show (candid));
             case (#Option(option_type)) {
                 buffer.add(OrchidTypeCode.Option);
@@ -188,15 +193,13 @@ module {
                 let blob = Principal.toBlob(p);
                 let bytes = Blob.toArray(blob);
 
-                let size = Nat8.fromNat(blob.size()); // -> Are principals only limited to 29 bytes? or just Principals for user and canister ids?
-
-                buffer.add(size);
-
                 var i = 0;
                 while (i < bytes.size()) {
                     buffer.add(bytes[i]);
                     i += 1;
                 };
+
+                buffer.add(0); // null terminator, helps with lexicographic comparison, if the principal ends before the other one, it will be considered smaller because the null terminator is smaller than any other byte
 
             };
             case (#Text(t)) {
@@ -217,20 +220,16 @@ module {
             case (#Blob(b)) {
 
                 let bytes = Blob.toArray(b);
-                let size = Nat32.fromNat(b.size());
 
                 buffer.add(OrchidTypeCode.Blob);
-
-                buffer.add(Nat8.fromNat(Nat32.toNat(size >> 24)));
-                buffer.add(Nat8.fromNat(Nat32.toNat((size >> 16) & 0xff)));
-                buffer.add(Nat8.fromNat(Nat32.toNat((size >> 8) & 0xff)));
-                buffer.add(Nat8.fromNat(Nat32.toNat(size & 0xff)));
 
                 var i = 0;
                 while (i < bytes.size()) {
                     buffer.add(bytes[i]);
                     i += 1;
                 };
+
+                buffer.add(0); // null terminator, helps with lexicographic comparison, if the blob ends before the other one, it will be considered smaller because the null terminator is smaller than any other byte
 
             };
             case (#Float(f)) Debug.trap("Orchid does not support Float type");
@@ -280,6 +279,7 @@ module {
                 let msbyte_with_flipped_msbit = msbyte ^ 0x80;
 
                 buffer.add(msbyte_with_flipped_msbit);
+
                 buffer.add(Nat8.fromNat(Nat64.toNat((n >> 48) & 0xff)));
                 buffer.add(Nat8.fromNat(Nat64.toNat((n >> 40) & 0xff)));
                 buffer.add(Nat8.fromNat(Nat64.toNat((n >> 32) & 0xff)));
@@ -392,7 +392,7 @@ module {
             };
             case (#Empty) buffer.add(OrchidTypeCode.Empty);
             case (#Null) buffer.add(OrchidTypeCode.Null);
-            case (#Maximum) buffer.add(255);
+            case (#Maximum) buffer.add(OrchidTypeCode.Maximum);
         };
     };
 

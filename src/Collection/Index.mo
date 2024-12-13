@@ -228,12 +228,12 @@ module {
             );
         };
 
-        Debug.print("Index_key_details: " # debug_show index.key_details);
-        Debug.print("full_start_query: " # debug_show full_start_query);
-        Debug.print("full_end_query: " # debug_show full_end_query);
+      // Debug.print("Index_key_details: " # debug_show index.key_details);
+      // Debug.print("full_start_query: " # debug_show full_start_query);
+      // Debug.print("full_end_query: " # debug_show full_end_query);
 
         let scans = CollectionUtils.memorybtree_scan_interval(index.data, index_data_utils, ?full_start_query, ?full_end_query);
-        Debug.print("scan_intervals: " # debug_show scans);
+      // Debug.print("scan_intervals: " # debug_show scans);
         scans
 
         // let records_iter = MemoryBTree.scan(index.data, index_data_utils, ?full_start_query, ?full_end_query);
@@ -570,24 +570,24 @@ module {
                     interval;
                 };
 
-                Debug.print("index matching results:");
-                Debug.print("index, score: " # debug_show (index.name, calculate_score(index_details, false)));
-                Debug.print("operations: " # debug_show operations);
+              // Debug.print("index matching results:");
+              // Debug.print("index, score: " # debug_show (index.name, calculate_score(index_details, false)));
+              // Debug.print("operations: " # debug_show operations);
 
-                Debug.print("index_key_details: " # debug_show index.key_details);
-                Debug.print("equal_fields: " # debug_show Set.toArray(equal_fields));
-                Debug.print("  num_of_equal_fields_covered: " # debug_show num_of_equal_fields_covered);
+              // Debug.print("index_key_details: " # debug_show index.key_details);
+              // Debug.print("equal_fields: " # debug_show Set.toArray(equal_fields));
+              // Debug.print("  num_of_equal_fields_covered: " # debug_show num_of_equal_fields_covered);
 
-                Debug.print("sort_fields: " # debug_show Buffer.toArray(sort_fields));
-                Debug.print("  num_of_sort_fields_evaluated: " # debug_show num_of_sort_fields_evaluated);
-                Debug.print("range_fields: " # debug_show Set.toArray(range_fields));
-                Debug.print("  num_of_range_fields_covered: " # debug_show num_of_range_fields_covered);
+              // Debug.print("sort_fields: " # debug_show Buffer.toArray(sort_fields));
+              // Debug.print("  num_of_sort_fields_evaluated: " # debug_show num_of_sort_fields_evaluated);
+              // Debug.print("range_fields: " # debug_show Set.toArray(range_fields));
+              // Debug.print("  num_of_range_fields_covered: " # debug_show num_of_range_fields_covered);
 
-                Debug.print("requires_additional_filtering: " # debug_show requires_additional_filtering);
-                Debug.print("requires_additional_sorting: " # debug_show requires_additional_sorting);
-                Debug.print("num, range_size: " # debug_show (num_of_range_fields_covered, Set.size(range_fields)));
-                Debug.print("num, equal_size: " # debug_show (num_of_equal_fields_covered, Set.size(equal_fields)));
-                Debug.print("fully_covered_equality_and_range_fields: " # debug_show Set.toArray(fully_covered_equality_and_range_fields));
+              // Debug.print("requires_additional_filtering: " # debug_show requires_additional_filtering);
+              // Debug.print("requires_additional_sorting: " # debug_show requires_additional_sorting);
+              // Debug.print("num, range_size: " # debug_show (num_of_range_fields_covered, Set.size(range_fields)));
+              // Debug.print("num, equal_size: " # debug_show (num_of_equal_fields_covered, Set.size(equal_fields)));
+              // Debug.print("fully_covered_equality_and_range_fields: " # debug_show Set.toArray(fully_covered_equality_and_range_fields));
 
                 indexes.add(index_details);
             };
@@ -772,24 +772,24 @@ module {
     //             };
     //         };
 
-    //         Debug.print("index matching results:");
-    //         Debug.print("index, score: " # debug_show (index.name, index_score));
-    //         Debug.print("operations: " # debug_show operations);
+    //       // Debug.print("index matching results:");
+    //       // Debug.print("index, score: " # debug_show (index.name, index_score));
+    //       // Debug.print("operations: " # debug_show operations);
 
-    //         Debug.print("index_key_details: " # debug_show index.key_details);
-    //         Debug.print("equal_fields: " # debug_show Set.toArray(equal_fields));
-    //         Debug.print("  num_of_equal_fields_evaluated: " # debug_show num_of_equal_fields_evaluated);
+    //       // Debug.print("index_key_details: " # debug_show index.key_details);
+    //       // Debug.print("equal_fields: " # debug_show Set.toArray(equal_fields));
+    //       // Debug.print("  num_of_equal_fields_evaluated: " # debug_show num_of_equal_fields_evaluated);
 
-    //         Debug.print("sort_fields: " # debug_show Buffer.toArray(sort_fields));
-    //         Debug.print("  num_of_sort_fields_evaluated: " # debug_show num_of_sort_fields_evaluated);
-    //         Debug.print("range_fields: " # debug_show Set.toArray(range_fields));
-    //         Debug.print("  num_of_range_fields_evaluated: " # debug_show num_of_range_fields_evaluated);
+    //       // Debug.print("sort_fields: " # debug_show Buffer.toArray(sort_fields));
+    //       // Debug.print("  num_of_sort_fields_evaluated: " # debug_show num_of_sort_fields_evaluated);
+    //       // Debug.print("range_fields: " # debug_show Set.toArray(range_fields));
+    //       // Debug.print("  num_of_range_fields_evaluated: " # debug_show num_of_range_fields_evaluated);
 
-    //         Debug.print("requires_additional_filtering: " # debug_show requires_additional_filtering);
-    //         Debug.print("requires_additional_sorting: " # debug_show requires_additional_sorting);
-    //         Debug.print("num, range_size: " # debug_show (num_of_range_fields_evaluated, Set.size(range_fields)));
-    //         Debug.print("num, equal_size: " # debug_show (num_of_equal_fields_evaluated, Set.size(equal_fields)));
-    //         Debug.print("fully_covered_equality_and_range_fields: " # debug_show Set.toArray(fully_covered_equality_and_range_fields));
+    //       // Debug.print("requires_additional_filtering: " # debug_show requires_additional_filtering);
+    //       // Debug.print("requires_additional_sorting: " # debug_show requires_additional_sorting);
+    //       // Debug.print("num, range_size: " # debug_show (num_of_range_fields_evaluated, Set.size(range_fields)));
+    //       // Debug.print("num, equal_size: " # debug_show (num_of_equal_fields_evaluated, Set.size(equal_fields)));
+    //       // Debug.print("fully_covered_equality_and_range_fields: " # debug_show Set.toArray(fully_covered_equality_and_range_fields));
 
     //         if (index_score > best_score) {
     //             best_score := index_score;

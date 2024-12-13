@@ -61,7 +61,6 @@ module {
 
     public type Schema = Candid.CandidType;
 
-    public type RecordPointer = Nat;
     public type Index = T.Index;
     public type Candid = T.Candid;
     public type SortDirection = T.SortDirection;
@@ -103,7 +102,7 @@ module {
                         scan_bounds;
                         filter_bounds;
                     } = index_scan_details;
-                    Debug.print("subplan index_scan_details: " # debug_show { index_scan_details with index = null });
+                    // Debug.print("subplan index_scan_details: " # debug_show { index_scan_details with index = null });
                     if (not requires_additional_filtering and not requires_additional_sorting) {
                         return #Interval(index.name, [interval], sorted_in_reverse);
                     };
@@ -138,7 +137,7 @@ module {
                     } = index_scan_details;
                     let index_data_utils = CollectionUtils.get_index_data_utils(collection, index.key_details);
 
-                    Debug.print("scan index_scan_details: " # debug_show { index_scan_details with index = null });
+                    // Debug.print("scan index_scan_details: " # debug_show { index_scan_details with index = null });
 
                     if (requires_additional_filtering) {
 
@@ -167,7 +166,7 @@ module {
                                 };
                             };
                             case (null) {
-                                Debug.print("could not use index based filtering");
+                                // Debug.print("could not use index based filtering");
 
                                 let record_ids = CollectionUtils.record_ids_from_index_intervals(collection, index.name, [interval], false);
                                 CollectionUtils.multi_filter(collection, record_ids, Buffer.fromArray([filter_bounds]));
@@ -189,7 +188,7 @@ module {
         };
 
         for (or_operation_subplan in query_plan.subplans.vals()) {
-            Debug.print("or_operation_subplan: " # debug_show (or_operation_subplan.simple_operations));
+            // Debug.print("or_operation_subplan: " # debug_show (or_operation_subplan.simple_operations));
             let eval_result = get_unique_record_ids_from_query_plan(collection, bitmap_cache, or_operation_subplan);
 
             switch (eval_result) {
@@ -212,15 +211,7 @@ module {
         };
 
         for ((index_name, interval_details) in Map.entries(intervals_by_index)) {
-            Debug.print(
-                "before (index_name, index_details): " # debug_show (
-                    index_name,
-                    {
-                        sorted_in_reverse = interval_details.sorted_in_reverse;
-                        intervals = Buffer.toArray(interval_details.intervals);
-                    },
-                )
-            );
+            // Debug.print( "before (index_name, index_details): " # debug_show ( index_name, { sorted_in_reverse = interval_details.sorted_in_reverse; intervals = Buffer.toArray(interval_details.intervals); },));
 
             if (query_plan.is_and_operation) {
                 switch (Intervals.intervals_intersect(interval_details.intervals)) {
@@ -234,16 +225,7 @@ module {
                 Intervals.intervals_union(interval_details.intervals);
             };
 
-            Debug.print(
-                "after (index_name, index_details): " # debug_show (
-                    index_name,
-                    {
-                        sorted_in_reverse = interval_details.sorted_in_reverse;
-                        intervals = Buffer.toArray(interval_details.intervals);
-                    },
-                )
-            );
-
+            // Debug.print( "after (index_name, index_details): " # debug_show ( index_name, { sorted_in_reverse = interval_details.sorted_in_reverse; intervals = Buffer.toArray(interval_details.intervals); },));
         };
 
         if (Map.size(intervals_by_index) > 1) {
@@ -324,7 +306,7 @@ module {
     };
 
     public func get_index_based_filtering_intervals(collection : T.StableCollection, filter_bounds : T.Bounds, operations : [(Text, T.ZqlOperators)]) : IndexIntervalFilterDetails {
-        Debug.print("get_index_based_filtering_intervals");
+        // Debug.print("get_index_based_filtering_intervals");
 
         var prev = filter_bounds;
         var curr = filter_bounds;
@@ -339,7 +321,7 @@ module {
                 Set.add(fields, thash, field);
             };
 
-            Debug.print("unique fields: " # debug_show Set.toArray(fields));
+            // Debug.print("unique fields: " # debug_show Set.toArray(fields));
 
             let filter_operations = Buffer.Buffer<(Text, T.ZqlOperators)>(8);
 
@@ -349,7 +331,7 @@ module {
                 };
             };
 
-            Debug.print("filter_operations: " # debug_show Buffer.toArray(filter_operations));
+            // Debug.print("filter_operations: " # debug_show Buffer.toArray(filter_operations));
 
             let { index; fully_covered_equality_and_range_fields } = switch (Index.get_best_index(collection, Buffer.toArray(filter_operations), null)) {
                 case (null) {
@@ -361,7 +343,7 @@ module {
                 case (?best_index_details) { best_index_details };
             };
 
-            Debug.print("chosed index: " # debug_show (index.key_details));
+            // Debug.print("chosed index: " # debug_show (index.key_details));
 
             let lower_map = Map.new<Text, T.State<Candid>>();
 
@@ -387,12 +369,12 @@ module {
 
             let (scan_bounds, filter_bounds) = Index.extract_scan_and_filter_bounds(lower_map, upper_map, ?index.key_details, ?fully_covered_equality_and_range_fields);
 
-            Debug.print("scan_bounds: " # debug_show scan_bounds);
-            Debug.print("filter_bounds: " # debug_show filter_bounds);
+            // Debug.print("scan_bounds: " # debug_show scan_bounds);
+            // Debug.print("filter_bounds: " # debug_show filter_bounds);
 
             let interval = Index.scan(collection, index, scan_bounds.0, scan_bounds.1, null);
 
-            Debug.print("interval: " # debug_show interval);
+            // Debug.print("interval: " # debug_show interval);
 
             switch (Map.get(intervals_map, thash, index.name)) {
                 case (?intervals) {
@@ -403,16 +385,7 @@ module {
                 };
             };
 
-            Debug.print(
-                "intervals_map: " # debug_show Array.map<(Text, Buffer.Buffer<(Nat, Nat)>), (Text, [(Nat, Nat)])>(
-                    Map.toArray<Text, Buffer.Buffer<(Nat, Nat)>>(intervals_map),
-                    func(
-                        (index_name, intervals) : (Text, Buffer.Buffer<(Nat, Nat)>)
-                    ) : (Text, [(Nat, Nat)]) {
-                        (index_name, Buffer.toArray(intervals));
-                    },
-                )
-            );
+            // Debug.print( "intervals_map: " # debug_show Array.map<(Text, Buffer.Buffer<(Nat, Nat)>), (Text, [(Nat, Nat)])>( Map.toArray<Text, Buffer.Buffer<(Nat, Nat)>>(intervals_map), func( (index_name, intervals) : (Text, Buffer.Buffer<(Nat, Nat)>)) : (Text, [(Nat, Nat)]) { (index_name, Buffer.toArray(intervals)); },));
 
             prev := curr;
             curr := filter_bounds;
@@ -464,7 +437,7 @@ module {
         index_scan_details : T.IndexScanDetails,
     ) : ?IndexBasedFilteringResult {
 
-        Debug.print("index_based_interval_filtering");
+        // Debug.print("index_based_interval_filtering");
         // Debug.print("index_scan_details: " # debug_show { index_scan_details with index = null });
         // Debug.print("sort_column: " # debug_show sort_column);
 
@@ -480,16 +453,7 @@ module {
 
         let { intervals_map; opt_filter_bounds } = get_index_based_filtering_intervals(collection, filter_bounds, operations);
 
-        Debug.print(
-            "intervals_map for filter: " # debug_show Array.map<(Text, Buffer.Buffer<(Nat, Nat)>), (Text, [(Nat, Nat)])>(
-                Map.toArray<Text, Buffer.Buffer<(Nat, Nat)>>(intervals_map),
-                func(
-                    (index_name, intervals) : (Text, Buffer.Buffer<(Nat, Nat)>)
-                ) : (Text, [(Nat, Nat)]) {
-                    (index_name, Buffer.toArray(intervals));
-                },
-            )
-        );
+        // Debug.print( "intervals_map for filter: " # debug_show Array.map<(Text, Buffer.Buffer<(Nat, Nat)>), (Text, [(Nat, Nat)])>( Map.toArray<Text, Buffer.Buffer<(Nat, Nat)>>(intervals_map), func( (index_name, intervals) : (Text, Buffer.Buffer<(Nat, Nat)>)) : (Text, [(Nat, Nat)]) { (index_name, Buffer.toArray(intervals)); },));
 
         var filtering_intervals_count = 0;
 
@@ -501,12 +465,12 @@ module {
             };
         };
 
-        Debug.print("filtering_intervals_count: " # debug_show filtering_intervals_count);
-        Debug.print("original_interval_count: " # debug_show original_interval_count);
+        // Debug.print("filtering_intervals_count: " # debug_show filtering_intervals_count);
+        // Debug.print("original_interval_count: " # debug_show original_interval_count);
 
         if (filtering_intervals_count > (original_interval_count * 10)) {
-            Debug.print("filtering_intervals_count > original_interval_count");
-            Debug.print(debug_show (filtering_intervals_count) # " > " # debug_show (original_interval_count) # " * 2");
+            // Debug.print("filtering_intervals_count > original_interval_count");
+            // Debug.print(debug_show (filtering_intervals_count) # " > " # debug_show (original_interval_count) # " * 2");
             return null;
         };
 
@@ -525,16 +489,7 @@ module {
             };
         };
 
-        Debug.print(
-            "intervals_map with original interval: " # debug_show Array.map<(Text, Buffer.Buffer<(Nat, Nat)>), (Text, [(Nat, Nat)])>(
-                Map.toArray<Text, Buffer.Buffer<(Nat, Nat)>>(intervals_map),
-                func(
-                    (index_name, intervals) : (Text, Buffer.Buffer<(Nat, Nat)>)
-                ) : (Text, [(Nat, Nat)]) {
-                    (index_name, Buffer.toArray(intervals));
-                },
-            )
-        );
+        // Debug.print( "intervals_map with original interval: " # debug_show Array.map<(Text, Buffer.Buffer<(Nat, Nat)>), (Text, [(Nat, Nat)])>( Map.toArray<Text, Buffer.Buffer<(Nat, Nat)>>(intervals_map), func( (index_name, intervals) : (Text, Buffer.Buffer<(Nat, Nat)>)) : (Text, [(Nat, Nat)]) { (index_name, Buffer.toArray(intervals)); },));
 
         for ((index_name, intervals) in Map.entries(intervals_map)) {
             switch (Intervals.intervals_intersect(intervals)) {
@@ -546,16 +501,7 @@ module {
             };
         };
 
-        Debug.print(
-            "intervals_map after intersect: " # debug_show Array.map<(Text, Buffer.Buffer<(Nat, Nat)>), (Text, [(Nat, Nat)])>(
-                Map.toArray<Text, Buffer.Buffer<(Nat, Nat)>>(intervals_map),
-                func(
-                    (index_name, intervals) : (Text, Buffer.Buffer<(Nat, Nat)>)
-                ) : (Text, [(Nat, Nat)]) {
-                    (index_name, Buffer.toArray(intervals));
-                },
-            )
-        );
+        // Debug.print( "intervals_map after intersect: " # debug_show Array.map<(Text, Buffer.Buffer<(Nat, Nat)>), (Text, [(Nat, Nat)])>( Map.toArray<Text, Buffer.Buffer<(Nat, Nat)>>(intervals_map), func( (index_name, intervals) : (Text, Buffer.Buffer<(Nat, Nat)>)) : (Text, [(Nat, Nat)]) { (index_name, Buffer.toArray(intervals)); },));
 
         let bitmaps = Buffer.Buffer<T.BitMap>(8);
 
@@ -578,19 +524,12 @@ module {
             bitmaps.add(bitmap);
         };
 
-        Debug.print(
-            "bitmaps: " # debug_show Array.map<BitMap.BitMap, Nat>(
-                Buffer.toArray(bitmaps),
-                func(bitmap : BitMap.BitMap) : Nat {
-                    bitmap.size();
-                },
-            )
-        );
+        // Debug.print( "bitmaps: " # debug_show Array.map<BitMap.BitMap, Nat>( Buffer.toArray(bitmaps), func(bitmap : BitMap.BitMap) : Nat { bitmap.size(); },));
 
         // filtering is an #And operation
         let bitmap = BitMap.multiIntersect(bitmaps.vals());
 
-        Debug.print("intersected bitmap size: " # debug_show bitmap.size());
+        // Debug.print("intersected bitmap size: " # debug_show bitmap.size());
 
         ?{ bitmap; opt_filter_bounds };
 
@@ -735,11 +674,11 @@ module {
             };
         };
 
-        Debug.print("intervals_by_index: " # debug_show Map.size(intervals_by_index));
-        Debug.print("iterators: " # debug_show iterators.size());
-        Debug.print("full_scan_details_buffer: " # debug_show full_scan_details_buffer.size());
-        Debug.print("bitmaps: " # debug_show bitmaps.size());
-        Debug.print("sorted_records_from_iter: " # debug_show sorted_records_from_iter.size());
+        // Debug.print("intervals_by_index: " # debug_show Map.size(intervals_by_index));
+        // Debug.print("iterators: " # debug_show iterators.size());
+        // Debug.print("full_scan_details_buffer: " # debug_show full_scan_details_buffer.size());
+        // Debug.print("bitmaps: " # debug_show bitmaps.size());
+        // Debug.print("sorted_records_from_iter: " # debug_show sorted_records_from_iter.size());
 
         if (bitmaps.size() == 0 and full_scan_details_buffer.size() == 0 and iterators.size() == 0 and Map.size(intervals_by_index) <= 1) {
 
@@ -759,7 +698,7 @@ module {
 
         };
 
-        Debug.print("not a single index with intervals");
+        // Debug.print("not a single index with intervals");
 
         for ((index_name, interval_details) in Map.entries(intervals_by_index)) {
             let interval = interval_details.intervals.get(0); // #And operations only have one interval
@@ -796,7 +735,7 @@ module {
                     */
 
         if (full_scan_details_buffer.size() > 0) {
-            Debug.print("requires full scan");
+            // Debug.print("requires full scan");
 
             var smallest_interval_index = "";
             var smallest_interval_start = 0;
@@ -864,21 +803,21 @@ module {
 
             };
 
-            Debug.print("added full scan bounds to bitmaps");
-            Debug.print("too bad it requires sorting: " # debug_show requires_sorting);
-            Debug.print("query_plan.subplans.size() : " # debug_show query_plan.subplans.size());
-            Debug.print("query_plan.scans.size() : " # debug_show query_plan.scans.size());
+            // Debug.print("added full scan bounds to bitmaps");
+            // Debug.print("too bad it requires sorting: " # debug_show requires_sorting);
+            // Debug.print("query_plan.subplans.size() : " # debug_show query_plan.subplans.size());
+            // Debug.print("query_plan.scans.size() : " # debug_show query_plan.scans.size());
 
             let bitmap = BitMap.fromIter(filtered_ids);
             bitmaps.add(bitmap);
 
-            Debug.print("created bitmap from full scan bounds");
+            // Debug.print("created bitmap from full scan bounds");
 
             // full_scan_details.clear();
         };
 
         if (iterators.size() == 1) {
-            Debug.print("single iterator");
+            // Debug.print("single iterator");
             return #Ids(iterators.get(0));
         };
 
@@ -1051,8 +990,8 @@ module {
 
             let should_return_as_interval = not requires_additional_sorting_between_intervals(collection, index_name, interval_details.intervals, opt_sort_column);
 
-            Debug.print("should_return_as_interval: " # debug_show should_return_as_interval);
-            Debug.print("intervals: " # debug_show (index.key_details, (intervals)));
+            // Debug.print("should_return_as_interval: " # debug_show should_return_as_interval);
+            // Debug.print("intervals: " # debug_show (index.key_details, (intervals)));
 
             if (should_return_as_interval) {
 
@@ -1141,7 +1080,7 @@ module {
 
             if (iterators.size() == 0) return #Empty;
 
-            Debug.print("Running kmerge on " # debug_show iterators.size() # " iterators");
+            // Debug.print("Running kmerge on " # debug_show iterators.size() # " iterators");
             let merged_iterators = Itertools.kmerge<Nat>(Buffer.toArray(iterators), sort_records_by_field_cmp);
 
             let deduped_iter = deduplicate_record_ids_iter(merged_iterators);

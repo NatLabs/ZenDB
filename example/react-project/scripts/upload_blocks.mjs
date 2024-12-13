@@ -10,24 +10,26 @@ const TXS_DIR = 'icp_blocks';
 await $`rm -rvf ./${TXS_DIR}/*k.plain`;
 const total_batches = fs.readdirSync(`./${TXS_DIR}`).length;
 
-const get_num_stored_batches = async () => {
-    let raw_num_txs = (await $`dfx canister call backend get_db_size`).stdout
+const get_db_size = async () => {
+    let raw_db_size = (
+        await $`dfx canister --playground call backend get_db_size`
+    ).stdout
         .replace('\n', '')
         .replace(' ', '')
         .replace('_', '')
         .slice(1, -1)
         .split(':')[0];
 
-    let num_txs = parseInt(raw_num_txs);
+    let db_size = parseInt(raw_db_size);
 
-    console.log(`num_txs: ${num_txs}`);
+    console.log(`db_size: ${db_size}`);
 
-    if (isNaN(num_txs)) {
-        console.log('num_txs is NaN');
+    if (isNaN(db_size)) {
+        console.log('db_size is NaN');
         exit(1);
     }
 
-    return num_txs / STORED_BATCH_SIZE;
+    return db_size;
 };
 
 let num_stored_batches = start_batch
@@ -43,7 +45,7 @@ const upload_batch = async (batch) => {
     }k.plain`;
 
     // upload decompressed file (same file name without .gz)
-    await $`dfx canister call backend upload_blocks --argument-file ./${TXS_DIR}/${
+    await $`dfx canister --playground call backend upload_blocks --argument-file ./${TXS_DIR}/${
         batch * 10
     }k.plain`;
 

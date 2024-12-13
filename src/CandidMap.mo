@@ -294,8 +294,8 @@ module {
             acc_key_size += key_size;
             acc_value_size += value_size;
 
-            let key_pointer_bytes = ByteUtils.from_nat32(Nat32.fromNat(key_pointer));
-            let value_pointer_bytes = ByteUtils.from_nat32(Nat32.fromNat(value_pointer));
+            let key_pointer_bytes = ByteUtils.from_nat32_be(Nat32.fromNat(key_pointer));
+            let value_pointer_bytes = ByteUtils.from_nat32_be(Nat32.fromNat(value_pointer));
 
             buffer_add_all(pointers, key_pointer_bytes.vals());
             buffer_add_all(pointers, value_pointer_bytes.vals());
@@ -305,7 +305,7 @@ module {
 
         let encoded = Buffer.Buffer<Nat8>(2 + pointers.size() + keys.size() + values.size());
 
-        let num_fields_bytes = ByteUtils.from_nat16(Nat16.fromNat(flattened_records.size()));
+        let num_fields_bytes = ByteUtils.from_nat16_be(Nat16.fromNat(flattened_records.size()));
         buffer_add_all(encoded, num_fields_bytes.vals());
 
         buffer_add_all(encoded, pointers.vals());
@@ -461,7 +461,7 @@ module {
                 (iter, bytes.size() + 1);
             };
             case (#Nat16(i)) {
-                let bytes = ByteUtils.from_nat16(i);
+                let bytes = ByteUtils.from_nat16_be(i);
 
                 let iter = Itertools.prepend(
                     TypeCode.Nat16,
@@ -471,7 +471,7 @@ module {
                 (iter, bytes.size() + 1);
             };
             case (#Nat32(i)) {
-                let bytes = ByteUtils.from_nat32(i);
+                let bytes = ByteUtils.from_nat32_be(i);
 
                 let iter = Itertools.prepend(
                     TypeCode.Nat32,
@@ -481,7 +481,7 @@ module {
                 (iter, bytes.size() + 1);
             };
             case (#Nat64(i)) {
-                let bytes = ByteUtils.from_nat64(i);
+                let bytes = ByteUtils.from_nat64_be(i);
 
                 let iter = Itertools.prepend(
                     TypeCode.Nat64,

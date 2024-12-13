@@ -318,7 +318,7 @@ module {
             // };
 
             case (schema, a, b) {
-                Debug.print(debug_show (a, b));
+                // Debug.print(debug_show (a, b));
                 Debug.trap("cmp_candid: unexpected candid type " # debug_show { schema; a; b });
             };
         };
