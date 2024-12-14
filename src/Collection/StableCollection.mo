@@ -357,12 +357,12 @@ module {
         #ok(record_details.0);
     };
 
-    public func find(
+    public func search(
         collection : StableCollection,
         main_btree_utils : BTreeUtils<Nat, (Blob, [Nat8])>,
         query_builder : QueryBuilder,
     ) : Result<[(ZT.WrapId<ZT.CandidBlob>)], Text> {
-        switch (internal_find(collection, query_builder)) {
+        switch (internal_search(collection, query_builder)) {
             case (#err(err)) return #err(err);
             case (#ok(record_ids_iter)) {
                 let candid_blob_iter = id_to_candid_blob_iter(collection, record_ids_iter);
@@ -419,7 +419,7 @@ module {
 
     };
 
-    public func internal_find(collection : StableCollection, query_builder : QueryBuilder) : Result<Iter<Nat>, Text> {
+    public func internal_search(collection : StableCollection, query_builder : QueryBuilder) : Result<Iter<Nat>, Text> {
         let stable_query = query_builder.build();
         switch (evaluate_query(collection, stable_query)) {
             case (#err(err)) #err(err);
@@ -452,7 +452,7 @@ module {
         main_btree_utils : BTreeUtils<Nat, (Blob, [Nat8])>,
         query_builder : QueryBuilder,
     ) : Result<Iter<ZT.WrapId<ZT.CandidBlob>>, Text> {
-        switch (internal_find(collection, query_builder)) {
+        switch (internal_search(collection, query_builder)) {
             case (#err(err)) return #err(err);
             case (#ok(record_ids_iter)) {
                 let record_iter = id_to_candid_blob_iter(collection, record_ids_iter);
@@ -586,6 +586,42 @@ module {
         };
 
         #ok(count);
+
+    };
+
+    public func exists(collection : StableCollection, query_builder : QueryBuilder) : Result<Bool, Text> {
+        let stable_query = query_builder.Limit(1).build();
+
+        let query_plan = QueryPlan.create_query_plan(
+            collection,
+            stable_query.query_operations,
+            null,
+            null,
+            CandidMap.fromCandid(#Record([])),
+        );
+
+        let sort_records_by_field_cmp = func(_ : Nat, _ : Nat) : Order = #equal;
+
+        let eval = QueryExecution.generate_record_ids_for_query_plan(collection, query_plan, null, sort_records_by_field_cmp);
+
+        let greater_than_0 = switch (eval) {
+            case (#Empty) false;
+            case (#BitMap(bitmap)) bitmap.size() > 0;
+            case (#Ids(iter)) switch (iter.next()) {
+                case (?_) true;
+                case (null) false;
+            };
+            case (#Interval(index_name, _intervals, sorted_in_reverse)) {
+                for (interval in _intervals.vals()) {
+                    if (interval.1 - interval.0 > 0) return #ok(true);
+                };
+
+                false;
+            };
+
+        };
+
+        #ok(greater_than_0);
 
     };
 

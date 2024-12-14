@@ -180,7 +180,7 @@ module {
         type Iter<A> = Iter.Iter<A>;
 
         public func find_iter(query_builder : QueryBuilder) : Result<Iter<T.WrapId<Record>>, Text> {
-            switch (StableCollection.internal_find(collection, query_builder)) {
+            switch (StableCollection.internal_search(collection, query_builder)) {
                 case (#err(err)) return #err(err);
                 case (#ok(record_ids_iter)) {
                     let record_iter = StableCollection.id_to_record_iter(collection, blobify, record_ids_iter);
@@ -189,8 +189,8 @@ module {
             };
         };
 
-        public func find(query_builder : QueryBuilder) : Result<[T.WrapId<Record>], Text> {
-            switch (StableCollection.internal_find(collection, query_builder)) {
+        public func search(query_builder : QueryBuilder) : Result<[T.WrapId<Record>], Text> {
+            switch (StableCollection.internal_search(collection, query_builder)) {
                 case (#err(err)) return #err(err);
                 case (#ok(record_ids_iter)) {
                     let record_iter = StableCollection.id_to_record_iter(collection, blobify, record_ids_iter);
@@ -325,7 +325,7 @@ module {
 
         public func update(query_builder : QueryBuilder, update_fn : (Record) -> Record) : Result<(), Text> {
 
-            let records_iter = switch (StableCollection.internal_find(collection, query_builder)) {
+            let records_iter = switch (StableCollection.internal_search(collection, query_builder)) {
                 case (#err(err)) return #err(err);
                 case (#ok(records_iter)) records_iter;
             };
@@ -350,7 +350,7 @@ module {
         public func delete(query_builder : QueryBuilder) : Result<[Record], Text> {
 
             // let db_query = query_builder.build();
-            let results_iter = switch (StableCollection.internal_find(collection, query_builder)) {
+            let results_iter = switch (StableCollection.internal_search(collection, query_builder)) {
                 case (#err(err)) return #err(err);
                 case (#ok(records_iter)) records_iter;
             };
@@ -365,7 +365,7 @@ module {
             #ok(Buffer.toArray(buffer));
         };
 
-        // public func find()
+        // public func search()
     };
 
 };
