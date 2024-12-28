@@ -26,7 +26,7 @@ module BlockUtils {
         let { parent_hash; timestamp; transaction } = ledger_block;
 
         let block : Block = switch (transaction.operation) {
-            case (? #Approve(approve)) {
+            case (?#Approve(approve)) {
                 {
                     btype = "2approve";
                     phash = parent_hash;
@@ -52,7 +52,7 @@ module BlockUtils {
                 };
             };
 
-            case (? #Burn(burn)) {
+            case (?#Burn(burn)) {
                 switch (burn.spender) {
                     case (?spender) {
                         {
@@ -95,7 +95,7 @@ module BlockUtils {
                     };
                 };
             };
-            case (? #Mint(mint)) {
+            case (?#Mint(mint)) {
                 {
                     btype = "1mint";
                     phash = parent_hash;
@@ -113,7 +113,7 @@ module BlockUtils {
                     };
                 };
             };
-            case (? #Transfer(transfer)) {
+            case (?#Transfer(transfer)) {
                 switch (transfer.spender) {
                     case (?spender) {
                         {
@@ -271,23 +271,20 @@ module BlockUtils {
 
                 let parallel = Buffer.Buffer<async Ledger.Result_4>(batches);
 
-                // for (i in Itertools.range(0, batches)) {
-                //     parallel.add(
-                //         rq.callback({
-                //             start = rq.start + Nat64.fromNat(i * MAX_BATCH_TXS_IN_RESPONSE);
-                //             length = rq.length - Nat64.fromNat(i * MAX_BATCH_TXS_IN_RESPONSE);
-                //         })
-                //     );
-                // };
+                for (i in Itertools.range(0, batches)) {
+                    parallel.add(
+                        rq.callback({
+                            start = rq.start + Nat64.fromNat(i * MAX_BATCH_TXS_IN_RESPONSE);
+                            length = rq.length - Nat64.fromNat(i * MAX_BATCH_TXS_IN_RESPONSE);
+                        })
+                    );
+                };
 
                 for (i in Itertools.range(0, batches)) {
                     assert (Nat64.toNat(rq.start) + (i * MAX_BATCH_TXS_IN_RESPONSE)) == start + buffer.size();
                     Debug.print("retrieving archived blocks batch " # debug_show i);
 
-                    let res = await rq.callback({
-                        start = rq.start + Nat64.fromNat(i * MAX_BATCH_TXS_IN_RESPONSE);
-                        length = rq.length - Nat64.fromNat(i * MAX_BATCH_TXS_IN_RESPONSE);
-                    });
+                    let res = await parallel.get(i);
                     let #Ok({ blocks = queried_blocks }) = res else Debug.trap("failed to retrieve archived blocks: " # debug_show res);
 
                     for ((j, block) in Itertools.enumerate(queried_blocks.vals())) {
