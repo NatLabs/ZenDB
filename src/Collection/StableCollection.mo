@@ -44,7 +44,6 @@ import Query "../Query";
 import Utils "../Utils";
 import CandidMap "../CandidMap";
 import ByteUtils "../ByteUtils";
-import LegacyCandidMap "../LegacyCandidMap";
 
 import Index "Index";
 import Orchid "Orchid";
@@ -106,7 +105,7 @@ module {
 
     public func create_index(
         collection : StableCollection,
-        main_btree_utils : BTreeUtils<Nat, (Blob, [Nat8])>,
+        main_btree_utils : BTreeUtils<Nat, Blob>,
         _index_key_details : [(Text)],
     ) : Result<(), Text> {
 
@@ -147,9 +146,9 @@ module {
 
         let candid_map = CandidMap.fromCandid(#Record([]));
 
-        for ((id, (candid_blob, candid_map_bytes)) in MemoryBTree.entries(collection.main, main_btree_utils)) {
+        for ((id, candid_blob) in MemoryBTree.entries(collection.main, main_btree_utils)) {
             let candid = CollectionUtils.decode_candid_blob(collection, candid_blob);
-            candid_map.reload(candid_map_bytes);
+            candid_map.reload(candid);
 
             let buffer = Buffer.Buffer<(Candid)>(8);
 
@@ -187,7 +186,7 @@ module {
 
     public func delete_index(
         collection : StableCollection,
-        _main_btree_utils : BTreeUtils<Nat, (Blob, [Nat8])>,
+        _main_btree_utils : BTreeUtils<Nat, Blob>,
         index_key_details : [Text],
     ) : Result<(), Text> {
 
@@ -261,13 +260,13 @@ module {
 
     };
 
-    public func insert_with_id(collection : StableCollection, main_btree_utils : BTreeUtils<Nat, (Blob, [Nat8])>, id : Nat, candid_blob : ZT.CandidBlob) : Result<(), Text> {
+    public func insert_with_id(collection : StableCollection, main_btree_utils : BTreeUtils<Nat, Blob>, id : Nat, candid_blob : ZT.CandidBlob) : Result<(), Text> {
         put_with_id(collection, main_btree_utils, id, candid_blob);
     };
 
     public func put_with_id(
         collection : StableCollection,
-        main_btree_utils : BTreeUtils<Nat, (Blob, [Nat8])>,
+        main_btree_utils : BTreeUtils<Nat, Blob>,
         id : Nat,
         candid_blob : ZT.CandidBlob,
     ) : Result<(), Text> {
@@ -283,7 +282,6 @@ module {
         Utils.assert_result(Schema.validate_record(collection.schema, candid));
 
         let candid_map = CandidMap.fromCandid(candid);
-        let main_btree_value = (candid_blob, candid_map.encoded_bytes());
 
         // if this fails, it means the id already exists
         // insert() - should to used to update existing records
@@ -292,12 +290,12 @@ module {
         // the inserted value will be discarded because the call fails
         // meaning the canister state will not be updated
         // at least that's what I think - need to confirm
-        let opt_prev = MemoryBTree.insert<Nat, (Blob, [Nat8])>(collection.main, main_btree_utils, id, main_btree_value);
+        let opt_prev = MemoryBTree.insert(collection.main, main_btree_utils, id, candid_blob);
 
         switch (opt_prev) {
             case (null) {};
             case (?prev) {
-                ignore MemoryBTree.insert<Nat, (Blob, [Nat8])>(collection.main, main_btree_utils, id, prev);
+                ignore MemoryBTree.insert(collection.main, main_btree_utils, id, prev);
                 return #err("Record with id (" # debug_show id # ") already exists");
             };
         };
@@ -333,11 +331,11 @@ module {
         #ok();
     };
 
-    public func insert(collection : StableCollection, main_btree_utils : BTreeUtils<Nat, (Blob, [Nat8])>, candid_blob : ZT.CandidBlob) : Result<Nat, Text> {
+    public func insert(collection : StableCollection, main_btree_utils : BTreeUtils<Nat, Blob>, candid_blob : ZT.CandidBlob) : Result<Nat, Text> {
         put(collection, main_btree_utils, candid_blob);
     };
 
-    public func put(collection : StableCollection, main_btree_utils : BTreeUtils<Nat, (Blob, [Nat8])>, candid_blob : ZT.CandidBlob) : Result<Nat, Text> {
+    public func put(collection : StableCollection, main_btree_utils : BTreeUtils<Nat, Blob>, candid_blob : ZT.CandidBlob) : Result<Nat, Text> {
         let id = Ids.Gen.next(collection.ids);
 
         switch (put_with_id(collection, main_btree_utils, id, candid_blob)) {
@@ -350,16 +348,16 @@ module {
 
     public func get(
         collection : StableCollection,
-        main_btree_utils : BTreeUtils<Nat, (Blob, [Nat8])>,
+        main_btree_utils : BTreeUtils<Nat, Blob>,
         id : Nat,
     ) : Result<ZT.CandidBlob, Text> {
         let ?record_details = MemoryBTree.get(collection.main, main_btree_utils, id) else return #err("Record not found");
-        #ok(record_details.0);
+        #ok(record_details);
     };
 
     public func search(
         collection : StableCollection,
-        main_btree_utils : BTreeUtils<Nat, (Blob, [Nat8])>,
+        main_btree_utils : BTreeUtils<Nat, Blob>,
         query_builder : QueryBuilder,
     ) : Result<[(ZT.WrapId<ZT.CandidBlob>)], Text> {
         switch (internal_search(collection, query_builder)) {
@@ -447,9 +445,9 @@ module {
         );
     };
 
-    public func find_iter(
+    public func search_iter(
         collection : StableCollection,
-        main_btree_utils : BTreeUtils<Nat, (Blob, [Nat8])>,
+        main_btree_utils : BTreeUtils<Nat, Blob>,
         query_builder : QueryBuilder,
     ) : Result<Iter<ZT.WrapId<ZT.CandidBlob>>, Text> {
         switch (internal_search(collection, query_builder)) {
@@ -466,15 +464,15 @@ module {
         sort_field : (Text, ZT.SortDirection),
     ) : (Nat, Nat) -> Order {
 
-        let deserialized_records_map = Map.new<Nat, [Nat8]>();
+        let deserialized_records_map = Map.new<Nat, Candid.Candid>();
 
-        func get_candid_map_bytes(id : Nat) : [Nat8] {
+        func get_candid_map_bytes(id : Nat) : Candid.Candid {
             switch (Map.get(deserialized_records_map, nhash, id)) {
-                case (?candid_map_bytes) candid_map_bytes;
+                case (?candid) candid;
                 case (null) {
-                    let ?candid_map_bytes = CollectionUtils.lookup_candid_map_bytes(collection, id) else Debug.trap("Couldn't find record with id: " # debug_show id);
+                    let ?candid = CollectionUtils.lookup_candid_record(collection, id) else Debug.trap("Couldn't find record with id: " # debug_show id);
                     // ignore Map.put(deserialized_records_map, nhash, id, record);
-                    candid_map_bytes;
+                    candid;
                 };
             };
         };
@@ -625,10 +623,10 @@ module {
 
     };
 
-    public func delete_by_id(collection : StableCollection, main_btree_utils : BTreeUtils<Nat, (Blob, [Nat8])>, id : Nat) : Result<(ZT.CandidBlob), Text> {
+    public func delete_by_id(collection : StableCollection, main_btree_utils : BTreeUtils<Nat, Blob>, id : Nat) : Result<(ZT.CandidBlob), Text> {
 
         let ?prev_record_details = MemoryBTree.remove(collection.main, main_btree_utils, id);
-        let prev_candid = CollectionUtils.decode_candid_blob(collection, prev_record_details.0);
+        let prev_candid = CollectionUtils.decode_candid_blob(collection, prev_record_details);
 
         let #Record(prev_records) = prev_candid else return #err("Couldn't get records");
         // Debug.print("prev_records: " # debug_show prev_records);
@@ -640,7 +638,7 @@ module {
             assert ?id == MemoryBTree.remove<[Candid], RecordId>(index.data, index_data_utils, prev_index_key_values);
         };
 
-        let candid_blob = prev_record_details.0;
+        let candid_blob = prev_record_details;
 
         Ids.Gen.release(collection.ids, id);
 

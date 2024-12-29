@@ -29,9 +29,7 @@ import Int8Cmp "mo:memory-collection/TypeUtils/Int8Cmp";
 import T "../Types";
 import Query "../Query";
 import Utils "../Utils";
-import CandidMap "../CandidMap";
 import ByteUtils "../ByteUtils";
-import LegacyCandidMap "../LegacyCandidMap";
 import C "../Constants";
 
 import Index "Index";

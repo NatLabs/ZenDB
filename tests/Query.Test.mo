@@ -220,7 +220,7 @@ suite(
     func() {
 
            // test(
-        //     "find(): records with available sizes #s or #m",
+        //     "search(): records with available sizes #s or #m",
         //     func() {
         //         let db_query = QueryBuilder().Where("available_sizes", #eq(#Variant([("s", #Null)]))).Or("available_sizes", #eq(#Variant([("m", #Null)])));
         //     },
@@ -230,17 +230,17 @@ suite(
             "Negative Query Test",
             func() {
                 let db_query = QueryBuilder().Where("name", #eq(#Text("item-not-in-store")));
-                let #ok(records) = store_items_collection.find(db_query);
+                let #ok(records) = store_items_collection.search(db_query);
 
                 assert records == [];
             },
         );
 
         test(
-            "find(): Returns error if query fields are not in schema",
+            "search(): Returns error if query fields are not in schema",
             func() {
                 let db_query = QueryBuilder().Where("field-not-in-schema", #eq(#Empty));
-                let result = store_items_collection.find(db_query);
+                let result = store_items_collection.search(db_query);
 
                 switch (result) {
                     case (#err(_)) {};
@@ -250,7 +250,7 @@ suite(
         );
 
         test(
-            "find(): records with price between 100 and 200",
+            "search(): records with price between 100 and 200",
             func() {
                 let db_query = QueryBuilder().Where(
                     "price",
@@ -260,7 +260,7 @@ suite(
                     #lt(#Float(200.0)),
                 );
 
-                let #ok(records) = store_items_collection.find(db_query);
+                let #ok(records) = store_items_collection.search(db_query);
 
                 let test_records = get_test_records(
                     func(i : Nat, item : StoreItem) : Bool {
@@ -278,7 +278,7 @@ suite(
         );
 
         test(
-            "find(): records with months_in_stock between 7 and 12 (inclusive)",
+            "search(): records with months_in_stock between 7 and 12 (inclusive)",
             func() {
                 let db_query = QueryBuilder().Where(
                     "months_in_stock",
@@ -288,7 +288,7 @@ suite(
                     #lte(#Nat(12)),
                 );
 
-                let #ok(records) = store_items_collection.find(db_query);
+                let #ok(records) = store_items_collection.search(db_query);
 
                 let test_records = get_test_records(
                     func(i : Nat, item : StoreItem) : Bool {
@@ -306,7 +306,7 @@ suite(
         );
 
         test(
-            "find(): records match any item in subset",
+            "search(): records match any item in subset",
             func() {
                 let db_query = QueryBuilder().Where(
                     "name",
@@ -317,7 +317,7 @@ suite(
                     ]),
                 );
 
-                let #ok(records) = store_items_collection.find(db_query);
+                let #ok(records) = store_items_collection.search(db_query);
 
                 let test_records = get_test_records(
                     func(i : Nat, item : StoreItem) : Bool {
@@ -334,7 +334,7 @@ suite(
         );
 
         test(
-            "find(): records with address in 'Toronto, Canada'",
+            "search(): records with address in 'Toronto, Canada'",
             func() {
                 let db_query = QueryBuilder().Where(
                     "address.country",
@@ -344,7 +344,7 @@ suite(
                     #eq(#Text("Toronto")),
                 );
 
-                let #ok(records) = store_items_collection.find(db_query);
+                let #ok(records) = store_items_collection.search(db_query);
 
                 let test_records = get_test_records(
                     func(i : Nat, item : StoreItem) : Bool {
@@ -361,14 +361,14 @@ suite(
         );
 
         test (
-            "find(): only records with a phone number (is not null)",
+            "search(): only records with a phone number (is not null)",
             func(){
                 let db_query = QueryBuilder().Where(
                     "contact.phone",
                     #Not(#eq(#Null)),
                 );
 
-                let #ok(records) = store_items_collection.find(db_query);
+                let #ok(records) = store_items_collection.search(db_query);
 
                 TestUtils.validate_records(
                     records, 

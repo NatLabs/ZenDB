@@ -103,19 +103,19 @@ suite(
         Debug.print("Retrieve every user with the name 'nam-do-san'");
         var _query = QueryBuilder()._where("name", #eq(#Text("nam-do-san")));
 
-        var result = ZenDB.find<User>(hydra_db, "users", candify_user, _query);
+        var result = ZenDB.search<User>(hydra_db, "users", candify_user, _query);
         Debug.print(debug_show Iter.toArray(result));
 
         Debug.print("Retrieve every user between the age of 3 and 7");
         _query := QueryBuilder()._where("age", #gte(#Nat(3)))._and("age", #lte(#Nat(7)));
 
-        result := ZenDB.find<User>(hydra_db, "users", candify_user, _query);
+        result := ZenDB.search<User>(hydra_db, "users", candify_user, _query);
         Debug.print(debug_show Iter.toArray(result));
 
         Debug.print("Retrieve every user with the name 'nam-do-san' and age between 3 and 7");
         _query := QueryBuilder()._where("age", #gte(#Nat(3)))._and("age", #lte(#Nat(7)))._and("name", #eq(#Text("nam-do-san")));
 
-        result := ZenDB.find<User>(hydra_db, "users", candify_user, _query);
+        result := ZenDB.search<User>(hydra_db, "users", candify_user, _query);
         Debug.print(debug_show Iter.toArray(result));
 
         Debug.print("Retrieve users between the age 0 and 2 named 'nam-do-san' or between the age 8 and 10 named 'claude'");
@@ -124,14 +124,14 @@ suite(
 
         _query := QueryBuilder()._where("age", #gte(#Nat(8)))._and("age", #lte(#Nat(10)))._and("name", #eq(#Text("claude")))._or_query(q1);
 
-        let res = ZenDB.find<User2>(hydra_db, "users", candify_user2, _query);
+        let res = ZenDB.search<User2>(hydra_db, "users", candify_user2, _query);
         // let array = Iter.toArray(res);
         Debug.print(debug_show res);
 
         Debug.print("Retrieve every user with an age of 0 or 10");
         _query := QueryBuilder()._where("age", #eq(#Nat(0)))._or("age", #eq(#Nat(10)));
 
-        result := ZenDB.find<User>(hydra_db, "users", candify_user, _query);
+        result := ZenDB.search<User>(hydra_db, "users", candify_user, _query);
         Debug.print(debug_show Iter.toArray(result));
 
         Debug.print("Update age of users named 'nam-do-san' to 0");
@@ -142,7 +142,7 @@ suite(
         Debug.print("Retrieve every user with an age of 0 or 10");
         _query := QueryBuilder()._where("age", #eq(#Nat(0)))._or("age", #eq(#Nat(10)));
 
-        result := ZenDB.find<User>(hydra_db, "users", candify_user, _query);
+        result := ZenDB.search<User>(hydra_db, "users", candify_user, _query);
         Debug.print(debug_show Iter.toArray(result));
 
         Debug.print("Delete every user with an age of 0");
@@ -158,7 +158,7 @@ suite(
         Debug.print("Retrieve every user with an age of 0");
         _query := QueryBuilder()._where("age", #eq(#Nat(0)));
 
-        result := ZenDB.find<User>(hydra_db, "users", candify_user, _query);
+        result := ZenDB.search<User>(hydra_db, "users", candify_user, _query);
         Debug.print(debug_show Iter.toArray(result));
 
     },
