@@ -38,6 +38,13 @@ module {
         Float.log(n) / Float.log(2);
     };
 
+    public func text_strip_start(text : Text, prefix : Text) : Text {
+        switch (Text.stripStart(text, #text(prefix))) {
+            case (?stripped) stripped;
+            case (null) text;
+        };
+    };
+
     public func buffer_concat_freeze<A>(buffers : [Buffer.Buffer<A>]) : [A] {
         var i = 0;
         var total_size = 0;
