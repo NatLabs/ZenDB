@@ -248,7 +248,7 @@ actor class Backend() {
         let instructions = IC.countInstructions(
             func() {
 
-                let query_res = txs.find(db_query);
+                let query_res = txs.search(db_query);
 
                 let #ok(matching_txs) = query_res else Debug.trap("get_txs failed: " # debug_show query_res);
                 Debug.print("successfully got matching txs: " # debug_show options);
@@ -287,7 +287,7 @@ actor class Backend() {
 
         let blocks_buffer = Buffer.Buffer<(Nat, Block)>(8);
 
-        let #ok(matching_txs) = txs.find(db_query);
+        let #ok(matching_txs) = txs.search(db_query);
 
         let total = if (options.count) {
             let #ok(total) = txs.count(db_query) else Debug.trap("txs.count failed");
@@ -358,7 +358,7 @@ actor class Backend() {
     public query func get_txs_from_tx_index_range(start : Nat, length : Nat) : async [Block] {
         let Query = ZenDB.QueryBuilder().Where("tx_index", #gte(#Nat(start))).And("tx_index", #lt(#Nat(start + length)));
 
-        let query_res = txs.find(Query);
+        let query_res = txs.search(Query);
         let #ok(matching_txs) = query_res else Debug.trap("get_txs_from_tx_index_range failed: " # debug_show query_res);
         let blocks = Array.map<(Nat, Block), Block>(
             matching_txs,

@@ -40,22 +40,21 @@ jobs:
 
       - name: Install dfx cache
         run: dfx cache install
-        
+
       - name: Install mops & mocv
         run: |
           npm --yes -g i ic-mops
           mops i
           mops toolchain init
-          mops toolchain use moc 0.10.4
 
           # set moc path for dfx to use
           echo "DFX_MOC_PATH=$(mops toolchain bin moc)" >> $GITHUB_ENV
-      
+
       - name: Benchmarks
         id: benchmarks
         run: |
-          mops bench  --gc incremental 2>&1 | tee benchmark_results.txt
-          
+          mops bench  --gc incremental --replica dfx 2>&1 | tee benchmark_results.txt
+
           # Process the output to remove everything up to the last occurrence of \033[2K
           awk '/\x1b\[2K/ { buffer = "" } { buffer = buffer $0 "\n" } END { print buffer }' benchmark_results.txt > intermediate_results.txt
           sed 's/\x1b\[[0-9;]*[a-zA-Z]//g' intermediate_results.txt > processed_results.txt

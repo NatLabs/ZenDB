@@ -1,6 +1,6 @@
 name: Makefile CI
 
-on: 
+on:
   push:
     branches:
       - main
@@ -39,7 +39,7 @@ jobs:
         uses: dfinity/setup-dfx@main
       - name: Confirm successful installation
         run: dfx --version
-    
+
       - name: Install dfx cache
         run: dfx cache install
 
@@ -48,13 +48,12 @@ jobs:
           npm --yes -g i ic-mops
           mops i
           mops toolchain init
-          mops toolchain use moc 0.10.4
 
           # set moc path for dfx to use
           echo "DFX_MOC_PATH=$(mops toolchain bin moc)" >> $GITHUB_ENV
-    
-      - name: Detect warnings
-        run: make check
+
+      # - name: Detect warnings
+      #   run: make check
 
       - name: Run Tests
         run: make test

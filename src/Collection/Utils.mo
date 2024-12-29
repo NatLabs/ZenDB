@@ -42,7 +42,6 @@ import Query "../Query";
 import Utils "../Utils";
 import CandidMap "../CandidMap";
 import ByteUtils "../ByteUtils";
-import LegacyCandidMap "../LegacyCandidMap";
 
 import Orchid "Orchid";
 import Schema "Schema";
@@ -94,23 +93,8 @@ module CollectionUtils {
         Orchid.Orchid;
     };
 
-    public func get_main_btree_utils() : BTreeUtils<Nat, (Blob, [Nat8])> {
-
-        let value_blobify : TypeUtils.Blobify<(Blob, [Nat8])> = {
-            to_blob = func((to_candid_blob, candid_map_bytes) : (Blob, [Nat8])) : Blob {
-                to_candid (to_candid_blob, candid_map_bytes);
-            };
-
-            from_blob = func(blob : Blob) : (Blob, [Nat8]) {
-                switch (from_candid (blob) : ?(Blob, [Nat8])) {
-                    case (?res) res;
-                    case (null) Debug.trap("get_main_btree_utils: from_blob failed");
-                };
-            };
-
-        };
-
-        MemoryBTree.createUtils<Nat, (Blob, [Nat8])>(Utils.typeutils_nat_as_nat64, { blobify = value_blobify });
+    public func get_main_btree_utils() : BTreeUtils<Nat, Blob> {
+        MemoryBTree.createUtils<Nat, Blob>(Utils.typeutils_nat_as_nat64, TypeUtils.Blob);
     };
 
     public func get_index_columns(collection : StableCollection, index_key_details : [(Text, SortDirection)], id : Nat, records : [(Text, Candid)]) : [Candid] {
@@ -159,13 +143,13 @@ module CollectionUtils {
     public func lookup_record<Record>(collection : T.StableCollection, blobify : T.Candify<Record>, id : Nat) : Record {
 
         let ?record_details = MemoryBTree.get(collection.main, get_main_btree_utils(), id);
-        let record = blobify.from_blob(record_details.0);
+        let record = blobify.from_blob(record_details);
         record;
     };
 
     public func lookup_candid_blob(collection : StableCollection, id : Nat) : Blob {
         let ?record_details = MemoryBTree.get(collection.main, get_main_btree_utils(), id);
-        record_details.0;
+        record_details;
     };
 
     public func decode_candid_blob(collection : StableCollection, candid_blob : Blob) : Candid.Candid {
@@ -177,21 +161,21 @@ module CollectionUtils {
 
     public func lookup_candid_record(collection : StableCollection, id : Nat) : ?Candid.Candid {
         let ?record_details = MemoryBTree.get(collection.main, get_main_btree_utils(), id);
-        let candid = decode_candid_blob(collection, record_details.0);
+        let candid = decode_candid_blob(collection, record_details);
 
         ?candid;
     };
 
-    public func lookup_candid_map_bytes(collection : StableCollection, id : Nat) : ?[Nat8] {
-        let ?record_details = MemoryBTree.get(collection.main, get_main_btree_utils(), id) else return null;
-        let bytes = record_details.1;
+    // public func lookup_candid_map_bytes(collection : StableCollection, id : Nat) : ?[Nat8] {
+    //     let ?record_details = MemoryBTree.get(collection.main, get_main_btree_utils(), id) else return null;
+    //     let bytes = record_details.1;
 
-        ?bytes;
-    };
+    //     ?bytes;
+    // };
 
-    public func candid_map_filter_condition(collection : StableCollection, candid_map_bytes : [Nat8], lower : [(Text, ?T.State<Candid>)], upper : [(Text, ?T.State<Candid>)]) : Bool {
+    public func candid_map_filter_condition(collection : StableCollection, candid_record : Candid.Candid, lower : [(Text, ?T.State<Candid>)], upper : [(Text, ?T.State<Candid>)]) : Bool {
 
-        let candid_map = CandidMap.CandidMap(candid_map_bytes);
+        let candid_map = CandidMap.CandidMap(candid_record);
 
         for (((key, opt_lower_val), (upper_key, opt_upper_val)) in Itertools.zip(lower.vals(), upper.vals())) {
             assert key == upper_key;
@@ -280,12 +264,12 @@ module CollectionUtils {
         Iter.filter<Nat>(
             records,
             func(id : Nat) : Bool {
-                let ?candid_map_bytes = CollectionUtils.lookup_candid_map_bytes(collection, id) else Debug.trap("multi_filter: candid_map_bytes not found");
+                let ?candid = CollectionUtils.lookup_candid_record(collection, id) else Debug.trap("multi_filter: candid_map_bytes not found");
 
                 var result = true;
 
                 for ((lower, upper) in bounds.vals()) {
-                    result := result and candid_map_filter_condition(collection, candid_map_bytes, lower, upper);
+                    result := result and candid_map_filter_condition(collection, candid, lower, upper);
                 };
 
                 result;
@@ -311,7 +295,7 @@ module CollectionUtils {
             candid_record := found_field.1;
 
             // return #Null if the nested field was terminated early
-            if (candid_record == #Null) return ? #Null;
+            if (candid_record == #Null) return ?#Null;
         };
 
         return ?candid_record;

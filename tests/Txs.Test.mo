@@ -393,7 +393,7 @@ func options_to_query(options : Options) : ZenDB.QueryBuilder {
 func get_txs(options : Options) : [(Nat, Tx)] {
     let Query = options_to_query(options);
 
-    let query_res = txs.find(Query);
+    let query_res = txs.search(Query);
     let #ok(matching_txs) = query_res else Debug.trap("get_txs failed: " # debug_show query_res);
 
     matching_txs;
@@ -402,7 +402,7 @@ func get_txs(options : Options) : [(Nat, Tx)] {
 
 func get_txs_from_query(db_query : ZenDB.QueryBuilder) : [(Nat, Tx)] {
 
-    let query_res = txs.find(db_query);
+    let query_res = txs.search(db_query);
     let #ok(matching_txs) = query_res else Debug.trap("get_txs failed: " # debug_show query_res);
 
     matching_txs;
@@ -412,7 +412,7 @@ func get_txs_from_query(db_query : ZenDB.QueryBuilder) : [(Nat, Tx)] {
 func skip_limit_paginated_query(db_query : ZenDB.QueryBuilder, pagination_limit : Nat) : [(Nat, Tx)] {
 
     ignore db_query.Limit(pagination_limit);
-    let #ok(matching_txs) = txs.find(db_query);
+    let #ok(matching_txs) = txs.search(db_query);
     let bitmap = BitMap.fromIter(Iter.map<(Nat, Tx), Nat>(matching_txs.vals(), func((id, _) : (Nat, Tx)) : Nat = id));
     let records = Buffer.fromArray<(Nat, Tx)>(matching_txs);
     var batch_size = records.size();
@@ -420,7 +420,7 @@ func skip_limit_paginated_query(db_query : ZenDB.QueryBuilder, pagination_limit 
     label skip_limit_pagination while (batch_size > 0) {
         ignore db_query.Skip(records.size()).Limit(pagination_limit);
 
-        let #ok(matching_txs) = txs.find(db_query);
+        let #ok(matching_txs) = txs.search(db_query);
         // Debug.print("matching_txs: " # debug_show matching_txs);
 
         assert matching_txs.size() <= pagination_limit;
@@ -447,7 +447,7 @@ func skip_limit_paginated_query(db_query : ZenDB.QueryBuilder, pagination_limit 
 func cursor_paginated_query(db_query : ZenDB.QueryBuilder, pagination_limit : Nat) : [(Nat, Tx)] {
 
     ignore db_query.Limit(pagination_limit);
-    let #ok(matching_txs) = txs.find(db_query);
+    let #ok(matching_txs) = txs.search(db_query);
     // Debug.print("matching_txs: " # debug_show matching_txs);
     let records = Buffer.fromArray<(Nat, Tx)>(matching_txs);
     let bitmap = BitMap.fromIter(Iter.map<(Nat, Tx), Nat>(matching_txs.vals(), func((id, _) : (Nat, Tx)) : Nat = id));
@@ -470,7 +470,7 @@ func cursor_paginated_query(db_query : ZenDB.QueryBuilder, pagination_limit : Na
 
         ignore db_query.Cursor(opt_cursor, #Forward).Limit(pagination_limit);
 
-        let #ok(matching_txs) = txs.find(db_query);
+        let #ok(matching_txs) = txs.search(db_query);
         Debug.print("matching_txs: " # debug_show matching_txs);
 
         assert matching_txs.size() <= pagination_limit;

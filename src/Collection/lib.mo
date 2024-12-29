@@ -44,7 +44,6 @@ import Query "../Query";
 import Utils "../Utils";
 import CandidMap "../CandidMap";
 import ByteUtils "../ByteUtils";
-import LegacyCandidMap "../LegacyCandidMap";
 import C "../Constants";
 
 import Index "Index";
@@ -97,14 +96,14 @@ module {
         public func name() : Text = collection_name;
         public func size() : Nat = MemoryBTree.size(collection.main);
 
-        let main_btree_utils : MemoryBTree.BTreeUtils<Nat, (Blob, [Nat8])> = CollectionUtils.get_main_btree_utils();
+        let main_btree_utils : MemoryBTree.BTreeUtils<Nat, Blob> = CollectionUtils.get_main_btree_utils();
 
         public func filter_iter(condition : (Record) -> Bool) : Iter<Record> {
 
             let iter = MemoryBTree.vals(collection.main, main_btree_utils);
-            let records = Iter.map<(Blob, [Nat8]), Record>(
+            let records = Iter.map<Blob, Record>(
                 iter,
-                func((candid_blob, _) : (Blob, [Nat8])) {
+                func(candid_blob : Blob) {
                     blobify.from_blob(candid_blob);
                 },
             );
@@ -179,8 +178,8 @@ module {
 
         type Iter<A> = Iter.Iter<A>;
 
-        public func find_iter(query_builder : QueryBuilder) : Result<Iter<T.WrapId<Record>>, Text> {
-            switch (StableCollection.internal_find(collection, query_builder)) {
+        public func search_iter(query_builder : QueryBuilder) : Result<Iter<T.WrapId<Record>>, Text> {
+            switch (StableCollection.internal_search(collection, query_builder)) {
                 case (#err(err)) return #err(err);
                 case (#ok(record_ids_iter)) {
                     let record_iter = StableCollection.id_to_record_iter(collection, blobify, record_ids_iter);
@@ -189,8 +188,8 @@ module {
             };
         };
 
-        public func find(query_builder : QueryBuilder) : Result<[T.WrapId<Record>], Text> {
-            switch (StableCollection.internal_find(collection, query_builder)) {
+        public func search(query_builder : QueryBuilder) : Result<[T.WrapId<Record>], Text> {
+            switch (StableCollection.internal_search(collection, query_builder)) {
                 case (#err(err)) return #err(err);
                 case (#ok(record_ids_iter)) {
                     let record_iter = StableCollection.id_to_record_iter(collection, blobify, record_ids_iter);
@@ -228,7 +227,7 @@ module {
         // };
 
         // public func async_find(query_builder : QueryBuilder, buffer : Buffer<T.WrapId<Record>>) : async* Result<(), Text> {
-        //     switch (find_iter(query_builder)) {
+        //     switch (search_iter(query_builder)) {
         //         case (#err(err)) #err(err);
         //         case (#ok(records)) {
         //             for (record in records) {
@@ -289,7 +288,7 @@ module {
         public func updateById(id : Nat, update_fn : (Record) -> Record) : Result<(), Text> {
 
             let ?prev_record_details = MemoryBTree.lookupVal(collection.main, main_btree_utils, id);
-            let prev_record = blobify.from_blob(prev_record_details.0);
+            let prev_record = blobify.from_blob(prev_record_details);
             // let prev_record = CollectionUtils.lookup_record<Record>(collection, blobify, id);
 
             let new_record = update_fn(prev_record);
@@ -298,13 +297,13 @@ module {
             let new_candid = CollectionUtils.decode_candid_blob(collection, new_candid_blob);
 
             let candid_map = CandidMap.fromCandid(new_candid);
-            let record_details = (new_candid_blob, candid_map.encoded_bytes());
+            let record_details = new_candid_blob;
 
             // not needed since it uses the same record type
             Utils.assert_result(Schema.validate_record(collection.schema, new_candid));
 
             assert ?prev_record_details == MemoryBTree.insert(collection.main, main_btree_utils, id, record_details);
-            let prev_candid = CollectionUtils.decode_candid_blob(collection, prev_record_details.0);
+            let prev_candid = CollectionUtils.decode_candid_blob(collection, prev_record_details);
 
             let #Record(prev_records) = prev_candid else return #err("Couldn't get records");
             let #Record(new_records) = new_candid else return #err("Couldn't get records");
@@ -325,7 +324,7 @@ module {
 
         public func update(query_builder : QueryBuilder, update_fn : (Record) -> Record) : Result<(), Text> {
 
-            let records_iter = switch (StableCollection.internal_find(collection, query_builder)) {
+            let records_iter = switch (StableCollection.internal_search(collection, query_builder)) {
                 case (#err(err)) return #err(err);
                 case (#ok(records_iter)) records_iter;
             };
@@ -350,7 +349,7 @@ module {
         public func delete(query_builder : QueryBuilder) : Result<[Record], Text> {
 
             // let db_query = query_builder.build();
-            let results_iter = switch (StableCollection.internal_find(collection, query_builder)) {
+            let results_iter = switch (StableCollection.internal_search(collection, query_builder)) {
                 case (#err(err)) return #err(err);
                 case (#ok(records_iter)) records_iter;
             };
@@ -365,7 +364,7 @@ module {
             #ok(Buffer.toArray(buffer));
         };
 
-        // public func find()
+        // public func search()
     };
 
 };

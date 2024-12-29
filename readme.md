@@ -1,9 +1,8 @@
 ## ZenDB
 
-
 > Very much still in development, Highly volatile API
 
-A single canister document database inspired by mongodb and implemented in motoko.
+A single canister, document database that natively supports candid encoding, inspired by MongoDB, for Motoko developers. Leverages multi-field indexes for performant query execution, scaling up to the Internet Computer's 500GB canister limit.
 
 ### Getting started
 
@@ -108,8 +107,8 @@ Supported operators: #eq(val), #gte(val), #lte(val), #gt(val), #lt(val), #in([va
 
 func get_usernames_with_balance_between(min: Nat, max: Nat) : [Text] {
   let users_query = ZenDB.QueryBuilder()
-                      .Where("account.balance", #gte(#Nat(min)))
-                      .Where("account.balance", #lte(#Nat(max)));
+    .Where("account.balance", #gte(#Nat(min)))
+    .Where("account.balance", #lte(#Nat(max)));
 
   let #ok(results) = users.find(users_query);
 
@@ -124,9 +123,9 @@ func get_usernames_with_balance_between(min: Nat, max: Nat) : [Text] {
 
 func get_most_recent_users_for_currency(currency: Text, limit: Nat) : [User] {
   let users_query = ZenDB.QueryBuilder()
-                      .Where("account.currency", #eq(currency))
-                      .Sort("created_at", #Descending)
-                      .Limit(limit);
+    .Where("account.currency", #eq(currency))
+    .Sort("created_at", #Descending)
+    .Limit(limit);
 
   let #ok(results) = users.find(users_query);
 
@@ -141,7 +140,6 @@ func get_most_recent_users_for_currency(currency: Text, limit: Nat) : [User] {
 - [x] Candid serialization for all types
 - [ ] Query Caching
 - [ ] Indexes
-  - [x] Single field index
   - [x] Multiple field index (Compound Index)
   - [ ] Multi-key array index
 - [ ] Zen Query Language

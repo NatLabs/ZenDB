@@ -159,6 +159,8 @@ module {
         Database.Database(sstore);
     };
 
+    public type Database = Database.Database;
+
     public let QueryBuilder = Query.QueryBuilder;
     public type QueryBuilder = Query.QueryBuilder;
 
