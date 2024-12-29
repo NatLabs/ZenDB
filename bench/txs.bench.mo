@@ -246,7 +246,7 @@ module {
                     #eq(#Text("1mint")),
                 );
 
-                let #ok(matching_txs) = txs.find(db_query);
+                let #ok(matching_txs) = txs.search(db_query);
             };
 
             case ("btype == '1xfer' or '2xfer'") {
@@ -255,7 +255,7 @@ module {
                     #In([#Text("1xfer"), #Text("2xfer")]),
                 );
 
-                let #ok(matching_txs) = txs.find(db_query);
+                let #ok(matching_txs) = txs.search(db_query);
             };
 
             case ("principals[0] == tx.to.owner (is recipient)") {
@@ -264,7 +264,7 @@ module {
                     #eq(#Principal(principals.get(0))),
                 );
 
-                let #ok(matching_txs) = txs.find(db_query);
+                let #ok(matching_txs) = txs.search(db_query);
             };
 
             case ("principals[0..10] == tx.to.owner (is recipient)") {
@@ -274,7 +274,7 @@ module {
                     #In(candid_principals),
                 );
 
-                let #ok(matching_txs) = txs.find(db_query);
+                let #ok(matching_txs) = txs.search(db_query);
             };
 
             case ("all txs involving principals[0]") {
@@ -289,7 +289,7 @@ module {
                     #eq(#Principal(principals.get(0))),
                 );
 
-                let #ok(matching_txs) = txs.find(db_query);
+                let #ok(matching_txs) = txs.search(db_query);
             };
 
             case ("all txs involving principals[0..10]") {
@@ -309,7 +309,7 @@ module {
                     #In(candid_principals),
                 );
 
-                let #ok(matching_txs) = txs.find(db_query);
+                let #ok(matching_txs) = txs.search(db_query);
             };
 
             case ("250 < tx.amt <= 400") {
@@ -321,7 +321,7 @@ module {
                     #lte(#Nat(400)),
                 );
 
-                let #ok(matching_txs) = txs.find(db_query);
+                let #ok(matching_txs) = txs.search(db_query);
             };
 
             case ("btype == 1burn and tx.amt >= 750") {
@@ -333,7 +333,7 @@ module {
                     #eq(#Text("1burn")),
                 );
 
-                let #ok(matching_txs) = txs.find(db_query);
+                let #ok(matching_txs) = txs.search(db_query);
             };
 
             case (_) {
@@ -364,7 +364,7 @@ module {
                     #eq(#Text("1mint")),
                 );
 
-                let #ok(matching_txs) = txs.find(db_query);
+                let #ok(matching_txs) = txs.search(db_query);
             };
 
             case ("btype == '1xfer' or '2xfer'") {
@@ -373,7 +373,7 @@ module {
                     #In([#Text("1xfer"), #Text("2xfer")]),
                 );
 
-                let #ok(matching_txs) = txs.find(db_query);
+                let #ok(matching_txs) = txs.search(db_query);
             };
 
             case ("principals[0] == tx.to.owner (is recipient)") {
@@ -382,7 +382,7 @@ module {
                     #eq(#Principal(principals.get(0))),
                 );
 
-                let #ok(matching_txs) = txs.find(db_query);
+                let #ok(matching_txs) = txs.search(db_query);
             };
 
             case ("principals[0..10] == tx.to.owner (is recipient)") {
@@ -396,7 +396,7 @@ module {
                     #In(candid_principals),
                 );
 
-                let #ok(matching_txs) = txs.find(db_query);
+                let #ok(matching_txs) = txs.search(db_query);
             };
 
             case ("all txs involving principals[0]") {
@@ -411,7 +411,7 @@ module {
                     #eq(#Principal(principals.get(0))),
                 );
 
-                let #ok(matching_txs) = txs.find(db_query);
+                let #ok(matching_txs) = txs.search(db_query);
             };
 
             case ("all txs involving principals[0..10]") {
@@ -431,7 +431,7 @@ module {
                     #In(candid_principals),
                 );
 
-                let #ok(matching_txs) = txs.find(db_query);
+                let #ok(matching_txs) = txs.search(db_query);
             };
 
             case ("250 < tx.amt <= 400") {
@@ -443,7 +443,7 @@ module {
                     #lte(#Nat(400)),
                 );
 
-                let #ok(matching_txs) = txs.find(db_query);
+                let #ok(matching_txs) = txs.search(db_query);
             };
 
             case ("btype == 1burn and tx.amt >= 750") {
@@ -455,7 +455,7 @@ module {
                     #gte(#Nat(750)),
                 );
 
-                let #ok(matching_txs) = txs.find(db_query);
+                let #ok(matching_txs) = txs.search(db_query);
             };
 
             case (_) {
@@ -627,7 +627,7 @@ module {
 
         func skip_limit_paginated_query(db_query : ZenDB.QueryBuilder)  {
             ignore db_query.Limit(pagination_limit);
-            let #ok(matching_txs) = txs.find(db_query);
+            let #ok(matching_txs) = txs.search(db_query);
             var records = matching_txs;
             var skip = 0;
             var opt_cursor : ?Nat = null;
@@ -637,7 +637,7 @@ module {
                     .Skip(skip)
                     .Limit(pagination_limit);
 
-                let #ok(matching_txs) = txs.find(db_query);
+                let #ok(matching_txs) = txs.search(db_query);
 
                 records := matching_txs;
 
@@ -649,7 +649,7 @@ module {
         func skip_limit_skip_limit_paginated_query(db_query : ZenDB.QueryBuilder, pagination_limit : Nat) : [(Nat, Tx)] {
 
             ignore db_query.Limit(pagination_limit);
-            let #ok(matching_txs) = txs.find(db_query);
+            let #ok(matching_txs) = txs.search(db_query);
             let bitmap = BitMap.fromIter(Iter.map<(Nat, Tx), Nat>(matching_txs.vals(), func((id, _) : (Nat, Tx)) : Nat = id));
             let records = Buffer.fromArray<(Nat, Tx)>(matching_txs);
             var batch_size = records.size();
@@ -657,7 +657,7 @@ module {
             label skip_limit_pagination while (batch_size > 0) {
                 ignore db_query.Skip(records.size()).Limit(pagination_limit);
 
-                let #ok(matching_txs) = txs.find(db_query);
+                let #ok(matching_txs) = txs.search(db_query);
                 // Debug.print("matching_txs: " # debug_show matching_txs);
 
                 assert matching_txs.size() <= pagination_limit;

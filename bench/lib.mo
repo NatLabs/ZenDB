@@ -37,10 +37,10 @@ module {
             "updateById() 4",
             "get()",
             "scan(): all records",
-            "find(): users named 'nam-do-dan'",
-            "find(): users between the age of 20 and 35",
-            "find(): users between the age of 20 and 35 and named 'nam-do-dan'",
-            "find(): users between the age of 20 and 35 and named 'nam-do-dan' v2",
+            "search(): users named 'nam-do-dan'",
+            "search(): users between the age of 20 and 35",
+            "search(): users between the age of 20 and 35 and named 'nam-do-dan'",
+            "search(): users between the age of 20 and 35 and named 'nam-do-dan' v2",
         ]);
 
         type Candid = Candid.Candid;
@@ -235,28 +235,28 @@ module {
                     Debug.print("results: " # debug_show (Iter.toArray(result)));
                 };
 
-                case ("ZenDB", "find(): users named 'nam-do-dan'") {
+                case ("ZenDB", "search(): users named 'nam-do-dan'") {
                     let _query = QueryBuilder()._where("name", #eq(#Text("nam-do-san")));
-                    let result = ZenDB.find<StoreItem>(hydra_db, "store_items", candify_store_item, _query);
+                    let result = ZenDB.search<StoreItem>(hydra_db, "store_items", candify_store_item, _query);
                     Debug.print("results: " # debug_show (Iter.toArray(result)));
                 };
-                case ("ZenDB", "find(): users between the age of 20 and 35") {
+                case ("ZenDB", "search(): users between the age of 20 and 35") {
                     let _query = QueryBuilder()._where("age", #gte(#Nat(20)))._and("age", #lte(#Nat(35)));
 
-                    let result = ZenDB.find<StoreItem>(hydra_db, "store_items", candify_store_item, _query);
+                    let result = ZenDB.search<StoreItem>(hydra_db, "store_items", candify_store_item, _query);
                     Debug.print("results: " # debug_show (Iter.toArray(result)));
                 };
-                case ("ZenDB", "find(): users between the age of 20 and 35 and named 'nam-do-dan'") {
+                case ("ZenDB", "search(): users between the age of 20 and 35 and named 'nam-do-dan'") {
                     let _query = QueryBuilder()._where("name", #eq(#Text("nam-do-san")))._and("age", #gte(#Nat(20)))._and("age", #lte(#Nat(35)));
 
-                    let result = ZenDB.find<StoreItem>(hydra_db, "store_items", candify_store_item, _query);
+                    let result = ZenDB.search<StoreItem>(hydra_db, "store_items", candify_store_item, _query);
                     Debug.print("results: " # debug_show (Iter.toArray(result)));
                 };
 
-                case ("ZenDB", "find(): users between the age of 20 and 35 and named 'nam-do-dan' v2") {
+                case ("ZenDB", "search(): users between the age of 20 and 35 and named 'nam-do-dan' v2") {
                     let _query = QueryBuilder()._where("email", #eq(#Text("email")))._where("age", #gte(#Nat(20)))._and("age", #lte(#Nat(35)))._and("name", #eq(#Text("nam-do-san")));
 
-                    let result = ZenDB.find<StoreItem>(hydra_db, "store_items", candify_store_item, _query);
+                    let result = ZenDB.search<StoreItem>(hydra_db, "store_items", candify_store_item, _query);
                     Debug.print("results: " # debug_show (Iter.toArray(result)));
                 };
 

@@ -53,7 +53,7 @@ jobs:
       - name: Benchmarks
         id: benchmarks
         run: |
-          mops bench  --gc incremental 2>&1 | tee benchmark_results.txt
+          mops bench  --gc incremental --replica dfx 2>&1 | tee benchmark_results.txt
 
           # Process the output to remove everything up to the last occurrence of \033[2K
           awk '/\x1b\[2K/ { buffer = "" } { buffer = buffer $0 "\n" } END { print buffer }' benchmark_results.txt > intermediate_results.txt
