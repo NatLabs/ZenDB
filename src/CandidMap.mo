@@ -13,6 +13,7 @@ import Map "mo:map/Map";
 import Set "mo:map/Set";
 import Candid "mo:serde/Candid";
 import { TypeCode } "mo:serde/Candid/Types";
+import Variant "mo:serde/Candid/Text/Parser/Variant";
 import Itertools "mo:itertools/Iter";
 
 import T "Types";
@@ -71,7 +72,7 @@ module {
             };
 
             let num_fields = Nat16.toNat(read_nat_16(0));
-            // Debug.print("num_fields: " # debug_show num_fields);
+            Debug.print("num_fields: " # debug_show num_fields);
 
             if (num_fields == 0) return null;
 
@@ -136,16 +137,16 @@ module {
                 let mid = (l + r) / 2;
                 // Debug.print("mid: " # debug_show mid);
 
-                // Debug.print(
-                //     "comparing (key, search_key): " # debug_show (
-                //         Text.decodeUtf8(
-                //             Blob.fromArray(Iter.toArray(read_key_iter(mid)))
-                //         ),
-                //         Text.decodeUtf8(
-                //             Blob.fromArray(Iter.toArray(search_key_bytes.vals()))
-                //         ),
-                //     )
-                // );
+                Debug.print(
+                    "comparing (key, search_key): " # debug_show (
+                        Text.decodeUtf8(
+                            Blob.fromArray(Iter.toArray(read_key_iter(mid)))
+                        ),
+                        Text.decodeUtf8(
+                            Blob.fromArray(Iter.toArray(search_key_bytes.vals()))
+                        ),
+                    )
+                );
 
                 let cmp = lexicographical_comparison(read_key_iter(mid), search_key_bytes.vals());
                 // Debug.print("cmp: " # debug_show cmp);
@@ -177,7 +178,7 @@ module {
                 };
             };
 
-            // Debug.print("could not find key: " # debug_show key);
+            Debug.print("could not find key: " # debug_show key);
 
             null;
         };
@@ -191,7 +192,7 @@ module {
     public func fromCandid(candid : Candid.Candid) : CandidMap {
         // Debug.print("fromCandid: " # debug_show candid);
         let flattened_records = flatten_nested_records(candid);
-        // Debug.print("flatten_nested_records: " # debug_show Buffer.toArray(flattened_records));
+        Debug.print("flatten_nested_records: " # debug_show Buffer.toArray(flattened_records));
         let candid_map_bytes = encode_flattened_records(flattened_records);
         CandidMap(candid_map_bytes);
     };
@@ -211,11 +212,11 @@ module {
                 let field_path = if (prefix == "") field else prefix # "." # field;
 
                 switch (value) {
-                    case (#Record(records) or #Map(records)) {
+                    case (#Record(records) or #Map(records) or #Option(#Record(records)) or #Option(#Map(records))) {
                         flatten(flattened_records, field_path, records);
                     };
-                    case (#Option(#Record(records)) or #Option(#Map(records))) {
-                        flatten(flattened_records, field_path, records);
+                    case (#Variant(record) or #Option(#Variant(record))) {
+                        flatten(flattened_records, field_path, [record]);
                     };
                     case (_) {
                         flattened_records.add(field_path, value);
@@ -368,6 +369,10 @@ module {
         } else if (type_code == TypeCode.Option) {
             let nested_candid = decode_candid_value(value_iter);
             #Option(nested_candid);
+        } else if (type_code == TypeCode.Variant) {
+            // return variant key as #Text
+            decode_candid_value(value_iter);
+
         } else {
             Debug.trap("CandidMap: Unsupported type code");
         };
@@ -537,6 +542,16 @@ module {
                 );
 
                 (iter, size + 1);
+            };
+            case (#Variant((key, candid_value))) {
+                let (nested_iter, size) = encode_candid_value(#Text(key));
+                let iter = Itertools.prepend(
+                    TypeCode.Variant,
+                    nested_iter,
+                );
+
+                (iter, size + 1);
+
             };
             case (_) {
                 Debug.trap("CandidMap: Does not support encoding of collection types : " # debug_show candid_value);

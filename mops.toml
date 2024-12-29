@@ -1,6 +1,8 @@
 [profile]
 name = "zendb"
-keywords = ["database", "document-db"]
+description = "An embedded document database with native candid support for Motoko developers"
+keywords = ["database", "document-db", "candid"]
+
 
 [dependencies]
 base = "0.13.2"

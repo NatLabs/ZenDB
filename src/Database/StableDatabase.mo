@@ -32,6 +32,7 @@ import Collection "../Collection";
 import Utils "../Utils";
 import ZT "../Types";
 import C "../Constants";
+import Schema "../Collection/Schema";
 
 module {
 
@@ -48,10 +49,11 @@ module {
     public type StableCollection = ZT.StableCollection;
 
     public func create_collection(zendb : ZT.ZenDB, name : Text, schema : ZT.Schema) : Result<StableCollection, Text> {
+        let processed_schema = Schema.process_schema(schema);
 
         switch (Map.get<Text, StableCollection>(zendb.collections, thash, name)) {
             case (?stable_collection) {
-                if (stable_collection.schema != schema) {
+                if (stable_collection.schema != processed_schema) {
                     return #err("Schema error: collection already exists with different schema");
                 };
 
@@ -60,13 +62,13 @@ module {
             case (null) ();
         };
 
-        let #Record(_) = schema else return #err("Schema error: schema type is not a record");
+        let #Record(_) = processed_schema else return #err("Schema error: schema type is not a record");
 
-        let schema_keys = Utils.extract_schema_keys(schema);
+        let schema_keys = Utils.extract_schema_keys(processed_schema);
 
         let stable_collection = {
             ids = Ids.create(zendb.id_store, name);
-            var schema = schema;
+            var schema = processed_schema;
             schema_keys;
             schema_keys_set = Set.fromIter(schema_keys.vals(), thash);
             main = MemoryBTree.new(?C.DEFAULT_BTREE_ORDER);
