@@ -5,7 +5,7 @@ import Char "mo:base/Char";
 
 import { test; suite } "mo:test";
 import Candid "mo:serde/Candid";
-import CandidMap "../src/CandidMap";
+import CandidMap "../src/CandidMapEncoding";
 
 suite(
     "CandidMap",
@@ -23,13 +23,13 @@ suite(
                 let candid_map = CandidMap.fromCandid(candid);
 
                 func retrieve_fields(candid_map : CandidMap.CandidMap) {
-                    assert candid_map.get("name") == ? #Text("Alice");
-                    assert candid_map.get("age") == ? #Nat(25);
-                    assert candid_map.get("email") == ? #Text("user_email@gmail.com");
-                    assert candid_map.get("details.phone") == ? #Text("1234567890");
-                    assert candid_map.get("details.address") == ? #Text("123, 4th Cross, 5th Main, Bangalore");
-                    assert candid_map.get("details.settings.theme") == ? #Text("dark");
-                    assert candid_map.get("details.settings.notifications") == ? #Bool(true);
+                    assert candid_map.get("name") == ?#Text("Alice");
+                    assert candid_map.get("age") == ?#Nat(25);
+                    assert candid_map.get("email") == ?#Text("user_email@gmail.com");
+                    assert candid_map.get("details.phone") == ?#Text("1234567890");
+                    assert candid_map.get("details.address") == ?#Text("123, 4th Cross, 5th Main, Bangalore");
+                    assert candid_map.get("details.settings.theme") == ?#Text("dark");
+                    assert candid_map.get("details.settings.notifications") == ?#Bool(true);
 
                     assert candid_map.get("missing.key") == null;
                     assert candid_map.get("details.missing.key") == null;

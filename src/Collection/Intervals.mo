@@ -27,7 +27,6 @@ import T "../Types";
 import Query "../Query";
 import Utils "../Utils";
 import ByteUtils "../ByteUtils";
-import LegacyCandidMap "../LegacyCandidMap";
 
 import Index "Index";
 import Orchid "Orchid";
