@@ -174,8 +174,8 @@ module T {
     public type WrapId<Record> = (Nat, Record);
 
     public type State<T> = {
-        #True : T;
-        #False : T;
+        #Inclusive : T;
+        #Exclusive : T;
     };
 
     public type CandidQuery = State<Candid>;

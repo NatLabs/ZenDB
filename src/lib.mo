@@ -139,8 +139,8 @@ module {
     public type WrapId<Record> = (Nat, Record);
 
     type State<T> = {
-        #True : T;
-        #False : T;
+        #Inclusive : T;
+        #Exclusive : T;
     };
 
     public func newStableStore() : ZenDB {

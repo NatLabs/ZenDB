@@ -183,20 +183,20 @@ module CollectionUtils {
             let ?field_value = candid_map.get(key) else Debug.trap("filter: field '" # debug_show key # "' not found in record");
 
             switch (opt_lower_val) {
-                case (?(#True(lower_val))) {
+                case (?(#Inclusive(lower_val))) {
                     if (Schema.cmp_candid(collection.schema, field_value, lower_val) == -1) return false;
                 };
-                case (?(#False(lower_val))) {
+                case (?(#Exclusive(lower_val))) {
                     if (Schema.cmp_candid(collection.schema, field_value, lower_val) < 1) return false;
                 };
                 case (null) {};
             };
 
             switch (opt_upper_val) {
-                case (?(#True(upper_val))) {
+                case (?(#Inclusive(upper_val))) {
                     if (Schema.cmp_candid(collection.schema, field_value, upper_val) == 1) return false;
                 };
-                case (?(#False(upper_val))) {
+                case (?(#Exclusive(upper_val))) {
                     if (Schema.cmp_candid(collection.schema, field_value, upper_val) > -1) return false;
                 };
                 case (null) {};

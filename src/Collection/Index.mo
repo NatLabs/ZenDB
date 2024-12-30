@@ -80,49 +80,49 @@ module {
     ) {
         switch (op) {
             case (#eq(candid)) {
-                ignore Map.put(lower, thash, field, #True(candid));
-                ignore Map.put(upper, thash, field, #True(candid));
+                ignore Map.put(lower, thash, field, #Inclusive(candid));
+                ignore Map.put(upper, thash, field, #Inclusive(candid));
             };
             case (#gte(candid)) {
                 switch (Map.get(lower, thash, field)) {
-                    case (?#True(val) or ?#False(val)) {
+                    case (?#Inclusive(val) or ?#Exclusive(val)) {
                         if (Schema.cmp_candid(#Empty, candid, val) == 1) {
-                            ignore Map.put(lower, thash, field, #True(candid));
+                            ignore Map.put(lower, thash, field, #Inclusive(candid));
                         };
                     };
-                    case (null) ignore Map.put(lower, thash, field, #True(candid));
+                    case (null) ignore Map.put(lower, thash, field, #Inclusive(candid));
                 };
             };
             case (#lte(candid)) {
                 switch (Map.get(upper, thash, field)) {
-                    case (?#True(val) or ?#False(val)) {
+                    case (?#Inclusive(val) or ?#Exclusive(val)) {
                         if (Schema.cmp_candid(#Empty, candid, val) == -1) {
-                            ignore Map.put(upper, thash, field, #True(candid));
+                            ignore Map.put(upper, thash, field, #Inclusive(candid));
                         };
                     };
-                    case (null) ignore Map.put(upper, thash, field, #True(candid));
+                    case (null) ignore Map.put(upper, thash, field, #Inclusive(candid));
                 };
             };
             case (#lt(candid)) {
                 switch (Map.get(upper, thash, field)) {
-                    case (?#True(val) or ?#False(val)) {
+                    case (?#Inclusive(val) or ?#Exclusive(val)) {
                         let cmp = Schema.cmp_candid(#Empty, candid, val);
                         if (cmp == -1 or cmp == 0) {
-                            ignore Map.put(upper, thash, field, #False(candid));
+                            ignore Map.put(upper, thash, field, #Exclusive(candid));
                         };
                     };
-                    case (null) ignore Map.put(upper, thash, field, #False(candid));
+                    case (null) ignore Map.put(upper, thash, field, #Exclusive(candid));
                 };
             };
             case (#gt(candid)) {
                 switch (Map.get(lower, thash, field)) {
-                    case (?#True(val) or ?#False(val)) {
+                    case (?#Inclusive(val) or ?#Exclusive(val)) {
                         let cmp = Schema.cmp_candid(#Empty, candid, val);
                         if (cmp == 1 or cmp == 0) {
-                            ignore Map.put(lower, thash, field, #False(candid));
+                            ignore Map.put(lower, thash, field, #Exclusive(candid));
                         };
                     };
-                    case (null) ignore Map.put(lower, thash, field, #False(candid));
+                    case (null) ignore Map.put(lower, thash, field, #Exclusive(candid));
                 };
             };
             case (#between(candid1, candid2)) {
@@ -185,7 +185,7 @@ module {
                         };
 
                         let val = switch (sorted_start_query[i].1) {
-                            case (?#True(val) or ?#False(val)) val;
+                            case (?#Inclusive(val) or ?#Exclusive(val)) val;
                             case (null) #Minimum;
                         };
 
@@ -208,7 +208,7 @@ module {
                         let val = if (i >= sorted_start_query.size()) {
                             (#Minimum);
                         } else switch (sorted_start_query[i].1) {
-                            case (?#True(val) or ?#False(val)) val;
+                            case (?#Inclusive(val) or ?#Exclusive(val)) val;
                             case (null) #Minimum;
                         };
 
@@ -230,7 +230,7 @@ module {
                     };
 
                     let key = sorted_end_query[i].0;
-                    let ?(#True(val)) or ?(#False(val)) = sorted_end_query[i].1 else return (#Maximum);
+                    let ?(#Inclusive(val)) or ?(#Exclusive(val)) = sorted_end_query[i].1 else return (#Maximum);
 
                     (val);
                 },
