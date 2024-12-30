@@ -296,7 +296,7 @@ module {
             let new_candid_blob = blobify.to_blob(new_record);
             let new_candid = CollectionUtils.decode_candid_blob(collection, new_candid_blob);
 
-            let candid_map = CandidMap.fromCandid(new_candid);
+            let candid_map = CandidMap.CandidMap(collection.schema, new_candid);
             let record_details = new_candid_blob;
 
             // not needed since it uses the same record type

@@ -13,6 +13,7 @@ suite(
         test(
             "fromCandid",
             func() {
+
                 let candid : Candid.Candid = #Record([
                     ("name", #Text("Alice")),
                     ("age", #Nat(25)),

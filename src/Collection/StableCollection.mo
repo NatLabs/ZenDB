@@ -144,7 +144,7 @@ module {
 
         let index_data_utils = CollectionUtils.get_index_data_utils(collection, index_key_details);
 
-        let candid_map = CandidMap.fromCandid(#Record([]));
+        let candid_map = CandidMap.CandidMap(collection.schema, #Record([]));
 
         for ((id, candid_blob) in MemoryBTree.entries(collection.main, main_btree_utils)) {
             let candid = CollectionUtils.decode_candid_blob(collection, candid_blob);
@@ -256,7 +256,7 @@ module {
             case (null) (iter_with_offset);
         };
 
-        ((paginated_iter));
+        paginated_iter;
 
     };
 
@@ -280,8 +280,6 @@ module {
 
         // Debug.print("validate: " # debug_show (collection.schema) #debug_show (candid));
         Utils.assert_result(Schema.validate_record(collection.schema, candid));
-
-        let candid_map = CandidMap.fromCandid(candid);
 
         // if this fails, it means the id already exists
         // insert() - should to used to update existing records
@@ -308,16 +306,18 @@ module {
 
         Debug.print("adding to indexes");
 
+        let candid_map = CandidMap.CandidMap(collection.schema, candid);
+
         for (index in Map.vals(collection.indexes)) {
 
             let buffer = Buffer.Buffer<Candid>(8);
 
             for ((index_key, dir) in index.key_details.vals()) {
 
+                Debug.print("index_key: " # debug_show index_key);
                 if (index_key == C.RECORD_ID_FIELD) {
                     buffer.add(#Nat(id));
                 } else {
-                    Debug.print("index_key: " # debug_show index_key);
                     let ?value = candid_map.get(index_key) else return #err("Couldn't get value for index key: " # debug_show index_key);
 
                     buffer.add(value);
@@ -387,11 +387,11 @@ module {
         let (opt_cursor, cursor_map) = switch (pagination.cursor) {
             case (?(id, pagination_direction)) switch (CollectionUtils.lookup_candid_record(collection, id)) {
                 case (?record) {
-                    (?(id, record), CandidMap.fromCandid(record));
+                    (?(id, record), CandidMap.CandidMap(collection.schema, record));
                 };
-                case (null) (null, CandidMap.fromCandid(#Record([])));
+                case (null) (null, CandidMap.CandidMap(collection.schema, #Record([])));
             };
-            case (null) (null, CandidMap.fromCandid(#Record([])));
+            case (null) (null, CandidMap.CandidMap(collection.schema, #Record([])));
         };
 
         switch (Query.validate_query(collection, stable_query.query_operations)) {
@@ -498,7 +498,7 @@ module {
                     candid_map;
                 };
                 case (null) {
-                    let candid_map = CandidMap.CandidMap(record_a);
+                    let candid_map = CandidMap.CandidMap(collection.schema, record_a);
                     candid_map;
                 };
             };
@@ -509,7 +509,7 @@ module {
                     candid_map;
                 };
                 case (null) {
-                    let candid_map = CandidMap.CandidMap(record_b);
+                    let candid_map = CandidMap.CandidMap(collection.schema, record_b);
                     candid_map;
                 };
             };
@@ -569,7 +569,7 @@ module {
             stable_query.query_operations,
             null,
             null,
-            CandidMap.fromCandid(#Record([])),
+            CandidMap.CandidMap(collection.schema, #Record([])),
         );
 
         let count = switch (QueryExecution.get_unique_record_ids_from_query_plan(collection, Map.new(), query_plan)) {
@@ -602,7 +602,7 @@ module {
             stable_query.query_operations,
             null,
             null,
-            CandidMap.fromCandid(#Record([])),
+            CandidMap.CandidMap(collection.schema, #Record([])),
         );
 
         let sort_records_by_field_cmp = func(_ : Nat, _ : Nat) : Order = #equal;

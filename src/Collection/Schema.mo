@@ -27,6 +27,7 @@ import TypeUtils "mo:memory-collection/TypeUtils";
 import Int8Cmp "mo:memory-collection/TypeUtils/Int8Cmp";
 
 import Itertools "mo:itertools/Iter";
+import { sort_candid_type } "mo:serde/Candid/Blob/CandidUtils";
 
 import T "../Types";
 import Utils "../Utils";
@@ -46,39 +47,7 @@ module {
     };
 
     public func process_schema(schema : Schema) : Schema {
-        switch (schema) {
-            case (#Empty) #Empty;
-            case (#Null) #Null;
-            case (#Text) #Text;
-            case (#Nat) #Nat;
-            case (#Int) #Int;
-            case (#Float) #Float;
-            case (#Bool) #Bool;
-            case (#Principal) #Principal;
-            case (#Option(inner)) #Option(process_schema(inner));
-            case (#Array(inner)) #Array(process_schema(inner));
-            case (#Tuple(tuples)) #Tuple(Array.map(tuples, process_schema));
-            case (#Record(fields)) #Record(
-                Array.map<(Text, Schema), (Text, Schema)>(
-                    fields,
-                    func(name : Text, schema : Schema) : (Text, Schema) {
-                        (name, process_schema(schema));
-                    },
-                )
-            );
-            case (#Variant(variants)) #Variant(
-                Array.map<(Text, Schema), (Text, Schema)>(
-                    variants,
-                    func(name : Text, schema : Schema) : (Text, Schema) {
-                        (
-                            Utils.text_strip_start(name, "#"),
-                            process_schema(schema),
-                        );
-                    },
-                )
-            );
-            case (_) Debug.trap("process_schema: unexpected schema type");
-        };
+        sort_candid_type(schema);
     };
 
     public func is_schema_backward_compatible(curr : Schema, new : Schema) : Bool {
@@ -255,8 +224,8 @@ module {
                         },
                     );
 
-                    Debug.print("schema: " # debug_show (schema));
-                    Debug.print("record: " # debug_show (record));
+                    // Debug.print("schema: " # debug_show (schema));
+                    // Debug.print("record: " # debug_show (record));
 
                     switch (result) {
                         case (null) return #err("Variant not found in schema");

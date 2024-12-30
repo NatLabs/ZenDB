@@ -175,7 +175,7 @@ module CollectionUtils {
 
     public func candid_map_filter_condition(collection : StableCollection, candid_record : Candid.Candid, lower : [(Text, ?T.State<Candid>)], upper : [(Text, ?T.State<Candid>)]) : Bool {
 
-        let candid_map = CandidMap.CandidMap(candid_record);
+        let candid_map = CandidMap.CandidMap(collection.schema, candid_record);
 
         for (((key, opt_lower_val), (upper_key, opt_upper_val)) in Itertools.zip(lower.vals(), upper.vals())) {
             assert key == upper_key;
