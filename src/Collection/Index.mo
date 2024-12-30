@@ -125,7 +125,7 @@ module {
                     case (null) ignore Map.put(lower, thash, field, #False(candid));
                 };
             };
-            case (#In(_) or #Not(_)) {
+            case (#in (_) or #not (_)) {
                 Debug.trap(debug_show op # " not allowed in this context. Should have been expanded by the query builder");
             };
         };

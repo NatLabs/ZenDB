@@ -77,7 +77,7 @@ module {
         func handle_not(key : Text, not_op : ZqlOperators) {
             switch (not_op) {
                 case (#eq(value)) {
-                    // #Not(#eq(x)) -> #Or([#lt(x), #gt(x)])
+                    // #not(#eq(x)) -> #Or([#lt(x), #gt(x)])
 
                     if (not is_and) {
                         buffer.add(#Operation(key, #lt(value)));
@@ -88,23 +88,23 @@ module {
 
                 };
                 case (#lt(value)) {
-                    // #Not(#lt(x)) -> #gte(x)
+                    // #not(#lt(x)) -> #gte(x)
                     buffer.add(#Operation(key, #gte(value)));
                 };
                 case (#gt(value)) {
-                    // #Not(#gt(x) )-> #lte(x)
+                    // #not(#gt(x) )-> #lte(x)
                     buffer.add(#Operation(key, #lte(value)));
                 };
                 case (#lte(value)) {
-                    // #Not(#lte(x)) -> #gt(x)
+                    // #not(#lte(x)) -> #gt(x)
                     buffer.add(#Operation(key, #gt(value)));
                 };
                 case (#gte(value)) {
-                    // #Not(#gte(x)) -> #lt(x)
+                    // #not(#gte(x)) -> #lt(x)
                     buffer.add(#Operation(key, #lt(value)));
                 };
-                case (#In(values)) {
-                    // #Not(#In([x, y, z])) -> #And([#Not(x), #Not(y), #Not(z)])
+                case (#in (values)) {
+                    // #not(#in([x, y, z])) -> #And([#not(x), #not(y), #not(z)])
                     // -> #And([#Or([#lt(x), #gt(x)]), #Or([#lt(y), #gt(y)]), #Or([#lt(z), #gt(z)])])
 
                     if (is_and) {
@@ -125,8 +125,8 @@ module {
                     };
 
                 };
-                case (#Not(nested_op)) {
-                    // #Not(#Not(x)) -> x
+                case (#not (nested_op)) {
+                    // #not(#not(x)) -> x
                     buffer.add(#Operation(key, nested_op));
                 };
             };
@@ -134,13 +134,13 @@ module {
 
         func handle_op(key : Text, op : ZqlOperators) {
             switch (op) {
-                case (#In(values)) {
+                case (#in (values)) {
                     update_query(false);
                     for (value in values.vals()) {
                         buffer.add(#Operation(key, #eq(value : T.Candid)));
                     };
                 };
-                case (#Not(not_op)) {
+                case (#not (not_op)) {
                     handle_not(key, not_op);
                 };
                 case (_) {

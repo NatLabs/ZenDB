@@ -129,9 +129,9 @@ module T {
         #lt : Candid;
         #gt : Candid;
         // #exists : Text;
-        #In : [Candid];
+        #in : [Candid];
 
-        #Not : ZqlOperators;
+        #not : ZqlOperators;
 
     };
 
@@ -146,9 +146,9 @@ module T {
         // #BatchSize : (Nat, ZenQueryLang);
 
         // #Regex : (Text, Text);
-        // #Not : ZenQueryLang;
+        // #not : ZenQueryLang;
 
-        // #In : (Text, [Candid]);
+        // #in : (Text, [Candid]);
         // #Between : (Text, Candid, Candid);
         // #All : (Text, ZenQueryLang);
         // #Intersect : (ZenQueryLang, ZenQueryLang);

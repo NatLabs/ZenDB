@@ -310,7 +310,7 @@ suite(
             func() {
                 let db_query = QueryBuilder().Where(
                     "name",
-                    #In([
+                    #in([
                         #Text("black hoodie"),
                         #Text("M1 macbook"),
                         #Text("white hoodie"),
@@ -365,7 +365,7 @@ suite(
             func(){
                 let db_query = QueryBuilder().Where(
                     "contact.phone",
-                    #Not(#eq(#Null)),
+                    #not(#eq(#Null)),
                 );
 
                 let #ok(records) = store_items_collection.search(db_query);

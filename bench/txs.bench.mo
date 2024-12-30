@@ -161,8 +161,8 @@ module {
             "btype == '1xfer' or '2xfer'",
             "principals[0] == tx.to.owner (is recipient)",
             "principals[0..10] == tx.to.owner (is recipient)",
-            // "all txs involving principals[0]",
-            // "all txs involving principals[0..10]",
+            "all txs involving principals[0]",
+            "all txs involving principals[0..10]",
             "250 < tx.amt <= 400",
             "btype == 1burn and tx.amt >= 750",
         ]);
@@ -252,7 +252,7 @@ module {
             case ("btype == '1xfer' or '2xfer'") {
                 let db_query = ZenDB.QueryBuilder().Where(
                     "btype",
-                    #In([#Text("1xfer"), #Text("2xfer")]),
+                    #in([#Text("1xfer"), #Text("2xfer")]),
                 );
 
                 let #ok(matching_txs) = txs.search(db_query);
@@ -271,7 +271,7 @@ module {
 
                 let db_query = ZenDB.QueryBuilder().Where(
                     "tx.to.owner",
-                    #In(candid_principals),
+                    #in(candid_principals),
                 );
 
                 let #ok(matching_txs) = txs.search(db_query);
@@ -300,13 +300,13 @@ module {
 
                 let db_query = ZenDB.QueryBuilder().Where(
                     "tx.to.owner",
-                    #In(candid_principals),
+                    #in(candid_principals),
                 ).Or(
                     "tx.from.owner",
-                    #In(candid_principals),
+                    #in(candid_principals),
                 ).Or(
                     "tx.spender.owner",
-                    #In(candid_principals),
+                    #in(candid_principals),
                 );
 
                 let #ok(matching_txs) = txs.search(db_query);
@@ -370,7 +370,7 @@ module {
             case ("btype == '1xfer' or '2xfer'") {
                 let db_query = ZenDB.QueryBuilder().Where(
                     "btype",
-                    #In([#Text("1xfer"), #Text("2xfer")]),
+                    #in([#Text("1xfer"), #Text("2xfer")]),
                 );
 
                 let #ok(matching_txs) = txs.search(db_query);
@@ -393,7 +393,7 @@ module {
 
                 let db_query = ZenDB.QueryBuilder().Where(
                     "tx.to.owner",
-                    #In(candid_principals),
+                    #in(candid_principals),
                 );
 
                 let #ok(matching_txs) = txs.search(db_query);
@@ -422,13 +422,13 @@ module {
 
                 let db_query = ZenDB.QueryBuilder().Where(
                     "tx.to.owner",
-                    #In(candid_principals),
+                    #in(candid_principals),
                 ).Or(
                     "tx.from.owner",
-                    #In(candid_principals),
+                    #in(candid_principals),
                 ).Or(
                     "tx.spender.owner",
-                    #In(candid_principals),
+                    #in(candid_principals),
                 );
 
                 let #ok(matching_txs) = txs.search(db_query);
@@ -699,7 +699,7 @@ module {
             case ("btype == '1xfer' or '2xfer'") {
                 let db_query = ZenDB.QueryBuilder().Where(
                     "btype",
-                    #In([#Text("1xfer"), #Text("2xfer")]),
+                    #in([#Text("1xfer"), #Text("2xfer")]),
                 );
 
                 skip_limit_paginated_query(db_query);
@@ -721,7 +721,7 @@ module {
 
                 let db_query = ZenDB.QueryBuilder().Where(
                     "tx.to.owner",
-                    #In(candid_principals),
+                    #in(candid_principals),
                 );
 
                 skip_limit_paginated_query(db_query);
@@ -751,13 +751,13 @@ module {
 
                 let db_query = ZenDB.QueryBuilder().Where(
                     "tx.to.owner",
-                    #In(candid_principals),
+                    #in(candid_principals),
                 ).Or(
                     "tx.from.owner",
-                    #In(candid_principals),
+                    #in(candid_principals),
                 ).Or(
                     "tx.spender.owner",
-                    #In(candid_principals),
+                    #in(candid_principals),
                 );
 
                 skip_limit_paginated_query(db_query);
