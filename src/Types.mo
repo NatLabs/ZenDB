@@ -58,7 +58,7 @@ module T {
     public type RevIter<A> = RevIter.RevIter<A>;
     public type Order = Order.Order;
 
-    // public type MemoryBTree = MemoryBTree.VersionedMemoryBTree;
+    public type MemoryBTree = MemoryBTree.StableMemoryBTree;
     public type BTreeUtils<K, V> = MemoryBTree.BTreeUtils<K, V>;
     public type TypeUtils<A> = TypeUtils.TypeUtils<A>;
 
