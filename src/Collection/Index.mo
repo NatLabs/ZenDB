@@ -125,7 +125,16 @@ module {
                     case (null) ignore Map.put(lower, thash, field, #False(candid));
                 };
             };
-            case (#in (_) or #not (_)) {
+            case (#between(candid1, candid2)) {
+                ignore operation_eval(field, #gte(candid1), lower, upper);
+                ignore operation_eval(field, #lte(candid2), lower, upper);
+            };
+            case (#startsWith(candid)) {
+                // Debug.print("startsWith: " # debug_show candid);
+                // Debug.trap("startsWith not implemented");
+            };
+
+            case (#In(_) or #Not(_) or #exists) {
                 Debug.trap(debug_show op # " not allowed in this context. Should have been expanded by the query builder");
             };
         };

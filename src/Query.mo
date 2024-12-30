@@ -77,7 +77,7 @@ module {
         func handle_not(key : Text, not_op : ZqlOperators) {
             switch (not_op) {
                 case (#eq(value)) {
-                    // #not(#eq(x)) -> #Or([#lt(x), #gt(x)])
+                    // #Not(#eq(x)) -> #Or([#lt(x), #gt(x)])
 
                     if (not is_and) {
                         buffer.add(#Operation(key, #lt(value)));
@@ -88,23 +88,36 @@ module {
 
                 };
                 case (#lt(value)) {
-                    // #not(#lt(x)) -> #gte(x)
+                    // #Not(#lt(x)) -> #gte(x)
                     buffer.add(#Operation(key, #gte(value)));
                 };
                 case (#gt(value)) {
-                    // #not(#gt(x) )-> #lte(x)
+                    // #Not(#gt(x) )-> #lte(x)
                     buffer.add(#Operation(key, #lte(value)));
                 };
                 case (#lte(value)) {
-                    // #not(#lte(x)) -> #gt(x)
+                    // #Not(#lte(x)) -> #gt(x)
                     buffer.add(#Operation(key, #gt(value)));
                 };
                 case (#gte(value)) {
-                    // #not(#gte(x)) -> #lt(x)
+                    // #Not(#gte(x)) -> #lt(x)
                     buffer.add(#Operation(key, #lt(value)));
                 };
-                case (#in (values)) {
-                    // #not(#in([x, y, z])) -> #And([#not(x), #not(y), #not(z)])
+                case (#between(min, max)) {
+                    // #Not(#between(min, max)) -> #Or([#lt(min), #gt(max)])
+                    ignore Or(key, #lt(min));
+                    ignore Or(key, #gt(max));
+                };
+                case (#exists) {
+                    // #Not(#exists) -> #Not(#exists)
+                    Debug.trap("#Not(#exists) is not implemented");
+                };
+                case (#startsWith(prefix)) {
+                    // #Not(#startsWith(prefix)) -> #Or([#lt(prefix), #gt(prefix)])
+                    Debug.trap("#Not(#startsWith(prefix)) is not implemented");
+                };
+                case (#In(values)) {
+                    // #Not(#In([x, y, z])) -> #And([#Not(x), #Not(y), #Not(z)])
                     // -> #And([#Or([#lt(x), #gt(x)]), #Or([#lt(y), #gt(y)]), #Or([#lt(z), #gt(z)])])
 
                     if (is_and) {
@@ -125,8 +138,8 @@ module {
                     };
 
                 };
-                case (#not (nested_op)) {
-                    // #not(#not(x)) -> x
+                case (#Not(nested_op)) {
+                    // #Not(#Not(x)) -> x
                     buffer.add(#Operation(key, nested_op));
                 };
             };
@@ -134,14 +147,22 @@ module {
 
         func handle_op(key : Text, op : ZqlOperators) {
             switch (op) {
-                case (#in (values)) {
+                case (#In(values)) {
                     update_query(false);
                     for (value in values.vals()) {
                         buffer.add(#Operation(key, #eq(value : T.Candid)));
                     };
                 };
-                case (#not (not_op)) {
+                case (#Not(not_op)) {
                     handle_not(key, not_op);
+                };
+                case (#between(min, max)) {
+                    update_query(true);
+                    buffer.add(#Operation(key, #gte(min)));
+                    buffer.add(#Operation(key, #lte(max)));
+                };
+                case (#exists) {
+                    handle_not(key, #Not(#eq(#Null)));
                 };
                 case (_) {
                     buffer.add(#Operation(key, op));

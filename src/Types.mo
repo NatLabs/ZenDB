@@ -128,10 +128,15 @@ module T {
         #lte : Candid;
         #lt : Candid;
         #gt : Candid;
-        // #exists : Text;
-        #in : [Candid];
 
-        #not : ZqlOperators;
+        #In : [Candid];
+        #Not : ZqlOperators;
+
+        #between : (Candid, Candid);
+        #exists;
+        #startsWith : Candid;
+
+        // #regex : Candid;
 
     };
 
@@ -141,18 +146,6 @@ module T {
         #And : [ZenQueryLang];
         #Or : [ZenQueryLang];
 
-        // #Limit : (Nat, ZenQueryLang);
-        // #Skip : (Nat, ZenQueryLang);
-        // #BatchSize : (Nat, ZenQueryLang);
-
-        // #Regex : (Text, Text);
-        // #not : ZenQueryLang;
-
-        // #in : (Text, [Candid]);
-        // #Between : (Text, Candid, Candid);
-        // #All : (Text, ZenQueryLang);
-        // #Intersect : (ZenQueryLang, ZenQueryLang);
-        // #Union : (ZenQueryLang, ZenQueryLang);
     };
 
     public type Cursor = Nat;
@@ -167,13 +160,11 @@ module T {
         limit : ?Nat;
         skip : ?Nat;
     };
-
     public type StableQuery = {
         query_operations : ZenQueryLang;
         pagination : StableQueryPagination;
         sort_by : ?(Text, SortDirection);
     };
-
     public type Operator = {
         #Eq;
         #Gt;

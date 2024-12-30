@@ -317,7 +317,7 @@ func options_to_query(options : Options) : ZenDB.QueryBuilder {
             let btypes = options.filter.btype!;
             let values = Array.map<Text, ZenDB.Candid>(btypes, func(btype : Text) : ZenDB.Candid = #Text(btype));
 
-            ignore Query.Where("btype", #in (values));
+            ignore Query.Where("btype", #In(values));
         };
 
         if (options.filter.account == null) {
@@ -598,7 +598,7 @@ let test_queries : [TestQuery] = [
         query_name = "get_txs() with btype = '1burn' or '1xfer'";
         db_query = QueryBuilder().Where(
             "btype",
-            #in ([#Text("1burn"), #Text("1xfer")]),
+            #In([#Text("1burn"), #Text("1xfer")]),
         );
         expected_query_resolution = #Or([
             #Operation(
@@ -797,13 +797,13 @@ let test_queries : [TestQuery] = [
         query_name = "get_txs() involving the first 2 principals";
         db_query = QueryBuilder().Where(
             "tx.to.owner",
-            #in ([#Principal(principals[1]), #Principal(principals[0])]),
+            #In([#Principal(principals[1]), #Principal(principals[0])]),
         ).Or(
             "tx.from.owner",
-            #in ([#Principal(principals[1]), #Principal(principals[0])]),
+            #In([#Principal(principals[1]), #Principal(principals[0])]),
         ).Or(
             "tx.spender.owner",
-            #in ([#Principal(principals[1]), #Principal(principals[0])]),
+            #In([#Principal(principals[1]), #Principal(principals[0])]),
         );
         expected_query_resolution = #Or([
             #Operation(
