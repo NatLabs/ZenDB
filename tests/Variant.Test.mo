@@ -54,7 +54,7 @@ let data_type_to_candid : ZenDB.Candify<Data> = {
 };
 
 let #ok(data) = zendb.create_collection<Data>("data", DataSchema, data_type_to_candid);
-// let #ok(_) = data.create_index(["version"]);
+let #ok(_) = data.create_index(["version"]);
 let #ok(_) = data.create_index(["version.v1.a"]);
 let #ok(_) = data.create_index(["version.v3.size.known"]);
 
@@ -63,21 +63,37 @@ let #ok(_) = data.insert({ version = #v2({ c = "world"; d = true }) });
 let #ok(_) = data.insert({ version = #v3({ size = #known(32) }) });
 let #ok(_) = data.insert({ version = #v3({ size = #unknown }) });
 
-// assert data.search(
-//     ZenDB.QueryBuilder().Where("version", #eq(#Text("v1")))
-// ) == #ok([(0, { version = #v1({ a = 42; b = "hello" }) })]);
-
-// assert data.search(
-//     ZenDB.QueryBuilder().Where("version", #eq(#Text("v2")))
-// ) == #ok([(1, { version = #v2({ c = "world"; d = true }) })]);
-
-// assert data.search(
-//     ZenDB.QueryBuilder().Where("version", #eq(#Text("v3")))
-// ) == #ok([]);
-
 suite(
     "searching with nested variant fields",
     func() {
+        test(
+            "search for variants by their tags",
+            func() {
+                assert data.search(
+                    ZenDB.QueryBuilder().Where("version", #eq(#Text("v1")))
+                ) == #ok([(0, { version = #v1({ a = 42; b = "hello" }) })]);
+
+                assert data.search(
+                    ZenDB.QueryBuilder().Where("version", #eq(#Text("v2")))
+                ) == #ok([(1, { version = #v2({ c = "world"; d = true }) })]);
+
+                assert data.search(
+                    ZenDB.QueryBuilder().Where("version", #eq(#Text("v3")))
+                ) == #ok([
+                    (2, { version = #v3({ size = #known(32) }) }),
+                    (3, { version = #v3({ size = #unknown }) }),
+                ]);
+
+                assert data.search(
+                    ZenDB.QueryBuilder().Where("version.v3.size", #eq(#Text("unknown")))
+                ) == #ok([(3, { version = #v3({ size = #unknown }) })]);
+
+                assert data.search(
+                    ZenDB.QueryBuilder().Where("version.v3.size", #eq(#Text("known")))
+                ) == #ok([(2, { version = #v3({ size = #known(32) }) })]);
+
+            },
+        );
         test(
             "search via indexed fields",
             func() {
@@ -116,15 +132,9 @@ suite(
                     (3, { version = #v3({ size = #unknown }) }),
                 ]);
 
-                // will come back to this later
-                // The operation we want to do is to search for all fields that have an unknown size
-                // but we can't do that using the query below
-                //
-                // The ideal query should be `.Where("version.v3.size", #eq(#Text("unknown")))
-
-                data.search(
-                    ZenDB.QueryBuilder().Where("version.v3.size.unknown", #eq(#Null))
-                ) |> Debug.print(debug_show (_));
+                assert data.search(
+                    ZenDB.QueryBuilder().Where("version.v3.size", #eq(#Text("unknown")))
+                ) == #ok([(3, { version = #v3({ size = #unknown }) })]);
 
             },
         );

@@ -304,7 +304,7 @@ module {
 
         if (Map.size(collection.indexes) == 0) return #ok();
 
-        Debug.print("adding to indexes");
+        //  Debug.print("adding to indexes");
 
         let candid_map = CandidMap.CandidMap(collection.schema, candid);
 
@@ -314,7 +314,7 @@ module {
 
             for ((index_key, dir) in index.key_details.vals()) {
 
-                Debug.print("index_key: " # debug_show index_key);
+                //  Debug.print("index_key: " # debug_show index_key);
                 if (index_key == C.RECORD_ID_FIELD) {
                     buffer.add(#Nat(id));
                 } else {
@@ -323,7 +323,7 @@ module {
                     buffer.add(value);
                 };
 
-                Debug.print("buffer contents: " # debug_show Buffer.toArray(buffer));
+                //  Debug.print("buffer contents: " # debug_show Buffer.toArray(buffer));
 
             };
 
@@ -333,7 +333,7 @@ module {
             ignore MemoryBTree.insert(index.data, index_data_utils, index_key_values, id);
         };
 
-        Debug.print("finished adding to indexes");
+        //  Debug.print("finished adding to indexes");
 
         #ok();
     };

@@ -17,6 +17,8 @@ module {
         #CandidMap : (Map.Map<Text, NestedCandid>);
     };
 
+    let IS_VARIANT_TAG = ":variant_tag";
+
     public class CandidMap(schema : T.Schema, candid : Candid.Candid) {
 
         func add_to_map(map : Map.Map<Text, NestedCandid>, field_key : Text, candid_type : T.Schema, candid_value : Candid.Candid) {
@@ -46,7 +48,7 @@ module {
 
             };
 
-            Debug.print("map: " # debug_show (Map.toArray(map)));
+            // Debug.print("map: " # debug_show (Map.toArray(map)));
 
             map;
         };
@@ -91,20 +93,20 @@ module {
                 i += 1;
             };
 
-            Debug.print("map: " # debug_show (Map.toArray(map)));
+            // Debug.print("map: " # debug_show (Map.toArray(map)));
 
         };
 
         let #Record(types) = schema else Debug.trap("CandidMap only accepts #Record types");
         let #Record(fields) = candid else Debug.trap("CandidMap only accepts #Record types");
 
-        Debug.print("types: " # debug_show (types));
-        Debug.print("fields: " # debug_show (fields));
+        // Debug.print("types: " # debug_show (types));
+        // Debug.print("fields: " # debug_show (fields));
 
         let candid_map = load_record_into_map(types, fields);
         let paths_with_optional_fields = Set.new<Text>();
 
-        Debug.print("candid_map: " # debug_show (Map.toArray(candid_map)));
+        // Debug.print("candid_map: " # debug_show (Map.toArray(candid_map)));
 
         public func get(key : Text) : ?Candid.Candid {
 
@@ -114,9 +116,12 @@ module {
             var result : ?Candid.Candid = null;
             var is_optional = false;
             var prefix_path = "";
+            var current_field = "";
+            var is_compound_type = true;
 
             label extracting_candid_value loop {
                 let ?field = fields.next() else break extracting_candid_value;
+                current_field := field;
                 prefix_path := if (prefix_path == "") field else prefix_path # "." # field;
 
                 if (Set.has(paths_with_optional_fields, thash, prefix_path)) {
@@ -124,6 +129,8 @@ module {
                 };
 
                 let ?candid = Map.get(map, thash, field) else return null;
+
+                // Debug.print("(prefix, value): " # debug_show (prefix_path, candid));
 
                 switch (candid) {
                     case (#CandidMap(nested_map)) {
@@ -149,6 +156,8 @@ module {
                                 );
 
                                 let nested_map = load_record_into_map(variant_types, variants);
+                                ignore Map.put<Text, NestedCandid>(nested_map, thash, IS_VARIANT_TAG, #Candid(#Text, #Text(variant.0)));
+
                                 ignore Map.put(map, thash, field, #CandidMap(nested_map));
                                 map := nested_map;
                             };
@@ -171,11 +180,14 @@ module {
 
                                 ignore Set.put(paths_with_optional_fields, thash, prefix_path);
                                 let nested_map = load_record_into_map(variant_types, variants);
+                                ignore Map.put<Text, NestedCandid>(nested_map, thash, IS_VARIANT_TAG, #Candid(#Text, #Text(variant.0)));
+
                                 ignore Map.put(map, thash, field, #CandidMap(nested_map));
                                 map := nested_map;
                             };
                             case (_, #Null) return ?#Null;
                             case (_) {
+                                is_compound_type := false;
                                 result := ?candid;
                                 break extracting_candid_value;
                             };
@@ -184,7 +196,9 @@ module {
                 };
             };
 
-            Debug.print("candid_map: " # debug_show (Map.toArray(candid_map)));
+            // Debug.print("candid_map: " # debug_show (Map.toArray(candid_map)));
+
+            // Debug.print("(key, prefix): " # debug_show (key, prefix_path));
 
             let last_field = fields.next();
             // Debug.print("(last_field, value) ->  " # debug_show (last_field, result));
@@ -196,6 +210,19 @@ module {
                 case (?val) return ?#Option(val : Candid.Candid);
                 case (null) return null;
             };
+
+            // Debug.print("is_compound_type: " # debug_show (is_compound_type));
+
+            let opt_variant_tag = Map.get(map, thash, IS_VARIANT_TAG);
+
+            // Debug.print("opt_variant_tag: " # debug_show (opt_variant_tag));
+
+            if (is_compound_type) switch (opt_variant_tag) {
+                case (?#Candid(#Text, #Text(tag))) return ?#Text(tag);
+                case (_) {};
+            };
+
+            // Debug.print("result: " # debug_show (result));
 
             return result;
         };
