@@ -40,6 +40,8 @@ module T {
         #Maximum;
     };
 
+    public type CandidType = Serde.CandidType;
+
     public type Interval = (Nat, Nat);
 
     public type Candify<A> = {

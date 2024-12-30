@@ -85,7 +85,7 @@ module {
             };
             case (#gte(candid)) {
                 switch (Map.get(lower, thash, field)) {
-                    case (? #True(val) or ? #False(val)) {
+                    case (?#True(val) or ?#False(val)) {
                         if (Schema.cmp_candid(#Empty, candid, val) == 1) {
                             ignore Map.put(lower, thash, field, #True(candid));
                         };
@@ -95,7 +95,7 @@ module {
             };
             case (#lte(candid)) {
                 switch (Map.get(upper, thash, field)) {
-                    case (? #True(val) or ? #False(val)) {
+                    case (?#True(val) or ?#False(val)) {
                         if (Schema.cmp_candid(#Empty, candid, val) == -1) {
                             ignore Map.put(upper, thash, field, #True(candid));
                         };
@@ -105,7 +105,7 @@ module {
             };
             case (#lt(candid)) {
                 switch (Map.get(upper, thash, field)) {
-                    case (? #True(val) or ? #False(val)) {
+                    case (?#True(val) or ?#False(val)) {
                         let cmp = Schema.cmp_candid(#Empty, candid, val);
                         if (cmp == -1 or cmp == 0) {
                             ignore Map.put(upper, thash, field, #False(candid));
@@ -116,7 +116,7 @@ module {
             };
             case (#gt(candid)) {
                 switch (Map.get(lower, thash, field)) {
-                    case (? #True(val) or ? #False(val)) {
+                    case (?#True(val) or ?#False(val)) {
                         let cmp = Schema.cmp_candid(#Empty, candid, val);
                         if (cmp == 1 or cmp == 0) {
                             ignore Map.put(lower, thash, field, #False(candid));
@@ -176,7 +176,7 @@ module {
                         };
 
                         let val = switch (sorted_start_query[i].1) {
-                            case (? #True(val) or ? #False(val)) val;
+                            case (?#True(val) or ?#False(val)) val;
                             case (null) #Minimum;
                         };
 
@@ -185,7 +185,7 @@ module {
                 );
             };
             case (?(id, cursor)) {
-                let cursor_map = CandidMap.fromCandid(cursor);
+                let cursor_map = CandidMap.CandidMap(collection.schema, cursor);
                 Array.tabulate<Candid>(
                     index.key_details.size(),
                     func(i : Nat) : (Candid) {
@@ -199,7 +199,7 @@ module {
                         let val = if (i >= sorted_start_query.size()) {
                             (#Minimum);
                         } else switch (sorted_start_query[i].1) {
-                            case (? #True(val) or ? #False(val)) val;
+                            case (?#True(val) or ?#False(val)) val;
                             case (null) #Minimum;
                         };
 
@@ -228,12 +228,12 @@ module {
             );
         };
 
-      // Debug.print("Index_key_details: " # debug_show index.key_details);
-      // Debug.print("full_start_query: " # debug_show full_start_query);
-      // Debug.print("full_end_query: " # debug_show full_end_query);
+        // Debug.print("Index_key_details: " # debug_show index.key_details);
+        // Debug.print("full_start_query: " # debug_show full_start_query);
+        // Debug.print("full_end_query: " # debug_show full_end_query);
 
         let scans = CollectionUtils.memorybtree_scan_interval(index.data, index_data_utils, ?full_start_query, ?full_end_query);
-      // Debug.print("scan_intervals: " # debug_show scans);
+        // Debug.print("scan_intervals: " # debug_show scans);
         scans
 
         // let records_iter = MemoryBTree.scan(index.data, index_data_utils, ?full_start_query, ?full_end_query);
@@ -471,6 +471,7 @@ module {
 
             var index_key_details_position = 0;
 
+            // Debug.print("scoring indexes");
             label scoring_indexes for ((index_key, direction) in index.key_details.vals()) {
                 index_key_details_position += 1;
 
@@ -539,6 +540,7 @@ module {
                 requires_additional_filtering := true;
             };
 
+            // Debug.print("searching_for_holes");
             label searching_for_holes for ((prev, current) in Itertools.slidingTuples(Set.keys(positions_matching_equality_or_range))) {
                 if (current - prev > 1) {
                     requires_additional_filtering := true;
@@ -570,24 +572,24 @@ module {
                     interval;
                 };
 
-              // Debug.print("index matching results:");
-              // Debug.print("index, score: " # debug_show (index.name, calculate_score(index_details, false)));
-              // Debug.print("operations: " # debug_show operations);
+                // Debug.print("index matching results:");
+                // Debug.print("index, score: " # debug_show (index.name, calculate_score(index_details, false)));
+                // Debug.print("operations: " # debug_show operations);
 
-              // Debug.print("index_key_details: " # debug_show index.key_details);
-              // Debug.print("equal_fields: " # debug_show Set.toArray(equal_fields));
-              // Debug.print("  num_of_equal_fields_covered: " # debug_show num_of_equal_fields_covered);
+                // Debug.print("index_key_details: " # debug_show index.key_details);
+                // Debug.print("equal_fields: " # debug_show Set.toArray(equal_fields));
+                // Debug.print("  num_of_equal_fields_covered: " # debug_show num_of_equal_fields_covered);
 
-              // Debug.print("sort_fields: " # debug_show Buffer.toArray(sort_fields));
-              // Debug.print("  num_of_sort_fields_evaluated: " # debug_show num_of_sort_fields_evaluated);
-              // Debug.print("range_fields: " # debug_show Set.toArray(range_fields));
-              // Debug.print("  num_of_range_fields_covered: " # debug_show num_of_range_fields_covered);
+                // Debug.print("sort_fields: " # debug_show Buffer.toArray(sort_fields));
+                // Debug.print("  num_of_sort_fields_evaluated: " # debug_show num_of_sort_fields_evaluated);
+                // Debug.print("range_fields: " # debug_show Set.toArray(range_fields));
+                // Debug.print("  num_of_range_fields_covered: " # debug_show num_of_range_fields_covered);
 
-              // Debug.print("requires_additional_filtering: " # debug_show requires_additional_filtering);
-              // Debug.print("requires_additional_sorting: " # debug_show requires_additional_sorting);
-              // Debug.print("num, range_size: " # debug_show (num_of_range_fields_covered, Set.size(range_fields)));
-              // Debug.print("num, equal_size: " # debug_show (num_of_equal_fields_covered, Set.size(equal_fields)));
-              // Debug.print("fully_covered_equality_and_range_fields: " # debug_show Set.toArray(fully_covered_equality_and_range_fields));
+                // Debug.print("requires_additional_filtering: " # debug_show requires_additional_filtering);
+                // Debug.print("requires_additional_sorting: " # debug_show requires_additional_sorting);
+                // Debug.print("num, range_size: " # debug_show (num_of_range_fields_covered, Set.size(range_fields)));
+                // Debug.print("num, equal_size: " # debug_show (num_of_equal_fields_covered, Set.size(equal_fields)));
+                // Debug.print("fully_covered_equality_and_range_fields: " # debug_show Set.toArray(fully_covered_equality_and_range_fields));
 
                 indexes.add(index_details);
             };
@@ -612,7 +614,10 @@ module {
 
         indexes.sort(sort_indexes_based_on_calculated_features);
 
-        switch (indexes.getOpt(indexes.size() - 1)) {
+        // Debug.print("extracting best index");
+        let last_index = if (indexes.size() == 0) 0 else (indexes.size() - 1 : Nat);
+
+        switch (indexes.getOpt(last_index)) {
             case (null) null;
             case (?best_index_details) {
                 let {

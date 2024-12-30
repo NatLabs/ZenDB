@@ -27,8 +27,10 @@ import TypeUtils "mo:memory-collection/TypeUtils";
 import Int8Cmp "mo:memory-collection/TypeUtils/Int8Cmp";
 
 import Itertools "mo:itertools/Iter";
+import { sort_candid_type } "mo:serde/Candid/Blob/CandidUtils";
 
 import T "../Types";
+import Utils "../Utils";
 
 module {
 
@@ -42,6 +44,10 @@ module {
             case (#ok(_)) Debug.trap("send_error: unexpected error type");
             case (#err(err)) return #err(err);
         };
+    };
+
+    public func process_schema(schema : Schema) : Schema {
+        sort_candid_type(schema);
     };
 
     public func is_schema_backward_compatible(curr : Schema, new : Schema) : Bool {
@@ -217,6 +223,9 @@ module {
                             variant_name == record_key;
                         },
                     );
+
+                    // Debug.print("schema: " # debug_show (schema));
+                    // Debug.print("record: " # debug_show (record));
 
                     switch (result) {
                         case (null) return #err("Variant not found in schema");

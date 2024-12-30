@@ -228,7 +228,7 @@ module {
 
             let resolved_query = switch (opt_nested_query) {
                 case (null) #And([]);
-                case (? #Operation(op)) #And([#Operation(op)]);
+                case (?#Operation(op)) #And([#Operation(op)]);
                 case (?nested_query) nested_query;
             };
 
@@ -255,17 +255,18 @@ module {
 
         switch (hydra_query) {
             case (#Operation(field, op)) {
+                // Debug.print(debug_show (Set.toArray(collection.schema_keys_set)));
 
                 if (not Set.has(collection.schema_keys_set, thash, field)) {
 
                     if (Text.contains(field, #text("."))) {
                         for (key in Text.split(field, #text("."))) {
                             if (not Set.has(collection.schema_keys_set, thash, key)) {
-                                return #err("Field " # key # " not found in schema");
+                                return #err("Field '" # key # "' not found in schema");
                             };
                         };
                     } else {
-                        return #err("Field " # field # " not found in schema");
+                        return #err("Field '" # field # "' not found in schema");
                     };
                 };
             };
