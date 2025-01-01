@@ -90,7 +90,7 @@ public func add_user(name: Text, email: Text, age: Nat, balance: Nat, currency: 
     account = { balance; currency; };
   };
 
-  switch(await* users.insert(user)){
+  switch(users.insert(user)){
     case #ok(_) {};
     case #err(msg) { Debug.print("Error: " # msg); };
   };
@@ -142,6 +142,7 @@ func get_most_recent_users_for_currency(currency: Text, limit: Nat) : [User] {
 - [ ] Indexes
   - [x] Multiple field index (Compound Index)
   - [ ] Multi-key array index
+  - [ ] BitMap indexes
 - [ ] Zen Query Language
   - [x] operators (and, or, not, eq, gte, lte, gt, lt, in, nin)
   - [x] modifiers (limit, skip, sort)
