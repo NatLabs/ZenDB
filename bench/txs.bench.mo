@@ -161,8 +161,8 @@ module {
             "btype == '1xfer' or '2xfer'",
             "principals[0] == tx.to.owner (is recipient)",
             "principals[0..10] == tx.to.owner (is recipient)",
-            // "all txs involving principals[0]",
-            // "all txs involving principals[0..10]",
+            "all txs involving principals[0]",
+            "all txs involving principals[0..10]",
             "250 < tx.amt <= 400",
             "btype == 1burn and tx.amt >= 750",
         ]);
