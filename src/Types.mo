@@ -21,7 +21,6 @@ import Decoder "mo:serde/Candid/Blob/Decoder";
 import Candid "mo:serde/Candid";
 import Itertools "mo:itertools/Iter";
 import RevIter "mo:itertools/RevIter";
-import Tag "mo:candid/Tag";
 import BitMap "mo:bit-map";
 import Vector "mo:vector";
 import Ids "mo:incremental-ids";
@@ -58,7 +57,7 @@ module T {
     public type RevIter<A> = RevIter.RevIter<A>;
     public type Order = Order.Order;
 
-    // public type MemoryBTree = MemoryBTree.VersionedMemoryBTree;
+    public type MemoryBTree = MemoryBTree.StableMemoryBTree;
     public type BTreeUtils<K, V> = MemoryBTree.BTreeUtils<K, V>;
     public type TypeUtils<A> = TypeUtils.TypeUtils<A>;
 

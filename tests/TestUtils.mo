@@ -1,6 +1,10 @@
 import Debug "mo:base/Debug";
 import Buffer "mo:base/Buffer";
 
+import MemoryBTree "mo:memory-collection/MemoryBTree/Stable";
+
+import ZT "../src/Types";
+
 module {
 
     public func validate_records<A>(data : Buffer.Buffer<A>, records : [(Nat, A)], pred : (Nat, A) -> Bool, print : (A) -> Text) {
@@ -46,4 +50,5 @@ module {
             prev := record;
         };
     };
+
 };
