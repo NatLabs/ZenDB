@@ -15,7 +15,7 @@ test:
 	mops test 
 
 test-replica:
-	mops test --mode replica --replica dfx .replica
+	mops test --mode replica --replica pocket-ic .replica
 
 # Create temp directory for pipes if needed
 PIPE_DIR := $(shell mkdir -p ./tests/.pipes)
@@ -23,7 +23,7 @@ PIPE_DIR := $(shell mkdir -p ./tests/.pipes)
 test-all:
 	@mkfifo ./tests/.pipes/pipe1 ./tests/.pipes/pipe2 2>/dev/null || true
 	@mops test > ./tests/.pipes/pipe1 & \
-	mops test --mode replica --replica dfx .replica > ./tests/.pipes/pipe2 & \
+	mops test --mode replica --replica pocket-ic .replica > ./tests/.pipes/pipe2 & \
 	cat ./tests/.pipes/pipe1 && \
 	cat ./tests/.pipes/pipe2; \
 	wait; \
