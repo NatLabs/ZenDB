@@ -30,7 +30,6 @@ import Decoder "mo:serde/Candid/Blob/Decoder";
 import Candid "mo:serde/Candid";
 import Itertools "mo:itertools/Iter";
 import RevIter "mo:itertools/RevIter";
-import Tag "mo:candid/Tag";
 import BitMap "mo:bit-map";
 import Vector "mo:vector";
 import Ids "mo:incremental-ids";
