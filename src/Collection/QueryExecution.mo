@@ -342,7 +342,7 @@ module {
 
             // Debug.print("chosed index: " # debug_show (index.key_details));
 
-            let lower_map = Map.new<Text, T.State<Candid>>();
+            let lower_map = Map.new<Text, T.CandidInclusivityQuery>();
 
             for ((field, opt_state) in curr.0.vals()) {
                 switch (opt_state) {
@@ -353,7 +353,7 @@ module {
                 };
             };
 
-            let upper_map = Map.new<Text, T.State<Candid>>();
+            let upper_map = Map.new<Text, T.CandidInclusivityQuery>();
 
             for ((field, opt_state) in curr.1.vals()) {
                 switch (opt_state) {

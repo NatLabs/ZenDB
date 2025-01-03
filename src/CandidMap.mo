@@ -1,5 +1,6 @@
 import Array "mo:base/Array";
 import Debug "mo:base/Debug";
+import Iter "mo:base/Iter";
 import Text "mo:base/Text";
 
 import Map "mo:map/Map";
@@ -108,10 +109,11 @@ module {
 
         // Debug.print("candid_map: " # debug_show (Map.toArray(candid_map)));
 
-        public func get(key : Text) : ?Candid.Candid {
+        func get_and_cache_map_for_field(key : Text) : ?(Map.Map<Text, NestedCandid>, Bool) {
 
             let fields = Text.split(key, #text("."));
             var map = candid_map;
+            var prev_map = map;
             var types = schema;
             var result : ?Candid.Candid = null;
             var is_optional = false;
@@ -120,6 +122,7 @@ module {
             var is_compound_type = true;
 
             label extracting_candid_value loop {
+                prev_map := map;
                 let ?field = fields.next() else break extracting_candid_value;
                 current_field := field;
                 prefix_path := if (prefix_path == "") field else prefix_path # "." # field;
@@ -185,7 +188,6 @@ module {
                                 ignore Map.put(map, thash, field, #CandidMap(nested_map));
                                 map := nested_map;
                             };
-                            case (_, #Null) return ?#Null;
                             case (_) {
                                 is_compound_type := false;
                                 result := ?candid;
@@ -196,33 +198,56 @@ module {
                 };
             };
 
-            // Debug.print("candid_map: " # debug_show (Map.toArray(candid_map)));
+            ?(prev_map, is_optional);
 
-            // Debug.print("(key, prefix): " # debug_show (key, prefix_path));
+        };
 
-            let last_field = fields.next();
-            // Debug.print("(last_field, value) ->  " # debug_show (last_field, result));
-            assert last_field == null;
+        public func get(key : Text) : ?Candid.Candid {
+
+            let fields = Iter.toArray(Text.split(key, #text(".")));
+            var types = schema;
+            var result : ?Candid.Candid = null;
+            var prefix_path = "";
+            var current_field = "";
+            var is_compound_type = true;
+
+            let ?(map, is_optional) = get_and_cache_map_for_field(key) else return null;
+
+            let field = fields[fields.size() - 1];
+            current_field := field;
+            prefix_path := if (prefix_path == "") field else prefix_path # "." # field;
+
+            let ?candid = Map.get(map, thash, field) else return null;
+
+            switch (candid) {
+                case (#CandidMap(_)) {
+                    Debug.trap("CandidMap.get(): Should have cached the nested map");
+                };
+                case (#Candid((candid_type, candid))) {
+                    switch (candid_type, candid) {
+                        case ((#Record(_) or #Map(_) or #Variant(_) or #Option(#Record(_)) or #Option(#Map(_)) or #Option(#Variant(_)), #Record(_) or #Map(_) or #Variant(_) or #Option(#Record(_)) or #Option(#Map(_)) or #Option(#Variant(_)))) {
+                            Debug.trap("CandidMap.get(): Should have cached the nested map");
+                        };
+                        case (_, #Null) return ?#Null;
+                        case (_) {
+                            is_compound_type := false;
+                            result := ?candid;
+                        };
+                    };
+                };
+            };
 
             if (is_optional) switch (result) {
-                // case (? #Minimum) return Debug.trap("CandidMap: Cannot return #Minimum for an optional field");
-                // case (? #Maximum) return Debug.trap("CandidMap: Cannot return #Maximum for an optional field");
                 case (?val) return ?#Option(val : Candid.Candid);
                 case (null) return null;
             };
 
-            // Debug.print("is_compound_type: " # debug_show (is_compound_type));
-
             let opt_variant_tag = Map.get(map, thash, IS_VARIANT_TAG);
-
-            // Debug.print("opt_variant_tag: " # debug_show (opt_variant_tag));
 
             if (is_compound_type) switch (opt_variant_tag) {
                 case (?#Candid(#Text, #Text(tag))) return ?#Text(tag);
                 case (_) {};
             };
-
-            // Debug.print("result: " # debug_show (result));
 
             return result;
         };
@@ -232,6 +257,79 @@ module {
             let #Record(fields) = new_candid else Debug.trap("CandidMap only accepts #Record types");
             let #Record(types) = schema else Debug.trap("CandidMap only accepts #Record types");
             reload_record_into_map(candid_map, types, fields);
+        };
+
+        public func set(key : Text, new_value : Candid.Candid) {
+
+            let ?(map, is_optional) = get_and_cache_map_for_field(key) else Debug.trap("Field not present in schema"); // this will cache the nested fields
+
+            let fields = Iter.toArray(Text.split(key, #text(".")));
+            let field = fields[fields.size() - 1];
+
+            switch (Map.get(map, thash, IS_VARIANT_TAG)) {
+                case (?#Candid(#Text, #Text(prev_tag))) {
+
+                    let #Variant(curr_tag, new_candid) = new_value else Debug.trap("Expected a variant type");
+
+                    switch (Map.get(map, thash, prev_tag), Map.get(map, thash, curr_tag)) {
+                        case (?#Candid(prev_type, #Variant(prev_tag, prev_candid)), ?#Candid(curr_type, #Variant(curr_tag, curr_candid))) {
+                            if (prev_tag != curr_tag) {
+                                ignore Map.put(map, thash, prev_tag, #Candid(prev_type, #Null));
+                            };
+
+                            ignore Map.put(map, thash, curr_tag, #Candid(curr_type, new_candid));
+                            ignore Map.put(map, thash, IS_VARIANT_TAG, #Candid(#Text, #Text(curr_tag)));
+                        };
+                        case (_) {};
+                    };
+
+                };
+
+                case (_) {
+                    switch (Map.get(map, thash, field)) {
+                        case (?#Candid((candid_type, prev_candid))) {
+                            ignore Map.put(map, thash, field, #Candid(candid_type, new_value));
+                        };
+                        case (_) {
+                            Debug.trap("Field not present in schema");
+                        };
+                    };
+                };
+            };
+
+        };
+
+        func extract_candid_helper(map : Map.Map<Text, NestedCandid>) : Candid.Candid {
+
+            switch (Map.get(map, thash, IS_VARIANT_TAG)) {
+                case (?#Candid(#Text, #Text(tag))) switch (Map.get(map, thash, tag)) {
+                    case (?#Candid(#Text, candid)) {
+                        return #Variant(tag, candid);
+                    };
+                    case (_) {};
+                };
+                case (_) {};
+            };
+
+            let fields = Array.map<(Text, NestedCandid), (Text, Candid.Candid)>(
+                Map.toArray<Text, NestedCandid>(map),
+                func((field, nested_candid) : (Text, NestedCandid)) : (Text, Candid.Candid) {
+                    switch (nested_candid) {
+                        case (#CandidMap(nested_map)) {
+                            (field, extract_candid_helper(nested_map));
+                        };
+                        case (#Candid((_candid_type, candid))) {
+                            (field, candid);
+                        };
+                    };
+                },
+            );
+
+            #Record(fields);
+        };
+
+        public func extract_candid() : Candid.Candid {
+            extract_candid_helper(candid_map);
         };
 
     };

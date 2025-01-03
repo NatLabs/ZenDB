@@ -34,7 +34,9 @@ module T {
 
     // public type ZenDB = ZenDB.ZenDB;
 
-    public type Candid = Serde.Candid or {
+    public type Candid = Serde.Candid;
+
+    public type CandidQuery = Serde.Candid or {
         #Minimum;
         #Maximum;
     };
@@ -117,8 +119,8 @@ module T {
 
     public type IndexKeyFields = [(Text, Candid)];
 
-    public type FieldLimit = (Text, ?State<Candid>);
-    public type RecordLimits = [(Text, ?State<Candid>)];
+    public type FieldLimit = (Text, ?State<CandidQuery>);
+    public type RecordLimits = [(Text, ?State<CandidQuery>)];
     public type Bounds = (RecordLimits, RecordLimits);
 
     public type ZqlOperators = {
@@ -186,7 +188,7 @@ module T {
         #False : T;
     };
 
-    public type CandidQuery = State<Candid>;
+    public type CandidInclusivityQuery = State<CandidQuery>;
 
     public type FullScanDetails = {
         requires_additional_sorting : Bool;
@@ -252,7 +254,24 @@ module T {
         sorted_in_reverse : Bool;
         fully_covered_equality_and_range_fields : Set.Set<Text>;
         score : Float;
+    };
 
+    public type UpdateFieldOperations = {
+        #set : (Candid.Candid);
+        #inc : (Int);
+        #dec : (Int);
+        #mul : (Int);
+        #div : (Int);
+    };
+
+    public type UpdateOperations<Record> = {
+        #doc : Record;
+        #ops : [(Text, UpdateFieldOperations)];
+    };
+
+    public type InternalUpdateOperations = {
+        #doc : CandidBlob;
+        #ops : [(Text, UpdateFieldOperations)];
     };
 
 };

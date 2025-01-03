@@ -37,6 +37,7 @@ module {
     type Order = Order.Order;
     type Schema = T.Schema;
     type Candid = T.Candid;
+    type CandidQuery = T.CandidQuery;
     type Result<A, B> = Result.Result<A, B>;
 
     func send_error<A, B, C>(res : Result<A, B>) : Result<C, B> {
@@ -244,7 +245,7 @@ module {
     };
 
     // schema is added here to get the order of the #Variant type
-    public func cmp_candid(schema : Schema, a : Candid, b : Candid) : Int8 {
+    public func cmp_candid(schema : Schema, a : CandidQuery, b : CandidQuery) : Int8 {
 
         switch (schema, a, b) {
             // The #Minimum variant is used in queries to represent the minimum value

@@ -28,7 +28,8 @@ import ByteUtils "../ByteUtils";
 
 module {
     type Candid = T.Candid;
-    // type Candid = Candid.Candid;
+    type CandidQuery = T.CandidQuery;
+    // type CandidQuery = CandidQuery.CandidQuery;
 
     public let OrchidTypeCode = {
         // primitive types
@@ -68,9 +69,9 @@ module {
 
     };
 
-    public let Orchid : TypeUtils.TypeUtils<[Candid]> = {
+    public let Orchid : TypeUtils.TypeUtils<[CandidQuery]> = {
         blobify = {
-            to_blob = func(candid_values : [Candid]) : Blob {
+            to_blob = func(candid_values : [CandidQuery]) : Blob {
                 let buffer = Buffer.Buffer<Nat8>(100);
                 buffer.add(candid_values.size() |> Nat8.fromNat(_));
 
@@ -85,7 +86,7 @@ module {
                 );
 
             };
-            from_blob = func(blob : Blob) : [Candid] {
+            from_blob = func(blob : Blob) : [CandidQuery] {
                 // we don't need to decode the index keys because we are only interested in the index values
                 return [];
 
@@ -95,7 +96,7 @@ module {
 
                 var i = 1;
 
-                let buffer = Buffer.Buffer<Candid>(8);
+                let buffer = Buffer.Buffer<CandidQuery>(8);
                 //                case (#Nat(n)) {
                 //     buffer.add(OrchidTypeCode.Nat);
                 //     var num = n;
@@ -177,7 +178,7 @@ module {
 
     };
 
-    func encode(buffer : Buffer.Buffer<Nat8>, candid : Candid) {
+    func encode(buffer : Buffer.Buffer<Nat8>, candid : CandidQuery) {
 
         switch (candid) {
             case (#Minimum) buffer.add(OrchidTypeCode.Minimum);
