@@ -157,14 +157,24 @@ module {
             "insert",
             "clear",
             "insert with 5 indexes",
-            "btype == '1mint'",
-            "btype == '1xfer' or '2xfer'",
-            "principals[0] == tx.to.owner (is recipient)",
-            "principals[0..10] == tx.to.owner (is recipient)",
-            "all txs involving principals[0]",
-            "all txs involving principals[0..10]",
-            "250 < tx.amt <= 400",
-            "btype == 1burn and tx.amt >= 750",
+            "query() -> btype == '1mint'",
+            "query() -> btype == '1xfer' or '2xfer'",
+            "query() -> principals[0] == tx.to.owner (is recipient)",
+            "query() -> principals[0..10] == tx.to.owner (is recipient)",
+            "query() -> all txs involving principals[0]",
+            "query() -> all txs involving principals[0..10]",
+            "query() -> 250 < tx.amt <= 400",
+            "query() -> btype == 1burn and tx.amt >= 750",
+            "update() -> #inc amt += 100 where btype == 1xfer",
+            // "update() -> #dec amt -= 100 where btype == 1xfer",
+            // "update() -> #div amt /= 2 where btype == 1xfer",
+            // "update() -> #mul amt *= 2 where btype == 1xfer",
+            // "update() -> #set amt = 100 where btype == 1xfer",
+            // "update() -> #doc -> replace tx with new tx where btype == 1xfer",
+            // "update() -> #ops -> [#inc, #div, #mul, #div] on tx.amt where btype == 1xfer",
+            // "update() -> #ops -> [#inc, #div, #mul, #div, #set] on diff fields where btype == 1xfer",
+
+
         ]);
 
         let limit = 10_000;
@@ -240,7 +250,7 @@ module {
                 // re-use the predefined txs
             };
 
-            case ("btype == '1mint'") {
+            case ("query() -> btype == '1mint'") {
                 let db_query = ZenDB.QueryBuilder().Where(
                     "btype",
                     #eq(#Text("1mint")),
@@ -249,7 +259,7 @@ module {
                 let #ok(matching_txs) = txs.search(db_query);
             };
 
-            case ("btype == '1xfer' or '2xfer'") {
+            case ("query() -> btype == '1xfer' or '2xfer'") {
                 let db_query = ZenDB.QueryBuilder().Where(
                     "btype",
                     #In([#Text("1xfer"), #Text("2xfer")]),
@@ -258,7 +268,7 @@ module {
                 let #ok(matching_txs) = txs.search(db_query);
             };
 
-            case ("principals[0] == tx.to.owner (is recipient)") {
+            case ("query() -> principals[0] == tx.to.owner (is recipient)") {
                 let db_query = ZenDB.QueryBuilder().Where(
                     "tx.to.owner",
                     #eq(#Principal(principals.get(0))),
@@ -267,7 +277,7 @@ module {
                 let #ok(matching_txs) = txs.search(db_query);
             };
 
-            case ("principals[0..10] == tx.to.owner (is recipient)") {
+            case ("query() -> principals[0..10] == tx.to.owner (is recipient)") {
 
                 let db_query = ZenDB.QueryBuilder().Where(
                     "tx.to.owner",
@@ -277,7 +287,7 @@ module {
                 let #ok(matching_txs) = txs.search(db_query);
             };
 
-            case ("all txs involving principals[0]") {
+            case ("query() -> all txs involving principals[0]") {
                 let db_query = ZenDB.QueryBuilder().Where(
                     "tx.to.owner",
                     #eq(#Principal(principals.get(0))),
@@ -292,7 +302,7 @@ module {
                 let #ok(matching_txs) = txs.search(db_query);
             };
 
-            case ("all txs involving principals[0..10]") {
+            case ("query() -> all txs involving principals[0..10]") {
                 let candid_principals = Array.map<Principal, ZenDB.Candid>(
                     Iter.toArray(Array.slice(principals, 0, 10)),
                     func(p : Principal) : ZenDB.Candid = #Principal(p),
@@ -312,7 +322,7 @@ module {
                 let #ok(matching_txs) = txs.search(db_query);
             };
 
-            case ("250 < tx.amt <= 400") {
+            case ("query() -> 250 < tx.amt <= 400") {
                 let db_query = ZenDB.QueryBuilder().Where(
                     "tx.amt",
                     #gt(#Nat(250)),
@@ -324,7 +334,7 @@ module {
                 let #ok(matching_txs) = txs.search(db_query);
             };
 
-            case ("btype == 1burn and tx.amt >= 750") {
+            case ("query() -> btype == 1burn and tx.amt >= 750") {
                 let db_query = ZenDB.QueryBuilder().Where(
                     "tx.amt",
                     #gte(#Nat(750)),
@@ -334,6 +344,13 @@ module {
                 );
 
                 let #ok(matching_txs) = txs.search(db_query);
+            };
+
+            case ("update() -> #inc amt += 100 where btype == 1xfer") {
+                let #ok(_) = txs.update(
+                    ZenDB.QueryBuilder().Where( "btype", #eq(#Text("1xfer"))),
+                    #ops([ ("tx.amt", #inc(100)) ]),
+                );
             };
 
             case (_) {
@@ -358,7 +375,7 @@ module {
                 // re-use the predefined txs
             };
 
-            case ("btype == '1mint'") {
+            case ("query() -> btype == '1mint'") {
                 let db_query = ZenDB.QueryBuilder().Where(
                     "btype",
                     #eq(#Text("1mint")),
@@ -367,7 +384,7 @@ module {
                 let #ok(matching_txs) = txs.search(db_query);
             };
 
-            case ("btype == '1xfer' or '2xfer'") {
+            case ("query() -> btype == '1xfer' or '2xfer'") {
                 let db_query = ZenDB.QueryBuilder().Where(
                     "btype",
                     #In([#Text("1xfer"), #Text("2xfer")]),
@@ -376,7 +393,7 @@ module {
                 let #ok(matching_txs) = txs.search(db_query);
             };
 
-            case ("principals[0] == tx.to.owner (is recipient)") {
+            case ("query() -> principals[0] == tx.to.owner (is recipient)") {
                 let db_query = ZenDB.QueryBuilder().Where(
                     "tx.to.owner",
                     #eq(#Principal(principals.get(0))),
@@ -385,7 +402,7 @@ module {
                 let #ok(matching_txs) = txs.search(db_query);
             };
 
-            case ("principals[0..10] == tx.to.owner (is recipient)") {
+            case ("query() -> principals[0..10] == tx.to.owner (is recipient)") {
                 let candid_principals = Array.map<Principal, ZenDB.Candid>(
                     Iter.toArray(Array.slice<Principal>(principals, 0, 10)),
                     func(p : Principal) : ZenDB.Candid = #Principal(p),
@@ -399,7 +416,7 @@ module {
                 let #ok(matching_txs) = txs.search(db_query);
             };
 
-            case ("all txs involving principals[0]") {
+            case ("query() -> all txs involving principals[0]") {
                 let db_query = ZenDB.QueryBuilder().Where(
                     "tx.to.owner",
                     #eq(#Principal(principals.get(0))),
@@ -414,7 +431,7 @@ module {
                 let #ok(matching_txs) = txs.search(db_query);
             };
 
-            case ("all txs involving principals[0..10]") {
+            case ("query() -> all txs involving principals[0..10]") {
                 let candid_principals = Array.map<Principal, ZenDB.Candid>(
                     Iter.toArray(Array.slice(principals, 0, 10)),
                     func(p : Principal) : ZenDB.Candid = #Principal(p),
@@ -434,7 +451,7 @@ module {
                 let #ok(matching_txs) = txs.search(db_query);
             };
 
-            case ("250 < tx.amt <= 400") {
+            case ("query() -> 250 < tx.amt <= 400") {
                 let db_query = ZenDB.QueryBuilder().Where(
                     "tx.amt",
                     #gt(#Nat(250)),
@@ -446,7 +463,7 @@ module {
                 let #ok(matching_txs) = txs.search(db_query);
             };
 
-            case ("btype == 1burn and tx.amt >= 750") {
+            case ("query() -> btype == 1burn and tx.amt >= 750") {
                 let db_query = ZenDB.QueryBuilder().Where(
                     "btype",
                     #eq(#Text("1burn")),
@@ -456,6 +473,13 @@ module {
                 );
 
                 let #ok(matching_txs) = txs.search(db_query);
+            };
+
+            case ("update() -> #inc amt += 100 where btype == 1xfer") {
+                let #ok(_) = txs.update(
+                    ZenDB.QueryBuilder().Where("btype", #eq(#Text("1xfer"))),
+                    #ops([ ("tx.amt", #inc(100)) ]),
+                );
             };
 
             case (_) {
@@ -493,7 +517,7 @@ module {
                 };
             };
 
-            case ("btype == '1mint'") {
+            case ("query() -> btype == '1mint'") {
                 let results = txs.filter(
                     func(tx : Tx) : Bool {
                         tx.btype == "1mint";
@@ -502,7 +526,7 @@ module {
 
             };
 
-            case ("btype == '1xfer' or '2xfer'") {
+            case ("query() -> btype == '1xfer' or '2xfer'") {
                 let results = txs.filter(
                     func(tx : Tx) : Bool {
                         tx.btype == "1xfer" or tx.btype == "2xfer";
@@ -510,7 +534,7 @@ module {
                 );
             };
 
-            case ("principals[0] == tx.to.owner (is recipient)") {
+            case ("query() -> principals[0] == tx.to.owner (is recipient)") {
                 let results = txs.filter(
                     func(tx : Tx) : Bool {
                         switch (tx.tx.to) {
@@ -523,7 +547,7 @@ module {
                 );
             };
 
-            case ("principals[0..10] == tx.to.owner (is recipient)") {
+            case ("query() -> principals[0..10] == tx.to.owner (is recipient)") {
                 let principals_0_10 = Array.take(principals, 10);
 
                 let results = txs.filter(
@@ -539,7 +563,7 @@ module {
 
             };
 
-            case ("all txs involving principals[0]") {
+            case ("query() -> all txs involving principals[0]") {
                 let results = txs.filter(
                     func(tx : Tx) : Bool {
 
@@ -567,7 +591,7 @@ module {
                 );
             };
 
-            case ("all txs involving principals[0..10]") {
+            case ("query() -> all txs involving principals[0..10]") {
                 let principals_0_10 = Array.take(principals, 10);
 
                 let results = txs.filter(
@@ -598,7 +622,7 @@ module {
 
             };
 
-            case ("250 < tx.amt <= 400") {
+            case ("query() -> 250 < tx.amt <= 400") {
                 let results = txs.filter(
                     func(tx : Tx) : Bool {
                         tx.tx.amt > 250 and tx.tx.amt <= 400;
@@ -606,12 +630,23 @@ module {
                 );
             };
 
-            case ("btype == 1burn and tx.amt >= 750") {
+            case ("query() -> btype == 1burn and tx.amt >= 750") {
                 let results = txs.filter(
                     func(tx : Tx) : Bool {
                         tx.btype == "1burn" and tx.tx.amt >= 750;
                     }
                 );
+            };
+            case ("update() -> #inc amt += 100 where btype == 1xfer") {
+                // let #ok(results) = txs.filter(
+                //     func(tx : Tx) : Bool {
+                //         tx.btype == "1xfer";
+                //     }
+                // );
+
+                // for ((id, tx) in results.vals()) {
+                //     let #ok(_) = txs.updateById(id, #ops([ ("tx.amt", #inc(100)) ]));
+                // };
             };
 
             case (_) {
@@ -686,7 +721,7 @@ module {
 
             case ("insert with 5 indexes") {};
 
-            case ("btype == '1mint'") {
+            case ("query() -> btype == '1mint'") {
                 let db_query = ZenDB.QueryBuilder().Where(
                     "btype",
                     #eq(#Text("1mint")),
@@ -696,7 +731,7 @@ module {
                 
             };
 
-            case ("btype == '1xfer' or '2xfer'") {
+            case ("query() -> btype == '1xfer' or '2xfer'") {
                 let db_query = ZenDB.QueryBuilder().Where(
                     "btype",
                     #In([#Text("1xfer"), #Text("2xfer")]),
@@ -705,7 +740,7 @@ module {
                 skip_limit_paginated_query(db_query);
             };
 
-            case ("principals[0] == tx.to.owner (is recipient)") {
+            case ("query() -> principals[0] == tx.to.owner (is recipient)") {
                 let db_query = ZenDB.QueryBuilder().Where(
                     "tx.to.owner",
                     #eq(#Principal(principals.get(0))),
@@ -713,7 +748,7 @@ module {
 
                 skip_limit_paginated_query(db_query);
             };
-            case ("principals[0..10] == tx.to.owner (is recipient)") {
+            case ("query() -> principals[0..10] == tx.to.owner (is recipient)") {
                 let candid_principals = Array.map<Principal, ZenDB.Candid>(
                     Iter.toArray(Array.slice<Principal>(principals, 0, 10)),
                     func(p : Principal) : ZenDB.Candid = #Principal(p),
@@ -728,7 +763,7 @@ module {
             };
 
 
-            case ("all txs involving principals[0]") {
+            case ("query() -> all txs involving principals[0]") {
                 let db_query = ZenDB.QueryBuilder().Where(
                     "tx.to.owner",
                     #eq(#Principal(principals.get(0))),
@@ -743,7 +778,7 @@ module {
                 skip_limit_paginated_query(db_query);
             };
 
-            case ("all txs involving principals[0..10]") {
+            case ("query() -> all txs involving principals[0..10]") {
                 let candid_principals = Array.map<Principal, ZenDB.Candid>(
                     Iter.toArray(Array.slice(principals, 0, 10)),
                     func(p : Principal) : ZenDB.Candid = #Principal(p),
@@ -763,7 +798,7 @@ module {
                 skip_limit_paginated_query(db_query);
             };
 
-            case ("250 < tx.amt <= 400") {
+            case ("query() -> 250 < tx.amt <= 400") {
                 let db_query = ZenDB.QueryBuilder().Where(
                     "tx.amt",
                     #gt(#Nat(250)),
@@ -775,7 +810,7 @@ module {
                 skip_limit_paginated_query(db_query);
             };
 
-            case ("btype == 1burn and tx.amt >= 750") {
+            case ("query() -> btype == 1burn and tx.amt >= 750") {
                 let db_query = ZenDB.QueryBuilder().Where(
                     "btype",
                     #eq(#Text("1burn")),

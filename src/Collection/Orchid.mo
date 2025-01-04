@@ -20,16 +20,13 @@ import MemoryBTree "mo:memory-collection/MemoryBTree/Stable";
 import TypeUtils "mo:memory-collection/TypeUtils";
 import Int8Cmp "mo:memory-collection/TypeUtils/Int8Cmp";
 
-import Candid "mo:serde/Candid";
 import Itertools "mo:itertools/Iter";
 
 import T "../Types";
 import ByteUtils "../ByteUtils";
 
 module {
-    type Candid = T.Candid;
     type CandidQuery = T.CandidQuery;
-    // type CandidQuery = CandidQuery.CandidQuery;
 
     public let OrchidTypeCode = {
         // primitive types
@@ -88,6 +85,7 @@ module {
             };
             from_blob = func(blob : Blob) : [CandidQuery] {
                 // we don't need to decode the index keys because we are only interested in the index values
+                // but it might be a good idea for debugging
                 return [];
 
                 let bytes = Blob.toArray(blob);

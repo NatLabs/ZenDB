@@ -565,7 +565,7 @@ module {
         for ((field_name, op) in update_operations.vals()) {
             let ?prev_value = prev_record_candid_map.get(field_name) else Debug.trap("Field '" # field_name # "' not found in record");
 
-            switch (op) {
+            let res = switch (op) {
                 case (#set(value)) {
                     prev_record_candid_map.set(field_name, value);
                 };
@@ -585,7 +585,11 @@ module {
                     let new_value = CandidOps.div(prev_value, #Int(value));
                     prev_record_candid_map.set(field_name, new_value);
                 };
-                case (_) {};
+            };
+
+            switch (res) {
+                case (#err(err)) Debug.trap("Failed to update field '" # field_name # "': " # err);
+                case (#ok(_)) {};
             };
         };
 
@@ -649,7 +653,12 @@ module {
                 // should validated the updated fields instead of the entire record
                 Utils.assert_result(Schema.validate_record(collection.schema, new_candid_record));
 
-                let #ok(new_candid_blob) = Candid.encodeOne(new_candid_record, null);
+                let #ok(new_candid_blob) = Candid.encodeOne(
+                    new_candid_record,
+                    ?{
+                        Candid.defaultOptions with types = ?[collection.schema]
+                    },
+                );
 
                 assert ?prev_candid_blob == MemoryBTree.insert(collection.main, main_btree_utils, id, new_candid_blob);
 

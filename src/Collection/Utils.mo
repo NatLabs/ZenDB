@@ -103,7 +103,11 @@ module CollectionUtils {
             if (index_key == C.RECORD_ID_FIELD) {
                 buffer.add(#Nat(id));
             } else {
-                let ?candid_value = candid_map.get(index_key) else Debug.trap("get_index_columns: field '" # debug_show index_key # "' not found in record");
+
+                let ?candid_value = candid_map.get(index_key) else Debug.trap("
+                get_index_columns: field '" # debug_show index_key # "' not found in record
+                candid: " # debug_show candid_map.extract_candid() # "
+                ");
                 buffer.add(candid_value);
             };
         };
@@ -275,7 +279,7 @@ module CollectionUtils {
         );
     };
 
-    func get_nested_candid_field(_candid_record : Candid, key : Text) : ?Candid {
+    public func get_nested_candid_field(_candid_record : Candid, key : Text) : ?Candid {
         let nested_field_keys = Text.split(key, #text("."));
 
         var candid_record = _candid_record;
@@ -297,27 +301,6 @@ module CollectionUtils {
         };
 
         return ?candid_record;
-    };
-
-    func get_nested_candid_type(_schema : Schema, key : Text) : ?Schema {
-        let nested_field_keys = Text.split(key, #text("."));
-
-        var schema = _schema;
-
-        for (key in nested_field_keys) {
-            let #Record(record_fields) or #Option(#Record(record_fields)) = schema else return null;
-
-            let ?found_field = Array.find<(Text, Schema)>(
-                record_fields,
-                func((variant_name, _) : (Text, Schema)) : Bool {
-                    variant_name == key;
-                },
-            ) else return null;
-
-            schema := found_field.1;
-        };
-
-        return ?schema;
     };
 
 };

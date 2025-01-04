@@ -12,7 +12,7 @@ bench:
 	mops bench  --gc incremental%
 
 test:
-	mops test 
+	mops test .test -r verbose
 
 test-replica:
 	mops test --mode replica --replica pocket-ic .replica
