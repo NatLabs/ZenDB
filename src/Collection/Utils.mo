@@ -275,7 +275,7 @@ module CollectionUtils {
         );
     };
 
-    func get_nested_candid_field(_candid_record : Candid, key : Text) : ?Candid {
+    public func get_nested_candid_field(_candid_record : Candid, key : Text) : ?Candid {
         let nested_field_keys = Text.split(key, #text("."));
 
         var candid_record = _candid_record;
@@ -297,27 +297,6 @@ module CollectionUtils {
         };
 
         return ?candid_record;
-    };
-
-    func get_nested_candid_type(_schema : Schema, key : Text) : ?Schema {
-        let nested_field_keys = Text.split(key, #text("."));
-
-        var schema = _schema;
-
-        for (key in nested_field_keys) {
-            let #Record(record_fields) or #Option(#Record(record_fields)) = schema else return null;
-
-            let ?found_field = Array.find<(Text, Schema)>(
-                record_fields,
-                func((variant_name, _) : (Text, Schema)) : Bool {
-                    variant_name == key;
-                },
-            ) else return null;
-
-            schema := found_field.1;
-        };
-
-        return ?schema;
     };
 
 };

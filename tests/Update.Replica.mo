@@ -92,12 +92,10 @@ actor {
                     func() {
                         let #ok(_) = data.updateById(
                             item2_id,
-                            #ops({
-                                version = #v2({
-                                    c = #set(#Text("hello"));
-                                    d = #set(#Bool(false));
-                                });
-                            }),
+                            #ops([
+                                ("version.v2.c", #set(#Text("hello"))),
+                                ("version.v2.d", #set(#Bool(false))),
+                            ]),
                         );
 
                         assert #ok([]) == data.search(
