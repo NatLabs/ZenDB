@@ -312,7 +312,7 @@ module {
         cursor_map : CandidMap.CandidMap,
     ) : QueryPlan {
 
-        switch (db_query) {
+        let query_plan = switch (db_query) {
             case (#And(operations)) query_plan_from_and_operation(
                 collection,
                 operations,
@@ -330,6 +330,10 @@ module {
             );
             case (_) Debug.trap("create_query_plan(): Unsupported query type");
         };
+
+        Debug.print(debug_show ({ query_plan with subplans = []; scans = [] }));
+
+        query_plan;
     };
 
 };

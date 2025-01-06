@@ -14,7 +14,6 @@ import Int "mo:base/Int";
 import Nat "mo:base/Nat";
 import Debug "mo:base/Debug";
 
-import Itertools "mo:itertools/Iter";
 import FloatX "mo:xtended-numbers/FloatX";
 
 module {

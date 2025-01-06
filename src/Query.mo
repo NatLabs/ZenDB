@@ -78,13 +78,8 @@ module {
             switch (not_op) {
                 case (#eq(value)) {
                     // #Not(#eq(x)) -> #Or([#lt(x), #gt(x)])
-
-                    if (not is_and) {
-                        buffer.add(#Operation(key, #lt(value)));
-                        buffer.add(#Operation(key, #gt(value)));
-                    } else {
-                        buffer.add(#Or([#Operation(key, #lt(value)), #Operation(key, #gt(value))]));
-                    };
+                    ignore Or(key, #lt(value));
+                    ignore Or(key, #gt(value));
 
                 };
                 case (#lt(value)) {
@@ -104,13 +99,15 @@ module {
                     buffer.add(#Operation(key, #lt(value)));
                 };
                 case (#between(min, max)) {
-                    // #Not(#between(min, max)) -> #Or([#lt(min), #gt(max)])
-                    ignore Or(key, #lt(min));
-                    ignore Or(key, #gt(max));
+                    // #Not(#between(min, max))
+                    // -> #Not(#And([#gte(min), #lte(max)]))
+                    // -> #Or([#lt(min), #gt(max)])
+                    ignore Or(key, #lte(min));
+                    ignore Or(key, #gte(max));
                 };
                 case (#exists) {
-                    // #Not(#exists) -> #Not(#exists)
-                    Debug.trap("#Not(#exists) is not implemented");
+                    // #Not(#exists) -> #Not(#Not(#eq(null))) -> #eq(null)
+                    buffer.add(#Operation(key, #eq(#Null)));
                 };
                 case (#startsWith(prefix)) {
                     // #Not(#startsWith(prefix)) -> #Or([#lt(prefix), #gt(prefix)])
@@ -145,8 +142,23 @@ module {
             };
         };
 
+        func handle_op_aliases(op : ZqlOperators) {
+            switch (op) {
+                case (#exists) {
+
+                };
+                case (_) {
+                    Debug.trap("Operator '" # debug_show op # "' is not an alias");
+                };
+            };
+        };
+
         func handle_op(key : Text, op : ZqlOperators) {
             switch (op) {
+                // aliases
+                case (#exists) {
+                    handle_op(key, #Not(#eq(#Null)));
+                };
                 case (#In(values)) {
                     update_query(false);
                     for (value in values.vals()) {
@@ -157,12 +169,8 @@ module {
                     handle_not(key, not_op);
                 };
                 case (#between(min, max)) {
-                    update_query(true);
-                    buffer.add(#Operation(key, #gte(min)));
-                    buffer.add(#Operation(key, #lte(max)));
-                };
-                case (#exists) {
-                    handle_not(key, #Not(#eq(#Null)));
+                    ignore And(key, #gte(min));
+                    ignore And(key, #lte(max));
                 };
                 case (_) {
                     buffer.add(#Operation(key, op));

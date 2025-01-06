@@ -121,7 +121,7 @@ module {
                     let full_scan_iter = MemoryBTree.keys(collection.main, main_btree_utils);
 
                     if (requires_additional_filtering) {
-                        CollectionUtils.multi_filter(collection, full_scan_iter, Buffer.fromArray([(filter_bounds)]));
+                        CollectionUtils.multi_filter(collection, full_scan_iter, Buffer.fromArray([(filter_bounds)]), query_plan.is_and_operation);
                     } else {
                         full_scan_iter;
                     };
@@ -156,7 +156,7 @@ module {
                         switch (index_based_interval_filtering(collection, bitmap_cache, index_scan_details)) {
                             case (?{ bitmap; opt_filter_bounds }) switch (opt_filter_bounds) {
                                 case (?filter_bounds) {
-                                    CollectionUtils.multi_filter(collection, bitmap.vals(), Buffer.fromArray([filter_bounds]));
+                                    CollectionUtils.multi_filter(collection, bitmap.vals(), Buffer.fromArray([filter_bounds]), query_plan.is_and_operation);
                                 };
                                 case (null) {
                                     bitmaps.add(bitmap);
@@ -167,7 +167,7 @@ module {
                                 // Debug.print("could not use index based filtering");
 
                                 let record_ids = CollectionUtils.record_ids_from_index_intervals(collection, index.name, [interval], false);
-                                CollectionUtils.multi_filter(collection, record_ids, Buffer.fromArray([filter_bounds]));
+                                CollectionUtils.multi_filter(collection, record_ids, Buffer.fromArray([filter_bounds]), query_plan.is_and_operation);
                             };
                         };
 
@@ -591,7 +591,7 @@ module {
 
                         // switch (opt_filter_bounds) {
                         //     case (?filter_bounds) {
-                        //         record_ids := CollectionUtils.multi_filter(collection, bitmap.vals(), Buffer.fromArray([filter_bounds]));
+                        //         record_ids := CollectionUtils.multi_filter(collection, bitmap.vals(), Buffer.fromArray([filter_bounds]), query_plan.is_and_operation);
                         //     };
                         //     case (null) if (requires_sorting or requires_additional_sorting) {
 
@@ -612,7 +612,7 @@ module {
                         //     };
                         // };
 
-                        record_ids := CollectionUtils.multi_filter(collection, record_ids, Buffer.fromArray([filter_bounds]));
+                        record_ids := CollectionUtils.multi_filter(collection, record_ids, Buffer.fromArray([filter_bounds]), query_plan.is_and_operation);
                     };
 
                     if (requires_additional_sorting) {
@@ -769,11 +769,12 @@ module {
                     collection,
                     MemoryBTree.keys(collection.main, main_btree_utils),
                     full_scan_filter_bounds,
+                    query_plan.is_and_operation,
                 );
             } else {
                 let record_ids_in_interval = CollectionUtils.record_ids_from_index_intervals(collection, smallest_interval_index, [(smallest_interval_start, smallest_interval_end)], false);
 
-                let filtered_ids = CollectionUtils.multi_filter(collection, record_ids_in_interval, full_scan_filter_bounds);
+                let filtered_ids = CollectionUtils.multi_filter(collection, record_ids_in_interval, full_scan_filter_bounds, query_plan.is_and_operation);
             };
 
             // if (not requires_sorting and and_operations == []) return #Ids(filtered_ids);
@@ -900,7 +901,7 @@ module {
                     var record_ids : Iter<Nat> = CollectionUtils.record_ids_from_index_intervals(collection, index.name, [interval], sorted_in_reverse);
 
                     if (requires_additional_filtering) {
-                        record_ids := CollectionUtils.multi_filter(collection, record_ids, Buffer.fromArray([filter_bounds]));
+                        record_ids := CollectionUtils.multi_filter(collection, record_ids, Buffer.fromArray([filter_bounds]), query_plan.is_and_operation);
                     };
 
                     if (requires_additional_sorting) {
@@ -1035,7 +1036,7 @@ module {
 
             let main_btree_utils = CollectionUtils.get_main_btree_utils();
             let record_ids = MemoryBTree.keys(collection.main, main_btree_utils);
-            let filtered_ids = CollectionUtils.multi_filter(collection, record_ids, full_scan_filter_bounds);
+            let filtered_ids = CollectionUtils.multi_filter(collection, record_ids, full_scan_filter_bounds, query_plan.is_and_operation);
 
             if (requires_sorting) {
                 let buffer = Buffer.Buffer<Nat>(8);

@@ -260,19 +260,24 @@ module CollectionUtils {
         collection : StableCollection,
         records : Iter<Nat>,
         bounds : Buffer.Buffer<(lower : [(Text, ?T.State<Candid>)], upper : [(Text, ?T.State<Candid>)])>,
+        is_and : Bool,
     ) : Iter<Nat> {
         Iter.filter<Nat>(
             records,
             func(id : Nat) : Bool {
                 let ?candid = CollectionUtils.lookup_candid_record(collection, id) else Debug.trap("multi_filter: candid_map_bytes not found");
 
-                var result = true;
-
-                for ((lower, upper) in bounds.vals()) {
-                    result := result and candid_map_filter_condition(collection, candid, lower, upper);
+                func filter_fn(
+                    (lower, upper) : (([(Text, ?T.State<Candid>)], [(Text, ?T.State<Candid>)]))
+                ) : Bool {
+                    candid_map_filter_condition(collection, candid, lower, upper);
                 };
 
-                result;
+                if (is_and) {
+                    Itertools.all(bounds.vals(), filter_fn);
+                } else {
+                    Itertools.any(bounds.vals(), filter_fn);
+                };
             },
         );
     };

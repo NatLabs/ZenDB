@@ -144,11 +144,10 @@ module {
 
         let index_data_utils = CollectionUtils.get_index_data_utils(collection, index_key_details);
 
-        let candid_map = CandidMap.CandidMap(collection.schema, #Record([]));
-
         for ((id, candid_blob) in MemoryBTree.entries(collection.main, main_btree_utils)) {
             let candid = CollectionUtils.decode_candid_blob(collection, candid_blob);
-            candid_map.reload(candid);
+            // candid_map.reload(candid);
+            let candid_map = CandidMap.CandidMap(collection.schema, candid);
 
             let buffer = Buffer.Buffer<(Candid)>(8);
 

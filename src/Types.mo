@@ -183,18 +183,18 @@ module T {
     public type FullScanDetails = {
         requires_additional_sorting : Bool;
         requires_additional_filtering : Bool;
-        scan_bounds : T.Bounds;
-        filter_bounds : T.Bounds;
+        scan_bounds : Bounds;
+        filter_bounds : Bounds;
     };
 
     public type IndexScanDetails = {
-        index : T.Index;
+        index : Index;
         requires_additional_sorting : Bool;
         requires_additional_filtering : Bool;
         sorted_in_reverse : Bool;
         interval : (Nat, Nat);
-        scan_bounds : T.Bounds;
-        filter_bounds : T.Bounds;
+        scan_bounds : Bounds;
+        filter_bounds : Bounds;
         simple_operations : [(Text, T.ZqlOperators)];
     };
 
