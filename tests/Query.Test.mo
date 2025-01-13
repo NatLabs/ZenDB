@@ -56,6 +56,8 @@ func query_tests(texts : ZenDB.Collection<Data>) {
     test(
         "#eq",
         func() {
+            Debug.print("Running #eq test");
+
             assert texts.search(
                 QueryBuilder().Where("value", #eq(#Text("a")))
             ) == #ok([(0, { value = "a" })]);
@@ -379,7 +381,10 @@ suite(
 suite(
     "testing on indexed field",
     func() {
-        let #ok(_) = texts.create_index(["value"]);
+        Debug.print("trying to index field");
+        let #ok(_) = texts.create_and_populate_index(["value"]);
+        Debug.print("field indexed");
+
         query_tests(texts);
     },
 );

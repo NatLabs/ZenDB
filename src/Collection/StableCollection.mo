@@ -136,29 +136,13 @@ module {
     public func create_index(
         collection : StableCollection,
         main_btree_utils : BTreeUtils<Nat, Blob>,
-        _index_key_details : [(Text)],
+        index_name : Text,
+        index_key_details : [(Text, SortDirection)],
     ) : Result<(), Text> {
 
         let index_key_details : [(Text, SortDirection)] = Array.append(
-            Array.map<Text, (Text, SortDirection)>(
-                _index_key_details,
-                func(key : Text) : (Text, SortDirection) {
-                    (key, #Ascending);
-                },
-            ),
+            index_key_details,
             [(C.RECORD_ID_FIELD, #Ascending)],
-        );
-
-        // let sorted_index_key_details = Array.sort(index_key_details, func(a : (Text, SortDirection), b : (Text, SortDirection)) : Order { Text.compare(a.0, b.0) });
-
-        let index_name = Text.join(
-            "_",
-            Iter.map<(Text, SortDirection), Text>(
-                index_key_details.vals(),
-                func((name, dir) : (Text, SortDirection)) : Text {
-                    name # (debug_show dir);
-                },
-            ),
         );
 
         switch (Map.get(collection.indexes, thash, index_name)) {
@@ -186,16 +170,16 @@ module {
     public func create_and_populate_index(
         collection : StableCollection,
         _main_btree_utils : BTreeUtils<Nat, Blob>,
-        index_key_details : [(Text)],
-        opt_batch_size : ?Nat,
+        index_name : Text,
+        index_key_details : [(Text, SortDirection)],
     ) : Result<(), Text> {
 
-        switch (create_index(collection, _main_btree_utils, index_key_details)) {
+        switch (create_index(collection, _main_btree_utils, index_name, index_key_details)) {
             case (#err(err)) return #err(err);
             case (#ok(_)) {};
         };
 
-        switch (populate_index(collection, _main_btree_utils, index_key_details, opt_batch_size)) {
+        switch (populate_index(collection, _main_btree_utils, index_name, opt_batch_size)) {
             case (#err(err)) return #err(err);
             case (#ok(_)) {};
         };
@@ -234,6 +218,8 @@ module {
         indexes : Buffer.Buffer<Index>,
         entries : Iter<(Nat, Blob)>,
     ) : Result<(), Text> {
+        Debug.print("internally populating indexes");
+
         for ((id, candid_blob) in entries) {
             let candid = CollectionUtils.decode_candid_blob(collection, candid_blob);
             let candid_map = CandidMap.CandidMap(collection.schema, candid);
@@ -270,45 +256,31 @@ module {
     public func populate_index(
         collection : StableCollection,
         _main_btree_utils : BTreeUtils<Nat, Blob>,
-        index_key_details : [(Text)],
-        opt_batch_size : ?Nat,
+        index_name : Text,
     ) : Result<(), Text> {
-        populate_indexes(collection, _main_btree_utils, [index_key_details], opt_batch_size);
+        populate_indexes(collection, _main_btree_utils, [index_name]);
     };
 
     public func populate_indexes(
         collection : StableCollection,
         _main_btree_utils : BTreeUtils<Nat, Blob>,
-        indexes_key_details : [[Text]],
-        opt_batch_size : ?Nat,
+        index_names : [[Text]],
     ) : Result<(), Text> {
 
-        let recommended_batch_size = recommended_entries_to_populate_based_on_benchmarks(indexes_key_details.size());
+        let indexes = Buffer.Buffer<Index>(index_names.size());
 
-        let BATCH_SIZE = Option.get(opt_batch_size, recommended_batch_size);
-
-        let indexes = Buffer.Buffer<Index>(indexes_key_details.size());
-
-        for (index_key_details in indexes_key_details.vals()) {
-            let index_name = Text.join(
-                "_",
-                Iter.map<Text, Text>(
-                    index_key_details.vals(),
-                    func(key : Text) : Text {
-                        key;
-                    },
-                ),
-            );
-
-            let ?index = Map.get(collection.indexes, thash, index_name) else return #err("Index with key_details '" # debug_show index_key_details # "' does not exist");
+        for (index_name in index_names.vals()) {
+            let ?index = Map.get(collection.indexes, thash, index_name) else return #err("Index '" # index_name # "' does not exist");
 
             indexes.add(index);
         };
 
+        Debug.print("collected indexes`");
+
         internal_populate_indexes(
             collection,
             indexes,
-            MemoryBTree.entries(collection.main, _main_btree_utils, start, end),
+            MemoryBTree.entries(collection.main, _main_btree_utils),
         );
 
     };

@@ -139,16 +139,16 @@ module {
             StableCollection.clear_index(collection, main_btree_utils, index_key_details);
         };
 
-        public func create_and_populate_index(index_key_details : [(Text)], opt_batch_size : ?Nat) : Result<(), Text> {
-            StableCollection.create_and_populate_index(collection, main_btree_utils, index_key_details, opt_batch_size);
+        public func create_and_populate_index(index_key_details : [(Text)]) : Result<(), Text> {
+            StableCollection.create_and_populate_index(collection, main_btree_utils, index_key_details);
         };
 
-        public func populate_index(index_key_details : [(Text)], opt_batch_size : ?Nat) : Result<(), Text> {
-            StableCollection.populate_index(collection, main_btree_utils, index_key_details, opt_batch_size);
+        public func populate_index(index_key_details : [(Text)]) : Result<(), Text> {
+            StableCollection.populate_index(collection, main_btree_utils, index_key_details);
         };
 
-        public func populate_indexes(indexes_key_details : [[(Text)]], opt_batch_size : ?Nat) : Result<(), Text> {
-            StableCollection.populate_indexes(collection, main_btree_utils, indexes_key_details, opt_batch_size);
+        public func populate_indexes(indexes_key_details : [[(Text)]]) : Result<(), Text> {
+            StableCollection.populate_indexes(collection, main_btree_utils, indexes_key_details);
         };
 
         public func insert_with_id(id : Nat, record : Record) : Result<(), Text> {

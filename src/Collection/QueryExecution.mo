@@ -660,8 +660,8 @@ module {
         };
 
         for ((index_name, interval_details) in Map.entries(intervals_by_index)) {
-            // Debug.print("index_name: " # debug_show index_name);
-            // Debug.print("interval_details: " # debug_show Buffer.toArray(interval_details.intervals));
+            Debug.print("index_name: " # debug_show index_name);
+            Debug.print("interval_details: " # debug_show Buffer.toArray(interval_details.intervals));
             switch (Intervals.intervals_intersect(interval_details.intervals)) {
                 case (?interval) {
                     interval_details.intervals.clear();
@@ -671,11 +671,11 @@ module {
             };
         };
 
-        // Debug.print("intervals_by_index: " # debug_show Map.size(intervals_by_index));
-        // Debug.print("iterators: " # debug_show iterators.size());
-        // Debug.print("full_scan_details_buffer: " # debug_show full_scan_details_buffer.size());
-        // Debug.print("bitmaps: " # debug_show bitmaps.size());
-        // Debug.print("sorted_records_from_iter: " # debug_show sorted_records_from_iter.size());
+        Debug.print("intervals_by_index: " # debug_show Map.size(intervals_by_index));
+        Debug.print("iterators: " # debug_show iterators.size());
+        Debug.print("full_scan_details_buffer: " # debug_show full_scan_details_buffer.size());
+        Debug.print("bitmaps: " # debug_show bitmaps.size());
+        Debug.print("sorted_records_from_iter: " # debug_show sorted_records_from_iter.size());
 
         if (bitmaps.size() == 0 and full_scan_details_buffer.size() == 0 and iterators.size() == 0 and Map.size(intervals_by_index) <= 1) {
 
