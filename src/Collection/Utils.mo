@@ -30,7 +30,6 @@ import Decoder "mo:serde/Candid/Blob/Decoder";
 import Candid "mo:serde/Candid";
 import Itertools "mo:itertools/Iter";
 import RevIter "mo:itertools/RevIter";
-import Tag "mo:candid/Tag";
 import BitMap "mo:bit-map";
 
 import MemoryBTree "mo:memory-collection/MemoryBTree/Stable";
@@ -80,7 +79,7 @@ module CollectionUtils {
     public func get_index_data_utils(
         collection : StableCollection,
         index_key_details : [(Text, SortDirection)],
-    ) : MemoryBTree.BTreeUtils<[Candid], T.RecordId> {
+    ) : MemoryBTree.BTreeUtils<[T.CandidQuery], T.RecordId> {
 
         let key_utils = get_index_key_utils(collection, index_key_details);
         let value_utils = TypeUtils.Nat;
@@ -89,7 +88,7 @@ module CollectionUtils {
 
     };
 
-    public func get_index_key_utils(collection : StableCollection, index_key_details : [(Text, SortDirection)]) : TypeUtils.TypeUtils<[Candid]> {
+    public func get_index_key_utils(collection : StableCollection, index_key_details : [(Text, SortDirection)]) : TypeUtils.TypeUtils<[T.CandidQuery]> {
         Orchid.Orchid;
     };
 
@@ -97,16 +96,19 @@ module CollectionUtils {
         MemoryBTree.createUtils<Nat, Blob>(Utils.typeutils_nat_as_nat64, TypeUtils.Blob);
     };
 
-    public func get_index_columns(collection : StableCollection, index_key_details : [(Text, SortDirection)], id : Nat, records : [(Text, Candid)]) : [Candid] {
+    public func get_index_columns(collection : StableCollection, index_key_details : [(Text, SortDirection)], id : Nat, candid_map : CandidMap.CandidMap) : [Candid] {
         let buffer = Buffer.Buffer<Candid>(8);
 
         for ((index_key, dir) in index_key_details.vals()) {
-            for ((key, value) in records.vals()) {
-                if (key == C.RECORD_ID_FIELD) {
-                    buffer.add(#Nat(id));
-                } else if (key == index_key) {
-                    buffer.add(value);
-                };
+            if (index_key == C.RECORD_ID_FIELD) {
+                buffer.add(#Nat(id));
+            } else {
+
+                let ?candid_value = candid_map.get(index_key) else Debug.trap("
+                get_index_columns: field '" # debug_show index_key # "' not found in record
+                candid: " # debug_show candid_map.extract_candid() # "
+                ");
+                buffer.add(candid_value);
             };
         };
 
@@ -173,14 +175,18 @@ module CollectionUtils {
     //     ?bytes;
     // };
 
-    public func candid_map_filter_condition(collection : StableCollection, candid_record : Candid.Candid, lower : [(Text, ?T.State<Candid>)], upper : [(Text, ?T.State<Candid>)]) : Bool {
+    public func candid_map_filter_condition(collection : StableCollection, candid_record : Candid.Candid, lower : [(Text, ?T.CandidInclusivityQuery)], upper : [(Text, ?T.CandidInclusivityQuery)]) : Bool {
 
         let candid_map = CandidMap.CandidMap(collection.schema, candid_record);
 
         for (((key, opt_lower_val), (upper_key, opt_upper_val)) in Itertools.zip(lower.vals(), upper.vals())) {
             assert key == upper_key;
 
-            let ?field_value = candid_map.get(key) else Debug.trap("filter: field '" # debug_show key # "' not found in record");
+            //    Debug.print("candid_map: " # debug_show candid_map.extract_candid());
+
+            let ?field_value = candid_map.get(key) else Debug.trap("candid_map_filter_condition: field '" # debug_show key # "' not found in record");
+
+            Debug.print("retrieve: " # debug_show key # " = " # debug_show field_value);
 
             switch (opt_lower_val) {
                 case (?(#Inclusive(lower_val))) {
@@ -259,7 +265,7 @@ module CollectionUtils {
     public func multi_filter(
         collection : StableCollection,
         records : Iter<Nat>,
-        bounds : Buffer.Buffer<(lower : [(Text, ?T.State<Candid>)], upper : [(Text, ?T.State<Candid>)])>,
+        bounds : Buffer.Buffer<(lower : [(Text, ?T.CandidInclusivityQuery)], upper : [(Text, ?T.CandidInclusivityQuery)])>,
         is_and : Bool,
     ) : Iter<Nat> {
         Iter.filter<Nat>(
@@ -268,7 +274,7 @@ module CollectionUtils {
                 let ?candid = CollectionUtils.lookup_candid_record(collection, id) else Debug.trap("multi_filter: candid_map_bytes not found");
 
                 func filter_fn(
-                    (lower, upper) : (([(Text, ?T.State<Candid>)], [(Text, ?T.State<Candid>)]))
+                    (lower, upper) : (([(Text, ?T.CandidInclusivityQuery)], [(Text, ?T.CandidInclusivityQuery)]))
                 ) : Bool {
                     candid_map_filter_condition(collection, candid, lower, upper);
                 };
@@ -282,7 +288,7 @@ module CollectionUtils {
         );
     };
 
-    func get_nested_candid_field(_candid_record : Candid, key : Text) : ?Candid {
+    public func get_nested_candid_field(_candid_record : Candid, key : Text) : ?Candid {
         let nested_field_keys = Text.split(key, #text("."));
 
         var candid_record = _candid_record;
@@ -304,27 +310,6 @@ module CollectionUtils {
         };
 
         return ?candid_record;
-    };
-
-    func get_nested_candid_type(_schema : Schema, key : Text) : ?Schema {
-        let nested_field_keys = Text.split(key, #text("."));
-
-        var schema = _schema;
-
-        for (key in nested_field_keys) {
-            let #Record(record_fields) or #Option(#Record(record_fields)) = schema else return null;
-
-            let ?found_field = Array.find<(Text, Schema)>(
-                record_fields,
-                func((variant_name, _) : (Text, Schema)) : Bool {
-                    variant_name == key;
-                },
-            ) else return null;
-
-            schema := found_field.1;
-        };
-
-        return ?schema;
     };
 
 };

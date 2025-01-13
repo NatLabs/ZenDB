@@ -16,7 +16,6 @@ import Decoder "mo:serde/Candid/Blob/Decoder";
 import Candid "mo:serde/Candid";
 import Itertools "mo:itertools/Iter";
 import RevIter "mo:itertools/RevIter";
-import Tag "mo:candid/Tag";
 import BitMap "mo:bit-map";
 
 import MemoryBTree "mo:memory-collection/MemoryBTree/Stable";
@@ -75,8 +74,8 @@ module {
     func operation_eval(
         field : Text,
         op : T.ZqlOperators,
-        lower : Map<Text, T.State<Candid>>,
-        upper : Map<Text, T.State<Candid>>,
+        lower : Map<Text, T.CandidInclusivityQuery>,
+        upper : Map<Text, T.CandidInclusivityQuery>,
     ) {
         switch (op) {
             case (#eq(candid)) {
@@ -143,8 +142,8 @@ module {
     public func scan<Record>(
         collection : T.StableCollection,
         index : T.Index,
-        start_query : [(Text, ?T.State<Candid>)],
-        end_query : [(Text, ?T.State<Candid>)],
+        start_query : [(Text, ?T.CandidInclusivityQuery)],
+        end_query : [(Text, ?T.CandidInclusivityQuery)],
         opt_cursor : ?(Nat, Candid.Candid),
     ) : (Nat, Nat) {
         // Debug.print("start_query: " # debug_show start_query);
@@ -176,9 +175,9 @@ module {
         let full_start_query = switch (opt_cursor) {
             case (null) do {
 
-                Array.tabulate<(Candid)>(
+                Array.tabulate<(T.CandidQuery)>(
                     index.key_details.size(),
-                    func(i : Nat) : (Candid) {
+                    func(i : Nat) : (T.CandidQuery) {
 
                         if (i >= sorted_start_query.size()) {
                             return (#Minimum);
@@ -195,9 +194,9 @@ module {
             };
             case (?(id, cursor)) {
                 let cursor_map = CandidMap.CandidMap(collection.schema, cursor);
-                Array.tabulate<Candid>(
+                Array.tabulate<T.CandidQuery>(
                     index.key_details.size(),
-                    func(i : Nat) : (Candid) {
+                    func(i : Nat) : (T.CandidQuery) {
                         if (index.key_details[i].0 == C.RECORD_ID_FIELD) {
                             // RECORD_ID_FIELD is only added in the query if it is a cursor
                             return #Nat(id + 1);
@@ -222,9 +221,9 @@ module {
         // Debug.print("full_scan_query: " # debug_show full_start_query);
 
         let full_end_query = do {
-            Array.tabulate<Candid>(
+            Array.tabulate<T.CandidQuery>(
                 index.key_details.size(),
-                func(i : Nat) : (Candid) {
+                func(i : Nat) : (T.CandidQuery) {
                     if (i >= sorted_end_query.size()) {
                         return (#Maximum);
                     };
@@ -258,7 +257,7 @@ module {
 
     };
 
-    public func extract_scan_and_filter_bounds(lower : Map<Text, T.State<Candid>>, upper : Map<Text, T.State<Candid>>, opt_index_key_details : ?[(Text, T.SortDirection)], opt_fully_covered_equality_and_range_fields : ?Set.Set<Text>) : (Bounds, Bounds) {
+    public func extract_scan_and_filter_bounds(lower : Map<Text, T.CandidInclusivityQuery>, upper : Map<Text, T.CandidInclusivityQuery>, opt_index_key_details : ?[(Text, T.SortDirection)], opt_fully_covered_equality_and_range_fields : ?Set.Set<Text>) : (Bounds, Bounds) {
 
         assert Option.isSome(opt_index_key_details) == Option.isSome(opt_fully_covered_equality_and_range_fields);
 
@@ -291,8 +290,8 @@ module {
             case (null) (lower, upper);
             case (?fully_covered_equality_and_range_fields) {
 
-                let partially_covered_lower = Map.new<Text, T.State<Candid>>();
-                let partially_covered_upper = Map.new<Text, T.State<Candid>>();
+                let partially_covered_lower = Map.new<Text, T.CandidInclusivityQuery>();
+                let partially_covered_upper = Map.new<Text, T.CandidInclusivityQuery>();
 
                 for ((field, value) in Map.entries(lower)) {
                     if (not Set.has(fully_covered_equality_and_range_fields, thash, field)) {
@@ -324,18 +323,18 @@ module {
         };
 
         let iter = Map.entries(a);
-        let arr1 = Array.tabulate<(Text, ?State<Candid>)>(
+        let arr1 = Array.tabulate<(Text, ?State<T.CandidQuery>)>(
             max_size,
-            func(i : Nat) : (Text, ?State<Candid>) {
+            func(i : Nat) : (Text, ?State<T.CandidQuery>) {
                 let ?(key, value) = iter.next();
                 (key, ?value);
             },
         );
 
         let iter_2 = Map.entries(a);
-        let arr2 = Array.tabulate<(Text, ?State<Candid>)>(
+        let arr2 = Array.tabulate<(Text, ?State<T.CandidQuery>)>(
             max_size,
-            func(i : Nat) : (Text, ?State<Candid>) {
+            func(i : Nat) : (Text, ?State<T.CandidQuery>) {
                 let ?(key, _) = iter_2.next();
                 let value = Map.get(b, thash, key);
                 (key, value);
@@ -350,8 +349,8 @@ module {
 
     public func convert_simple_operations_to_scan_and_filter_bounds(is_and_operation : Bool, simple_operations : [(Text, T.ZqlOperators)], opt_index_key_details : ?[(Text, T.SortDirection)], opt_fully_covered_equality_and_range_fields : ?Set.Set<Text>) : (T.Bounds, T.Bounds) {
 
-        let lower_bound = Map.new<Text, T.State<T.Candid>>();
-        let upper_bound = Map.new<Text, T.State<T.Candid>>();
+        let lower_bound = Map.new<Text, T.State<T.CandidQuery>>();
+        let upper_bound = Map.new<Text, T.State<T.CandidQuery>>();
 
         let fields_with_equality_ops = Set.new<Text>();
 

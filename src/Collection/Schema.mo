@@ -37,6 +37,7 @@ module {
     type Order = Order.Order;
     type Schema = T.Schema;
     type Candid = T.Candid;
+    type CandidQuery = T.CandidQuery;
     type Result<A, B> = Result.Result<A, B>;
 
     func send_error<A, B, C>(res : Result<A, B>) : Result<C, B> {
@@ -124,127 +125,121 @@ module {
         };
     };
 
+    public func validate(schema : Schema, record : Candid) : Result<(), Text> {
+
+        switch (schema, record) {
+            case (#Empty, #Empty) #ok;
+            case (#Null, #Null) #ok;
+            case (#Text, #Text(_)) #ok;
+            case (#Nat, #Nat(_)) #ok;
+            case (#Int, #Int(_)) #ok;
+            case (#Float, #Float(_)) #ok;
+            case (#Bool, #Bool(_)) #ok;
+            case (#Principal, #Principal(_)) #ok;
+            case (#Blob, #Blob(_)) #ok;
+            case (#Option(inner), #Null) #ok;
+            case (#Option(inner), record) {
+
+                // it should pass in
+                // the case where you update a schema type to be optional
+                return validate(inner, record);
+            };
+            case (schema, #Option(inner)) {
+                if (inner == #Null) return #ok;
+
+                validate(schema, inner);
+            };
+            case (#Tuple(tuples), #Record(records)) {
+                if (records.size() != tuples.size()) return #err("Tuple size mismatch: expected " # debug_show (tuples.size()) # ", got " # debug_show (records.size()));
+
+                for ((i, (key, _)) in Itertools.enumerate(records.vals())) {
+                    if (key != Nat.toText(i)) return #err("Tuple key mismatch: expected " # Nat.toText(i) # ", got " # debug_show (key));
+                };
+
+                for ((i, (key, value)) in Itertools.enumerate(records.vals())) {
+                    let res = validate(tuples[i], value);
+                    let #ok(_) = res else return send_error(res);
+                };
+
+                #ok;
+
+            };
+            case (#Record(fields), #Record(records)) {
+                if (fields.size() != records.size()) {
+                    return #err("Record size mismatch: " # debug_show (("schema", fields.size()), ("record", records.size())));
+                };
+
+                let sorted_fields = Array.sort(
+                    fields,
+                    func(a : (Text, Schema), b : (Text, Schema)) : Order {
+                        Text.compare(a.0, b.0);
+                    },
+                );
+
+                let sorted_records = Array.sort(
+                    records,
+                    func(a : (Text, Candid), b : (Text, Candid)) : Order {
+                        Text.compare(a.0, b.0);
+                    },
+                );
+
+                // should sort fields and records
+                var i = 0;
+                while (i < fields.size()) {
+                    let field = sorted_fields[i];
+                    let record = sorted_records[i];
+
+                    if (field.0 != record.0) return #err("Record field mismatch: " # debug_show (("field", field.0), ("record", record.0)) # debug_show (fields, records));
+
+                    let res = validate(field.1, record.1);
+                    let #ok(_) = res else return send_error(res);
+
+                    i += 1;
+                };
+
+                #ok;
+            };
+            case (#Array(inner), #Array(records)) {
+                var i = 0;
+                while (i < records.size()) {
+                    let res = validate(inner, records[i]);
+                    let #ok(_) = res else return send_error(res);
+                    i += 1;
+                };
+                #ok;
+            };
+            case (#Variant(variants), #Variant((record_key, nested_record))) {
+
+                let result = Array.find<(Text, Schema)>(
+                    variants,
+                    func((variant_name, _) : (Text, Schema)) : Bool {
+                        variant_name == record_key;
+                    },
+                );
+
+                // Debug.print("schema: " # debug_show (schema));
+                // Debug.print("record: " # debug_show (record));
+
+                switch (result) {
+                    case (null) return #err("Variant not found in schema");
+                    case (?(name, variant)) return validate(variant, nested_record);
+                };
+            };
+
+            case (a, b) return #err("validate_record(): schema and record mismatch: " # debug_show (a, b) # " in " # debug_show (schema, record));
+        };
+    };
+
     public func validate_record(main_schema : Schema, main_record : Candid) : Result<(), Text> {
 
-        // var var_schema = schema;
-        // var var_record = record;
-
-        func _validate(schema : Schema, record : Candid) : Result<(), Text> {
-            // Debug.print("unwrapping: ");
-            // Debug.print("schema: " # debug_show (schema));
-            // Debug.print("record: " # debug_show (record));
-
-            switch (schema, record) {
-                case (#Empty, #Empty) #ok;
-                case (#Null, #Null) #ok;
-                case (#Text, #Text(_)) #ok;
-                case (#Nat, #Nat(_)) #ok;
-                case (#Int, #Int(_)) #ok;
-                case (#Float, #Float(_)) #ok;
-                case (#Bool, #Bool(_)) #ok;
-                case (#Principal, #Principal(_)) #ok;
-                case (#Blob, #Blob(_)) #ok;
-                case (#Option(inner), #Null) #ok;
-                case (#Option(inner), record) {
-
-                    // it should pass in
-                    // the case where you update a schema type to be optional
-                    return _validate(inner, record);
-                };
-                case (schema, #Option(inner)) {
-                    if (inner == #Null) return #ok;
-
-                    _validate(schema, inner);
-                };
-                case (#Tuple(tuples), #Record(records)) {
-                    if (records.size() != tuples.size()) return #err("Tuple size mismatch: expected " # debug_show (tuples.size()) # ", got " # debug_show (records.size()));
-
-                    for ((i, (key, _)) in Itertools.enumerate(records.vals())) {
-                        if (key != debug_show (i)) return #err("Tuple key mismatch: expected " # debug_show (i) # ", got " # debug_show (key));
-                    };
-
-                    for ((i, (key, value)) in Itertools.enumerate(records.vals())) {
-                        let res = _validate(tuples[i], value);
-                        let #ok(_) = res else return send_error(res);
-                    };
-
-                    #ok;
-
-                };
-                case (#Record(fields), #Record(records)) {
-                    if (fields.size() != records.size()) {
-                        return #err("Record size mismatch: " # debug_show (("schema", fields.size()), ("record", records.size())));
-                    };
-
-                    let sorted_fields = Array.sort(
-                        fields,
-                        func(a : (Text, Schema), b : (Text, Schema)) : Order {
-                            Text.compare(a.0, b.0);
-                        },
-                    );
-
-                    let sorted_records = Array.sort(
-                        records,
-                        func(a : (Text, Candid), b : (Text, Candid)) : Order {
-                            Text.compare(a.0, b.0);
-                        },
-                    );
-
-                    // should sort fields and records
-                    var i = 0;
-                    while (i < fields.size()) {
-                        let field = sorted_fields[i];
-                        let record = sorted_records[i];
-
-                        if (field.0 != record.0) return #err("Record field mismatch: " # debug_show (("field", field.0), ("record", record.0)) # debug_show (fields, records));
-
-                        let res = _validate(field.1, record.1);
-                        let #ok(_) = res else return send_error(res);
-
-                        i += 1;
-                    };
-
-                    #ok;
-                };
-                case (#Array(inner), #Array(records)) {
-                    var i = 0;
-                    while (i < records.size()) {
-                        let res = _validate(inner, records[i]);
-                        let #ok(_) = res else return send_error(res);
-                        i += 1;
-                    };
-                    #ok;
-                };
-                case (#Variant(variants), #Variant((record_key, nested_record))) {
-
-                    let result = Array.find<(Text, Schema)>(
-                        variants,
-                        func((variant_name, _) : (Text, Schema)) : Bool {
-                            variant_name == record_key;
-                        },
-                    );
-
-                    // Debug.print("schema: " # debug_show (schema));
-                    // Debug.print("record: " # debug_show (record));
-
-                    switch (result) {
-                        case (null) return #err("Variant not found in schema");
-                        case (?(name, variant)) return _validate(variant, nested_record);
-                    };
-                };
-
-                case (a, b) return #err("validate_record(): schema and record mismatch: " # debug_show (a, b) # " in " # debug_show (main_schema, main_record));
-            };
-        };
-
         switch (main_schema) {
-            case (#Record(fields)) _validate(main_schema, main_record);
+            case (#Record(fields)) validate(main_schema, main_record);
             case (_) #err("validate_schema(): schema is not a record");
         };
     };
 
     // schema is added here to get the order of the #Variant type
-    public func cmp_candid(schema : Schema, a : Candid, b : Candid) : Int8 {
+    public func cmp_candid(schema : Schema, a : CandidQuery, b : CandidQuery) : Int8 {
 
         switch (schema, a, b) {
             // The #Minimum variant is used in queries to represent the minimum value

@@ -21,7 +21,6 @@ import Decoder "mo:serde/Candid/Blob/Decoder";
 import Candid "mo:serde/Candid";
 import Itertools "mo:itertools/Iter";
 import RevIter "mo:itertools/RevIter";
-import Tag "mo:candid/Tag";
 import BitMap "mo:bit-map";
 import Vector "mo:vector";
 import Ids "mo:incremental-ids";
@@ -35,7 +34,9 @@ module T {
 
     // public type ZenDB = ZenDB.ZenDB;
 
-    public type Candid = Serde.Candid or {
+    public type Candid = Serde.Candid;
+
+    public type CandidQuery = Serde.Candid or {
         #Minimum;
         #Maximum;
     };
@@ -58,7 +59,7 @@ module T {
     public type RevIter<A> = RevIter.RevIter<A>;
     public type Order = Order.Order;
 
-    // public type MemoryBTree = MemoryBTree.VersionedMemoryBTree;
+    public type MemoryBTree = MemoryBTree.StableMemoryBTree;
     public type BTreeUtils<K, V> = MemoryBTree.BTreeUtils<K, V>;
     public type TypeUtils<A> = TypeUtils.TypeUtils<A>;
 
@@ -100,6 +101,7 @@ module T {
     public type StableCollection = {
         ids : Ids.Generator;
         var schema : Schema;
+        var formatted_schema : Schema;
         schema_keys : [Text];
         schema_keys_set : Set<Text>;
         main : MemoryBTree.StableMemoryBTree;
@@ -118,8 +120,8 @@ module T {
 
     public type IndexKeyFields = [(Text, Candid)];
 
-    public type FieldLimit = (Text, ?State<Candid>);
-    public type RecordLimits = [(Text, ?State<Candid>)];
+    public type FieldLimit = (Text, ?State<CandidQuery>);
+    public type RecordLimits = [(Text, ?State<CandidQuery>)];
     public type Bounds = (RecordLimits, RecordLimits);
 
     public type ZqlOperators = {
@@ -178,7 +180,7 @@ module T {
         #Exclusive : T;
     };
 
-    public type CandidQuery = State<Candid>;
+    public type CandidInclusivityQuery = State<CandidQuery>;
 
     public type FullScanDetails = {
         requires_additional_sorting : Bool;
@@ -244,7 +246,36 @@ module T {
         sorted_in_reverse : Bool;
         fully_covered_equality_and_range_fields : Set.Set<Text>;
         score : Float;
+    };
 
+    public type CommonUpdateFieldOperations = {
+        #get : Text;
+    };
+
+    public type UpdateFieldSetOperations = {
+        #add : [UpdateFieldSetOperations];
+        #sub : [UpdateFieldSetOperations];
+        #mul : [UpdateFieldSetOperations];
+        #div : [UpdateFieldSetOperations];
+        #val : Candid;
+    } or CommonUpdateFieldOperations;
+
+    public type UpdateFieldOperations = {
+        #set : (UpdateFieldSetOperations);
+        #add : (Candid);
+        #sub : (Candid);
+        #mul : (Candid);
+        #div : (Candid);
+    };
+
+    public type UpdateOperations<Record> = {
+        #doc : Record;
+        #ops : [(Text, UpdateFieldOperations)];
+    };
+
+    public type InternalUpdateOperations = {
+        #doc : CandidBlob;
+        #ops : [(Text, UpdateFieldOperations)];
     };
 
 };

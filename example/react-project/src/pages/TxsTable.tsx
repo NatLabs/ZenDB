@@ -79,7 +79,7 @@ const render_address = (from: Uint8Array | number[]) => {
     );
 };
 
-const format_with_icp_decimals = (amt: bigint) => Number(amt / 10n ** 8n);
+const format_with_icp_decimals = (amt: bigint) => Number(amt) / 10 ** 8;
 
 const render_icp = (amt: bigint) =>
     number_with_comma(
@@ -295,7 +295,7 @@ export const TxsTable = () => {
                 expected_allowance: block.tx.expected_allowance[0],
                 expires_at: block.tx.expires_at[0],
                 spender: block.tx.spender[0],
-                fee: block.fee,
+                fee: block.fee[0],
                 ts: block.ts,
                 btype: block.btype,
                 phash: block.phash[0],

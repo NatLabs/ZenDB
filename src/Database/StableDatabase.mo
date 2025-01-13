@@ -21,7 +21,6 @@ import Decoder "mo:serde/Candid/Blob/Decoder";
 import Candid "mo:serde/Candid";
 import Itertools "mo:itertools/Iter";
 import RevIter "mo:itertools/RevIter";
-import Tag "mo:candid/Tag";
 import Ids "mo:incremental-ids";
 
 import MemoryBTree "mo:memory-collection/MemoryBTree/Stable";
@@ -69,6 +68,7 @@ module {
         let stable_collection = {
             ids = Ids.create(zendb.id_store, name);
             var schema = processed_schema;
+            var formatted_schema = Candid.formatCandidType([schema], null)[0];
             schema_keys;
             schema_keys_set = Set.fromIter(schema_keys.vals(), thash);
             main = MemoryBTree.new(?C.DEFAULT_BTREE_ORDER);

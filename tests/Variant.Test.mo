@@ -97,6 +97,7 @@ suite(
         test(
             "search via indexed fields",
             func() {
+
                 assert data.search(
                     ZenDB.QueryBuilder().Where("version.v1.a", #eq(#Nat(42)))
                 ) == #ok([(0, { version = #v1({ a = 42; b = "hello" }) })]);

@@ -32,14 +32,13 @@ import Decoder "mo:serde/Candid/Blob/Decoder";
 import Candid "mo:serde/Candid";
 import Itertools "mo:itertools/Iter";
 import RevIter "mo:itertools/RevIter";
-import Tag "mo:candid/Tag";
 import BitMap "mo:bit-map";
 
 import MemoryBTree "mo:memory-collection/MemoryBTree/Stable";
 import TypeUtils "mo:memory-collection/TypeUtils";
 import Int8Cmp "mo:memory-collection/TypeUtils/Int8Cmp";
 
-import T "../Types";
+import ZT "../Types";
 import Query "../Query";
 import Utils "../Utils";
 import CandidMap "../CandidMap";
@@ -75,23 +74,23 @@ module {
 
     public type Schema = Candid.CandidType;
 
-    public type Index = T.Index;
-    public type Candid = T.Candid;
-    public type SortDirection = T.SortDirection;
-    public type State<R> = T.State<R>;
-    public type ZenQueryLang = T.ZenQueryLang;
+    public type Index = ZT.Index;
+    public type Candid = ZT.Candid;
+    public type SortDirection = ZT.SortDirection;
+    public type State<R> = ZT.State<R>;
+    public type ZenQueryLang = ZT.ZenQueryLang;
 
-    public type Candify<A> = T.Candify<A>;
+    public type Candify<A> = ZT.Candify<A>;
 
-    public type StableCollection = T.StableCollection;
+    public type StableCollection = ZT.StableCollection;
 
-    public type IndexKeyFields = T.IndexKeyFields;
+    public type IndexKeyFields = ZT.IndexKeyFields;
 
     let DEFAULT_BTREE_ORDER = 256;
     let MAX_QUERY_INSTRUCTIONS : Nat64 = 5_000_000_000;
     let MAX_UPDATE_INSTRUCTIONS : Nat64 = 40_000_000_000;
 
-    public class Collection<Record>(collection_name : Text, collection : StableCollection, blobify : T.Candify<Record>) = self {
+    public class Collection<Record>(collection_name : Text, collection : StableCollection, blobify : ZT.Candify<Record>) = self {
 
         public func name() : Text = collection_name;
         public func size() : Nat = MemoryBTree.size(collection.main);
@@ -136,6 +135,22 @@ module {
             StableCollection.delete_index(collection, main_btree_utils, index_key_details);
         };
 
+        public func clear_index(index_key_details : [Text]) : Result<(), Text> {
+            StableCollection.clear_index(collection, main_btree_utils, index_key_details);
+        };
+
+        // public func create_and_populate_index(index_key_details : [(Text)], opt_batch_size : ?Nat) : async* Result<(), Text> {
+        //     await* StableCollection.create_and_populate_index(collection, main_btree_utils, index_key_details, opt_batch_size);
+        // };
+
+        // public func populate_index(index_key_details : [(Text)], opt_batch_size : ?Nat) : async* Result<(), Text> {
+        //     await* StableCollection.populate_index(collection, main_btree_utils, index_key_details, opt_batch_size);
+        // };
+
+        // public func populate_indexes(indexes_key_details : [[(Text)]], opt_batch_size : ?Nat) : async* Result<(), Text> {
+        //     await* StableCollection.populate_indexes(collection, main_btree_utils, indexes_key_details, opt_batch_size);
+        // };
+
         public func insert_with_id(id : Nat, record : Record) : Result<(), Text> {
             put_with_id(id, record);
         };
@@ -166,8 +181,8 @@ module {
             };
         };
 
-        type RecordLimits = [(Text, ?State<Candid>)];
-        type FieldLimit = (Text, ?State<Candid>);
+        type RecordLimits = [(Text, ?State<ZT.CandidQuery>)];
+        type FieldLimit = (Text, ?State<ZT.CandidQuery>);
 
         type Bounds = (RecordLimits, RecordLimits);
 
@@ -178,7 +193,7 @@ module {
 
         type Iter<A> = Iter.Iter<A>;
 
-        public func search_iter(query_builder : QueryBuilder) : Result<Iter<T.WrapId<Record>>, Text> {
+        public func search_iter(query_builder : QueryBuilder) : Result<Iter<ZT.WrapId<Record>>, Text> {
             switch (StableCollection.internal_search(collection, query_builder)) {
                 case (#err(err)) return #err(err);
                 case (#ok(record_ids_iter)) {
@@ -188,7 +203,7 @@ module {
             };
         };
 
-        public func search(query_builder : QueryBuilder) : Result<[T.WrapId<Record>], Text> {
+        public func search(query_builder : QueryBuilder) : Result<[ZT.WrapId<Record>], Text> {
             switch (StableCollection.internal_search(collection, query_builder)) {
                 case (#err(err)) return #err(err);
                 case (#ok(record_ids_iter)) {
@@ -226,7 +241,7 @@ module {
 
         // };
 
-        // public func async_find(query_builder : QueryBuilder, buffer : Buffer<T.WrapId<Record>>) : async* Result<(), Text> {
+        // public func async_find(query_builder : QueryBuilder, buffer : Buffer<ZT.WrapId<Record>>) : async* Result<(), Text> {
         //     switch (search_iter(query_builder)) {
         //         case (#err(err)) #err(err);
         //         case (#ok(records)) {
@@ -238,7 +253,7 @@ module {
         //     };
         // };
 
-        public func stats() : T.CollectionStats {
+        public func stats() : ZT.CollectionStats {
             StableCollection.stats(collection);
         };
 
@@ -285,52 +300,31 @@ module {
         //     count(query_builder);
         // };
 
-        public func updateById(id : Nat, update_fn : (Record) -> Record) : Result<(), Text> {
+        public func updateById(id : Nat, update_operations : ZT.UpdateOperations<Record>) : Result<(), Text> {
 
-            let ?prev_record_details = MemoryBTree.lookupVal(collection.main, main_btree_utils, id);
-            let prev_record = blobify.from_blob(prev_record_details);
-            // let prev_record = CollectionUtils.lookup_record<Record>(collection, blobify, id);
-
-            let new_record = update_fn(prev_record);
-
-            let new_candid_blob = blobify.to_blob(new_record);
-            let new_candid = CollectionUtils.decode_candid_blob(collection, new_candid_blob);
-
-            let candid_map = CandidMap.CandidMap(collection.schema, new_candid);
-            let record_details = new_candid_blob;
-
-            // not needed since it uses the same record type
-            Utils.assert_result(Schema.validate_record(collection.schema, new_candid));
-
-            assert ?prev_record_details == MemoryBTree.insert(collection.main, main_btree_utils, id, record_details);
-            let prev_candid = CollectionUtils.decode_candid_blob(collection, prev_record_details);
-
-            let #Record(prev_records) = prev_candid else return #err("Couldn't get records");
-            let #Record(new_records) = new_candid else return #err("Couldn't get records");
-
-            for (index in Map.vals(collection.indexes)) {
-
-                let prev_index_key_values = CollectionUtils.get_index_columns(collection, index.key_details, id, prev_records);
-                let index_data_utils = CollectionUtils.get_index_data_utils(collection, index.key_details);
-
-                assert ?id == MemoryBTree.remove(index.data, index_data_utils, prev_index_key_values);
-
-                let new_index_key_values = CollectionUtils.get_index_columns(collection, index.key_details, id, new_records);
-                ignore MemoryBTree.insert(index.data, index_data_utils, new_index_key_values, id);
+            let internal_update_opertions = switch (update_operations) {
+                case (#doc(record)) #doc(blobify.to_blob(record));
+                case (#ops(field_ops)) #ops(field_ops);
             };
 
-            #ok;
+            StableCollection.update_by_id(collection, main_btree_utils, id, internal_update_opertions);
+
         };
 
-        public func update(query_builder : QueryBuilder, update_fn : (Record) -> Record) : Result<(), Text> {
+        public func update(query_builder : QueryBuilder, update_operations : ZT.UpdateOperations<Record>) : Result<(), Text> {
 
             let records_iter = switch (StableCollection.internal_search(collection, query_builder)) {
                 case (#err(err)) return #err(err);
                 case (#ok(records_iter)) records_iter;
             };
 
-            for ((id) in records_iter) {
-                let #ok(_) = updateById(id, update_fn);
+            let internal_update_opertions = switch (update_operations) {
+                case (#doc(record)) #doc(blobify.to_blob(record));
+                case (#ops(field_ops)) #ops(field_ops);
+            };
+
+            for (id in records_iter) {
+                let #ok(_) = StableCollection.update_by_id(collection, main_btree_utils, id, internal_update_opertions) else return #err("failed to update record");
             };
 
             #ok;

@@ -19,7 +19,6 @@ import Decoder "mo:serde/Candid/Blob/Decoder";
 import Candid "mo:serde/Candid";
 import Itertools "mo:itertools/Iter";
 import RevIter "mo:itertools/RevIter";
-import Tag "mo:candid/Tag";
 import BitMap "mo:bit-map";
 
 import MemoryBTree "mo:memory-collection/MemoryBTree/Stable";
@@ -343,7 +342,7 @@ module {
 
             // Debug.print("chosed index: " # debug_show (index.key_details));
 
-            let lower_map = Map.new<Text, T.State<Candid>>();
+            let lower_map = Map.new<Text, T.CandidInclusivityQuery>();
 
             for ((field, opt_state) in curr.0.vals()) {
                 switch (opt_state) {
@@ -354,7 +353,7 @@ module {
                 };
             };
 
-            let upper_map = Map.new<Text, T.State<Candid>>();
+            let upper_map = Map.new<Text, T.CandidInclusivityQuery>();
 
             for ((field, opt_state) in curr.1.vals()) {
                 switch (opt_state) {

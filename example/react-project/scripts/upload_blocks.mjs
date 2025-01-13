@@ -30,7 +30,9 @@ const get_db_size = async () => {
     return db_size;
 };
 
-let num_stored_batches = start_batch ? start_batch - 1 : await get_db_size();
+let num_stored_batches = start_batch
+    ? start_batch - 1
+    : (await get_db_size()) / STORED_BATCH_SIZE;
 
 console.log(`num_stored_batches: ${num_stored_batches}`);
 
