@@ -68,6 +68,7 @@ module {
         let stable_collection = {
             ids = Ids.create(zendb.id_store, name);
             var schema = processed_schema;
+            var formatted_schema = Candid.formatCandidType([schema], null)[0];
             schema_keys;
             schema_keys_set = Set.fromIter(schema_keys.vals(), thash);
             main = MemoryBTree.new(?C.DEFAULT_BTREE_ORDER);

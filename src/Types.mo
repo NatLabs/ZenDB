@@ -101,6 +101,7 @@ module T {
     public type StableCollection = {
         ids : Ids.Generator;
         var schema : Schema;
+        var formatted_schema : Schema;
         schema_keys : [Text];
         schema_keys_set : Set<Text>;
         main : MemoryBTree.StableMemoryBTree;
@@ -256,12 +257,24 @@ module T {
         score : Float;
     };
 
+    public type CommonUpdateFieldOperations = {
+        #get : Text;
+    };
+
+    public type UpdateFieldSetOperations = {
+        #add : [UpdateFieldSetOperations];
+        #sub : [UpdateFieldSetOperations];
+        #mul : [UpdateFieldSetOperations];
+        #div : [UpdateFieldSetOperations];
+        #val : Candid;
+    } or CommonUpdateFieldOperations;
+
     public type UpdateFieldOperations = {
-        #set : (Candid.Candid);
-        #inc : (Int);
-        #dec : (Int);
-        #mul : (Int);
-        #div : (Int);
+        #set : (UpdateFieldSetOperations);
+        #add : (Candid);
+        #sub : (Candid);
+        #mul : (Candid);
+        #div : (Candid);
     };
 
     public type UpdateOperations<Record> = {

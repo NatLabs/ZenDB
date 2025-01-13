@@ -182,7 +182,11 @@ module CollectionUtils {
         for (((key, opt_lower_val), (upper_key, opt_upper_val)) in Itertools.zip(lower.vals(), upper.vals())) {
             assert key == upper_key;
 
-            let ?field_value = candid_map.get(key) else Debug.trap("filter: field '" # debug_show key # "' not found in record");
+            //    Debug.print("candid_map: " # debug_show candid_map.extract_candid());
+
+            let ?field_value = candid_map.get(key) else Debug.trap("candid_map_filter_condition: field '" # debug_show key # "' not found in record");
+
+            Debug.print("retrieve: " # debug_show key # " = " # debug_show field_value);
 
             switch (opt_lower_val) {
                 case (?(#True(lower_val))) {

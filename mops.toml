@@ -1,12 +1,12 @@
 [profile]
 name = "zendb"
 description = "An embedded document database with native candid support for Motoko developers"
-keywords = [ "database", "document-db", "candid" ]
+keywords = ["database", "document-db", "candid"]
 
 [dependencies]
 base = "0.13.2"
 map = "9.0.1"
-serde = "3.1.0"
+serde = "3.2.2"
 itertools = "0.2.1"
 memory-collection = "0.0.4"
 bit-map = "0.1.1"

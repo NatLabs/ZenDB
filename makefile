@@ -9,10 +9,10 @@ docs:
 	$(MocvPath)/mo-doc --format plain
 
 bench:
-	mops bench  --gc incremental%
+	mops bench  --gc incremental --replica dfx $(name).bench
 
 test:
-	mops test .test -r verbose
+	mops test $(name).test -r verbose
 
 test-replica:
 	mops test --mode replica --replica pocket-ic .replica

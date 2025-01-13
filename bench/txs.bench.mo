@@ -145,7 +145,7 @@ module {
         bench.description("Benchmarking the performance with 10k txs");
 
         bench.cols([
-            // "(best index)",
+            
             "(full scan, -> array)",
             "(index intersection, -> array)",
             // "(sorted by tx.amt, ↑)",
@@ -165,14 +165,14 @@ module {
             "query() -> all txs involving principals[0..10]",
             "query() -> 250 < tx.amt <= 400",
             "query() -> btype == 1burn and tx.amt >= 750",
-            "update() -> #inc amt += 100 where btype == 1xfer",
-            // "update() -> #dec amt -= 100 where btype == 1xfer",
-            // "update() -> #div amt /= 2 where btype == 1xfer",
-            // "update() -> #mul amt *= 2 where btype == 1xfer",
-            // "update() -> #set amt = 100 where btype == 1xfer",
-            // "update() -> #doc -> replace tx with new tx where btype == 1xfer",
-            // "update() -> #ops -> [#inc, #div, #mul, #div] on tx.amt where btype == 1xfer",
-            // "update() -> #ops -> [#inc, #div, #mul, #div, #set] on diff fields where btype == 1xfer",
+            "update() -> #add amt += 100",
+            "update() -> #sub amt -= 100",
+            "update() -> #div amt /= 2",
+            "update() -> #mul amt *= 2",
+            "update() -> #set amt = 100",
+            "update() -> #doc -> replace tx with new tx",
+            // "update() -> #ops -> [#add, #div, #mul, #div] on tx.amt",
+            // "update() -> #ops -> [#add, #div, #mul, #div, #set] on diff fields",
 
 
         ]);
@@ -213,11 +213,9 @@ module {
 
         bench.runner(
             func(col, row) = switch (row) {
-                case ("(best index)") {
-                    best_index(txs, col, limit, predefined_txs, principals, candid_principals, principals_0_10);
-                };
+                
                 case ("(index intersection, -> array)") {
-                    index_intersection(txs, col, limit, predefined_txs, principals, candid_principals, principals_0_10);
+                    index_intersection(txs, col, limit, predefined_txs, principals, candid_principals, principals_0_10, fuzz);
                 };
                 case ("(full scan, -> array)") {
                     full_scan(txs, col, limit, predefined_txs, principals, candid_principals, principals_0_10);
@@ -232,136 +230,13 @@ module {
             }
         );
 
+      
+
+
         bench;
     };
 
-    func best_index(txs : ZenDB.Collection<Tx>, section : Text, limit : Nat, predefined_txs : Buffer.Buffer<Tx>, principals : [Principal], candid_principals : [ZenDB.Candid], principals_0_10 : [Principal]) {
-        switch (section) {
-
-            case ("insert") {
-                // re-use the predefined txs
-            };
-
-            case ("clear") {
-                // re-use the predefined txs
-            };
-
-            case ("insert with 5 indexes") {
-                // re-use the predefined txs
-            };
-
-            case ("query() -> btype == '1mint'") {
-                let db_query = ZenDB.QueryBuilder().Where(
-                    "btype",
-                    #eq(#Text("1mint")),
-                );
-
-                let #ok(matching_txs) = txs.search(db_query);
-            };
-
-            case ("query() -> btype == '1xfer' or '2xfer'") {
-                let db_query = ZenDB.QueryBuilder().Where(
-                    "btype",
-                    #In([#Text("1xfer"), #Text("2xfer")]),
-                );
-
-                let #ok(matching_txs) = txs.search(db_query);
-            };
-
-            case ("query() -> principals[0] == tx.to.owner (is recipient)") {
-                let db_query = ZenDB.QueryBuilder().Where(
-                    "tx.to.owner",
-                    #eq(#Principal(principals.get(0))),
-                );
-
-                let #ok(matching_txs) = txs.search(db_query);
-            };
-
-            case ("query() -> principals[0..10] == tx.to.owner (is recipient)") {
-
-                let db_query = ZenDB.QueryBuilder().Where(
-                    "tx.to.owner",
-                    #In(candid_principals),
-                );
-
-                let #ok(matching_txs) = txs.search(db_query);
-            };
-
-            case ("query() -> all txs involving principals[0]") {
-                let db_query = ZenDB.QueryBuilder().Where(
-                    "tx.to.owner",
-                    #eq(#Principal(principals.get(0))),
-                ).Or(
-                    "tx.from.owner",
-                    #eq(#Principal(principals.get(0))),
-                ).Or(
-                    "tx.spender.owner",
-                    #eq(#Principal(principals.get(0))),
-                );
-
-                let #ok(matching_txs) = txs.search(db_query);
-            };
-
-            case ("query() -> all txs involving principals[0..10]") {
-                let candid_principals = Array.map<Principal, ZenDB.Candid>(
-                    Iter.toArray(Array.slice(principals, 0, 10)),
-                    func(p : Principal) : ZenDB.Candid = #Principal(p),
-                );
-
-                let db_query = ZenDB.QueryBuilder().Where(
-                    "tx.to.owner",
-                    #In(candid_principals),
-                ).Or(
-                    "tx.from.owner",
-                    #In(candid_principals),
-                ).Or(
-                    "tx.spender.owner",
-                    #In(candid_principals),
-                );
-
-                let #ok(matching_txs) = txs.search(db_query);
-            };
-
-            case ("query() -> 250 < tx.amt <= 400") {
-                let db_query = ZenDB.QueryBuilder().Where(
-                    "tx.amt",
-                    #gt(#Nat(250)),
-                ).And(
-                    "tx.amt",
-                    #lte(#Nat(400)),
-                );
-
-                let #ok(matching_txs) = txs.search(db_query);
-            };
-
-            case ("query() -> btype == 1burn and tx.amt >= 750") {
-                let db_query = ZenDB.QueryBuilder().Where(
-                    "tx.amt",
-                    #gte(#Nat(750)),
-                ).And(
-                    "btype",
-                    #eq(#Text("1burn")),
-                );
-
-                let #ok(matching_txs) = txs.search(db_query);
-            };
-
-            case ("update() -> #inc amt += 100 where btype == 1xfer") {
-                let #ok(_) = txs.update(
-                    ZenDB.QueryBuilder().Where( "btype", #eq(#Text("1xfer"))),
-                    #ops([ ("tx.amt", #inc(100)) ]),
-                );
-            };
-
-            case (_) {
-                Debug.trap("Should be unreachable:\n row = (best index, -> array)  and col = \"" # debug_show section # "\"");
-            };
-
-        };
-
-    };
-
-    func index_intersection(txs : ZenDB.Collection<Tx>, section : Text, limit : Nat, predefined_txs : Buffer.Buffer<Tx>, principals : [Principal], candid_principals : [ZenDB.Candid], principals_0_10 : [Principal]) {
+        func index_intersection(txs : ZenDB.Collection<Tx>, section : Text, limit : Nat, predefined_txs : Buffer.Buffer<Tx>, principals : [Principal], candid_principals : [ZenDB.Candid], principals_0_10 : [Principal], fuzz: Fuzz.Fuzzer) {
         switch (section) {
             case ("insert") {
                 // re-use the predefined txs
@@ -475,11 +350,41 @@ module {
                 let #ok(matching_txs) = txs.search(db_query);
             };
 
-            case ("update() -> #inc amt += 100 where btype == 1xfer") {
-                let #ok(_) = txs.update(
-                    ZenDB.QueryBuilder().Where("btype", #eq(#Text("1xfer"))),
-                    #ops([ ("tx.amt", #inc(100)) ]),
-                );
+            case ("update() -> #add amt += 100") {
+                for (i in Iter.range(0, limit - 1)) {
+                    switch(txs.updateById( i, #ops([("tx.amt", #add(#Nat(100)))]))){
+                        case (#ok(_)) Debug.print("Successfully updated tx " # debug_show i);
+                        case (#err(msg)) Debug.trap("Error updating tx: " # debug_show msg);
+                    };
+                };
+            };
+            case ("update() -> #sub amt -= 100") {
+                for (i in Iter.range(0, limit - 1)) {
+                    let #ok(_) = txs.updateById( i, #ops([ ("tx.amt", #sub(#Nat(100))) ]),);
+                };
+            };
+            case ("update() -> #div amt /= 2") {
+                for (i in Iter.range(0, limit - 1)) {
+                    let #ok(_) = txs.updateById( i, #ops([ ("tx.amt", #div(#Nat(2))) ]),);
+                };
+            };
+            case ("update() -> #mul amt *= 2") {
+                for (i in Iter.range(0, limit - 1)) {
+                    let #ok(_) = txs.updateById( i, #ops([ ("tx.amt", #mul(#Nat(2))) ]),);
+                };
+            };
+            case ("update() -> #set amt = 100") {
+                for (i in Iter.range(0, limit - 1)) {
+                    let #ok(_) = txs.updateById( i, #ops([ ("tx.amt", #set(#val(#Nat(100)))) ]),);
+                };
+            };
+            case ("update() -> #doc -> replace tx with new tx") {
+                for (i in Iter.range(0, limit - 1)) {
+                    let #ok(_) = txs.updateById(
+                        i,
+                        #doc(new_tx(fuzz, principals)),
+                    );
+                };
             };
 
             case (_) {
@@ -637,17 +542,12 @@ module {
                     }
                 );
             };
-            case ("update() -> #inc amt += 100 where btype == 1xfer") {
-                // let #ok(results) = txs.filter(
-                //     func(tx : Tx) : Bool {
-                //         tx.btype == "1xfer";
-                //     }
-                // );
-
-                // for ((id, tx) in results.vals()) {
-                //     let #ok(_) = txs.updateById(id, #ops([ ("tx.amt", #inc(100)) ]));
-                // };
-            };
+            case ("update() -> #add amt += 100") { };
+            case ("update() -> #sub amt -= 100") { };
+            case ("update() -> #div amt /= 2") { };
+            case ("update() -> #mul amt *= 2") { };
+            case ("update() -> #set amt = 100") { };
+            case ("update() -> #doc -> replace tx with new tx") { };
 
             case (_) {
                 Debug.trap("Should be unreachable:\n row = zenDB (full scan, -> array) and col = \"" # debug_show section # "\"");
@@ -657,6 +557,7 @@ module {
 
     };
 
+  
 
   func paginated_queries(txs : ZenDB.Collection<Tx>, section : Text, limit : Nat, predefined_txs : Buffer.Buffer<Tx>, principals : [Principal], candid_principals : [ZenDB.Candid], principals_0_10 : [Principal], sort_direction : ZenDB.SortDirection, pagination_limit : Nat) {
 

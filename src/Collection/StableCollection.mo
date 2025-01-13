@@ -52,6 +52,7 @@ import QueryPlan "QueryPlan";
 import C "../Constants";
 import QueryExecution "QueryExecution";
 import Intervals "Intervals";
+import CandidMod "../CandidMod";
 
 module {
 
@@ -98,6 +99,7 @@ module {
         if (not is_compatible) return #err("Schema is not backward compatible");
 
         collection.schema := schema;
+        collection.formatted_schema := Candid.formatCandidType([schema], null)[0];
         // Debug.print("Schema Updated: Ensure to update your Record type as well.");
         #ok;
     };
@@ -181,26 +183,26 @@ module {
         #ok();
     };
 
-    public func create_and_populate_index(
-        collection : StableCollection,
-        _main_btree_utils : BTreeUtils<Nat, Blob>,
-        index_key_details : [(Text)],
-        opt_batch_size : ?Nat,
-    ) : async* Result<(), Text> {
+    // public func create_and_populate_index(
+    //     collection : StableCollection,
+    //     _main_btree_utils : BTreeUtils<Nat, Blob>,
+    //     index_key_details : [(Text)],
+    //     opt_batch_size : ?Nat,
+    // ) : async* Result<(), Text> {
 
-        switch (create_index(collection, _main_btree_utils, index_key_details)) {
-            case (#err(err)) return #err(err);
-            case (#ok(_)) {};
-        };
+    //     switch (create_index(collection, _main_btree_utils, index_key_details)) {
+    //         case (#err(err)) return #err(err);
+    //         case (#ok(_)) {};
+    //     };
 
-        switch (await* populate_index(collection, _main_btree_utils, index_key_details, opt_batch_size)) {
-            case (#err(err)) return #err(err);
-            case (#ok(_)) {};
-        };
+    //     switch (await* populate_index(collection, _main_btree_utils, index_key_details, opt_batch_size)) {
+    //         case (#err(err)) return #err(err);
+    //         case (#ok(_)) {};
+    //     };
 
-        #ok();
+    //     #ok();
 
-    };
+    // };
 
     public func clear_index(
         collection : StableCollection,
@@ -227,27 +229,27 @@ module {
 
     };
 
-    func internal_populate_indexes(
-        collection : StableCollection,
-        indexes : Buffer.Buffer<Index>,
-        entries : Iter<(Nat, Blob)>,
-    ) : async Result<(), Text> {
-        for ((id, candid_blob) in entries) {
-            let candid = CollectionUtils.decode_candid_blob(collection, candid_blob);
-            let candid_map = CandidMap.CandidMap(collection.schema, candid);
+    // func internal_populate_indexes(
+    //     collection : StableCollection,
+    //     indexes : Buffer.Buffer<Index>,
+    //     entries : Iter<(Nat, Blob)>,
+    // ) : async Result<(), Text> {
+    //     for ((id, candid_blob) in entries) {
+    //         let candid = CollectionUtils.decode_candid_blob(collection, candid_blob);
+    //         let candid_map = CandidMap.CandidMap(collection.schema, candid);
 
-            for (index in indexes.vals()) {
-                switch (insert_into_index(collection, index, id, candid_map)) {
-                    case (#err(err)) return #err(err);
-                    case (#ok(_)) {};
-                };
-            };
+    //         for (index in indexes.vals()) {
+    //             switch (insert_into_index(collection, index, id, candid_map)) {
+    //                 case (#err(err)) return #err(err);
+    //                 case (#ok(_)) {};
+    //             };
+    //         };
 
-        };
+    //     };
 
-        #ok();
+    //     #ok();
 
-    };
+    // };
 
     func recommended_entries_to_populate_based_on_benchmarks(
         num_indexes : Nat
@@ -265,69 +267,69 @@ module {
         max_entries;
     };
 
-    public func populate_index(
-        collection : StableCollection,
-        _main_btree_utils : BTreeUtils<Nat, Blob>,
-        index_key_details : [(Text)],
-        opt_batch_size : ?Nat,
-    ) : async* Result<(), Text> {
-        await* populate_indexes(collection, _main_btree_utils, [index_key_details], opt_batch_size);
-    };
+    // public func populate_index(
+    //     collection : StableCollection,
+    //     _main_btree_utils : BTreeUtils<Nat, Blob>,
+    //     index_key_details : [(Text)],
+    //     opt_batch_size : ?Nat,
+    // ) : async* Result<(), Text> {
+    //     await* populate_indexes(collection, _main_btree_utils, [index_key_details], opt_batch_size);
+    // };
 
-    public func populate_indexes(
-        collection : StableCollection,
-        _main_btree_utils : BTreeUtils<Nat, Blob>,
-        indexes_key_details : [[Text]],
-        opt_batch_size : ?Nat,
-    ) : async* Result<(), Text> {
+    // public func populate_indexes(
+    //     collection : StableCollection,
+    //     _main_btree_utils : BTreeUtils<Nat, Blob>,
+    //     indexes_key_details : [[Text]],
+    //     opt_batch_size : ?Nat,
+    // ) : async* Result<(), Text> {
 
-        let recommended_batch_size = recommended_entries_to_populate_based_on_benchmarks(indexes_key_details.size());
+    //     let recommended_batch_size = recommended_entries_to_populate_based_on_benchmarks(indexes_key_details.size());
 
-        let BATCH_SIZE = Option.get(opt_batch_size, recommended_batch_size);
+    //     let BATCH_SIZE = Option.get(opt_batch_size, recommended_batch_size);
 
-        let indexes = Buffer.Buffer<Index>(indexes_key_details.size());
+    //     let indexes = Buffer.Buffer<Index>(indexes_key_details.size());
 
-        for (index_key_details in indexes_key_details.vals()) {
-            let index_name = Text.join(
-                "_",
-                Iter.map<Text, Text>(
-                    index_key_details.vals(),
-                    func(key : Text) : Text {
-                        key;
-                    },
-                ),
-            );
+    //     for (index_key_details in indexes_key_details.vals()) {
+    //         let index_name = Text.join(
+    //             "_",
+    //             Iter.map<Text, Text>(
+    //                 index_key_details.vals(),
+    //                 func(key : Text) : Text {
+    //                     key;
+    //                 },
+    //             ),
+    //         );
 
-            let ?index = Map.get(collection.indexes, thash, index_name) else return #err("Index with key_details '" # debug_show index_key_details # "' does not exist");
+    //         let ?index = Map.get(collection.indexes, thash, index_name) else return #err("Index with key_details '" # debug_show index_key_details # "' does not exist");
 
-            indexes.add(index);
-        };
+    //         indexes.add(index);
+    //     };
 
-        var size = 0;
+    //     var size = 0;
 
-        while (size < MemoryBTree.size(collection.main)) {
+    //     while (size < MemoryBTree.size(collection.main)) {
 
-            let start = size;
-            let end = Nat.min(size + BATCH_SIZE, MemoryBTree.size(collection.main));
+    //         let start = size;
+    //         let end = Nat.min(size + BATCH_SIZE, MemoryBTree.size(collection.main));
 
-            let res = await internal_populate_indexes(
-                collection,
-                indexes,
-                MemoryBTree.range(collection.main, _main_btree_utils, start, end),
-            );
+    //         let res = await internal_populate_indexes(
+    //             collection,
+    //             indexes,
+    //             MemoryBTree.range(collection.main, _main_btree_utils, start, end),
+    //         );
 
-            switch (res) {
-                case (#err(err)) return #err(err);
-                case (#ok(_)) {};
-            };
+    //         switch (res) {
+    //             case (#err(err)) return #err(err);
+    //             case (#ok(_)) {};
+    //         };
 
-            size += BATCH_SIZE;
+    //         size += BATCH_SIZE;
 
-        };
+    //     };
 
-        #ok()
+    //     #ok()
 
-    };
+    // };
 
     public func delete_index(
         collection : StableCollection,
@@ -468,134 +470,110 @@ module {
         #ok();
     };
 
-    module CandidOps {
+    func handle_update_field_set_operation(
+        candid_map : CandidMap.CandidMap,
+        op : ZT.UpdateFieldSetOperations,
+    ) : Result<Candid, Text> {
 
-        func to_float(candid : Candid) : Float {
-            switch (candid) {
-                case (#Nat(nat)) Float.fromInt(nat);
-                case (#Int(int)) Float.fromInt(int);
-                case (#Float(float)) float;
-                case (#Option(opt)) to_float(opt);
-                case (#Null) 0.0;
-                case (#Nat8(nat8)) Float.fromInt(Nat8.toNat(nat8));
-                case (#Nat16(nat16)) Float.fromInt(Nat16.toNat(nat16));
-                case (#Nat32(nat32)) Float.fromInt(Nat32.toNat(nat32));
-                case (#Nat64(nat64)) Float.fromInt(Nat64.toNat(nat64));
-                case (#Int8(int8)) Float.fromInt(Int8.toInt(int8));
-                case (#Int16(int16)) Float.fromInt(Int16.toInt(int16));
-                case (#Int32(int32)) Float.fromInt(Int32.toInt(int32));
-                case (#Int64(int64)) Float.fromInt(Int64.toInt(int64));
-                case (#Text(text)) Debug.trap("Can't convert text to float");
-                case (#Bool(bool)) Debug.trap("Can't convert bool to float");
-                case (compound_candid) Debug.trap("Can't convert compound candid '" # debug_show compound_candid # "' to float");
-            };
-        };
+        func handle_nested_operations(
+            nested_operations : [ZT.UpdateFieldSetOperations],
+            operation_handler : (Iter<Candid>) -> Result<Candid, Text>,
+        ) : Result<Candid, Text> {
+            let candid_values = Array.init<Candid>(nested_operations.size(), #Null);
 
-        func from_float(self : Candid, float : Float) : Candid.Candid {
+            for ((i, nested_op) in Itertools.enumerate(nested_operations.vals())) {
 
-            switch (self) {
-                case (#Nat(_)) #Nat(Int.abs(Float.toInt(float)));
-                case (#Int(_)) #Int(Float.toInt(float));
-                case (#Float(_)) #Float(float);
-                case (#Option(opt)) #Option(from_float(opt, float));
-                case (#Null) Debug.trap("Can't convert null to float. Need to pass in the candid type as well");
-                case (#Nat8(nat8)) #Nat8(Nat8.fromNat(Int.abs(Float.toInt(float))));
-                case (#Nat16(nat16)) #Nat16(Nat16.fromNat(Int.abs(Float.toInt(float))));
-                case (#Nat32(nat32)) #Nat32(Nat32.fromNat(Int.abs(Float.toInt(float))));
-                case (#Nat64(nat64)) #Nat64(Nat64.fromNat(Int.abs(Float.toInt(float))));
-                case (#Int8(int8)) #Int8(Int8.fromInt(Float.toInt(float)));
-                case (#Int16(int16)) #Int16(Int16.fromInt(Float.toInt(float)));
-                case (#Int32(int32)) #Int32(Int32.fromInt(Float.toInt(float)));
-                case (#Int64(int64)) #Int64(Int64.fromInt(Float.toInt(float)));
-                case (#Text(text)) Debug.trap("Can't convert float to text");
-                case (#Bool(bool)) Debug.trap("Can't convert float to bool");
-                case (compound_candid) Debug.trap("Can't convert from float to compound type '" # debug_show compound_candid # "'");
+                switch (handle_update_field_set_operation(candid_map, nested_op)) {
+                    case (#ok(candid_value)) candid_values[i] := candid_value;
+                    case (#err(msg)) return #err(debug_show (nested_operations) # " failed: " # msg);
+                };
+
             };
 
+            operation_handler(candid_values.vals());
         };
 
-        public func add(self : Candid, other : Candid) : Candid {
+        let new_value = switch (op) {
+            case (#get(field_name)) {
+                let ?value = candid_map.get(field_name) else return #err("Field '" # field_name # "' not found in record");
+                #ok(value);
+            };
+            case (#add(nested_operations)) {
+                handle_nested_operations(nested_operations, CandidMod.Multi.add);
+            };
+            case (#sub(nested_operations)) {
+                handle_nested_operations(nested_operations, CandidMod.Multi.sub);
+            };
+            case (#mul(nested_operations)) {
+                handle_nested_operations(nested_operations, CandidMod.Multi.mul);
 
-            let a = to_float(self);
-            let b = to_float(other);
+            };
+            case (#div(nested_operations)) {
+                handle_nested_operations(nested_operations, CandidMod.Multi.div);
 
-            let c = a + b;
-
-            from_float(self, c);
-
+            };
+            case (#val(candid)) { #ok(candid) };
         };
 
-        public func sub(self : Candid, other : Candid) : Candid {
-
-            let a = to_float(self);
-            let b = to_float(other);
-
-            let c = a - b;
-
-            from_float(self, c);
-
-        };
-
-        public func mul(self : Candid, other : Candid) : Candid {
-
-            let a = to_float(self);
-            let b = to_float(other);
-
-            let c = a * b;
-
-            from_float(self, c);
-
-        };
-
-        public func div(self : Candid, other : Candid) : Candid {
-
-            let a = to_float(self);
-            let b = to_float(other);
-
-            let c = a / b;
-
-            from_float(self, c);
-
-        };
-
+        new_value;
     };
 
-    func partially_update_doc(prev_record_candid_map : CandidMap.CandidMap, update_operations : [(Text, ZT.UpdateFieldOperations)]) : Candid.Candid {
+    func partially_update_doc(candid_map : CandidMap.CandidMap, update_operations : [(Text, ZT.UpdateFieldOperations)]) : Result<Candid, Text> {
 
         for ((field_name, op) in update_operations.vals()) {
-            let ?prev_value = prev_record_candid_map.get(field_name) else Debug.trap("Field '" # field_name # "' not found in record");
+            //    Debug.print("field_name: " # field_name);
+
+            let ?candid_type = candid_map.get_type(field_name) else Debug.trap("Field type'" # field_name # "' not found in record");
+            let ?prev_candid = candid_map.get(field_name) else Debug.trap("Field '" # field_name # "' not found in record");
 
             let res = switch (op) {
-                case (#set(value)) {
-                    prev_record_candid_map.set(field_name, value);
+                case (#set(nested_operation)) {
+                    switch (nested_operation) {
+                        case (#val(candid)) { #ok(candid) };
+                        case (nested_operation) {
+                            let resolved_value = switch (handle_update_field_set_operation(candid_map, nested_operation)) {
+                                case (#ok(val)) val;
+                                case (#err(msg)) return #err(msg);
+                            };
+
+                            //    Debug.print("cast: " # debug_show (candid_type) # " -> " # debug_show (resolved_value));
+                            CandidMod.cast(candid_type, resolved_value);
+                        };
+                    };
                 };
-                case (#inc(value)) {
-                    let new_value = CandidOps.add(prev_value, #Int(value));
-                    prev_record_candid_map.set(field_name, new_value);
+                case (#add(candid_value)) {
+                    CandidMod.add(prev_candid, candid_value);
                 };
-                case (#dec(value)) {
-                    let new_value = CandidOps.sub(prev_value, #Int(value));
-                    prev_record_candid_map.set(field_name, new_value);
+                case (#sub(candid_value)) {
+                    CandidMod.sub(prev_candid, candid_value);
                 };
-                case (#mul(value)) {
-                    let new_value = CandidOps.mul(prev_value, #Int(value));
-                    prev_record_candid_map.set(field_name, new_value);
+                case (#mul(candid_value)) {
+                    CandidMod.mul(prev_candid, candid_value);
                 };
-                case (#div(value)) {
-                    let new_value = CandidOps.div(prev_value, #Int(value));
-                    prev_record_candid_map.set(field_name, new_value);
+                case (#div(candid_value)) {
+                    CandidMod.div(prev_candid, candid_value);
                 };
             };
 
-            switch (res) {
-                case (#err(err)) Debug.trap("Failed to update field '" # field_name # "': " # err);
+            let new_value : Candid = switch (res) {
+                case (#ok(new_value)) new_value;
+                case (#err(msg)) return #err(msg);
+            };
+
+            //    Debug.print("new_value for field: " # field_name # " -> " # debug_show new_value);
+
+            switch (candid_map.set(field_name, new_value)) {
+                case (#err(err)) return #err("Failed to update field '" # field_name # "': " # err);
                 case (#ok(_)) {};
             };
+
+            //    Debug.print("updated field: " # field_name # " -> " # debug_show candid_map.get(field_name));
+
         };
 
-        let candid = prev_record_candid_map.extract_candid();
+        let candid = candid_map.extract_candid();
 
-        candid;
+        #ok(candid);
     };
 
     func update_indexed_doc_data(collection : StableCollection, index : Index, id : Nat, prev_record_candid_map : CandidMap.CandidMap, new_record_candid_map : CandidMap.CandidMap) : Result<(), Text> {
@@ -625,16 +603,25 @@ module {
 
         #ok;
     };
-    public func update_by_id<Record>(collection : StableCollection, main_btree_utils : BTreeUtils<Nat, Blob>, id : Nat, update_operations : ZT.InternalUpdateOperations) : Result<(), Text> {
 
-        let ?prev_candid_blob = MemoryBTree.lookupVal(collection.main, main_btree_utils, id) else return #err("Record for id '" # debug_show (id) # "' not found");
+    public func update_by_id<Record>(collection : StableCollection, main_btree_utils : BTreeUtils<Nat, Blob>, id : Nat, update_operations : ZT.InternalUpdateOperations) : Result<(), Text> {
+        //    Debug.print("retrieving record for id: " # debug_show id);
+
+        let ?prev_candid_blob = MemoryBTree.get(collection.main, main_btree_utils, id) else return #err("Record for id '" # debug_show (id) # "' not found");
+        //    Debug.print("retrieved prev_candid_blob");
         let prev_candid = CollectionUtils.decode_candid_blob(collection, prev_candid_blob);
+        //    Debug.print("decoded prev_candid_blob");
         let prev_candid_map = CandidMap.CandidMap(collection.schema, prev_candid);
+        //    Debug.print("created prev_candid_map");
+
+        //    Debug.print(debug_show ({ prev_candid_blob; prev_candid }));
 
         switch (update_operations) {
             case (#doc(new_candid_blob)) {
                 let new_candid = CollectionUtils.decode_candid_blob(collection, new_candid_blob);
                 let new_candid_map = CandidMap.CandidMap(collection.schema, new_candid);
+
+                //    Debug.print(debug_show ({ new_candid_blob; new_candid }));
 
                 Utils.assert_result(Schema.validate_record(collection.schema, new_candid));
 
@@ -646,9 +633,12 @@ module {
 
             };
             case (#ops(field_updates)) {
+                let new_candid_map = prev_candid_map.clone();
 
-                let new_candid_record = partially_update_doc(prev_candid_map, field_updates);
-                let new_candid_map = CandidMap.CandidMap(collection.schema, new_candid_record);
+                let new_candid_record = switch (partially_update_doc(new_candid_map, field_updates)) {
+                    case (#ok(new_candid_record)) new_candid_record;
+                    case (#err(msg)) return #err(msg);
+                };
 
                 // should validated the updated fields instead of the entire record
                 Utils.assert_result(Schema.validate_record(collection.schema, new_candid_record));
@@ -656,7 +646,7 @@ module {
                 let #ok(new_candid_blob) = Candid.encodeOne(
                     new_candid_record,
                     ?{
-                        Candid.defaultOptions with types = ?[collection.schema]
+                        Candid.defaultOptions with types = ?[collection.formatted_schema];
                     },
                 );
 
@@ -698,6 +688,14 @@ module {
     ) : Result<ZT.CandidBlob, Text> {
         let ?record_details = MemoryBTree.get(collection.main, main_btree_utils, id) else return #err("Record not found");
         #ok(record_details);
+    };
+
+    public func keys(collection : StableCollection, main_btree_utils : BTreeUtils<Nat, Blob>) : Iter<Nat> {
+        MemoryBTree.keys(collection.main, main_btree_utils);
+    };
+
+    public func rangeKeys(collection : StableCollection, main_btree_utils : BTreeUtils<Nat, Blob>, start : Nat, end : Nat) : Iter<Nat> {
+        MemoryBTree.rangeKeys(collection.main, main_btree_utils, start, end);
     };
 
     public func search(
