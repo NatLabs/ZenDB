@@ -43,8 +43,6 @@ let candify_data = {
 
 let #ok(texts) = zendb.create_collection("texts", DataSchema, candify_data);
 
-// let #ok(_) = texts.create_index(["value"]);
-
 let #ok(_) = texts.insert({ value = "a" });
 let #ok(_) = texts.insert({ value = "alphabet" });
 let #ok(_) = texts.insert({ value = "alphabetical" });
@@ -371,7 +369,12 @@ func query_tests(texts : ZenDB.Collection<Data>) {
 
 };
 
-suite("testing on non indexed field", func() { query_tests(texts) });
+suite(
+    "testing on non indexed field",
+    func() {
+        query_tests(texts);
+    },
+);
 
 suite(
     "testing on indexed field",

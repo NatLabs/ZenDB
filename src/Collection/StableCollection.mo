@@ -183,26 +183,26 @@ module {
         #ok();
     };
 
-    // public func create_and_populate_index(
-    //     collection : StableCollection,
-    //     _main_btree_utils : BTreeUtils<Nat, Blob>,
-    //     index_key_details : [(Text)],
-    //     opt_batch_size : ?Nat,
-    // ) : async* Result<(), Text> {
+    public func create_and_populate_index(
+        collection : StableCollection,
+        _main_btree_utils : BTreeUtils<Nat, Blob>,
+        index_key_details : [(Text)],
+        opt_batch_size : ?Nat,
+    ) : Result<(), Text> {
 
-    //     switch (create_index(collection, _main_btree_utils, index_key_details)) {
-    //         case (#err(err)) return #err(err);
-    //         case (#ok(_)) {};
-    //     };
+        switch (create_index(collection, _main_btree_utils, index_key_details)) {
+            case (#err(err)) return #err(err);
+            case (#ok(_)) {};
+        };
 
-    //     switch (await* populate_index(collection, _main_btree_utils, index_key_details, opt_batch_size)) {
-    //         case (#err(err)) return #err(err);
-    //         case (#ok(_)) {};
-    //     };
+        switch (populate_index(collection, _main_btree_utils, index_key_details, opt_batch_size)) {
+            case (#err(err)) return #err(err);
+            case (#ok(_)) {};
+        };
 
-    //     #ok();
+        #ok();
 
-    // };
+    };
 
     public func clear_index(
         collection : StableCollection,
@@ -229,27 +229,27 @@ module {
 
     };
 
-    // func internal_populate_indexes(
-    //     collection : StableCollection,
-    //     indexes : Buffer.Buffer<Index>,
-    //     entries : Iter<(Nat, Blob)>,
-    // ) : async Result<(), Text> {
-    //     for ((id, candid_blob) in entries) {
-    //         let candid = CollectionUtils.decode_candid_blob(collection, candid_blob);
-    //         let candid_map = CandidMap.CandidMap(collection.schema, candid);
+    func internal_populate_indexes(
+        collection : StableCollection,
+        indexes : Buffer.Buffer<Index>,
+        entries : Iter<(Nat, Blob)>,
+    ) : Result<(), Text> {
+        for ((id, candid_blob) in entries) {
+            let candid = CollectionUtils.decode_candid_blob(collection, candid_blob);
+            let candid_map = CandidMap.CandidMap(collection.schema, candid);
 
-    //         for (index in indexes.vals()) {
-    //             switch (insert_into_index(collection, index, id, candid_map)) {
-    //                 case (#err(err)) return #err(err);
-    //                 case (#ok(_)) {};
-    //             };
-    //         };
+            for (index in indexes.vals()) {
+                switch (insert_into_index(collection, index, id, candid_map)) {
+                    case (#err(err)) return #err(err);
+                    case (#ok(_)) {};
+                };
+            };
 
-    //     };
+        };
 
-    //     #ok();
+        #ok();
 
-    // };
+    };
 
     func recommended_entries_to_populate_based_on_benchmarks(
         num_indexes : Nat
@@ -267,16 +267,53 @@ module {
         max_entries;
     };
 
-    // public func populate_index(
-    //     collection : StableCollection,
-    //     _main_btree_utils : BTreeUtils<Nat, Blob>,
-    //     index_key_details : [(Text)],
-    //     opt_batch_size : ?Nat,
-    // ) : async* Result<(), Text> {
-    //     await* populate_indexes(collection, _main_btree_utils, [index_key_details], opt_batch_size);
-    // };
+    public func populate_index(
+        collection : StableCollection,
+        _main_btree_utils : BTreeUtils<Nat, Blob>,
+        index_key_details : [(Text)],
+        opt_batch_size : ?Nat,
+    ) : Result<(), Text> {
+        populate_indexes(collection, _main_btree_utils, [index_key_details], opt_batch_size);
+    };
 
-    // public func populate_indexes(
+    public func populate_indexes(
+        collection : StableCollection,
+        _main_btree_utils : BTreeUtils<Nat, Blob>,
+        indexes_key_details : [[Text]],
+        opt_batch_size : ?Nat,
+    ) : Result<(), Text> {
+
+        let recommended_batch_size = recommended_entries_to_populate_based_on_benchmarks(indexes_key_details.size());
+
+        let BATCH_SIZE = Option.get(opt_batch_size, recommended_batch_size);
+
+        let indexes = Buffer.Buffer<Index>(indexes_key_details.size());
+
+        for (index_key_details in indexes_key_details.vals()) {
+            let index_name = Text.join(
+                "_",
+                Iter.map<Text, Text>(
+                    index_key_details.vals(),
+                    func(key : Text) : Text {
+                        key;
+                    },
+                ),
+            );
+
+            let ?index = Map.get(collection.indexes, thash, index_name) else return #err("Index with key_details '" # debug_show index_key_details # "' does not exist");
+
+            indexes.add(index);
+        };
+
+        internal_populate_indexes(
+            collection,
+            indexes,
+            MemoryBTree.entries(collection.main, _main_btree_utils, start, end),
+        );
+
+    };
+
+    // public func async_populate_indexes(
     //     collection : StableCollection,
     //     _main_btree_utils : BTreeUtils<Nat, Blob>,
     //     indexes_key_details : [[Text]],
