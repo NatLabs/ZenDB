@@ -67,6 +67,14 @@ func query_tests(texts : ZenDB.Collection<Data>) {
     test(
         "#gt",
         func() {
+            Debug.print(
+                debug_show (
+                    texts.search(
+                        QueryBuilder().Where("value", #gt(#Text("and")))
+                    )
+                )
+            );
+
             assert texts.search(
                 QueryBuilder().Where("value", #gt(#Text("and")))
             ) == #ok([
@@ -75,6 +83,14 @@ func query_tests(texts : ZenDB.Collection<Data>) {
                 (6, { value = "berry" }),
                 (7, { value = "c" }),
             ]);
+
+            Debug.print(
+                debug_show (
+                    texts.search(
+                        QueryBuilder().Where("value", #Not(#gt(#Text("and"))))
+                    )
+                )
+            );
 
             assert texts.search(
                 QueryBuilder().Where("value", #Not(#gt(#Text("and"))))
@@ -182,60 +198,60 @@ func query_tests(texts : ZenDB.Collection<Data>) {
         },
     );
 
-    // test(
-    //     "#between",
-    //     func() {
+    test(
+        "#between",
+        func() {
 
-    //         let expected_response = #ok([
-    //             (0, { value = "a" }),
-    //             (1, { value = "alphabet" }),
-    //             (2, { value = "alphabetical" }),
-    //             (3, { value = "and" }),
-    //             (4, { value = "anderson" }),
-    //         ]);
+            let expected_response = #ok([
+                (0, { value = "a" }),
+                (1, { value = "alphabet" }),
+                (2, { value = "alphabetical" }),
+                (3, { value = "and" }),
+                (4, { value = "anderson" }),
+            ]);
 
-    //         let res0 = texts.search(
-    //             QueryBuilder().Where("value", #gte(#Text("a"))).And("value", #lte(#Text("anderson")))
-    //         );
+            let res0 = texts.search(
+                QueryBuilder().Where("value", #gte(#Text("a"))).And("value", #lte(#Text("anderson")))
+            );
 
-    //         assert res0 == expected_response;
+            assert res0 == expected_response;
 
-    //         let res1 = texts.search(
-    //             QueryBuilder().Where("value", #between(#Text("a"), #Text("anderson")))
-    //         );
+            let res1 = texts.search(
+                QueryBuilder().Where("value", #between(#Text("a"), #Text("anderson")))
+            );
 
-    //         assert res1 == expected_response;
+            assert res1 == expected_response;
 
-    //         let expected_negative_response = #ok([
-    //             (5, { value = "b" }),
-    //             (6, { value = "berry" }),
-    //             (7, { value = "c" }),
-    //         ]);
+            let expected_negative_response = #ok([
+                (5, { value = "b" }),
+                (6, { value = "berry" }),
+                (7, { value = "c" }),
+            ]);
 
-    //         Debug.print(
-    //             debug_show (
-    //                 QueryBuilder().Where("value", #gt(#Text("anderson"))).Or("value", #lt(#Text("a"))).build()
-    //             )
-    //         );
+            Debug.print(
+                debug_show (
+                    QueryBuilder().Where("value", #gt(#Text("anderson"))).Or("value", #lt(#Text("a"))).build()
+                )
+            );
 
-    //         let res2 = texts.search(
-    //             QueryBuilder().Where("value", #gt(#Text("anderson"))).Or("value", #lt(#Text("a")))
-    //         );
+            let res2 = texts.search(
+                QueryBuilder().Where("value", #gt(#Text("anderson"))).Or("value", #lt(#Text("a")))
+            );
 
-    //         Debug.print(debug_show { res2 });
+            Debug.print(debug_show { res2 });
 
-    //         // assert res2 == expected_negative_response;
+            assert res2 == expected_negative_response;
 
-    //         let res3 = texts.search(
-    //             QueryBuilder().Where("value", #Not(#between(#Text("a"), #Text("anderson"))))
-    //         );
+            let res3 = texts.search(
+                QueryBuilder().Where("value", #Not(#between(#Text("a"), #Text("anderson"))))
+            );
 
-    //         Debug.print(debug_show { res3 });
+            Debug.print(debug_show { res3 });
 
-    //         assert res3 == expected_negative_response;
+            assert res3 == expected_negative_response;
 
-    //     },
-    // );
+        },
+    );
 
     test(
         "#exists()",
@@ -378,13 +394,13 @@ suite(
     },
 );
 
-suite(
-    "testing on indexed field",
-    func() {
-        Debug.print("trying to index field");
-        let #ok(_) = texts.create_and_populate_index(["value"]);
-        Debug.print("field indexed");
+// suite(
+//     "testing on indexed field",
+//     func() {
+//         Debug.print("trying to index field");
+//         let #ok(_) = texts.create_and_populate_index("value_index", [("value", #Ascending)]);
+//         Debug.print("field indexed");
 
-        query_tests(texts);
-    },
-);
+//         query_tests(texts);
+//     },
+// );

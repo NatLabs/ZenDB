@@ -75,7 +75,7 @@ actor class Backend() {
         };
     };
 
-    let #ok(txs) = db.get_or_create_collection<Block>("_t_x_s", BlockSchema, CandifyBlock);
+    let #ok(txs) = db.get_or_create_collection<Block>("txs", BlockSchema, CandifyBlock);
 
     // because of the way indexes are selected, the order of the fields in the index matters
     // but also if there are more than one index selected as the best index,

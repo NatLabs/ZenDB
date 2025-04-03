@@ -3,6 +3,7 @@
         "backend": {
             "type": "motoko",
             "main": "backend/Backend.mo",
+            "args": "--max-stable-pages 1638400",
             "declarations": {
                 "node_compatibility": true
             }

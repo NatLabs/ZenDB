@@ -7,7 +7,9 @@ import Text "mo:base/Text";
 import Blob "mo:base/Blob";
 import Nat8 "mo:base/Nat8";
 import Nat32 "mo:base/Nat32";
+import Int64 "mo:base/Int64";
 import Buffer "mo:base/Buffer";
+import Nat64 "mo:base/Nat64";
 
 import Map "mo:map/Map";
 import Set "mo:map/Set";
@@ -294,8 +296,8 @@ module {
             acc_key_size += key_size;
             acc_value_size += value_size;
 
-            let key_pointer_bytes = ByteUtils.from_nat32_be(Nat32.fromNat(key_pointer));
-            let value_pointer_bytes = ByteUtils.from_nat32_be(Nat32.fromNat(value_pointer));
+            let key_pointer_bytes = ByteUtils.BigEndian.fromNat32(Nat32.fromNat(key_pointer));
+            let value_pointer_bytes = ByteUtils.BigEndian.fromNat32(Nat32.fromNat(value_pointer));
 
             buffer_add_all(pointers, key_pointer_bytes.vals());
             buffer_add_all(pointers, value_pointer_bytes.vals());
@@ -305,7 +307,7 @@ module {
 
         let encoded = Buffer.Buffer<Nat8>(2 + pointers.size() + keys.size() + values.size());
 
-        let num_fields_bytes = ByteUtils.from_nat16_be(Nat16.fromNat(flattened_records.size()));
+        let num_fields_bytes = ByteUtils.BigEndian.fromNat16(Nat16.fromNat(flattened_records.size()));
         buffer_add_all(encoded, num_fields_bytes.vals());
 
         buffer_add_all(encoded, pointers.vals());
@@ -328,27 +330,27 @@ module {
         } else if (type_code == TypeCode.Empty) {
             #Empty;
         } else if (type_code == TypeCode.Int) {
-            #Int(ByteUtils.to_int(value_iter));
+            #Int(Int64.toInt(ByteUtils.LittleEndian.toInt64(value_iter)));
         } else if (type_code == TypeCode.Int8) {
-            #Int8(ByteUtils.to_int8(value_iter));
+            #Int8(ByteUtils.LittleEndian.toInt8(value_iter));
         } else if (type_code == TypeCode.Int16) {
-            #Int16(ByteUtils.to_int16(value_iter));
+            #Int16(ByteUtils.LittleEndian.toInt16(value_iter));
         } else if (type_code == TypeCode.Int32) {
-            #Int32(ByteUtils.to_int32(value_iter));
+            #Int32(ByteUtils.LittleEndian.toInt32(value_iter));
         } else if (type_code == TypeCode.Int64) {
-            #Int64(ByteUtils.to_int64(value_iter));
+            #Int64(ByteUtils.LittleEndian.toInt64(value_iter));
         } else if (type_code == TypeCode.Nat) {
-            #Nat(ByteUtils.to_nat(value_iter));
+            #Nat(Nat64.toNat(ByteUtils.LittleEndian.toNat64(value_iter)));
         } else if (type_code == TypeCode.Nat8) {
-            #Nat8(ByteUtils.to_nat8(value_iter));
+            #Nat8(ByteUtils.LittleEndian.toNat8(value_iter));
         } else if (type_code == TypeCode.Nat16) {
-            #Nat16(ByteUtils.to_nat16(value_iter));
+            #Nat16(ByteUtils.LittleEndian.toNat16(value_iter));
         } else if (type_code == TypeCode.Nat32) {
-            #Nat32(ByteUtils.to_nat32(value_iter));
+            #Nat32(ByteUtils.LittleEndian.toNat32(value_iter));
         } else if (type_code == TypeCode.Nat64) {
-            #Nat64(ByteUtils.to_nat64(value_iter));
+            #Nat64(ByteUtils.LittleEndian.toNat64(value_iter));
         } else if (type_code == TypeCode.Float) {
-            #Float(ByteUtils.to_float64(value_iter));
+            #Float(ByteUtils.LittleEndian.toFloat64(value_iter));
         } else if (type_code == TypeCode.Text) {
             let text_bytes = Blob.fromArray(Iter.toArray(value_iter));
             let ?text = Text.decodeUtf8(text_bytes) else Debug.trap("CandidMap: Invalid utf8 text");
@@ -390,7 +392,7 @@ module {
                 (arr.vals(), arr.size());
             };
             case (#Int(i)) {
-                let bytes = ByteUtils.from_int(i);
+                let bytes = ByteUtils.LittleEndian.fromInt64(Int64.fromInt(i));
 
                 let iter = Itertools.prepend(
                     TypeCode.Int,
@@ -401,7 +403,7 @@ module {
             };
             case (#Int8(i)) {
 
-                let bytes = ByteUtils.from_int8(i);
+                let bytes = ByteUtils.LittleEndian.fromInt8(i);
 
                 let iter = Itertools.prepend(
                     TypeCode.Int8,
@@ -411,7 +413,7 @@ module {
                 (iter, bytes.size() + 1);
             };
             case (#Int16(i)) {
-                let bytes = ByteUtils.from_int16(i);
+                let bytes = ByteUtils.LittleEndian.fromInt16(i);
 
                 let iter = Itertools.prepend(
                     TypeCode.Int16,
@@ -421,7 +423,7 @@ module {
                 (iter, bytes.size() + 1);
             };
             case (#Int32(i)) {
-                let bytes = ByteUtils.from_int32(i);
+                let bytes = ByteUtils.LittleEndian.fromInt32(i);
 
                 let iter = Itertools.prepend(
                     TypeCode.Int32,
@@ -431,7 +433,7 @@ module {
                 (iter, bytes.size() + 1);
             };
             case (#Int64(i)) {
-                let bytes = ByteUtils.from_int64(i);
+                let bytes = ByteUtils.LittleEndian.fromInt64(i);
 
                 let iter = Itertools.prepend(
                     TypeCode.Int64,
@@ -441,7 +443,7 @@ module {
                 (iter, bytes.size() + 1);
             };
             case (#Nat(i)) {
-                let bytes = ByteUtils.from_nat(i);
+                let bytes = ByteUtils.LittleEndian.fromNat64(Nat64.fromNat(i));
 
                 let iter = Itertools.prepend(
                     TypeCode.Nat,
@@ -451,7 +453,7 @@ module {
                 (iter, bytes.size() + 1);
             };
             case (#Nat8(i)) {
-                let bytes = ByteUtils.from_nat8(i);
+                let bytes = ByteUtils.LittleEndian.fromNat8(i);
 
                 let iter = Itertools.prepend(
                     TypeCode.Nat8,
@@ -461,7 +463,7 @@ module {
                 (iter, bytes.size() + 1);
             };
             case (#Nat16(i)) {
-                let bytes = ByteUtils.from_nat16_be(i);
+                let bytes = ByteUtils.LittleEndian.fromNat16(i);
 
                 let iter = Itertools.prepend(
                     TypeCode.Nat16,
@@ -471,7 +473,7 @@ module {
                 (iter, bytes.size() + 1);
             };
             case (#Nat32(i)) {
-                let bytes = ByteUtils.from_nat32_be(i);
+                let bytes = ByteUtils.LittleEndian.fromNat32(i);
 
                 let iter = Itertools.prepend(
                     TypeCode.Nat32,
@@ -481,7 +483,7 @@ module {
                 (iter, bytes.size() + 1);
             };
             case (#Nat64(i)) {
-                let bytes = ByteUtils.from_nat64_be(i);
+                let bytes = ByteUtils.LittleEndian.fromNat64(i);
 
                 let iter = Itertools.prepend(
                     TypeCode.Nat64,
@@ -491,7 +493,7 @@ module {
                 (iter, bytes.size() + 1);
             };
             case (#Float(f)) {
-                let bytes = ByteUtils.from_float64(f);
+                let bytes = ByteUtils.LittleEndian.fromFloat64(f);
 
                 let iter = Itertools.prepend(
                     TypeCode.Float,

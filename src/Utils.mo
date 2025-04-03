@@ -13,6 +13,7 @@ import Nat "mo:base/Nat";
 import Option "mo:base/Option";
 import Hash "mo:base/Hash";
 import Float "mo:base/Float";
+import Blob "mo:base/Blob";
 
 import Int "mo:base/Int";
 
@@ -29,6 +30,7 @@ import TypeUtils "mo:memory-collection/TypeUtils";
 import Int8Cmp "mo:memory-collection/TypeUtils/Int8Cmp";
 
 import T "Types";
+import ByteUtils "ByteUtils";
 
 module {
     type Order = Order.Order;
@@ -133,12 +135,19 @@ module {
         // converts to Nat64 because pointers are 64-bit
         blobify = {
             from_blob = func(blob : Blob) : Nat {
-                TypeUtils.BigEndian.Nat64.blobify.from_blob(blob) |> Nat64.toNat(_);
+                assert blob.size() == 8;
+                let n64 = ByteUtils.LittleEndian.toNat64(blob.vals());
+                // TypeUtils.BigEndian.Nat64.blobify.from_blob(blob) |> Nat64.toNat(_);
+                Nat64.toNat(n64);
             };
 
             to_blob = func(nat : Nat) : Blob {
                 let n64 = Nat64.fromNat(nat);
-                TypeUtils.BigEndian.Nat64.blobify.to_blob(n64);
+                let bytes = ByteUtils.BigEndian.fromNat64(n64);
+                let blob = Blob.fromArray(bytes);
+                // let blob = TypeUtils.BigEndian.Nat64.blobify.to_blob(n64);
+                assert blob.size() == 8;
+                blob;
             };
         };
 

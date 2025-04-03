@@ -331,8 +331,6 @@ module {
             case (_) Debug.trap("create_query_plan(): Unsupported query type");
         };
 
-        Debug.print(debug_show ({ query_plan with subplans = []; scans = [] }));
-
         query_plan;
     };
 

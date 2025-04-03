@@ -70,9 +70,9 @@ let data_type_to_candid : ZenDB.Candify<Doc> = {
 };
 
 let #ok(data) = zendb.create_collection<Doc>("data", DocSchema, data_type_to_candid);
-let #ok(_) = data.create_index(["version"]);
-let #ok(_) = data.create_index(["version.v1.a"]);
-let #ok(_) = data.create_index(["version.v3.size.known"]);
+let #ok(_) = data.create_index("index_1", [("version", #Ascending)]);
+let #ok(_) = data.create_index("index_2", [("version.v1.a", #Ascending)]);
+let #ok(_) = data.create_index("index_3", [("version.v3.size.known", #Ascending)]);
 
 var item1 : Doc = { version = #v1({ a = 42; b = "hello" }) };
 var item2 : Doc = { version = #v2({ c = "world"; d = true }) };

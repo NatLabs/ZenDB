@@ -1,12 +1,6 @@
 {
   "version": 1,
-  "canisters": {
-    "icp-txs-db": {
-      "type": "motoko",
-      "main": "example/icp-txs-db/main.mo",
-      "args": "--max-stable-pages 300000"
-    }
-  },
+  "canisters": {},
   "defaults": {
     "build": {
       "packtool": "mops sources",

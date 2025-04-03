@@ -162,7 +162,7 @@ module CollectionUtils {
     };
 
     public func lookup_candid_record(collection : StableCollection, id : Nat) : ?Candid.Candid {
-        let ?record_details = MemoryBTree.get(collection.main, get_main_btree_utils(), id);
+        let ?record_details = MemoryBTree.get(collection.main, get_main_btree_utils(), id) else return null;
         let candid = decode_candid_blob(collection, record_details);
 
         ?candid;
@@ -186,31 +186,33 @@ module CollectionUtils {
 
             let ?field_value = candid_map.get(key) else Debug.trap("candid_map_filter_condition: field '" # debug_show key # "' not found in record");
 
-            Debug.print("retrieve: " # debug_show key # " = " # debug_show field_value);
+            var res = true;
 
             switch (opt_lower_val) {
                 case (?(#Inclusive(lower_val))) {
-                    if (Schema.cmp_candid(collection.schema, field_value, lower_val) == -1) return false;
+                    if (Schema.cmp_candid_ignore_option(collection.schema, field_value, lower_val) == -1) res := false;
                 };
                 case (?(#Exclusive(lower_val))) {
-                    if (Schema.cmp_candid(collection.schema, field_value, lower_val) < 1) return false;
+                    if (Schema.cmp_candid_ignore_option(collection.schema, field_value, lower_val) < 1) res := false;
                 };
                 case (null) {};
             };
 
             switch (opt_upper_val) {
                 case (?(#Inclusive(upper_val))) {
-                    if (Schema.cmp_candid(collection.schema, field_value, upper_val) == 1) return false;
+                    if (Schema.cmp_candid_ignore_option(collection.schema, field_value, upper_val) == 1) res := false;
                 };
                 case (?(#Exclusive(upper_val))) {
-                    if (Schema.cmp_candid(collection.schema, field_value, upper_val) > -1) return false;
+                    if (Schema.cmp_candid_ignore_option(collection.schema, field_value, upper_val) > -1) res := false;
                 };
                 case (null) {};
             };
 
+            if (not res) return res;
+
         };
 
-        true;
+        true
 
     };
 
@@ -276,7 +278,10 @@ module CollectionUtils {
                 func filter_fn(
                     (lower, upper) : (([(Text, ?T.CandidInclusivityQuery)], [(Text, ?T.CandidInclusivityQuery)]))
                 ) : Bool {
-                    candid_map_filter_condition(collection, candid, lower, upper);
+
+                    let res = candid_map_filter_condition(collection, candid, lower, upper);
+
+                    res;
                 };
 
                 if (is_and) {

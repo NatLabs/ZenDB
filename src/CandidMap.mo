@@ -97,8 +97,6 @@ module {
                 let candid_type = types[i].1;
                 let candid_value = var_fields[i].1;
 
-                Debug.print("field: " # debug_show (field));
-
                 let ?nested_candid = Map.get(map, thash, field) else return Debug.trap("CandidMap: Extra field not present in the original candid during reload");
 
                 switch (nested_candid) {

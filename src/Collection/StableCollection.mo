@@ -93,6 +93,32 @@ module {
         MemoryBTree.size(collection.main);
     };
 
+    // BTree methods
+
+    public func entries(collection : StableCollection, main_btree_utils : BTreeUtils<Nat, Blob>) : Iter<(Nat, Blob)> {
+        MemoryBTree.entries(collection.main, main_btree_utils);
+    };
+
+    public func keys(collection : StableCollection, main_btree_utils : BTreeUtils<Nat, Blob>) : Iter<Nat> {
+        MemoryBTree.keys(collection.main, main_btree_utils);
+    };
+
+    public func vals(collection : StableCollection, main_btree_utils : BTreeUtils<Nat, Blob>) : Iter<Blob> {
+        MemoryBTree.vals(collection.main, main_btree_utils);
+    };
+
+    public func range(collection : StableCollection, main_btree_utils : BTreeUtils<Nat, Blob>, start : Nat, end : Nat) : Iter<(Nat, Blob)> {
+        MemoryBTree.range(collection.main, main_btree_utils, start, end);
+    };
+
+    public func rangeKeys(collection : StableCollection, main_btree_utils : BTreeUtils<Nat, Blob>, start : Nat, end : Nat) : Iter<Nat> {
+        MemoryBTree.rangeKeys(collection.main, main_btree_utils, start, end);
+    };
+
+    public func rangeVals(collection : StableCollection, main_btree_utils : BTreeUtils<Nat, Blob>, start : Nat, end : Nat) : Iter<Blob> {
+        MemoryBTree.rangeVals(collection.main, main_btree_utils, start, end);
+    };
+
     public func update_schema(collection : StableCollection, schema : ZT.Schema) : Result<(), Text> {
 
         let is_compatible = Schema.is_schema_backward_compatible(collection.schema, schema);
@@ -137,11 +163,11 @@ module {
         collection : StableCollection,
         main_btree_utils : BTreeUtils<Nat, Blob>,
         index_name : Text,
-        index_key_details : [(Text, SortDirection)],
+        _index_key_details : [(Text, SortDirection)],
     ) : Result<(), Text> {
 
         let index_key_details : [(Text, SortDirection)] = Array.append(
-            index_key_details,
+            _index_key_details,
             [(C.RECORD_ID_FIELD, #Ascending)],
         );
 
@@ -179,7 +205,7 @@ module {
             case (#ok(_)) {};
         };
 
-        switch (populate_index(collection, _main_btree_utils, index_name, opt_batch_size)) {
+        switch (populate_index(collection, _main_btree_utils, index_name)) {
             case (#err(err)) return #err(err);
             case (#ok(_)) {};
         };
@@ -191,18 +217,8 @@ module {
     public func clear_index(
         collection : StableCollection,
         _main_btree_utils : BTreeUtils<Nat, Blob>,
-        index_key_details : [Text],
+        index_name : Text,
     ) : Result<(), Text> {
-
-        let index_name = Text.join(
-            "_",
-            Iter.map<Text, Text>(
-                index_key_details.vals(),
-                func(key : Text) : Text {
-                    key;
-                },
-            ),
-        );
 
         switch (Map.get(collection.indexes, thash, index_name)) {
             case (?index) MemoryBTree.clear(index.data);
@@ -264,7 +280,7 @@ module {
     public func populate_indexes(
         collection : StableCollection,
         _main_btree_utils : BTreeUtils<Nat, Blob>,
-        index_names : [[Text]],
+        index_names : [Text],
     ) : Result<(), Text> {
 
         let indexes = Buffer.Buffer<Index>(index_names.size());
@@ -343,19 +359,8 @@ module {
     public func delete_index(
         collection : StableCollection,
         _main_btree_utils : BTreeUtils<Nat, Blob>,
-        index_key_details : [Text],
+        index_name : Text,
     ) : Result<(), Text> {
-
-        let index_name = Text.join(
-            "_",
-            Iter.map<Text, Text>(
-                index_key_details.vals(),
-                func(key : Text) : Text {
-                    key;
-                },
-            ),
-        );
-
         let opt_index = Map.remove(collection.indexes, thash, index_name);
 
         switch (opt_index) {
@@ -697,14 +702,6 @@ module {
     ) : Result<ZT.CandidBlob, Text> {
         let ?record_details = MemoryBTree.get(collection.main, main_btree_utils, id) else return #err("Record not found");
         #ok(record_details);
-    };
-
-    public func keys(collection : StableCollection, main_btree_utils : BTreeUtils<Nat, Blob>) : Iter<Nat> {
-        MemoryBTree.keys(collection.main, main_btree_utils);
-    };
-
-    public func rangeKeys(collection : StableCollection, main_btree_utils : BTreeUtils<Nat, Blob>, start : Nat, end : Nat) : Iter<Nat> {
-        MemoryBTree.rangeKeys(collection.main, main_btree_utils, start, end);
     };
 
     public func search(

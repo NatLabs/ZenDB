@@ -225,11 +225,9 @@ module T {
     public type CollectionStats = {
         records : Nat;
         indexes : [IndexStats];
-
         main_btree_index : {
             stable_memory : MemoryStats;
         };
-
     };
 
     public type EvalResult = {

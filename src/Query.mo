@@ -102,8 +102,8 @@ module {
                     // #Not(#between(min, max))
                     // -> #Not(#And([#gte(min), #lte(max)]))
                     // -> #Or([#lt(min), #gt(max)])
-                    ignore Or(key, #lte(min));
-                    ignore Or(key, #gte(max));
+                    ignore Or(key, #lt(min));
+                    ignore Or(key, #gt(max));
                 };
                 case (#exists) {
                     // #Not(#exists) -> #Not(#Not(#eq(null))) -> #eq(null)

@@ -25,7 +25,6 @@ func get_prefix(blob : Blob, other : Blob) : Blob {
         };
 
         buffer.add(a);
-
     };
 
     Blob.fromArray(Buffer.toArray(buffer));
@@ -76,7 +75,6 @@ suite(
                 assert a < b;
             },
         )
-
     },
 );
 

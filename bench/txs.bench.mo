@@ -211,6 +211,11 @@ module {
             predefined_txs.add(tx);
         };
 
+        let defaultIndexName = "default_index";
+        let defaultIndexField = ("default_field", #Ascending);
+
+        let #ok(_) = txs.create_index(defaultIndexName, [defaultIndexField]);
+
         bench.runner(
             func(col, row) = switch (row) {
                 
@@ -408,13 +413,14 @@ module {
             };
 
             case ("insert with 5 indexes") {
-                let #ok(_) = txs.create_index(["btype", "tx.amt"]);
-                let #ok(_) = txs.create_index(["tx.amt"]);
-                let #ok(_) = txs.create_index(["btype", "ts"]);
-                let #ok(_) = txs.create_index(["ts"]);
-                let #ok(_) = txs.create_index(["tx.from.owner", "tx.from.sub_account"]);
-                let #ok(_) = txs.create_index(["tx.to.owner", "tx.to.sub_account"]);
-                let #ok(_) = txs.create_index(["tx.spender.owner", "tx.spender.sub_account"]);
+  
+                let #ok(_) = txs.create_index("index_1", [("btype", #Ascending), ("tx.amt", #Ascending)]);
+                let #ok(_) = txs.create_index("index_2", [("btype", #Ascending), ("ts", #Ascending)]);
+                let #ok(_) = txs.create_index("index_3", [("tx.amt", #Ascending)]);
+                let #ok(_) = txs.create_index("index_4", [("ts", #Ascending)]);
+                let #ok(_) = txs.create_index("index_5", [("tx.from.owner", #Ascending), ("tx.from.sub_account", #Ascending)]);
+                let #ok(_) = txs.create_index("index_6", [("tx.to.owner", #Ascending), ("tx.to.sub_account", #Ascending)]);
+                let #ok(_) = txs.create_index("index_7", [("tx.spender.owner", #Ascending), ("tx.spender.sub_account", #Ascending)]);
 
                 for (i in Iter.range(0, limit - 1)) {
                     let tx = predefined_txs.get(i);

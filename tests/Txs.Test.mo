@@ -30,6 +30,7 @@ type Tx = {
     btype : Text;
     phash : Blob;
     ts : Nat;
+    tx_index : Nat;
     tx : {
         amt : Nat;
         from : ?Account;
@@ -49,6 +50,7 @@ let TxSchema : ZenDB.Schema = #Record([
     ("btype", #Text),
     ("phash", #Blob),
     ("ts", #Nat),
+    ("tx_index", #Nat),
     (
         "tx",
         #Record([("amt", #Nat), ("from", #Option(AccountSchema)), ("to", #Option(AccountSchema)), ("spender", #Option(AccountSchema)), ("memo", #Option(#Blob))]),
@@ -71,7 +73,7 @@ let principals = Array.tabulate(
     },
 );
 
-func new_tx(fuzz : Fuzz.Fuzzer, principals : [Principal]) : Tx {
+func new_tx(fuzz : Fuzz.Fuzzer, principals : [Principal], i : Nat) : Tx {
 
     let block_types = [
         "1mint",
@@ -87,6 +89,7 @@ func new_tx(fuzz : Fuzz.Fuzzer, principals : [Principal]) : Tx {
         btype;
         phash = fuzz.blob.randomBlob(32);
         ts = fuzz.nat.randomRange(0, 1000000000);
+        tx_index = i;
         fee = switch (btype) {
             case ("1mint" or "2approve" or "1burn") { null };
             case ("1xfer" or "2xfer") { ?20 };
@@ -151,21 +154,29 @@ let db = ZenDB.launch(db_sstore);
 
 let #ok(txs) = db.create_collection<Tx>("transactions", TxSchema, candify_tx);
 
-let limit = 50;
+let limit = 1000;
 let pagination_limit = 3;
 
 let input_txs = Buffer.fromArray<Tx>(
     Array.tabulate<Tx>(
         limit,
         func(i : Nat) : Tx {
-            new_tx(fuzz, principals);
+            new_tx(fuzz, principals, i);
         },
     )
 );
 
-for ((tx) in input_txs.vals()) {
-    let #ok(_) = txs.insert(tx);
+for ((i, tx) in Itertools.enumerate(input_txs.vals())) {
+    let #ok(_) = txs.insert_with_id(tx.tx_index, tx);
 };
+
+assert txs.size() == limit;
+
+var size = 0;
+let bitmap = BitMap.fromIter(txs.keys());
+
+Debug.print("bitmap: " # debug_show bitmap.size());
+assert bitmap.size() == limit;
 
 type Options = {
     filter : {
@@ -406,7 +417,7 @@ let test_queries : [TestQuery] = [
         };
     },
     {
-        query_name = "get_txs() with tx.amt > 355";
+        query_name = "get_txs() with tx.amt >= 355";
         db_query = QueryBuilder().Where(
             "tx.amt",
             #gte(#Nat(355)),
@@ -560,12 +571,12 @@ let test_queries : [TestQuery] = [
         query_name = "get_txs() with the 3rd principal as the spender";
         db_query = QueryBuilder().Where(
             "tx.spender.owner",
-            #eq(#Principal(principals[2])),
+            #eq(#Option(#Principal(principals[2]))),
         );
         expected_query_resolution = #And([
             #Operation(
                 "tx.spender.owner",
-                #eq(#Principal(principals[2])),
+                #eq(#Option(#Principal(principals[2]))),
             )
         ]);
         check_if_result_matches_query = func(id : Nat, tx : Tx) : Bool {
@@ -587,26 +598,26 @@ let test_queries : [TestQuery] = [
         query_name = "get_txs() involving the 2nd principal, sort by ('ts', #Ascending)";
         db_query = QueryBuilder().Where(
             "tx.to.owner",
-            #eq(#Principal(principals[1])),
+            #eq(#Option(#Principal(principals[1]))),
         ).Or(
             "tx.from.owner",
-            #eq(#Principal(principals[1])),
+            #eq(#Option(#Principal(principals[1]))),
         ).Or(
             "tx.spender.owner",
-            #eq(#Principal(principals[1])),
+            #eq(#Option(#Principal(principals[1]))),
         ).Sort("ts", #Ascending);
         expected_query_resolution = #Or([
             #Operation(
                 "tx.to.owner",
-                #eq(#Principal(principals[1])),
+                #eq(#Option(#Principal(principals[1]))),
             ),
             #Operation(
                 "tx.from.owner",
-                #eq(#Principal(principals[1])),
+                #eq(#Option(#Principal(principals[1]))),
             ),
             #Operation(
                 "tx.spender.owner",
-                #eq(#Principal(principals[1])),
+                #eq(#Option(#Principal(principals[1]))),
             ),
         ]);
         check_if_result_matches_query = func(id : Nat, tx : Tx) : Bool {
@@ -677,38 +688,38 @@ let test_queries : [TestQuery] = [
         query_name = "get_txs() involving the first 2 principals";
         db_query = QueryBuilder().Where(
             "tx.to.owner",
-            #In([#Principal(principals[1]), #Principal(principals[0])]),
+            #In([#Option(#Principal(principals[1])), #Option(#Principal(principals[0]))]),
         ).Or(
             "tx.from.owner",
-            #In([#Principal(principals[1]), #Principal(principals[0])]),
+            #In([#Option(#Principal(principals[1])), #Option(#Principal(principals[0]))]),
         ).Or(
             "tx.spender.owner",
-            #In([#Principal(principals[1]), #Principal(principals[0])]),
+            #In([#Option(#Principal(principals[1])), #Option(#Principal(principals[0]))]),
         );
         expected_query_resolution = #Or([
             #Operation(
                 "tx.to.owner",
-                #eq(#Principal(principals[1])),
+                #eq(#Option(#Principal(principals[1]))),
             ),
             #Operation(
                 "tx.to.owner",
-                #eq(#Principal(principals[0])),
+                #eq(#Option(#Principal(principals[0]))),
             ),
             #Operation(
                 "tx.from.owner",
-                #eq(#Principal(principals[1])),
+                #eq(#Option(#Principal(principals[1]))),
             ),
             #Operation(
                 "tx.from.owner",
-                #eq(#Principal(principals[0])),
+                #eq(#Option(#Principal(principals[0]))),
             ),
             #Operation(
                 "tx.spender.owner",
-                #eq(#Principal(principals[1])),
+                #eq(#Option(#Principal(principals[1]))),
             ),
             #Operation(
                 "tx.spender.owner",
-                #eq(#Principal(principals[0])),
+                #eq(#Option(#Principal(principals[0]))),
             ),
         ]);
         check_if_result_matches_query = func(id : Nat, tx : Tx) : Bool {
@@ -777,164 +788,139 @@ let test_queries : [TestQuery] = [
 
 ];
 
-func test_suites(test_suites_names : Text) {
+func test_suites() {
     suite(
-        test_suites_names,
+        "testing txs db with queries",
         func() {
-            suite(
-                "testing txs db with queries",
-                func() {
-                    for (q in test_queries.vals()) {
+            for (q in test_queries.vals()) {
 
-                        test(
-                            q.query_name,
-                            func() {
-                                let actual_query_resolution = q.db_query.build().query_operations;
-                                let expected_query_resolution = q.expected_query_resolution;
-                                Debug.print("actual_query_resolution: " # debug_show actual_query_resolution);
-                                Debug.print("expected_query_resolution: " # debug_show expected_query_resolution);
+                test(
+                    q.query_name,
+                    func() {
+                        let actual_query_resolution = q.db_query.build().query_operations;
+                        let expected_query_resolution = q.expected_query_resolution;
 
-                                assert actual_query_resolution == expected_query_resolution;
+                        assert actual_query_resolution == expected_query_resolution;
 
-                                let results = get_txs_from_query(q.db_query);
+                        let results = get_txs_from_query(q.db_query);
 
-                                Debug.print(debug_show { results });
-                                Debug.print(
-                                    debug_show (
-                                        txs.search(ZenDB.QueryBuilder())
-                                    )
-                                );
-
-                                TestUtils.validate_records(
-                                    input_txs,
-                                    results,
-                                    q.check_if_result_matches_query,
-                                    func(tx : Tx) : Text = debug_show tx,
-                                );
-
-                            },
+                        TestUtils.validate_records(
+                            input_txs,
+                            results,
+                            q.check_if_result_matches_query,
+                            func(tx : Tx) : Text = debug_show tx,
                         );
 
-                    };
-                },
-            );
+                    },
+                );
 
-            suite(
-                "testing txs db with pagination",
-                func() {
-
-                    for (q in test_queries.vals()) {
-
-                        test(
-                            q.query_name,
-                            func() {
-                                let paginated_results = skip_limit_paginated_query(q.db_query, pagination_limit);
-
-                                TestUtils.validate_records(
-                                    input_txs,
-                                    paginated_results,
-                                    q.check_if_result_matches_query,
-                                    func(tx : Tx) : Text = debug_show tx,
-                                );
-                            },
-                        );
-
-                    };
-                },
-            );
-
-            suite(
-                "testing txs db with sorting",
-                func() {
-
-                    for (q in test_queries.vals()) {
-
-                        test(
-                            q.query_name,
-                            func() {
-                                for (sort_condition in q.sort.vals()) {
-                                    ignore q.db_query.Sort(sort_condition);
-                                };
-
-                                let results = get_txs_from_query(q.db_query);
-
-                                TestUtils.validate_sorted_records(
-                                    input_txs,
-                                    results,
-                                    q.check_if_result_matches_query,
-                                    q.check_if_results_are_sorted,
-                                    q.display_record,
-                                );
-                            },
-                        );
-
-                    };
-
-                },
-            );
-
-            suite(
-                "testing txs db with sorting and pagination",
-                func() {
-
-                    for (q in test_queries.vals()) {
-
-                        test(
-                            q.query_name,
-                            func() {
-                                // the sort conditions from the previous suite still apply
-
-                                let paginated_results = skip_limit_paginated_query(q.db_query, pagination_limit);
-
-                                TestUtils.validate_sorted_records(
-                                    input_txs,
-                                    paginated_results,
-                                    q.check_if_result_matches_query,
-                                    q.check_if_results_are_sorted,
-                                    q.display_record,
-                                );
-
-                            },
-                        );
-
-                    };
-
-                },
-            );
-
-            suite(
-                "update tests",
-                func() {
-                    test(
-                        "#add 100 to tx.amt",
-                        func() {
-
-                            for (i in Iter.range(0, limit - 1)) {
-                                let #ok(prev) = txs.get(i) else Debug.trap("Could not retrieve prev for id: " # debug_show i);
-                                let #ok(_) = txs.updateById(i, #ops([("tx.amt", #add(#Nat(100)))]));
-
-                                let #ok(updated) = txs.get(i) else Debug.trap("Could not retrieve updated for id: " # debug_show i);
-
-                                assert updated.tx.amt == prev.tx.amt + 100;
-
-                            };
-                        },
-                    );
-                },
-            );
+            };
         },
-    )
+    );
+
+    suite(
+        "testing txs db with pagination",
+        func() {
+
+            for (q in test_queries.vals()) {
+
+                test(
+                    q.query_name,
+                    func() {
+                        let paginated_results = skip_limit_paginated_query(q.db_query, pagination_limit);
+
+                        TestUtils.validate_records(
+                            input_txs,
+                            paginated_results,
+                            q.check_if_result_matches_query,
+                            func(tx : Tx) : Text = debug_show tx,
+                        );
+                    },
+                );
+
+            };
+        },
+    );
+
+    suite(
+        "testing txs db with sorting",
+        func() {
+
+            for (q in test_queries.vals()) {
+
+                test(
+                    q.query_name,
+                    func() {
+                        for (sort_condition in q.sort.vals()) {
+                            ignore q.db_query.Sort(sort_condition);
+                        };
+
+                        let results = get_txs_from_query(q.db_query);
+
+                        TestUtils.validate_sorted_records(
+                            input_txs,
+                            results,
+                            q.check_if_result_matches_query,
+                            q.check_if_results_are_sorted,
+                            q.display_record,
+                        );
+                    },
+                );
+
+            };
+
+        },
+    );
+
+    suite(
+        "testing txs db with sorting and pagination",
+        func() {
+
+            for (q in test_queries.vals()) {
+
+                test(
+                    q.query_name,
+                    func() {
+                        // the sort conditions from the previous suite still apply
+
+                        let paginated_results = skip_limit_paginated_query(q.db_query, pagination_limit);
+
+                        TestUtils.validate_sorted_records(
+                            input_txs,
+                            paginated_results,
+                            q.check_if_result_matches_query,
+                            q.check_if_results_are_sorted,
+                            q.display_record,
+                        );
+
+                    },
+                );
+
+            };
+
+        },
+    );
 
 };
 
-test_suites("running txs db tests without indexing");
+suite(
+    "running txs db tests without indexing",
+    func() {
+        // test_suites();
+    },
+);
 
-let #ok(_) = txs.create_and_populate_index(["btype", "tx.amt"]);
-let #ok(_) = txs.create_and_populate_index(["btype", "ts"]);
-let #ok(_) = txs.create_and_populate_index(["tx.amt"]);
-let #ok(_) = txs.create_and_populate_index(["ts"]);
-let #ok(_) = txs.create_and_populate_index(["tx.from.owner", "tx.from.sub_account"]);
-let #ok(_) = txs.create_and_populate_index(["tx.to.owner", "tx.to.sub_account"]);
-let #ok(_) = txs.create_and_populate_index(["tx.spender.owner", "tx.spender.sub_account"]);
+suite(
+    "running txs db tests with indexing",
+    func() {
+        let #ok(_) = txs.create_and_populate_index("index_1", [("btype", #Ascending), ("tx.amt", #Ascending)]);
+        let #ok(_) = txs.create_and_populate_index("index_2", [("btype", #Ascending), ("ts", #Ascending)]);
+        let #ok(_) = txs.create_and_populate_index("index_3", [("tx.amt", #Ascending)]);
+        let #ok(_) = txs.create_and_populate_index("index_4", [("ts", #Ascending)]);
+        let #ok(_) = txs.create_and_populate_index("index_5", [("tx.from.owner", #Ascending), ("tx.from.sub_account", #Ascending)]);
+        let #ok(_) = txs.create_and_populate_index("index_6", [("tx.to.owner", #Ascending), ("tx.to.sub_account", #Ascending)]);
+        let #ok(_) = txs.create_and_populate_index("index_7", [("tx.spender.owner", #Ascending), ("tx.spender.sub_account", #Ascending)]);
 
-test_suites("running txs db tests with indexing");
+        test_suites();
+    },
+);

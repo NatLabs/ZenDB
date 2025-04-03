@@ -327,4 +327,95 @@ module {
             };
         };
     };
+
+    public func cmp_candid_ignore_option(schema : Schema, a : CandidQuery, b : CandidQuery) : Int8 {
+
+        switch (schema, a, b) {
+            // The #Minimum variant is used in queries to represent the minimum value
+            case (_, #Minimum, _) -1;
+            case (_, _, #Minimum) 1;
+
+            // The #Maximum variant is used in queries to represent the maximum value
+            case (_, #Maximum, _) 1;
+            case (_, _, #Maximum) -1;
+
+            case (_, #Null, #Null) 0;
+            case (_, #Empty, #Empty) 0;
+
+            case (_, _, #Null) 1;
+            case (_, #Null, _) -1;
+
+            case (_, #Text(a), #Text(b)) Int8Cmp.Text(a, b);
+            case (_, #Blob(a), #Blob(b)) Int8Cmp.Blob(a, b);
+            case (_, #Nat(a), #Nat(b)) Int8Cmp.Nat(a, b);
+            case (_, #Nat8(a), #Nat8(b)) Int8Cmp.Nat8(a, b);
+            case (_, #Nat16(a), #Nat16(b)) Int8Cmp.Nat16(a, b);
+            case (_, #Nat32(a), #Nat32(b)) Int8Cmp.Nat32(a, b);
+            case (_, #Nat64(a), #Nat64(b)) Int8Cmp.Nat64(a, b);
+            case (_, #Principal(a), #Principal(b)) Int8Cmp.Principal(a, b);
+            case (_, #Float(a), #Float(b)) Int8Cmp.Float(a, b);
+            case (_, #Bool(a), #Bool(b)) Int8Cmp.Bool(a, b);
+            case (_, #Int(a), #Int(b)) Int8Cmp.Int(a, b);
+            case (_, #Int8(a), #Int8(b)) Int8Cmp.Int8(a, b);
+            case (_, #Int16(a), #Int16(b)) Int8Cmp.Int16(a, b);
+            case (_, #Int32(a), #Int32(b)) Int8Cmp.Int32(a, b);
+            case (_, #Int64(a), #Int64(b)) Int8Cmp.Int64(a, b);
+
+            case (_, #Option(a), #Option(b)) {
+                switch (a, b) {
+                    case (#Null, #Null) 0;
+                    case (#Null, _) -1;
+                    case (_, #Null) 1;
+                    case (_, _) cmp_candid(schema, a, b);
+                };
+            };
+            case (_, #Option(a), b) cmp_candid_ignore_option(schema, a, b);
+            case (_, a, #Option(b)) cmp_candid_ignore_option(schema, a, b);
+            case (#Variant(schema), #Variant(a), #Variant(b)) {
+
+                let ?i = Array.indexOf<(Text, Any)>(
+                    a,
+                    schema,
+                    func((name, _) : (Text, Any), (name2, _) : (Text, Any)) : Bool {
+                        name == name2;
+                    },
+                ) else Debug.trap("cmp_candid: variant not found in schema");
+
+                let ?j = Array.indexOf<(Text, Any)>(
+                    b,
+                    schema,
+                    func((name, _) : (Text, Any), (name2, _) : (Text, Any)) : Bool {
+                        name == name2;
+                    },
+                ) else Debug.trap("cmp_candid: variant not found in schema");
+
+                let res = Int8Cmp.Nat(i, j);
+
+                if (res == 0) {
+                    cmp_candid(schema[i].1, a.1, b.1);
+                } else {
+                    res;
+                };
+
+            };
+
+            // case (_, #Array(a), #Array(b)) {
+            //     // compare the length of the arrays
+            //     let len_cmp = Int8Cmp.Nat(a.size(), b.size());
+            //     if (len_cmp != 0) return len_cmp;
+
+            //     let min_len = Nat.min(a.size(), b.size());
+            //     for (i in Iter.range(0, min_len - 1)) {
+            //         let cmp_result = cmp_candid(a[i], b[i]);
+            //         if (cmp_result != 0) return cmp_result;
+            //     };
+            //     Int8Cmp.Nat(a.size(), b.size());
+            // };
+
+            case (schema, a, b) {
+                // Debug.print(debug_show (a, b));
+                Debug.trap("cmp_candid: unexpected candid type " # debug_show { schema; a; b });
+            };
+        };
+    };
 };

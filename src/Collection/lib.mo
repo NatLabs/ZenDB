@@ -97,6 +97,10 @@ module {
 
         let main_btree_utils : MemoryBTree.BTreeUtils<Nat, Blob> = CollectionUtils.get_main_btree_utils();
 
+        public func keys() : Iter<Nat> {
+            MemoryBTree.keys(collection.main, main_btree_utils);
+        };
+
         public func filter_iter(condition : (Record) -> Bool) : Iter<Record> {
 
             let iter = MemoryBTree.vals(collection.main, main_btree_utils);
@@ -127,28 +131,28 @@ module {
             StableCollection.update_schema(collection, schema);
         };
 
-        public func create_index(index_key_details : [(Text)]) : Result<(), Text> {
-            StableCollection.create_index(collection, main_btree_utils, index_key_details);
+        public func create_index(name : Text, index_key_details : [(Text, SortDirection)]) : Result<(), Text> {
+            StableCollection.create_index(collection, main_btree_utils, name, index_key_details);
         };
 
-        public func delete_index(index_key_details : [Text]) : Result<(), Text> {
-            StableCollection.delete_index(collection, main_btree_utils, index_key_details);
+        public func delete_index(name : Text) : Result<(), Text> {
+            StableCollection.delete_index(collection, main_btree_utils, name);
         };
 
-        public func clear_index(index_key_details : [Text]) : Result<(), Text> {
-            StableCollection.clear_index(collection, main_btree_utils, index_key_details);
+        public func clear_index(name : Text) : Result<(), Text> {
+            StableCollection.clear_index(collection, main_btree_utils, name);
         };
 
-        public func create_and_populate_index(index_key_details : [(Text)]) : Result<(), Text> {
-            StableCollection.create_and_populate_index(collection, main_btree_utils, index_key_details);
+        public func create_and_populate_index(name : Text, index_key_details : [(Text, SortDirection)]) : Result<(), Text> {
+            StableCollection.create_and_populate_index(collection, main_btree_utils, name, index_key_details);
         };
 
-        public func populate_index(index_key_details : [(Text)]) : Result<(), Text> {
-            StableCollection.populate_index(collection, main_btree_utils, index_key_details);
+        public func populate_index(name : Text) : Result<(), Text> {
+            StableCollection.populate_index(collection, main_btree_utils, name);
         };
 
-        public func populate_indexes(indexes_key_details : [[(Text)]]) : Result<(), Text> {
-            StableCollection.populate_indexes(collection, main_btree_utils, indexes_key_details);
+        public func populate_indexes(names : [Text]) : Result<(), Text> {
+            StableCollection.populate_indexes(collection, main_btree_utils, names);
         };
 
         public func insert_with_id(id : Nat, record : Record) : Result<(), Text> {
