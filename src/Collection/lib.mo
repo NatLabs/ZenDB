@@ -52,6 +52,7 @@ import CollectionUtils "Utils";
 import QueryPlan "QueryPlan";
 import QueryExecution "QueryExecution";
 import StableCollection "StableCollection";
+import Logger "../Logger";
 
 module {
 

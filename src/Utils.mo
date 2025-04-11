@@ -136,8 +136,10 @@ module {
         blobify = {
             from_blob = func(blob : Blob) : Nat {
                 assert blob.size() == 8;
-                let n64 = ByteUtils.LittleEndian.toNat64(blob.vals());
-                // TypeUtils.BigEndian.Nat64.blobify.from_blob(blob) |> Nat64.toNat(_);
+
+                // must be big-endian, because these keys are sorted in the BTree
+                // and we need to be able to compare them correctly in their byte form
+                let n64 = ByteUtils.BigEndian.toNat64(blob.vals());
                 Nat64.toNat(n64);
             };
 
@@ -145,7 +147,7 @@ module {
                 let n64 = Nat64.fromNat(nat);
                 let bytes = ByteUtils.BigEndian.fromNat64(n64);
                 let blob = Blob.fromArray(bytes);
-                // let blob = TypeUtils.BigEndian.Nat64.blobify.to_blob(n64);
+
                 assert blob.size() == 8;
                 blob;
             };

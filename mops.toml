@@ -1,7 +1,7 @@
 [profile]
 name = "zendb"
 description = "An embedded document database with native candid support for Motoko developers"
-keywords = ["database", "document-db", "candid"]
+keywords = [ "database", "document-db", "candid" ]
 
 [dependencies]
 base = "0.13.2"
@@ -15,6 +15,7 @@ xtended-numbers = "0.3.1"
 vector = "0.4.1"
 incremental-ids = "0.0.1"
 moh = "https://github.com/NatLabs/moh#main@2d687808a07e48d983b33c63fae27700c3029731"
+new-base = "0.4.0"
 
 [dev-dependencies]
 test = "2.0.0"
@@ -23,4 +24,4 @@ fuzz = "0.2.1"
 
 [toolchain]
 wasmtime = "14.0.4"
-moc = "0.13.4"
+moc = "0.14.7"

@@ -110,12 +110,28 @@ module T {
         // reference to the freed btrees to the same variable in
         // the ZenDB database record
         freed_btrees : Vector.Vector<MemoryBTree.StableMemoryBTree>;
+        logger : Logger;
+    };
+
+    public type LogLevel = {
+        #Debug;
+        #Info;
+        #Warn;
+        #Error;
+        #Trap;
+    };
+
+    public type Logger = {
+        var log_level : LogLevel;
+        var next_thread_id : Nat;
+        var is_running_locally : Bool;
     };
 
     public type ZenDB = {
         id_store : Ids.Ids;
         collections : Map<Text, StableCollection>;
         freed_btrees : Vector.Vector<MemoryBTree.StableMemoryBTree>;
+        logger : Logger;
     };
 
     public type IndexKeyFields = [(Text, Candid)];

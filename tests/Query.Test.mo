@@ -18,7 +18,15 @@ import TestUtils "TestUtils";
 let fuzz = Fuzz.fromSeed(0x7eadbeef);
 let { QueryBuilder } = ZenDB;
 
-let sstore = ZenDB.newStableStore();
+let sstore = ZenDB.newStableStore(
+    ?{
+        logging = ?{
+            log_level = #Debug;
+            is_running_locally = true;
+        };
+    }
+);
+
 let zendb = ZenDB.launch(sstore);
 
 let limit = 10_000;
@@ -313,7 +321,7 @@ func query_tests(texts : ZenDB.Collection<Data>) {
     //             #lt(#Float(200.0)),
     //         );
 
-    //         let #ok(records) = store_items_collection.search(db_query);
+    //         let #ok(records) = texts.search(db_query);
 
     //         let test_records = get_test_records(
     //             func(i : Nat, item : StoreItem) : Bool {
@@ -341,7 +349,7 @@ func query_tests(texts : ZenDB.Collection<Data>) {
     //             #lte(#Nat(12)),
     //         );
 
-    //         let #ok(records) = store_items_collection.search(db_query);
+    //         let #ok(records) = texts.search(db_query);
 
     //         let test_records = get_test_records(
     //             func(i : Nat, item : StoreItem) : Bool {
@@ -369,7 +377,7 @@ func query_tests(texts : ZenDB.Collection<Data>) {
     //             #eq(#Text("Toronto")),
     //         );
 
-    //         let #ok(records) = store_items_collection.search(db_query);
+    //         let #ok(records) = texts.search(db_query);
 
     //         let test_records = get_test_records(
     //             func(i : Nat, item : StoreItem) : Bool {
@@ -394,13 +402,13 @@ suite(
     },
 );
 
-// suite(
-//     "testing on indexed field",
-//     func() {
-//         Debug.print("trying to index field");
-//         let #ok(_) = texts.create_and_populate_index("value_index", [("value", #Ascending)]);
-//         Debug.print("field indexed");
+suite(
+    "testing on indexed field",
+    func() {
+        Debug.print("trying to index field");
+        let #ok(_) = texts.create_and_populate_index("value_index", [("value", #Ascending)]);
+        Debug.print("field indexed");
 
-//         query_tests(texts);
-//     },
-// );
+        query_tests(texts);
+    },
+);

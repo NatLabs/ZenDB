@@ -32,6 +32,7 @@ import Collection "Collection";
 import Database "Database";
 import Query "Query";
 import ZT "Types";
+import Logger "Logger";
 
 module {
     public type Map<K, V> = Map.Map<K, V>;
@@ -142,20 +143,41 @@ module {
         #Exclusive : T;
     };
 
-    public func newStableStore() : ZenDB {
-        let hydra_db = {
-            id_store = Ids.new();
-            collections = Map.new<Text, StableCollection>();
-            freed_btrees = Vector.new<MemoryBTree.StableMemoryBTree>();
+    public type Settings = {
+        logging : ?{
+            log_level : Logger.LogLevel;
+            is_running_locally : Bool;
         };
     };
 
-    public func new() : ZenDB {
-        newStableStore();
+    public func newStableStore(settings : ?Settings) : ZenDB {
+        let zendb = {
+            id_store = Ids.new();
+            collections = Map.new<Text, StableCollection>();
+            freed_btrees = Vector.new<MemoryBTree.StableMemoryBTree>();
+            logger = Logger.init(#Trap, false);
+        };
+
+        ignore do ? {
+            let log_settings = settings!.logging!;
+
+            Logger.setLogLevel(zendb.logger, log_settings.log_level);
+            Logger.setIsRunLocally(zendb.logger, log_settings.is_running_locally);
+        };
+
+        zendb;
     };
+
+    // public func new() : ZenDB {
+    //     newStableStore();
+    // };
 
     public func launch(sstore : ZenDB) : Database.Database {
         Database.Database(sstore);
+    };
+
+    public func setLogLevel(zendb : ZenDB, log_level : Logger.LogLevel) {
+        Logger.setLogLevel(zendb.logger, log_level);
     };
 
     public type Database = Database.Database;

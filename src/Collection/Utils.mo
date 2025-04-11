@@ -45,6 +45,7 @@ import ByteUtils "../ByteUtils";
 import Orchid "Orchid";
 import Schema "Schema";
 import C "../Constants";
+import Logger "../Logger";
 
 module CollectionUtils {
 
@@ -270,9 +271,13 @@ module CollectionUtils {
         bounds : Buffer.Buffer<(lower : [(Text, ?T.CandidInclusivityQuery)], upper : [(Text, ?T.CandidInclusivityQuery)])>,
         is_and : Bool,
     ) : Iter<Nat> {
+        let log_thread = Logger.Thread(collection.logger, "CollectionUtils.multi_filter()", null);
+        log_thread.log("bounds: " # debug_show Buffer.toArray(bounds));
+
         Iter.filter<Nat>(
             records,
             func(id : Nat) : Bool {
+                log_thread.log("evaluating record id: " # debug_show id);
                 let ?candid = CollectionUtils.lookup_candid_record(collection, id) else Debug.trap("multi_filter: candid_map_bytes not found");
 
                 func filter_fn(
@@ -284,11 +289,15 @@ module CollectionUtils {
                     res;
                 };
 
-                if (is_and) {
+                let res = if (is_and) {
                     Itertools.all(bounds.vals(), filter_fn);
                 } else {
                     Itertools.any(bounds.vals(), filter_fn);
                 };
+
+                log_thread.log("filtered record id (" # debug_show id # "): " # debug_show res);
+
+                res;
             },
         );
     };

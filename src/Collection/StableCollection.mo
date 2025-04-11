@@ -53,6 +53,7 @@ import C "../Constants";
 import QueryExecution "QueryExecution";
 import Intervals "Intervals";
 import CandidMod "../CandidMod";
+import Logger "../Logger";
 
 module {
 
@@ -126,7 +127,7 @@ module {
 
         collection.schema := schema;
         collection.formatted_schema := Candid.formatCandidType([schema], null)[0];
-        // Debug.print("Schema Updated: Ensure to update your Record type as well.");
+        Logger.info(collection.logger, "Updating schema to: " # debug_show collection.formatted_schema);
         #ok;
     };
 
@@ -172,13 +173,21 @@ module {
         );
 
         switch (Map.get(collection.indexes, thash, index_name)) {
-            // doesn't fail if index already exists, just returns ok, because this is likely to be called in the top level actor block and will be executed multiple times during upgrades
-            case (?_) return #ok();
+            case (?_) {
+                // doesn't fail if index already exists, just returns ok, because this is likely to be called in the top level actor block and will be executed multiple times during upgrades
+                Logger.info(collection.logger, "Index '" # index_name # "' already exists");
+                return #ok();
+            };
             case (null) {};
         };
 
+        Logger.info(collection.logger, "Creating index '" # index_name # "' with key details: " # debug_show index_key_details);
+
         let index_data : MemoryBTree.StableMemoryBTree = switch (Vector.removeLast(collection.freed_btrees)) {
-            case (?btree) btree;
+            case (?btree) {
+                Logger.log(collection.logger, "Using recycled BTree for index: " # index_name);
+                btree;
+            };
             case (null) MemoryBTree.new(?C.DEFAULT_BTREE_ORDER);
         };
 
@@ -189,6 +198,7 @@ module {
         };
 
         ignore Map.put<Text, Index>(collection.indexes, thash, index_name, index);
+        Logger.info(collection.logger, "Successfully created index: " # index_name);
 
         #ok();
     };
@@ -234,23 +244,27 @@ module {
         indexes : Buffer.Buffer<Index>,
         entries : Iter<(Nat, Blob)>,
     ) : Result<(), Text> {
-        Debug.print("internally populating indexes");
+        Logger.info(collection.logger, "Populating " # debug_show indexes.size() # " indexes");
 
+        var count = 0;
         for ((id, candid_blob) in entries) {
             let candid = CollectionUtils.decode_candid_blob(collection, candid_blob);
             let candid_map = CandidMap.CandidMap(collection.schema, candid);
 
             for (index in indexes.vals()) {
                 switch (insert_into_index(collection, index, id, candid_map)) {
-                    case (#err(err)) return #err(err);
+                    case (#err(err)) {
+                        Logger.error(collection.logger, "Failed to insert into index '" # index.name # "': " # err);
+                        return #err(err);
+                    };
                     case (#ok(_)) {};
                 };
             };
-
+            count += 1;
         };
 
+        Logger.info(collection.logger, "Successfully populated indexes with " # debug_show count # " records");
         #ok();
-
     };
 
     func recommended_entries_to_populate_based_on_benchmarks(
@@ -283,15 +297,19 @@ module {
         index_names : [Text],
     ) : Result<(), Text> {
 
+        Logger.info(collection.logger, "Starting to populate indexes: " # debug_show index_names);
         let indexes = Buffer.Buffer<Index>(index_names.size());
 
         for (index_name in index_names.vals()) {
-            let ?index = Map.get(collection.indexes, thash, index_name) else return #err("Index '" # index_name # "' does not exist");
+            let ?index = Map.get(collection.indexes, thash, index_name) else {
+                Logger.error(collection.logger, "Index '" # index_name # "' does not exist");
+                return #err("Index '" # index_name # "' does not exist");
+            };
 
             indexes.add(index);
         };
 
-        Debug.print("collected indexes`");
+        Logger.log(collection.logger, "Collected " # debug_show indexes.size() # " indexes to populate");
 
         internal_populate_indexes(
             collection,
@@ -361,18 +379,22 @@ module {
         _main_btree_utils : BTreeUtils<Nat, Blob>,
         index_name : Text,
     ) : Result<(), Text> {
+        Logger.info(collection.logger, "Deleting index: " # index_name);
         let opt_index = Map.remove(collection.indexes, thash, index_name);
 
         switch (opt_index) {
             case (?index) {
+                Logger.log(collection.logger, "Clearing and recycling BTree for index: " # index_name);
                 MemoryBTree.clear(index.data);
                 Vector.add(collection.freed_btrees, index.data);
 
                 #ok();
             };
-            case (null) #err("Index not found");
+            case (null) {
+                Logger.error(collection.logger, "Index not found: " # index_name);
+                #err("Index not found");
+            };
         };
-
     };
 
     let MAX_QUERY_INSTRUCTIONS : Nat64 = 5_000_000_000;
@@ -432,6 +454,8 @@ module {
         candid_blob : ZT.CandidBlob,
     ) : Result<(), Text> {
 
+        Logger.info(collection.logger, "ZenDB Collection.put_with_id(): Inserting record with id " # debug_show id);
+
         let candid = CollectionUtils.decode_candid_blob(collection, candid_blob);
 
         switch (candid) {
@@ -439,8 +463,17 @@ module {
             case (_) return #err("Values inserted into the collection must be #Records");
         };
 
-        // Debug.print("validate: " # debug_show (collection.schema) #debug_show (candid));
-        Utils.assert_result(Schema.validate_record(collection.schema, candid));
+        Logger.log(collection.logger, "ZenDB Collection.put_with_id(): Inserting record with id " # debug_show id # " and candid " # debug_show candid);
+
+        switch (Schema.validate_record(collection.schema, candid)) {
+            case (#ok(_)) {};
+            case (#err(msg)) {
+                let err_msg = "Schema validation failed: " # msg;
+
+                Logger.error(collection.logger, err_msg);
+                return #err(err_msg);
+            };
+        };
 
         // if this fails, it means the id already exists
         // insert() - should to used to update existing records
@@ -449,13 +482,16 @@ module {
         // the inserted value will be discarded because the call fails
         // meaning the canister state will not be updated
         // at least that's what I think - need to confirm
+
         let opt_prev = MemoryBTree.insert(collection.main, main_btree_utils, id, candid_blob);
 
         switch (opt_prev) {
             case (null) {};
             case (?prev) {
                 ignore MemoryBTree.insert(collection.main, main_btree_utils, id, prev);
-                return #err("Record with id (" # debug_show id # ") already exists");
+                let error_msg = "Record with id " # debug_show id # " already exists";
+                Logger.error(collection.logger, error_msg);
+                return #err(error_msg);
             };
         };
 
@@ -477,6 +513,8 @@ module {
 
             let index_data_utils = CollectionUtils.get_index_data_utils(collection, index.key_details);
             ignore MemoryBTree.insert(index.data, index_data_utils, index_key_values, id);
+
+            Logger.log(collection.logger, "ZenDB Collection.put_with_id(): Indexing record with id " # debug_show id # " and index key values " # debug_show index_key_values);
         };
 
         //  Debug.print("finished adding to indexes");
@@ -619,7 +657,7 @@ module {
     };
 
     public func update_by_id<Record>(collection : StableCollection, main_btree_utils : BTreeUtils<Nat, Blob>, id : Nat, update_operations : ZT.InternalUpdateOperations) : Result<(), Text> {
-        //    Debug.print("retrieving record for id: " # debug_show id);
+        Logger.info(collection.logger, "Updating record with id: " # debug_show id);
 
         let ?prev_candid_blob = MemoryBTree.get(collection.main, main_btree_utils, id) else return #err("Record for id '" # debug_show (id) # "' not found");
         //    Debug.print("retrieved prev_candid_blob");
@@ -632,30 +670,47 @@ module {
 
         switch (update_operations) {
             case (#doc(new_candid_blob)) {
+                Logger.log(collection.logger, "Performing full document update for id: " # debug_show id);
                 let new_candid = CollectionUtils.decode_candid_blob(collection, new_candid_blob);
                 let new_candid_map = CandidMap.CandidMap(collection.schema, new_candid);
 
-                //    Debug.print(debug_show ({ new_candid_blob; new_candid }));
-
-                Utils.assert_result(Schema.validate_record(collection.schema, new_candid));
+                switch (Schema.validate_record(collection.schema, new_candid)) {
+                    case (#err(msg)) {
+                        Logger.error(collection.logger, "Schema validation failed: " # msg);
+                        return #err("Schema validation failed: " # msg);
+                    };
+                    case (#ok(_)) {};
+                };
 
                 assert ?prev_candid_blob == MemoryBTree.insert(collection.main, main_btree_utils, id, new_candid_blob);
 
                 for (index in Map.vals(collection.indexes)) {
-                    let #ok(_) = update_indexed_doc_data(collection, index, id, prev_candid_map, new_candid_map) else return #err("Failed to update index data");
+                    let #ok(_) = update_indexed_doc_data(collection, index, id, prev_candid_map, new_candid_map) else {
+                        Logger.error(collection.logger, "Failed to update index data for index: " # index.name);
+                        return #err("Failed to update index data");
+                    };
                 };
 
             };
             case (#ops(field_updates)) {
+                Logger.log(collection.logger, "Performing partial update on fields: " # debug_show (Array.map<(Text, Any), Text>(field_updates, func(k, _) = k)));
                 let new_candid_map = prev_candid_map.clone();
 
                 let new_candid_record = switch (partially_update_doc(new_candid_map, field_updates)) {
                     case (#ok(new_candid_record)) new_candid_record;
-                    case (#err(msg)) return #err(msg);
+                    case (#err(msg)) {
+                        Logger.error(collection.logger, "Failed to update fields: " # msg);
+                        return #err(msg);
+                    };
                 };
 
-                // should validated the updated fields instead of the entire record
-                Utils.assert_result(Schema.validate_record(collection.schema, new_candid_record));
+                switch (Schema.validate_record(collection.schema, new_candid_record)) {
+                    case (#err(msg)) {
+                        Logger.error(collection.logger, "Schema validation failed: " # msg);
+                        return #err("Schema validation failed: " # msg);
+                    };
+                    case (#ok(_)) {};
+                };
 
                 let #ok(new_candid_blob) = Candid.encodeOne(
                     new_candid_record,
@@ -671,13 +726,15 @@ module {
                     func(field_name : Text, _ : Any) : Text { field_name },
                 );
 
-                let #ok(_) = update_indexed_data_on_updated_fields(collection, id, prev_candid_map, new_candid_map, updated_keys) else return #err("Failed to update index data");
-
+                let #ok(_) = update_indexed_data_on_updated_fields(collection, id, prev_candid_map, new_candid_map, updated_keys) else {
+                    Logger.error(collection.logger, "Failed to update indexes for updated fields");
+                    return #err("Failed to update index data");
+                };
             };
         };
 
+        Logger.info(collection.logger, "Successfully updated record with id: " # debug_show id);
         #ok();
-
     };
 
     public func insert(collection : StableCollection, main_btree_utils : BTreeUtils<Nat, Blob>, candid_blob : ZT.CandidBlob) : Result<Nat, Text> {
@@ -709,11 +766,17 @@ module {
         main_btree_utils : BTreeUtils<Nat, Blob>,
         query_builder : QueryBuilder,
     ) : Result<[(ZT.WrapId<ZT.CandidBlob>)], Text> {
+        Logger.log(collection.logger, "Executing search with query: " # debug_show (query_builder.build()));
+
         switch (internal_search(collection, query_builder)) {
-            case (#err(err)) return #err(err);
+            case (#err(err)) {
+                Logger.error(collection.logger, "Search failed: " # err);
+                return #err(err);
+            };
             case (#ok(record_ids_iter)) {
                 let candid_blob_iter = id_to_candid_blob_iter(collection, record_ids_iter);
                 let candid_blobs = Iter.toArray(candid_blob_iter);
+                Logger.log(collection.logger, "Search completed, found " # debug_show (candid_blobs.size()) # " results");
                 #ok(candid_blobs);
             };
         };
@@ -721,6 +784,7 @@ module {
 
     /// Evaluates a query and returns an iterator of record ids.
     public func evaluate_query(collection : StableCollection, stable_query : ZT.StableQuery) : Result<Iter<Nat>, Text> {
+        Logger.log(collection.logger, "Evaluating query with operations: " # debug_show (stable_query.query_operations));
 
         let query_operations = stable_query.query_operations;
         let sort_by = stable_query.sort_by;
@@ -737,7 +801,10 @@ module {
         };
 
         switch (Query.validate_query(collection, stable_query.query_operations)) {
-            case (#err(err)) return #err("Invalid Query: " # err);
+            case (#err(err)) {
+                Logger.error(collection.logger, "Invalid Query: " # err);
+                return #err("Invalid Query: " # err);
+            };
             case (#ok(_)) ();
         };
 
@@ -759,11 +826,10 @@ module {
         };
 
         let eval = QueryExecution.generate_record_ids_for_query_plan(collection, query_plan, sort_by, sort_records_by_field_cmp);
-
         let iter = paginate(collection, eval, Option.get(pagination.skip, 0), pagination.limit);
 
+        Logger.log(collection.logger, "Query evaluation completed");
         return #ok((iter));
-
     };
 
     public func internal_search(collection : StableCollection, query_builder : QueryBuilder) : Result<Iter<Nat>, Text> {
@@ -820,7 +886,6 @@ module {
                 case (?candid) candid;
                 case (null) {
                     let ?candid = CollectionUtils.lookup_candid_record(collection, id) else Debug.trap("Couldn't find record with id: " # debug_show id);
-                    // ignore Map.put(deserialized_records_map, nhash, id, record);
                     candid;
                 };
             };
@@ -973,25 +1038,36 @@ module {
     };
 
     public func delete_by_id(collection : StableCollection, main_btree_utils : BTreeUtils<Nat, Blob>, id : Nat) : Result<(ZT.CandidBlob), Text> {
+        Logger.info(collection.logger, "Deleting record with id: " # debug_show id);
 
-        let ?prev_candid_blob = MemoryBTree.remove(collection.main, main_btree_utils, id);
+        let ?prev_candid_blob = MemoryBTree.remove(collection.main, main_btree_utils, id) else {
+            Logger.error(collection.logger, "Record with id " # debug_show id # " not found for deletion");
+            return #err("Record not found");
+        };
+
         let prev_candid = CollectionUtils.decode_candid_blob(collection, prev_candid_blob);
         let prev_candid_map = CandidMap.CandidMap(collection.schema, prev_candid);
 
-        let #Record(prev_records) = prev_candid else return #err("Couldn't get records");
-        // Debug.print("prev_records: " # debug_show prev_records);
-        for (index in Map.vals(collection.indexes)) {
+        let #Record(prev_records) = prev_candid else {
+            Logger.error(collection.logger, "Invalid record format when deleting id: " # debug_show id);
+            return #err("Couldn't get records");
+        };
 
+        // Remove from all indexes
+        for (index in Map.vals(collection.indexes)) {
             let prev_index_key_values = CollectionUtils.get_index_columns(collection, index.key_details, id, prev_candid_map);
             let index_data_utils = CollectionUtils.get_index_data_utils(collection, index.key_details);
 
-            assert ?id == MemoryBTree.remove(index.data, index_data_utils, prev_index_key_values);
+            let removed_id = MemoryBTree.remove(index.data, index_data_utils, prev_index_key_values);
+            if (removed_id != ?id) {
+                Logger.error(collection.logger, "Failed to remove id " # debug_show id # " from index " # index.name);
+            };
         };
 
         let candid_blob = prev_candid_blob;
-
         Ids.Gen.release(collection.ids, id);
 
+        Logger.info(collection.logger, "Successfully deleted record with id: " # debug_show id);
         #ok(candid_blob);
     };
 
