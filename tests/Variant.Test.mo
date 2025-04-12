@@ -9,7 +9,14 @@ import ZenDB "../src";
 import { test; suite } "mo:test";
 import Itertools "mo:itertools/Iter";
 
-let zendb_sstore = ZenDB.newStableStore();
+let zendb_sstore = let sstore = ZenDB.newStableStore(
+    ?{
+        logging = ?{
+            log_level = #Debug;
+            is_running_locally = true;
+        };
+    }
+);
 let zendb = ZenDB.launch(zendb_sstore);
 
 type SizeVariant = {

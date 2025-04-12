@@ -149,7 +149,15 @@ func new_tx(fuzz : Fuzz.Fuzzer, principals : [Principal], i : Nat) : Tx {
     };
 };
 
-let db_sstore = ZenDB.newStableStore();
+let db_sstore = let sstore = ZenDB.newStableStore(
+    ?{
+        logging = ?{
+            log_level = #Debug;
+            is_running_locally = true;
+        };
+    }
+);
+
 let db = ZenDB.launch(db_sstore);
 
 let #ok(txs) = db.create_collection<Tx>("transactions", TxSchema, candify_tx);

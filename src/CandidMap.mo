@@ -401,6 +401,7 @@ module {
         };
 
         public func set(key : Text, new_value : Candid) : Result<(), Text> {
+            Debug.print("set(): " # debug_show (key, new_value));
 
             let fields = Iter.toArray(Text.split(key, #text(".")));
             let field = fields[fields.size() - 1];
@@ -437,6 +438,7 @@ module {
                 case (?#Candid((candid_type, prev_candid))) {
                     let value : Candid = switch (candid_type) {
                         case (#Option(opt_type)) {
+                            Debug.print(debug_show (opt_type, new_value));
                             let opt_value : Candid = switch (new_value) {
                                 case (#Null or #Option(_)) { new_value };
                                 case (unwrapped) {

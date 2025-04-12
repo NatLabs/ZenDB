@@ -32,6 +32,10 @@ module ByteUtils {
         for (elem in iter) { buffer.add(elem) };
     };
 
+    public type BufferLike<A> = {
+        add : (A) -> ();
+    };
+
     public module LittleEndian {
 
         public func toNat8(bytes : Bytes) : Nat8 {
@@ -464,6 +468,18 @@ module ByteUtils {
     public let LE = LittleEndian;
     public let BE = BigEndian;
 
+    public func leb128_64(n64 : Nat64) : [Nat8] {
+        let buffer = B.Buffer<Nat8>(10);
+        Buffer.leb128_64(buffer, n64);
+        B.toArray(buffer);
+    };
+
+    public func sleb128_64(n : Int64) : [Nat8] {
+        let buffer = B.Buffer<Nat8>(10);
+        Buffer.sleb128_64(buffer, n);
+        B.toArray(buffer);
+    };
+
     public module Buffer {
         public module LittleEndian {
             // Rename existing write methods to add methods (add to end of buffer)
@@ -794,6 +810,56 @@ module ByteUtils {
 
         public let LE = LittleEndian;
         public let BE = BigEndian;
+
+        // https://en.wikipedia.org/wiki/LEB128
+        // limited to 64-bit unsigned integers
+        // more performant than the general unsigned_leb128
+        public func leb128_64(buffer : BufferLike<Nat8>, n : Nat64) {
+            var n64 : Nat64 = n;
+
+            loop {
+                var byte = n64 & 0x7F |> Nat64.toNat(_) |> Nat8.fromNat(_);
+                n64 >>= 7;
+
+                if (n64 > 0) byte := (byte | 0x80);
+                buffer.add(byte);
+
+            } while (n64 > 0);
+        };
+
+        // https://en.wikipedia.org/wiki/LEB128
+        // limited to 64-bit signed integers
+        // more performant than the general signed_leb128
+        public func sleb128_64(buffer : BufferLike<Nat8>, _n : Int64) {
+            let num = Int64.toInt(_n);
+
+            let is_negative = num < 0;
+
+            // because we extract bytes in multiple of 7 bits
+            // to extract the 64th bit we pad the number with 6 extra bits
+            // to make it 70 which is a multiple of 7
+            // however, because nat64 is bounded by 64 bits
+            // the extra 6 bits are not flipped which leads to an incorrect result
+
+            var n64 = Nat64.fromNat(Int.abs(num));
+
+            let bit_length = Nat64.toNat(64 - Nat64.bitcountLeadingZero(n64));
+            var n7bits = (bit_length / 7) + 1;
+            if (is_negative) n64 := Nat64.fromNat(Int.abs(num) - 1);
+
+            loop {
+                var word = if (is_negative) ^n64 else n64;
+                var byte = word & 0x7F |> Nat64.toNat(_) |> Nat8.fromNat(_);
+                n64 >>= 7;
+                n7bits -= 1;
+
+                if (n7bits > 0) byte := (byte | 0x80);
+                buffer.add(byte);
+
+            } while (n7bits > 0);
+            return;
+
+        };
 
     };
 

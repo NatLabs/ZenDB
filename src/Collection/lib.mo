@@ -305,31 +305,30 @@ module {
         //     count(query_builder);
         // };
 
-        public func updateById(id : Nat, update_operations : ZT.UpdateOperations<Record>) : Result<(), Text> {
-
-            let internal_update_opertions = switch (update_operations) {
-                case (#doc(record)) #doc(blobify.to_blob(record));
-                case (#ops(field_ops)) #ops(field_ops);
-            };
-
-            StableCollection.update_by_id(collection, main_btree_utils, id, internal_update_opertions);
-
+        public func replaceRecord(id : Nat, record : Record) : Result<(), Text> {
+            StableCollection.replace_record_by_id(collection, main_btree_utils, id, blobify.to_blob(record));
         };
 
-        public func update(query_builder : QueryBuilder, update_operations : ZT.UpdateOperations<Record>) : Result<(), Text> {
+        public func replaceRecords(records : [(Nat, Record)]) : Result<(), Text> {
+            for ((id, record) in records.vals()) {
+                let #ok(_) = replaceRecord(id, record) else return #err("failed to replace record");
+            };
+            #ok();
+        };
+
+        public func updateById(id : Nat, update_operations : [(Text, ZT.FieldUpdateOperations)]) : Result<(), Text> {
+            StableCollection.update_by_id(collection, main_btree_utils, id, update_operations);
+        };
+
+        public func update(query_builder : QueryBuilder, update_operations : [(Text, ZT.FieldUpdateOperations)]) : Result<(), Text> {
 
             let records_iter = switch (StableCollection.internal_search(collection, query_builder)) {
                 case (#err(err)) return #err(err);
                 case (#ok(records_iter)) records_iter;
             };
 
-            let internal_update_opertions = switch (update_operations) {
-                case (#doc(record)) #doc(blobify.to_blob(record));
-                case (#ops(field_ops)) #ops(field_ops);
-            };
-
             for (id in records_iter) {
-                let #ok(_) = StableCollection.update_by_id(collection, main_btree_utils, id, internal_update_opertions) else return #err("failed to update record");
+                let #ok(_) = StableCollection.update_by_id(collection, main_btree_utils, id, update_operations) else return #err("failed to update record");
             };
 
             #ok;

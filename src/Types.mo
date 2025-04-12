@@ -262,34 +262,33 @@ module T {
         score : Float;
     };
 
-    public type CommonUpdateFieldOperations = {
-        #get : Text;
-    };
-
-    public type UpdateFieldSetOperations = {
-        #add : [UpdateFieldSetOperations];
-        #sub : [UpdateFieldSetOperations];
-        #mul : [UpdateFieldSetOperations];
-        #div : [UpdateFieldSetOperations];
-        #val : Candid;
-    } or CommonUpdateFieldOperations;
-
-    public type UpdateFieldOperations = {
-        #set : (UpdateFieldSetOperations);
+    // These operations use the current value of the field to perform the operation
+    // e.g. #add(1) will add 1 to the current value of the field
+    public type NonNestableFieldUpdateOperations = {
         #add : (Candid);
         #sub : (Candid);
         #mul : (Candid);
         #div : (Candid);
     };
 
-    public type UpdateOperations<Record> = {
-        #doc : Record;
-        #ops : [(Text, UpdateFieldOperations)];
+    // These operations overwrite the current value of the field
+    // e.g. #set(#Nat(1)) will set the field to 1
+    // e.g. #get("field_name") will set the field to the value of the field_name
+
+    public type NestableFieldUpdateOperations = {
+        #set : (Candid);
+        #val : (Candid);
+        #get : (Text);
+
+        #op : (MultiFieldUpdateOperations);
     };
 
-    public type InternalUpdateOperations = {
-        #doc : CandidBlob;
-        #ops : [(Text, UpdateFieldOperations)];
-    };
+    public type FieldUpdateOperations = NonNestableFieldUpdateOperations or NestableFieldUpdateOperations;
 
+    public type MultiFieldUpdateOperations = {
+        #add : [MultiFieldUpdateOperations];
+        #sub : [MultiFieldUpdateOperations];
+        #mul : [MultiFieldUpdateOperations];
+        #div : [MultiFieldUpdateOperations];
+    } or NestableFieldUpdateOperations;
 };

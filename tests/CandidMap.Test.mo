@@ -205,6 +205,26 @@ suite(
         test(
             "set() - option",
             func() {
+                let #ok(_) = candid_map.set("details.settings.theme", #Option(#Text("light")));
+                assert candid_map.get("details.settings.theme") == ?#Option(#Text("light"));
+
+                let #ok(_) = candid_map.set("details.settings.notifications", #Option(#Bool(true)));
+                assert candid_map.get("details.settings.notifications") == ?#Option(#Bool(true));
+
+                let #ok(_) = candid_map.set("details.settings", #Option(#Record([("theme", #Text("dark")), ("notifications", #Bool(false))])));
+                assert candid_map.get("details.settings.theme") == ?#Option(#Text("dark"));
+                assert candid_map.get("details.settings.notifications") == ?#Option(#Bool(false));
+
+                // todo: does not support retrieving compound types, not sure if there would be any real use case for this
+                // assert candid_map.get("details.settings") == ?#Option(#Record([("theme", #Text("dark")), ("notifications", #Bool(false))]));
+
+                // todo: the following code successfully updates the value to #Null, even though the type is not an #Option
+                // todo: the confusion is that the parant type is an #Option, but the child type is not
+                // ignore candid_map.set("details.settings.theme", #Null);
+                // candid_map.get("details.settings.theme") |> Debug.print("option - details.settings.theme: " # debug_show _);
+                // candid_map.get("details.settings.notifications") |> Debug.print("option - details.settings.notifications: " # debug_show _);
+                // let #err(_) = candid_map.set("details.settings.notifications", #Null);
+
                 let #ok(_) = candid_map.set("details.settings", #Null);
 
                 Debug.print("option - details.settings.theme: " # debug_show candid_map.get("details.settings.theme"));

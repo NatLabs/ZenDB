@@ -8,7 +8,6 @@ import Buffer "mo:base/Buffer";
 import Nat "mo:base/Nat";
 import Option "mo:base/Option";
 
-
 import Bench "mo:bench";
 import Fuzz "mo:fuzz";
 import Candid "mo:serde/Candid";
@@ -145,7 +144,7 @@ module {
         bench.description("Benchmarking the performance with 10k txs");
 
         bench.cols([
-            
+
             "(full scan, -> array)",
             "(index intersection, -> array)",
             // "(sorted by tx.amt, ↑)",
@@ -174,13 +173,20 @@ module {
             // "update() -> #ops -> [#add, #div, #mul, #div] on tx.amt",
             // "update() -> #ops -> [#add, #div, #mul, #div, #set] on diff fields",
 
-
         ]);
 
         let limit = 10_000;
         let fuzz = Fuzz.fromSeed(0x7eadbeef);
 
-        let db_sstore = ZenDB.newStableStore();
+        let db_sstore = ZenDB.newStableStore(
+            ?{
+                logging = ?{
+                    log_level = #Trap;
+                    is_running_locally = false;
+                };
+            }
+        );
+
         let db = ZenDB.launch(db_sstore);
 
         let #ok(txs) = db.create_collection<Tx>("transactions", TxSchema, candify_tx);
@@ -218,7 +224,7 @@ module {
 
         bench.runner(
             func(col, row) = switch (row) {
-                
+
                 case ("(index intersection, -> array)") {
                     index_intersection(txs, col, limit, predefined_txs, principals, candid_principals, principals_0_10, fuzz);
                 };
@@ -235,13 +241,10 @@ module {
             }
         );
 
-      
-
-
         bench;
     };
 
-        func index_intersection(txs : ZenDB.Collection<Tx>, section : Text, limit : Nat, predefined_txs : Buffer.Buffer<Tx>, principals : [Principal], candid_principals : [ZenDB.Candid], principals_0_10 : [Principal], fuzz: Fuzz.Fuzzer) {
+    func index_intersection(txs : ZenDB.Collection<Tx>, section : Text, limit : Nat, predefined_txs : Buffer.Buffer<Tx>, principals : [Principal], candid_principals : [ZenDB.Candid], principals_0_10 : [Principal], fuzz : Fuzz.Fuzzer) {
         switch (section) {
             case ("insert") {
                 // re-use the predefined txs
@@ -357,7 +360,7 @@ module {
 
             case ("update() -> #add amt += 100") {
                 for (i in Iter.range(0, limit - 1)) {
-                    switch(txs.updateById( i, #ops([("tx.amt", #add(#Nat(100)))]))){
+                    switch (txs.updateById(i, #ops([("tx.amt", #add(#Nat(100)))]))) {
                         case (#ok(_)) Debug.print("Successfully updated tx " # debug_show i);
                         case (#err(msg)) Debug.trap("Error updating tx: " # debug_show msg);
                     };
@@ -365,22 +368,22 @@ module {
             };
             case ("update() -> #sub amt -= 100") {
                 for (i in Iter.range(0, limit - 1)) {
-                    let #ok(_) = txs.updateById( i, #ops([ ("tx.amt", #sub(#Nat(100))) ]),);
+                    let #ok(_) = txs.updateById(i, #ops([("tx.amt", #sub(#Nat(100)))]));
                 };
             };
             case ("update() -> #div amt /= 2") {
                 for (i in Iter.range(0, limit - 1)) {
-                    let #ok(_) = txs.updateById( i, #ops([ ("tx.amt", #div(#Nat(2))) ]),);
+                    let #ok(_) = txs.updateById(i, #ops([("tx.amt", #div(#Nat(2)))]));
                 };
             };
             case ("update() -> #mul amt *= 2") {
                 for (i in Iter.range(0, limit - 1)) {
-                    let #ok(_) = txs.updateById( i, #ops([ ("tx.amt", #mul(#Nat(2))) ]),);
+                    let #ok(_) = txs.updateById(i, #ops([("tx.amt", #mul(#Nat(2)))]));
                 };
             };
             case ("update() -> #set amt = 100") {
                 for (i in Iter.range(0, limit - 1)) {
-                    let #ok(_) = txs.updateById( i, #ops([ ("tx.amt", #set(#val(#Nat(100)))) ]),);
+                    let #ok(_) = txs.updateById(i, #ops([("tx.amt", #set(#val(#Nat(100))))]));
                 };
             };
             case ("update() -> #doc -> replace tx with new tx") {
@@ -413,7 +416,7 @@ module {
             };
 
             case ("insert with 5 indexes") {
-  
+
                 let #ok(_) = txs.create_index("index_1", [("btype", #Ascending), ("tx.amt", #Ascending)]);
                 let #ok(_) = txs.create_index("index_2", [("btype", #Ascending), ("ts", #Ascending)]);
                 let #ok(_) = txs.create_index("index_3", [("tx.amt", #Ascending)]);
@@ -548,12 +551,12 @@ module {
                     }
                 );
             };
-            case ("update() -> #add amt += 100") { };
-            case ("update() -> #sub amt -= 100") { };
-            case ("update() -> #div amt /= 2") { };
-            case ("update() -> #mul amt *= 2") { };
-            case ("update() -> #set amt = 100") { };
-            case ("update() -> #doc -> replace tx with new tx") { };
+            case ("update() -> #add amt += 100") {};
+            case ("update() -> #sub amt -= 100") {};
+            case ("update() -> #div amt /= 2") {};
+            case ("update() -> #mul amt *= 2") {};
+            case ("update() -> #set amt = 100") {};
+            case ("update() -> #doc -> replace tx with new tx") {};
 
             case (_) {
                 Debug.trap("Should be unreachable:\n row = zenDB (full scan, -> array) and col = \"" # debug_show section # "\"");
@@ -563,21 +566,17 @@ module {
 
     };
 
-  
+    func paginated_queries(txs : ZenDB.Collection<Tx>, section : Text, limit : Nat, predefined_txs : Buffer.Buffer<Tx>, principals : [Principal], candid_principals : [ZenDB.Candid], principals_0_10 : [Principal], sort_direction : ZenDB.SortDirection, pagination_limit : Nat) {
 
-  func paginated_queries(txs : ZenDB.Collection<Tx>, section : Text, limit : Nat, predefined_txs : Buffer.Buffer<Tx>, principals : [Principal], candid_principals : [ZenDB.Candid], principals_0_10 : [Principal], sort_direction : ZenDB.SortDirection, pagination_limit : Nat) {
-
-        func skip_limit_paginated_query(db_query : ZenDB.QueryBuilder)  {
+        func skip_limit_paginated_query(db_query : ZenDB.QueryBuilder) {
             ignore db_query.Limit(pagination_limit);
             let #ok(matching_txs) = txs.search(db_query);
             var records = matching_txs;
             var skip = 0;
             var opt_cursor : ?Nat = null;
 
-            label pagination while (records.size() > 0){
-                ignore db_query
-                    .Skip(skip)
-                    .Limit(pagination_limit);
+            label pagination while (records.size() > 0) {
+                ignore db_query.Skip(skip).Limit(pagination_limit);
 
                 let #ok(matching_txs) = txs.search(db_query);
 
@@ -635,7 +634,7 @@ module {
                 );
 
                 skip_limit_paginated_query(db_query);
-                
+
             };
 
             case ("query() -> btype == '1xfer' or '2xfer'") {
@@ -668,7 +667,6 @@ module {
 
                 skip_limit_paginated_query(db_query);
             };
-
 
             case ("query() -> all txs involving principals[0]") {
                 let db_query = ZenDB.QueryBuilder().Where(
@@ -736,5 +734,5 @@ module {
         };
 
     };
-   
+
 };

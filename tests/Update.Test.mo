@@ -10,7 +10,14 @@ import { test; suite } "mo:test";
 import Itertools "mo:itertools/Iter";
 import Record "mo:serde/Candid/Text/Parser/Record";
 
-let zendb_sstore = ZenDB.newStableStore();
+let zendb_sstore = let sstore = ZenDB.newStableStore(
+    ?{
+        logging = ?{
+            log_level = #Debug;
+            is_running_locally = true;
+        };
+    }
+);
 let zendb = ZenDB.launch(zendb_sstore);
 
 type SizeVariant = {
@@ -95,7 +102,7 @@ suite(
     "Update Tests",
     func() {
         test(
-            "#doc",
+            "replaceRecord",
             func() {
 
                 assert #ok([(item1_id, item1)]) == data.search(
@@ -103,7 +110,7 @@ suite(
                 );
 
                 let new_doc : Doc = { version = #v1({ a = 0; b = "text" }) };
-                let #ok(_) = data.updateById(item1_id, #doc(new_doc));
+                let #ok(_) = data.replaceRecord(item1_id, (new_doc));
 
                 assert #ok([]) == data.search(
                     ZenDB.QueryBuilder().Where("version.v1.a", #eq(#Nat(42)))
@@ -119,7 +126,7 @@ suite(
         );
 
         test(
-            "#ops: #add field",
+            "#add field",
             func() {
 
                 assert #ok([(item1_id, item1)]) == data.search(
@@ -128,10 +135,10 @@ suite(
 
                 let #ok(_) = data.updateById(
                     item1_id,
-                    #ops([
+                    [
                         ("version.v1.a", #add(#Nat(1))),
                         ("version.v1.a", #add(#Nat(1))),
-                    ]),
+                    ],
                 );
 
                 item1 := { version = #v1({ a = 2; b = "text" }) };
@@ -143,7 +150,7 @@ suite(
         );
 
         test(
-            "#ops: #sub field",
+            "#sub field",
             func() {
 
                 assert #ok([(item3_id, item3)]) == data.search(
@@ -152,10 +159,10 @@ suite(
 
                 let #ok(_) = data.updateById(
                     item3_id,
-                    #ops([
+                    [
                         ("version.v3.size.known", #sub(#Nat(1))),
                         ("version.v3.size.known", #sub(#Nat(1))),
-                    ]),
+                    ],
                 );
 
                 item3 := { version = #v3({ size = #known(30) }) };
@@ -168,7 +175,7 @@ suite(
         );
 
         test(
-            "#ops: #mul field",
+            " #mul field",
             func() {
 
                 assert #ok([(item3_id, item3)]) == data.search(
@@ -177,10 +184,10 @@ suite(
 
                 let #ok(_) = data.updateById(
                     item3_id,
-                    #ops([
+                    [
                         ("version.v3.size.known", #mul(#Nat(2))),
                         ("version.v3.size.known", #mul(#Nat(2))),
-                    ]),
+                    ],
                 );
 
                 item3 := { version = #v3({ size = #known(120) }) };
@@ -193,7 +200,7 @@ suite(
         );
 
         test(
-            "#ops: #div field",
+            "#div field",
             func() {
 
                 assert #ok([(item3_id, item3)]) == data.search(
@@ -202,7 +209,7 @@ suite(
 
                 let #ok(_) = data.updateById(
                     item3_id,
-                    #ops([
+                    ([
                         ("version.v3.size.known", #div(#Nat(2))),
                         ("version.v3.size.known", #div(#Nat(2))),
                     ]),
@@ -218,7 +225,7 @@ suite(
         );
 
         test(
-            "#ops: [#add, #sub, #mul, #div]",
+            "[#add, #sub, #mul, #div]",
             func() {
 
                 assert #ok([(item1_id, item1)]) == data.search(
@@ -227,12 +234,12 @@ suite(
 
                 let #ok(_) = data.updateById(
                     item1_id,
-                    #ops([
+                    [
                         ("version.v1.a", #mul(#Nat(9))),
                         ("version.v1.a", #add(#Nat(2))),
                         ("version.v1.a", #div(#Nat(5))),
                         ("version.v1.a", #sub(#Nat(1))),
-                    ]),
+                    ],
                 );
 
                 item1 := { version = #v1({ a = 3; b = "text" }) };
@@ -245,7 +252,7 @@ suite(
         );
 
         test(
-            "#ops: #set compound fields",
+            "#set compound fields",
             func() {
 
                 assert #ok([(item3_id, item3)]) == data.search(
@@ -254,35 +261,33 @@ suite(
 
                 let #ok(_) = data.updateById(
                     item3_id,
-                    #ops([
+                    [
                         (
                             "version",
-                            #set(
-                                // #v3({ size = #known(42) })
-                                #val(#Variant("v3", #Record([("size", #Variant("known", #Nat(42)))]))),
-                            ),
+                            // set to #v3({ size = #known(42) })
+                            #set(#Variant("v3", #Record([("size", #Variant("known", #Nat(42)))]))),
                         ),
-                    ]),
+                    ],
                 );
             },
         );
 
         suite(
-            "#ops: #set nested operations",
+            "#op: multi and nested operations",
             func() {
                 test(
-                    "#set: multi #add",
+                    "multi #add",
                     func() {
                         assert #ok([(item5_id, item5)]) == data.search(
                             ZenDB.QueryBuilder().Where("version.v4.units.products", #eq(#Nat(1000)))
                         );
 
-                        data.updateById(
+                        let #ok(_) = data.updateById(
                             item5_id,
-                            #ops([
+                            [
                                 (
                                     "version.v4.total",
-                                    #set(
+                                    #op(
                                         #add([
                                             #get("version.v4.units.products"),
                                             #get("version.v4.units.sales"),
@@ -290,8 +295,8 @@ suite(
                                         ])
                                     ),
                                 ),
-                            ]),
-                        ) |> Debug.print(debug_show (_));
+                            ],
+                        );
 
                         item5 := {
                             version = #v4({
@@ -304,6 +309,8 @@ suite(
                             });
                         };
 
+                        data.get(item5_id) |> Debug.print("item5 updated: " # debug_show (_));
+
                         assert data.search(
                             ZenDB.QueryBuilder().Where("version.v4.total", #eq(#Option(#Nat(2474))))
                         ) == #ok([(item5_id, item5)]);
@@ -312,17 +319,17 @@ suite(
                 );
 
                 test(
-                    "#set: multi #sub",
+                    "#multi #sub",
                     func() {
 
                         // fails because sales is greater than products and the type is Nat
                         // should pass if the type is Int or Float
                         let #err(msg) = data.updateById(
                             item5_id,
-                            #ops([
+                            [
                                 (
                                     "version.v4.total",
-                                    #set(
+                                    #op(
                                         #sub([
                                             #get("version.v4.units.products"),
                                             #get("version.v4.units.sales"),
@@ -330,7 +337,7 @@ suite(
                                         ])
                                     ),
                                 ),
-                            ]),
+                            ],
                         );
 
                         Debug.print("#sub update error msg: " # debug_show (msg));
@@ -339,17 +346,17 @@ suite(
 
                         let #ok(_) = data.updateById(
                             item5_id,
-                            #ops([
+                            [
                                 (
                                     "version.v4.total",
-                                    #set(
+                                    #op(
                                         #sub([
                                             #get("version.v4.units.sales"),
                                             #get("version.v4.units.products"),
                                         ])
                                     ),
                                 ),
-                            ]),
+                            ],
                         );
 
                         item5 := {
@@ -367,14 +374,14 @@ suite(
                     },
                 );
                 test(
-                    "#set: multi #mul",
+                    "multi #mul",
                     func() {
                         let #ok(_) = data.updateById(
                             item5_id,
-                            #ops([
+                            [
                                 (
                                     "version.v4.total",
-                                    #set(
+                                    #op(
                                         #mul([
                                             #get("version.v4.units.products"),
                                             #get("version.v4.units.sales"),
@@ -382,7 +389,7 @@ suite(
                                         ])
                                     ),
                                 ),
-                            ]),
+                            ],
                         );
 
                         assert data.get(item5_id) == #ok({
@@ -399,14 +406,14 @@ suite(
                 );
 
                 test(
-                    "#set: multi #div",
+                    "multi #div",
                     func() {
                         let #ok(_) = data.updateById(
                             item5_id,
-                            #ops([
+                            [
                                 (
                                     "version.v4.total",
-                                    #set(
+                                    #op(
                                         #div([
                                             #get("version.v4.units.products"),
                                             #get("version.v4.units.sales"),
@@ -414,7 +421,7 @@ suite(
                                         ])
                                     ),
                                 ),
-                            ]),
+                            ],
                         );
 
                         Debug.print(debug_show { item5 = data.get(item5_id) });
@@ -432,10 +439,10 @@ suite(
 
                         let #ok(_) = data.updateById(
                             item5_id,
-                            #ops([
+                            ([
                                 (
                                     "version.v4.total",
-                                    #set(
+                                    #op(
                                         #div([
                                             #get("version.v4.units.sales"),
                                             #get("version.v4.units.customers"),
@@ -463,10 +470,10 @@ suite(
                     func() {
                         let #ok(_) = data.updateById(
                             item5_id,
-                            #ops([
+                            ([
                                 (
                                     "version.v4.total",
-                                    #set(
+                                    #op(
                                         #add([
                                             #sub([
                                                 #mul([
