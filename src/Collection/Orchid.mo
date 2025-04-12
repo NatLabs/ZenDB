@@ -70,7 +70,9 @@ module {
         blobify = {
             to_blob = func(candid_values : [CandidQuery]) : Blob {
                 let buffer = Buffer.Buffer<Nat8>(100);
-                buffer.add(candid_values.size() |> Nat8.fromNat(_));
+                //! Do not store the size as it affects the ordering
+                //! - the size is not important for the comparison, the typecode is more important
+                // buffer.add(candid_values.size() |> Nat8.fromNat(_));
 
                 var i = 0;
                 while (i < candid_values.size()) {
@@ -90,9 +92,9 @@ module {
 
                 let bytes = Blob.toArray(blob);
 
-                let size = bytes[0] |> Nat8.toNat(_);
+                // let size = bytes[0] |> Nat8.toNat(_);
 
-                var i = 1;
+                var i = 0;
 
                 let buffer = Buffer.Buffer<CandidQuery>(8);
                 //                case (#Nat(n)) {

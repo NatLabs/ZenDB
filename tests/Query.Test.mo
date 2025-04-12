@@ -310,88 +310,9 @@ func query_tests(texts : ZenDB.Collection<Data>) {
         },
     );
 
-    // test(
-    //     "search(): records with price between 100 and 200",
-    //     func() {
-    //         let db_query = QueryBuilder().Where(
-    //             "price",
-    //             #gt(#Float(100.0)),
-    //         ).And(
-    //             "price",
-    //             #lt(#Float(200.0)),
-    //         );
-
-    //         let #ok(records) = texts.search(db_query);
-
-    //         let test_records = get_test_records(
-    //             func(i : Nat, item : StoreItem) : Bool {
-    //                 item.price > 100.0 and item.price < 200.0;
-    //             }
-    //         );
-
-    //         for ((id, record) in records.vals()) {
-    //             assert record.price > 100.0 and record.price < 200.0;
-    //         };
-
-    //         assert records.size() == test_records.size();
-    //     },
-
-    // );
-
-    // test(
-    //     "search(): records with months_in_stock between 7 and 12 (inclusive)",
-    //     func() {
-    //         let db_query = QueryBuilder().Where(
-    //             "months_in_stock",
-    //             #gte(#Nat(7)),
-    //         ).And(
-    //             "months_in_stock",
-    //             #lte(#Nat(12)),
-    //         );
-
-    //         let #ok(records) = texts.search(db_query);
-
-    //         let test_records = get_test_records(
-    //             func(i : Nat, item : StoreItem) : Bool {
-    //                 item.months_in_stock >= 7 and item.months_in_stock <= 12;
-    //             }
-    //         );
-
-    //         for ((id, record) in records.vals()) {
-    //             assert record.months_in_stock >= 7 and record.months_in_stock <= 12;
-    //         };
-
-    //         assert records.size() == test_records.size();
-    //     },
-
-    // );
-
-    // test(
-    //     "search(): records with address in 'Toronto, Canada'",
-    //     func() {
-    //         let db_query = QueryBuilder().Where(
-    //             "address.country",
-    //             #eq(#Text("Canada")),
-    //         ).And(
-    //             "address.city",
-    //             #eq(#Text("Toronto")),
-    //         );
-
-    //         let #ok(records) = texts.search(db_query);
-
-    //         let test_records = get_test_records(
-    //             func(i : Nat, item : StoreItem) : Bool {
-    //                 item.address.city == "Toronto";
-    //             }
-    //         );
-
-    //         for ((id, record) in records.vals()) {
-    //             assert record.address.city == "Toronto";
-    //         };
-
-    //         assert records.size() == test_records.size();
-    //     },
-    // );
+    for (i in object { public func next() : ?Nat = ?1 }) {
+        Debug.print("Running test " # debug_show (i));
+    }
 
 };
 

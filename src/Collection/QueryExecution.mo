@@ -156,7 +156,7 @@ module {
                         debug_show requires_additional_filtering,
                     );
 
-                    let index_data_utils = CollectionUtils.get_index_data_utils(collection, index.key_details);
+                    let index_data_utils = CollectionUtils.get_index_data_utils();
 
                     if (requires_additional_filtering) {
                         Logger.log(collection.logger, "QueryExecution.get_unique_record_ids(): Attempting index-based filtering");
@@ -1460,7 +1460,7 @@ module {
 
         for ((index_name, interval_details) in Map.entries(intervals_by_index)) {
             let ?index = Map.get(collection.indexes, thash, index_name) else Debug.trap("Unreachable: IndexMap not found for index: " # index_name);
-            let index_data_utils = CollectionUtils.get_index_data_utils(collection, index.key_details);
+            let index_data_utils = CollectionUtils.get_index_data_utils();
 
             log_thread.log(
                 "Processing "
@@ -1604,42 +1604,40 @@ module {
             generate_record_ids_for_query_plan_with_or_operation(collection, query_plan, opt_sort_column, sort_records_by_field_cmp);
         };
 
-        let elapsed = 0;
-
         switch (result) {
             case (#Empty) {
                 Logger.info(
                     collection.logger,
-                    "QueryExecution.generate_record_ids_for_query_plan(): Query returned empty result in "
-                    # debug_show elapsed # " instructions",
+                    "QueryExecution.generate_record_ids_for_query_plan(): Query returned empty result  ",
                 );
             };
             case (#BitMap(bitmap)) {
                 Logger.info(
                     collection.logger,
                     "QueryExecution.generate_record_ids_for_query_plan(): Query returned "
-                    # debug_show bitmap.size() # " records in bitmap in " # debug_show elapsed # " instructions",
+                    # debug_show bitmap.size() # " records in bitmap ",
                 );
             };
             case (#Ids(iter)) {
                 Logger.info(
                     collection.logger,
-                    "QueryExecution.generate_record_ids_for_query_plan(): Query returned iterator in "
-                    # debug_show elapsed # " instructions",
+                    "QueryExecution.generate_record_ids_for_query_plan(): Query returned iterator ",
                 );
             };
             case (#Interval(index_name, intervals, is_reversed)) {
+                Logger.info(collection.logger, debug_show ({ intervals; is_reversed }));
+
                 var total = 0;
                 for (interval in intervals.vals()) {
                     total += interval.1 - interval.0;
                 };
+
                 Logger.info(
                     collection.logger,
                     "QueryExecution.generate_record_ids_for_query_plan(): Query returned "
                     # debug_show total # " records from " # debug_show intervals.size()
                     # " intervals on index '" # index_name # "'"
-                    # (if (is_reversed) " (reversed order)" else "")
-                    # " in " # debug_show elapsed # " instructions",
+                    # (if (is_reversed) " (reversed order)" else ""),
                 );
             };
         };

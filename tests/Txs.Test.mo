@@ -921,13 +921,13 @@ suite(
 suite(
     "running txs db tests with indexing",
     func() {
-        let #ok(_) = txs.create_and_populate_index("index_1", [("btype", #Ascending), ("tx.amt", #Ascending)]);
-        let #ok(_) = txs.create_and_populate_index("index_2", [("btype", #Ascending), ("ts", #Ascending)]);
-        let #ok(_) = txs.create_and_populate_index("index_3", [("tx.amt", #Ascending)]);
-        let #ok(_) = txs.create_and_populate_index("index_4", [("ts", #Ascending)]);
-        let #ok(_) = txs.create_and_populate_index("index_5", [("tx.from.owner", #Ascending), ("tx.from.sub_account", #Ascending)]);
-        let #ok(_) = txs.create_and_populate_index("index_6", [("tx.to.owner", #Ascending), ("tx.to.sub_account", #Ascending)]);
-        let #ok(_) = txs.create_and_populate_index("index_7", [("tx.spender.owner", #Ascending), ("tx.spender.sub_account", #Ascending)]);
+        let #ok(_) = txs.create_and_populate_index("index:[[btype],[tx.amt]]", [("btype", #Ascending), ("tx.amt", #Ascending)]);
+        let #ok(_) = txs.create_and_populate_index("index:[[btype],[ts]]", [("btype", #Ascending), ("ts", #Ascending)]);
+        let #ok(_) = txs.create_and_populate_index("index:[[tx.amt]]", [("tx.amt", #Ascending)]);
+        let #ok(_) = txs.create_and_populate_index("index:[[ts]]", [("ts", #Ascending)]);
+        let #ok(_) = txs.create_and_populate_index("index:[[tx.from.owner],[tx.from.sub_account]]", [("tx.from.owner", #Ascending), ("tx.from.sub_account", #Ascending)]);
+        let #ok(_) = txs.create_and_populate_index("index:[[tx.to.owner],[tx.to.sub_account]]", [("tx.to.owner", #Ascending), ("tx.to.sub_account", #Ascending)]);
+        let #ok(_) = txs.create_and_populate_index("index:[[tx.spender.owner],[tx.spender.sub_account]]", [("tx.spender.owner", #Ascending), ("tx.spender.sub_account", #Ascending)]);
 
         test_suites();
     },

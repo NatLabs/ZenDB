@@ -74,7 +74,7 @@ suite(
                 b := Orchid.Orchid.blobify.to_blob([#Int64(-321)]);
                 assert a < b;
             },
-        )
+        );
     },
 );
 
@@ -102,12 +102,12 @@ suite(
                 var b = Orchid.Orchid.blobify.to_blob([#Int64(321)]);
 
                 var prefix_bytes = get_prefix(a, b);
-                assert prefix_bytes.size() == 8;
+                assert prefix_bytes.size() == 7;
 
                 a := Orchid.Orchid.blobify.to_blob([#Int64(-1234)]);
                 b := Orchid.Orchid.blobify.to_blob([#Int64(-321)]);
                 prefix_bytes := get_prefix(a, b);
-                assert prefix_bytes.size() == 8;
+                assert prefix_bytes.size() == 7;
 
                 a := Orchid.Orchid.blobify.to_blob([#Int64(-1234)]);
                 b := Orchid.Orchid.blobify.to_blob([#Int64(321)]);
