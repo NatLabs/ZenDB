@@ -69,10 +69,7 @@ module {
             };
         };
 
-        let #Record(_) = processed_schema else {
-            Logger.error(zendb.logger, "StableDatabase.create_collection(): Schema must be a record type, got: " # debug_show processed_schema);
-            return #err("Schema error: schema type is not a record");
-        };
+        let #Record(_) = processed_schema else return #err("Schema error: schema type is not a record");
 
         let schema_keys = Utils.extract_schema_keys(processed_schema);
 
@@ -146,5 +143,7 @@ module {
                 };
             };
         };
+
     };
+
 };
