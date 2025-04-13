@@ -195,11 +195,7 @@ module {
                 let blob = Principal.toBlob(p);
                 let bytes = Blob.toArray(blob);
 
-                var i = 0;
-                while (i < bytes.size()) {
-                    buffer.add(bytes[i]);
-                    i += 1;
-                };
+                ByteUtils.Buffer.addBytes(buffer, bytes.vals());
 
                 buffer.add(0); // null terminator, helps with lexicographic comparison, if the principal ends before the other one, it will be considered smaller because the null terminator is smaller than any other byte
 
@@ -247,6 +243,7 @@ module {
 
                 let n = Int64.toNat64(i);
 
+                // Need custom logic for the most significant byte to flip the sign bit
                 let msbyte = Nat8.fromNat(Nat64.toNat(n >> 56));
                 let msbyte_with_flipped_msbit = msbyte ^ 0x80;
 
@@ -266,6 +263,7 @@ module {
 
                 let n = Int32.toNat32(i);
 
+                // Need custom logic for the most significant byte to flip the sign bit
                 let msbyte = Nat8.fromNat(Nat32.toNat(n >> 24));
                 let msbyte_with_flipped_msbit = msbyte ^ 0x80;
 
@@ -286,6 +284,7 @@ module {
                 buffer.add(msbyte_with_flipped_msbit);
                 buffer.add(Nat8.fromNat(Nat16.toNat(n & 0xff)));
             };
+
             case (#Int8(i)) {
                 buffer.add(OrchidTypeCode.Int8);
 
@@ -297,43 +296,34 @@ module {
 
             case (#Nat64(n)) {
                 buffer.add(OrchidTypeCode.Nat64);
-
-                buffer.add(Nat8.fromNat(Nat64.toNat(n >> 56)));
-                buffer.add(Nat8.fromNat(Nat64.toNat((n >> 48) & 0xff)));
-                buffer.add(Nat8.fromNat(Nat64.toNat((n >> 40) & 0xff)));
-                buffer.add(Nat8.fromNat(Nat64.toNat((n >> 32) & 0xff)));
-                buffer.add(Nat8.fromNat(Nat64.toNat((n >> 24) & 0xff)));
-                buffer.add(Nat8.fromNat(Nat64.toNat((n >> 16) & 0xff)));
-                buffer.add(Nat8.fromNat(Nat64.toNat((n >> 8) & 0xff)));
-                buffer.add(Nat8.fromNat(Nat64.toNat(n & 0xff)));
-
+                ByteUtils.Buffer.BE.addNat64(buffer, n);
             };
+
             case (#Nat32(n)) {
                 buffer.add(OrchidTypeCode.Nat32);
-
-                buffer.add(Nat8.fromNat(Nat32.toNat(n >> 24)));
-                buffer.add(Nat8.fromNat(Nat32.toNat((n >> 16) & 0xff)));
-                buffer.add(Nat8.fromNat(Nat32.toNat((n >> 8) & 0xff)));
-                buffer.add(Nat8.fromNat(Nat32.toNat(n & 0xff)));
+                ByteUtils.Buffer.BE.addNat32(buffer, n);
             };
+
             case (#Nat16(n)) {
                 buffer.add(OrchidTypeCode.Nat16);
-
-                buffer.add(Nat8.fromNat(Nat16.toNat(n >> 8)));
-                buffer.add(Nat8.fromNat(Nat16.toNat(n & 0xff)));
+                ByteUtils.Buffer.BE.addNat16(buffer, n);
             };
+
             case (#Nat8(n)) {
                 buffer.add(OrchidTypeCode.Nat8);
                 buffer.add(n);
             };
+
             case (#Nat(n)) {
                 let n64 = Nat64.fromNat(n);
                 encode(buffer, #Nat64(n64));
             };
+
             case (#Bool(b)) {
                 buffer.add(OrchidTypeCode.Bool);
                 buffer.add(if (b) 1 else 0);
             };
+
             case (#Empty) buffer.add(OrchidTypeCode.Empty);
             case (#Null) buffer.add(OrchidTypeCode.Null);
             case (#Maximum) buffer.add(OrchidTypeCode.Maximum);
