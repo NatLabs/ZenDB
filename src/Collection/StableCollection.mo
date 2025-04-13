@@ -138,24 +138,16 @@ module {
         candid_map : CandidMap.CandidMap,
     ) : Result<(), Text> {
 
-        let buffer = Buffer.Buffer<Candid>(8);
+        let index_key_values = CollectionUtils.get_index_columns(collection, index.key_details, id, candid_map);
 
-        for ((index_key, dir) in index.key_details.vals()) {
-
-            if (index_key == C.RECORD_ID_FIELD) {
-                buffer.add(#Nat(id));
-            } else {
-                let ?value = candid_map.get(index_key) else return #err("Couldn't get value for index key: " # debug_show index_key);
-
-                buffer.add(value);
-            };
-
-        };
-
-        let index_key_values = Buffer.toArray(buffer);
-
-        let index_data_utils = CollectionUtils.get_index_data_utils(collection, index.key_details);
+        let index_data_utils = CollectionUtils.get_index_data_utils();
         ignore MemoryBTree.insert(index.data, index_data_utils, index_key_values, id);
+
+        Logger.lazyLog(
+            collection.logger,
+            func() = "Storing record with id " # debug_show id # " in index " # index.name # ", originally "
+            # debug_show (index_key_values) # ", now encoded as " # debug_show (index_data_utils.key.blobify.to_blob(index_key_values)),
+        );
 
         #ok();
     };
@@ -784,7 +776,7 @@ module {
 
     func update_indexed_record_fields(collection : StableCollection, index : Index, id : Nat, new_record_candid_map : CandidMap.CandidMap, opt_prev_record_candid_map : ?CandidMap.CandidMap) : Result<(), Text> {
 
-        let index_data_utils = CollectionUtils.get_index_data_utils(collection, index.key_details);
+        let index_data_utils = CollectionUtils.get_index_data_utils();
 
         ignore do ? {
             let prev_record_candid_map = opt_prev_record_candid_map!;
@@ -795,7 +787,11 @@ module {
         let new_index_key_values = CollectionUtils.get_index_columns(collection, index.key_details, id, new_record_candid_map);
         ignore MemoryBTree.insert(index.data, index_data_utils, new_index_key_values, id);
 
-        Logger.log(collection.logger, "ZenDB Collection.put_with_id(): Indexing record with id " # debug_show id # " and index key values " # debug_show new_index_key_values);
+        Logger.log(
+            collection.logger,
+            "Storing record with id " # debug_show id # " in index " # index.name # ", originally "
+            # debug_show (new_index_key_values) # ", now encoded as  as " # debug_show (index_data_utils.key.blobify.to_blob(new_index_key_values)),
+        );
 
         #ok;
     };
@@ -942,13 +938,18 @@ module {
             case (#ok(_)) ();
         };
 
+        let #ok(formatted_query_operations) = Query.process_query(collection, query_operations) else {
+            Logger.error(collection.logger, "Failed to process query operations");
+            return #err("Failed to process query operations");
+        };
+
         // Debug.print("stable_query: " # debug_show stable_query);
         // Debug.print("pagination: " # debug_show pagination);
         // Debug.print("cursor_record: " # debug_show (opt_cursor));
 
         let query_plan : ZT.QueryPlan = QueryPlan.create_query_plan(
             collection,
-            query_operations,
+            formatted_query_operations,
             sort_by,
             opt_cursor,
             cursor_map,
@@ -1190,7 +1191,7 @@ module {
         // Remove from all indexes
         for (index in Map.vals(collection.indexes)) {
             let prev_index_key_values = CollectionUtils.get_index_columns(collection, index.key_details, id, prev_candid_map);
-            let index_data_utils = CollectionUtils.get_index_data_utils(collection, index.key_details);
+            let index_data_utils = CollectionUtils.get_index_data_utils();
 
             let removed_id = MemoryBTree.remove(index.data, index_data_utils, prev_index_key_values);
             if (removed_id != ?id) {

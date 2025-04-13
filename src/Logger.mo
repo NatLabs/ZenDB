@@ -112,9 +112,54 @@ module Logger {
         Debug.print(msg);
     };
 
+    public func lazyLogAtLevel(logger : Logger, log_level : LogLevel, msgFn : () -> Text) {
+        if (LogLevel.compare(log_level, logger.log_level) == #less) {
+            return;
+        };
+
+        switch (log_level) {
+            case (#Debug) {
+                Debug.print("[DEBUG]: " # msgFn());
+            };
+            case (#Info) {
+                Debug.print("[INFO]: " # msgFn());
+            };
+            case (#Warn) {
+                Debug.print("[WARN]: " # msgFn());
+            };
+            case (#Error) {
+                Debug.print("[ERROR]: " # msgFn());
+            };
+            case (#Trap) {
+                Debug.trap(msgFn());
+            };
+        };
+
+    };
+
+    public func lazyLog(logger : Logger, msgFn : () -> Text) {
+        lazyLogAtLevel(logger, #Debug, msgFn);
+    };
+
+    public func lazyInfo(logger : Logger, msgFn : () -> Text) {
+        lazyLogAtLevel(logger, #Info, msgFn);
+    };
+
+    public func lazyWarn(logger : Logger, msgFn : () -> Text) {
+        lazyLogAtLevel(logger, #Warn, msgFn);
+    };
+
+    public func lazyError(logger : Logger, msgFn : () -> Text) {
+        lazyLogAtLevel(logger, #Error, msgFn);
+    };
+
     public class Thread(logger : Logger, name : Text, parent_thread_id : ?Nat) {
         let thread_id = logger.next_thread_id;
         logger.next_thread_id += 1;
+
+        public func getId() : Nat { thread_id };
+        public func getName() : Text { name };
+        public func getParentId() : ?Nat { parent_thread_id };
 
         func get_instructions() : Nat64 {
             if (logger.is_running_locally) {
@@ -174,6 +219,36 @@ module Logger {
 
         public func createSubThread(name : Text) : Thread {
             return Thread(logger, name, ?thread_id);
+        };
+
+        public func lazyLogAtLevel(log_level : LogLevel, msgFn : () -> Text) {
+            Logger.lazyLogAtLevel(
+                logger,
+                log_level,
+                func() {
+                    if (LogLevel.compare(#Info, logger.log_level) == #less) {
+                        name # ": " # msgFn();
+                    } else {
+                        "[Thread: " # debug_show (thread_id) # "] " # msgFn();
+                    };
+                },
+            );
+        };
+
+        public func lazyLog(msgFn : () -> Text) {
+            lazyLogAtLevel(#Debug, msgFn);
+        };
+
+        public func lazyInfo(msgFn : () -> Text) {
+            lazyLogAtLevel(#Info, msgFn);
+        };
+
+        public func lazyWarn(msgFn : () -> Text) {
+            lazyLogAtLevel(#Warn, msgFn);
+        };
+
+        public func lazyError(msgFn : () -> Text) {
+            lazyLogAtLevel(#Error, msgFn);
         };
 
     };

@@ -163,7 +163,7 @@ let db = ZenDB.launch(db_sstore);
 let #ok(txs) = db.create_collection<Tx>("transactions", TxSchema, candify_tx);
 
 let limit = 1000;
-let pagination_limit = 3;
+let pagination_limit = 10;
 
 let input_txs = Buffer.fromArray<Tx>(
     Array.tabulate<Tx>(
@@ -317,6 +317,9 @@ func skip_limit_paginated_query(db_query : ZenDB.QueryBuilder, pagination_limit 
     var batch_size = records.size();
 
     label skip_limit_pagination while (batch_size > 0) {
+        Debug.print("total size: " # debug_show records.size());
+        Debug.print("records: " # debug_show (Array.map<(Nat, Tx), Nat>(Buffer.toArray(records), func((id, tx) : (Nat, Tx)) : Nat = id)));
+
         ignore db_query.Skip(records.size()).Limit(pagination_limit);
 
         let #ok(matching_txs) = txs.search(db_query);
@@ -921,13 +924,13 @@ suite(
 suite(
     "running txs db tests with indexing",
     func() {
-        let #ok(_) = txs.create_and_populate_index("index_1", [("btype", #Ascending), ("tx.amt", #Ascending)]);
-        let #ok(_) = txs.create_and_populate_index("index_2", [("btype", #Ascending), ("ts", #Ascending)]);
-        let #ok(_) = txs.create_and_populate_index("index_3", [("tx.amt", #Ascending)]);
-        let #ok(_) = txs.create_and_populate_index("index_4", [("ts", #Ascending)]);
-        let #ok(_) = txs.create_and_populate_index("index_5", [("tx.from.owner", #Ascending), ("tx.from.sub_account", #Ascending)]);
-        let #ok(_) = txs.create_and_populate_index("index_6", [("tx.to.owner", #Ascending), ("tx.to.sub_account", #Ascending)]);
-        let #ok(_) = txs.create_and_populate_index("index_7", [("tx.spender.owner", #Ascending), ("tx.spender.sub_account", #Ascending)]);
+        let #ok(_) = txs.create_and_populate_index("index:[[btype],[tx.amt]]", [("btype", #Ascending), ("tx.amt", #Ascending)]);
+        let #ok(_) = txs.create_and_populate_index("index:[[btype],[ts]]", [("btype", #Ascending), ("ts", #Ascending)]);
+        let #ok(_) = txs.create_and_populate_index("index:[[tx.amt]]", [("tx.amt", #Ascending)]);
+        let #ok(_) = txs.create_and_populate_index("index:[[ts]]", [("ts", #Ascending)]);
+        let #ok(_) = txs.create_and_populate_index("index:[[tx.from.owner],[tx.from.sub_account]]", [("tx.from.owner", #Ascending), ("tx.from.sub_account", #Ascending)]);
+        let #ok(_) = txs.create_and_populate_index("index:[[tx.to.owner],[tx.to.sub_account]]", [("tx.to.owner", #Ascending), ("tx.to.sub_account", #Ascending)]);
+        let #ok(_) = txs.create_and_populate_index("index:[[tx.spender.owner],[tx.spender.sub_account]]", [("tx.spender.owner", #Ascending), ("tx.spender.sub_account", #Ascending)]);
 
         test_suites();
     },

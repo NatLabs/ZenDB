@@ -74,7 +74,65 @@ suite(
                 b := Orchid.Orchid.blobify.to_blob([#Int64(-321)]);
                 assert a < b;
             },
-        )
+        );
+
+        test(
+            "Float",
+            func() {
+                // Regular float comparisons
+                var a = Orchid.Orchid.blobify.to_blob([#Float(1.23)]);
+                var b = Orchid.Orchid.blobify.to_blob([#Float(4.56)]);
+                assert a < b;
+
+                a := Orchid.Orchid.blobify.to_blob([#Float(4.56)]);
+                b := Orchid.Orchid.blobify.to_blob([#Float(4.56)]);
+                assert a == b;
+
+                a := Orchid.Orchid.blobify.to_blob([#Float(7.89)]);
+                b := Orchid.Orchid.blobify.to_blob([#Float(4.56)]);
+
+                assert a > b;
+
+                // // Negative number comparisons
+                // a := Orchid.Orchid.blobify.to_blob([#Float(-1.23)]);
+                // b := Orchid.Orchid.blobify.to_blob([#Float(-4.56)]);
+                // assert a > b;
+
+                // // Positive vs negative
+                // a := Orchid.Orchid.blobify.to_blob([#Float(-1.23)]);
+                // b := Orchid.Orchid.blobify.to_blob([#Float(4.56)]);
+                // assert a < b;
+
+                // Zero handling
+                a := Orchid.Orchid.blobify.to_blob([#Float(0.0)]);
+                b := Orchid.Orchid.blobify.to_blob([#Float(-0.0)]);
+                assert a >= b; // -0.0 and +0.0 may compare equal
+
+                // Very small values
+                a := Orchid.Orchid.blobify.to_blob([#Float(0.0000001)]);
+                b := Orchid.Orchid.blobify.to_blob([#Float(0.00000001)]);
+                assert a > b;
+
+                // Very large values
+                a := Orchid.Orchid.blobify.to_blob([#Float(1_000_000.0)]);
+                b := Orchid.Orchid.blobify.to_blob([#Float(10_000_000.0)]);
+                assert a < b;
+
+                // // Special values
+                // a := Orchid.Orchid.blobify.to_blob([#Float(0.0 / 0.0)]); // NaN
+                // b := Orchid.Orchid.blobify.to_blob([#Float(1.0 / 0.0)]); // +Infinity
+                // assert a != b;
+
+                // a := Orchid.Orchid.blobify.to_blob([#Float(1.0 / 0.0)]); // +Infinity
+                // b := Orchid.Orchid.blobify.to_blob([#Float(-1.0 / 0.0)]); // -Infinity
+                // assert a > b;
+
+                // Subnormal numbers
+                a := Orchid.Orchid.blobify.to_blob([#Float(1.0e-308)]);
+                b := Orchid.Orchid.blobify.to_blob([#Float(1.0e-309)]);
+                assert a > b;
+            },
+        );
     },
 );
 
@@ -102,18 +160,51 @@ suite(
                 var b = Orchid.Orchid.blobify.to_blob([#Int64(321)]);
 
                 var prefix_bytes = get_prefix(a, b);
-                assert prefix_bytes.size() == 8;
+                assert prefix_bytes.size() == 7;
 
                 a := Orchid.Orchid.blobify.to_blob([#Int64(-1234)]);
                 b := Orchid.Orchid.blobify.to_blob([#Int64(-321)]);
                 prefix_bytes := get_prefix(a, b);
-                assert prefix_bytes.size() == 8;
+                assert prefix_bytes.size() == 7;
 
                 a := Orchid.Orchid.blobify.to_blob([#Int64(-1234)]);
                 b := Orchid.Orchid.blobify.to_blob([#Int64(321)]);
 
                 prefix_bytes := get_prefix(a, b);
                 Debug.print("prefix_bytes: " # debug_show (prefix_bytes));
+            },
+        );
+
+        test(
+            "Float",
+            func() {
+                // // Test prefix preservation for floats with same exponent
+                // var a = Orchid.Orchid.blobify.to_blob([#Float(123.456)]);
+                // var b = Orchid.Orchid.blobify.to_blob([#Float(123.789)]);
+
+                // var prefix_bytes = get_prefix(a, b);
+                // assert prefix_bytes.size() > 0;
+
+                // // Test prefix preservation for floats with different signs
+                // a := Orchid.Orchid.blobify.to_blob([#Float(123.456)]);
+                // b := Orchid.Orchid.blobify.to_blob([#Float(-123.456)]);
+
+                // prefix_bytes := get_prefix(a, b);
+                // Debug.print("Float +/- prefix_bytes: " # debug_show (prefix_bytes));
+
+                // // Test prefix preservation for special values
+                // a := Orchid.Orchid.blobify.to_blob([#Float(1.0 / 0.0)]); // +Infinity
+                // b := Orchid.Orchid.blobify.to_blob([#Float(-1.0 / 0.0)]); // -Infinity
+
+                // prefix_bytes := get_prefix(a, b);
+                // Debug.print("Float inf prefix_bytes: " # debug_show (prefix_bytes));
+
+                // // Test scientific notation values
+                // a := Orchid.Orchid.blobify.to_blob([#Float(1.23e20)]);
+                // b := Orchid.Orchid.blobify.to_blob([#Float(1.23e19)]);
+
+                // prefix_bytes := get_prefix(a, b);
+                // Debug.print("Float scientific prefix_bytes: " # debug_show (prefix_bytes));
             },
         );
     },

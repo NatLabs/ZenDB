@@ -77,19 +77,16 @@ module CollectionUtils {
 
     public let { thash; bhash } = Map;
 
-    public func get_index_data_utils(
-        collection : StableCollection,
-        index_key_details : [(Text, SortDirection)],
-    ) : MemoryBTree.BTreeUtils<[T.CandidQuery], T.RecordId> {
+    public func get_index_data_utils() : MemoryBTree.BTreeUtils<[T.CandidQuery], T.RecordId> {
 
-        let key_utils = get_index_key_utils(collection, index_key_details);
+        let key_utils = get_index_key_utils();
         let value_utils = TypeUtils.Nat;
 
         MemoryBTree.createUtils(key_utils, value_utils);
 
     };
 
-    public func get_index_key_utils(collection : StableCollection, index_key_details : [(Text, SortDirection)]) : TypeUtils.TypeUtils<[T.CandidQuery]> {
+    public func get_index_key_utils() : TypeUtils.TypeUtils<[T.CandidQuery]> {
         Orchid.Orchid;
     };
 
@@ -248,7 +245,7 @@ module CollectionUtils {
 
         let ?index = Map.get(collection.indexes, thash, index_name) else Debug.trap("Unreachable: IndexMap not found for index: " # index_name);
 
-        let index_data_utils = CollectionUtils.get_index_data_utils(collection, index.key_details);
+        let index_data_utils = CollectionUtils.get_index_data_utils();
 
         Itertools.flatten(
             Iter.map(
@@ -271,13 +268,10 @@ module CollectionUtils {
         bounds : Buffer.Buffer<(lower : [(Text, ?T.CandidInclusivityQuery)], upper : [(Text, ?T.CandidInclusivityQuery)])>,
         is_and : Bool,
     ) : Iter<Nat> {
-        let log_thread = Logger.Thread(collection.logger, "CollectionUtils.multi_filter()", null);
-        log_thread.log("bounds: " # debug_show Buffer.toArray(bounds));
 
         Iter.filter<Nat>(
             records,
             func(id : Nat) : Bool {
-                log_thread.log("evaluating record id: " # debug_show id);
                 let ?candid = CollectionUtils.lookup_candid_record(collection, id) else Debug.trap("multi_filter: candid_map_bytes not found");
 
                 func filter_fn(
@@ -294,8 +288,6 @@ module CollectionUtils {
                 } else {
                     Itertools.any(bounds.vals(), filter_fn);
                 };
-
-                log_thread.log("filtered record id (" # debug_show id # "): " # debug_show res);
 
                 res;
             },

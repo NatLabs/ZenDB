@@ -26,6 +26,10 @@ import T "../Types";
 import CandidMap "../CandidMap";
 import Utils "../Utils";
 import C "../Constants";
+import Logger "../Logger";
+import CandidMod "../CandidMod";
+
+import { Orchid } "Orchid";
 
 import CollectionUtils "Utils";
 import Schema "Schema";
@@ -125,8 +129,8 @@ module {
                 };
             };
             case (#between(candid1, candid2)) {
-                ignore operation_eval(field, #gte(candid1), lower, upper);
-                ignore operation_eval(field, #lte(candid2), lower, upper);
+                operation_eval(field, #gte(candid1), lower, upper);
+                operation_eval(field, #lte(candid2), lower, upper);
             };
             case (#startsWith(candid)) {
                 // Debug.print("startsWith: " # debug_show candid);
@@ -149,7 +153,7 @@ module {
         // Debug.print("start_query: " # debug_show start_query);
         // Debug.print("end_query: " # debug_show end_query);
 
-        let index_data_utils = CollectionUtils.get_index_data_utils(collection, index.key_details);
+        let index_data_utils = CollectionUtils.get_index_data_utils();
 
         func sort_by_key_details(a : (Text, Any), b : (Text, Any)) : Order {
             let pos_a = switch (Array.indexOf<(Text, SortDirection)>((a.0, #Ascending), index.key_details, Utils.tuple_eq(Text.equal))) {
@@ -167,81 +171,113 @@ module {
             #equal;
         };
 
-        let sorted_start_query = Array.sort(start_query, sort_by_key_details);
-        let sorted_end_query = Array.sort(end_query, sort_by_key_details);
+        func sort_and_fill_query_entries(
+            query_entries : [(Text, ?T.CandidInclusivityQuery)],
+            opt_cursor : ?(Nat, T.PaginationDirection),
+            is_lower_bound : Bool,
+        ) : [(Text, ?T.CandidInclusivityQuery)] {
+            let sorted = Array.sort(query_entries, sort_by_key_details);
 
-        // Debug.print("scan cursor: " # debug_show opt_cursor);
-
-        let full_start_query = switch (opt_cursor) {
-            case (null) do {
-
-                Array.tabulate<(T.CandidQuery)>(
-                    index.key_details.size(),
-                    func(i : Nat) : (T.CandidQuery) {
-
-                        if (i >= sorted_start_query.size()) {
-                            return (#Minimum);
-                        };
-
-                        let val = switch (sorted_start_query[i].1) {
-                            case (?#Inclusive(val) or ?#Exclusive(val)) val;
-                            case (null) #Minimum;
-                        };
-
-                        (val);
-                    },
-                );
-            };
-            case (?(id, cursor)) {
-                let cursor_map = CandidMap.CandidMap(collection.schema, cursor);
-                Array.tabulate<T.CandidQuery>(
-                    index.key_details.size(),
-                    func(i : Nat) : (T.CandidQuery) {
-                        if (index.key_details[i].0 == C.RECORD_ID_FIELD) {
-                            // RECORD_ID_FIELD is only added in the query if it is a cursor
-                            return #Nat(id + 1);
-                        };
-
-                        let key = index.key_details[i].0;
-
-                        let val = if (i >= sorted_start_query.size()) {
-                            (#Minimum);
-                        } else switch (sorted_start_query[i].1) {
-                            case (?#Inclusive(val) or ?#Exclusive(val)) val;
-                            case (null) #Minimum;
-                        };
-
-                        val;
-
-                    },
-                );
-            };
-        };
-
-        // Debug.print("full_scan_query: " # debug_show full_start_query);
-
-        let full_end_query = do {
-            Array.tabulate<T.CandidQuery>(
+            Array.tabulate<(Text, ?T.CandidInclusivityQuery)>(
                 index.key_details.size(),
-                func(i : Nat) : (T.CandidQuery) {
-                    if (i >= sorted_end_query.size()) {
-                        return (#Maximum);
+                func(i : Nat) : (Text, ?T.CandidInclusivityQuery) {
+
+                    let index_key_tuple = index.key_details[i];
+
+                    switch (opt_cursor) {
+                        case (?(id, pagination_direction)) if (index.key_details[i].0 == C.RECORD_ID_FIELD) {
+                            // RECORD_ID_FIELD is only added in the query if it is a cursor
+                            // todo: update based on pagination_direction and is_lower_bound
+                            return (C.RECORD_ID_FIELD, ?#Inclusive(#Nat(id + 1)));
+                        };
+                        case (null) {};
                     };
 
-                    let key = sorted_end_query[i].0;
-                    let ?(#Inclusive(val)) or ?(#Exclusive(val)) = sorted_end_query[i].1 else return (#Maximum);
+                    if (i >= query_entries.size()) {
+                        return (index_key_tuple.0, null);
+                    };
 
-                    (val);
+                    sorted[i];
                 },
             );
+
         };
 
-        // Debug.print("Index_key_details: " # debug_show index.key_details);
-        // Debug.print("full_start_query: " # debug_show full_start_query);
-        // Debug.print("full_end_query: " # debug_show full_end_query);
+        // filter null entries and update the last entry to be inclusive by replacing it with the next or previous value
+        func format_query_entries(query_entries : [(Text, ?T.CandidInclusivityQuery)], is_lower_bound : Bool) : [T.CandidQuery] {
+            if (query_entries.size() == 0) return [];
 
-        let scans = CollectionUtils.memorybtree_scan_interval(index.data, index_data_utils, ?full_start_query, ?full_end_query);
-        // Debug.print("scan_intervals: " # debug_show scans);
+            let opt_index_of_first_null = Itertools.findIndex(
+                query_entries.vals(),
+                func(entry : (Text, ?T.CandidInclusivityQuery)) : Bool {
+                    entry.1 == null;
+                },
+            );
+
+            let is_null_or_equal_to_zero = Option.isNull(opt_index_of_first_null) or opt_index_of_first_null == ?0;
+
+            if (is_null_or_equal_to_zero) {
+                return [
+                    switch (query_entries[0].1) {
+                        case (?#Exclusive(value) or ?#Inclusive(value)) value;
+                        case (null) if (is_lower_bound) #Minimum else #Maximum;
+                    }
+                ];
+            };
+
+            let index_of_first_null = Option.get(opt_index_of_first_null, 0);
+
+            let new_value_at_index = switch (query_entries[index_of_first_null - 1]) {
+                case ((_field, ?#Inclusive(value))) value;
+                case ((_field, ?#Exclusive(value))) if (is_lower_bound) {
+                    CandidMod.get_next_value(value);
+                } else {
+                    CandidMod.get_prev_value(value);
+                };
+                case (_) Debug.trap("filter_null_entries_in_query: received null value, should not happen");
+            };
+
+            Array.tabulate<T.CandidQuery>(
+                Nat.min(index_of_first_null + 2, query_entries.size()),
+                func(i : Nat) : T.CandidQuery {
+                    let (_field, inclusivity_query) = query_entries[i];
+
+                    if (i + 1 == index_of_first_null) return new_value_at_index;
+
+                    switch (inclusivity_query) {
+                        case (?#Exclusive(value) or ?#Inclusive(value)) value;
+                        case (null) if (is_lower_bound) #Minimum else #Maximum;
+                    };
+
+                },
+            );
+
+        };
+
+        let opt_cursor_with_direction : ?(Nat, T.PaginationDirection) = switch (opt_cursor) {
+            case (null) null;
+            case (?(id, cursor)) {
+                ?(id, #Forward);
+            };
+        };
+
+        let sorted_start_query = sort_and_fill_query_entries(start_query, opt_cursor_with_direction, true);
+        let sorted_end_query = sort_and_fill_query_entries(end_query, opt_cursor_with_direction, false);
+
+        Logger.log(collection.logger, "scan after sort and fill: " # debug_show (sorted_start_query, sorted_end_query));
+
+        let start_query_values = format_query_entries(sorted_start_query, true);
+        let end_query_values = format_query_entries(sorted_end_query, false);
+
+        Logger.log(collection.logger, "scan after format: " # debug_show (start_query_values, end_query_values));
+
+        Logger.log(collection.logger, "encoded start_query_values: " # debug_show (Orchid.blobify.to_blob(start_query_values)));
+        Logger.log(collection.logger, "encoded end_query_values: " # debug_show (Orchid.blobify.to_blob(end_query_values)));
+
+        let scans = CollectionUtils.memorybtree_scan_interval(index.data, index_data_utils, ?start_query_values, ?end_query_values);
+
+        Logger.log(collection.logger, "scan interval results: " # debug_show scans);
+
         scans
 
         // let records_iter = MemoryBTree.scan(index.data, index_data_utils, ?full_start_query, ?full_end_query);

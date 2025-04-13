@@ -11,6 +11,8 @@ import Map "mo:map/Map";
 import Set "mo:map/Set";
 
 import T "Types";
+import Logger "Logger";
+import Schema "Collection/Schema";
 
 module {
 
@@ -117,21 +119,9 @@ module {
                     // #Not(#In([x, y, z])) -> #And([#Not(x), #Not(y), #Not(z)])
                     // -> #And([#Or([#lt(x), #gt(x)]), #Or([#lt(y), #gt(y)]), #Or([#lt(z), #gt(z)])])
 
-                    if (is_and) {
-                        for (value in values.vals()) {
-                            buffer.add(#Or([#Operation(key, #lt(value)), #Operation(key, #gt(value))]));
-                        };
-                    } else {
-                        buffer.add(
-                            #And(
-                                Array.tabulate(
-                                    values.size(),
-                                    func(i : Nat) : ZenQueryLang {
-                                        #Or([#Operation(key, #lt(values.get(i))), #Operation(key, #gt(values.get(i)))]);
-                                    },
-                                )
-                            )
-                        );
+                    update_query(true);
+                    for (value in values.vals()) {
+                        buffer.add(#Or([#Operation(key, #lt(value)), #Operation(key, #gt(value))]));
                     };
 
                 };
@@ -193,36 +183,23 @@ module {
             self;
         };
 
-        // public func Or_Query(new_query : QueryBuilder) : QueryBuilder {
-        //     let or_buffer = if (not is_and) {
-        //         buffer;
-        //     } else {
-        //         update_query(false);
-        //         buffer;
-        //     };
+        public func OrQuery(new_query : QueryBuilder) : QueryBuilder {
+            update_query(false);
 
-        //     let op = new_query.build();
+            let nested_query = new_query.build();
+            buffer.add(nested_query.query_operations);
 
-        //     handle_op(op);
+            self;
+        };
 
-        //     self;
-        // };
+        public func AndQuery(new_query : QueryBuilder) : QueryBuilder {
+            update_query(true);
 
-        // public func And_Query(new_query : QueryBuilder) : QueryBuilder {
+            let nested_query = new_query.build();
+            buffer.add(nested_query.query_operations);
 
-        //     let and_buffer = if (is_and) {
-        //         buffer;
-        //     } else {
-        //         update_query(true);
-        //         buffer;
-        //     };
-
-        //     let op = new_query.build();
-
-        //     handle_op(key, p);
-
-        //     self;
-        // };
+            self;
+        };
 
         public func Sort(key : Text, direction : T.SortDirection) : QueryBuilder {
             sort_by := ?(key, direction);
@@ -319,6 +296,76 @@ module {
         };
 
         #ok();
+    };
+
+    // Process the query and convert it to a format most suitable for the collection
+    public func process_query(collection : T.StableCollection, zendb_query : T.ZenQueryLang) : T.Result<T.ZenQueryLang, Text> {
+
+        func handle_operation(field : Text, op : T.ZqlOperators) : T.Result<T.ZenQueryLang, Text> {
+            // Debug.print(debug_show (Set.toArray(collection.schema_keys_set)));
+            let ?candid_type = Schema.get_nested_candid_type(collection.schema, field) else {
+                Logger.log(collection.logger, "Field '" # field # "' not found in schema");
+                return #err("Field '" # field # "' not found in schema");
+            };
+
+            func handle_value(value : T.Candid) : T.Candid {
+                switch (value) {
+                    case (#Option(_)) value;
+                    case (#Null) #Null;
+                    case (_) #Option(value);
+                };
+            };
+
+            func handle_operator(op : ZqlOperators) : T.ZqlOperators {
+                switch (op) {
+                    case (#eq(value)) #eq(handle_value(value));
+                    case (#gte(value)) #gte(handle_value(value));
+                    case (#lte(value)) #lte(handle_value(value));
+                    case (#lt(value)) #lt(handle_value(value));
+                    case (#gt(value)) #gt(handle_value(value));
+                    case (#between(min, max)) #between(handle_value(min), handle_value(max));
+                    case (#exists) #exists;
+                    case (#startsWith(prefix)) #startsWith(handle_value(prefix));
+                    case (#In(values)) #In(Array.map(values, handle_value));
+                    case (#Not(op)) #Not(handle_operator(op));
+                };
+
+            };
+
+            let res = switch (candid_type) {
+                case (#Option(_)) #Operation(field, handle_operator(op));
+                case (_) #Operation(field, op);
+            };
+
+            #ok(res);
+        };
+
+        switch (zendb_query) {
+            case (#Operation(field, op)) {
+                (handle_operation(field, op));
+            };
+            case (#And(buffer)) {
+                let new_buffer = Buffer.Buffer<ZenQueryLang>(buffer.size());
+                for (expr in buffer.vals()) {
+                    switch (process_query(collection, expr)) {
+                        case (#err(err)) return #err(err);
+                        case (#ok(new_expr)) new_buffer.add(new_expr);
+                    };
+                };
+                #ok(#And(Buffer.toArray(new_buffer)));
+            };
+            case (#Or(buffer)) {
+                let new_buffer = Buffer.Buffer<ZenQueryLang>(buffer.size());
+                for (expr in buffer.vals()) {
+                    switch (process_query(collection, expr)) {
+                        case (#err(err)) return #err(err);
+                        case (#ok(new_expr)) new_buffer.add(new_expr);
+                    };
+                };
+                #ok(#Or(Buffer.toArray(new_buffer)));
+            };
+        };
+
     };
 
 };

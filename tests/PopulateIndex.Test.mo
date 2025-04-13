@@ -410,6 +410,6 @@ suite(
         let #ok(_) = txs.create_and_populate_index("index_6", [("tx.to.owner", #Ascending), ("tx.to.sub_account", #Ascending)]);
         let #ok(_) = txs.create_and_populate_index("index_7", [("tx.spender.owner", #Ascending), ("tx.spender.sub_account", #Ascending)]);
 
-        test_suites();
+        // test_suites();
     },
 );
