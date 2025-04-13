@@ -138,24 +138,16 @@ module {
         candid_map : CandidMap.CandidMap,
     ) : Result<(), Text> {
 
-        let buffer = Buffer.Buffer<Candid>(8);
-
-        for ((index_key, dir) in index.key_details.vals()) {
-
-            if (index_key == C.RECORD_ID_FIELD) {
-                buffer.add(#Nat(id));
-            } else {
-                let ?value = candid_map.get(index_key) else return #err("Couldn't get value for index key: " # debug_show index_key);
-
-                buffer.add(value);
-            };
-
-        };
-
-        let index_key_values = Buffer.toArray(buffer);
+        let index_key_values = CollectionUtils.get_index_columns(collection, index.key_details, id, candid_map);
 
         let index_data_utils = CollectionUtils.get_index_data_utils(collection, index.key_details);
         ignore MemoryBTree.insert(index.data, index_data_utils, index_key_values, id);
+
+        Logger.lazyLog(
+            collection.logger,
+            func() = "Storing record with id " # debug_show id # " in index " # index.name # ", originally "
+            # debug_show (index_key_values) # ", now encoded as " # debug_show (index_data_utils.key.blobify.to_blob(index_key_values)),
+        );
 
         #ok();
     };
@@ -795,7 +787,7 @@ module {
         let new_index_key_values = CollectionUtils.get_index_columns(collection, index.key_details, id, new_record_candid_map);
         ignore MemoryBTree.insert(index.data, index_data_utils, new_index_key_values, id);
 
-        Logger.log(collection.logger, "ZenDB Collection.put_with_id(): Indexing record with id " # debug_show id # " and index key values " # debug_show new_index_key_values);
+        Logger.log(collection.logger, "Storing record with id " # debug_show id # " in index " # index.name # " as " # debug_show (index_data_utils.key.blobify.to_blob(new_index_key_values)));
 
         #ok;
     };
