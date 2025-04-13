@@ -401,7 +401,7 @@ module {
         };
 
         public func set(key : Text, new_value : Candid) : Result<(), Text> {
-            Debug.print("set(): " # debug_show (key, new_value));
+            // Debug.print("set(): " # debug_show (key, new_value));
 
             let fields = Iter.toArray(Text.split(key, #text(".")));
             let field = fields[fields.size() - 1];
@@ -438,7 +438,7 @@ module {
                 case (?#Candid((candid_type, prev_candid))) {
                     let value : Candid = switch (candid_type) {
                         case (#Option(opt_type)) {
-                            Debug.print(debug_show (opt_type, new_value));
+                            // Debug.print(debug_show (opt_type, new_value));
                             let opt_value : Candid = switch (new_value) {
                                 case (#Null or #Option(_)) { new_value };
                                 case (unwrapped) {
@@ -523,7 +523,7 @@ module {
                         };
 
                         case (_) {
-                            let ?candid_type = get_nested_candid_type(schema, key) else return #err("set(): Could not retrieve candid type for key '" # key # "'");
+                            let ?candid_type = Schema.get_nested_candid_type(schema, key) else return #err("set(): Could not retrieve candid type for key '" # key # "'");
 
                             ignore Map.put(map, thash, field, #Candid(candid_type, new_value));
                         };
@@ -633,30 +633,9 @@ module {
         };
 
         public func get_type(key : Text) : ?Schema {
-            get_nested_candid_type(schema, key);
+            Schema.get_nested_candid_type(schema, key);
         };
 
-    };
-
-    public func get_nested_candid_type(_schema : Schema, key : Text) : ?Schema {
-        let nested_field_keys = Text.split(key, #text("."));
-
-        var schema = _schema;
-
-        for (key in nested_field_keys) {
-            let #Record(record_fields) or #Option(#Record(record_fields)) or #Variant(record_fields) or #Option(#Variant(record_fields)) = schema else return null;
-
-            let ?found_field = Array.find<(Text, Schema)>(
-                record_fields,
-                func((variant_name, _) : (Text, Schema)) : Bool {
-                    variant_name == key;
-                },
-            ) else return null;
-
-            schema := found_field.1;
-        };
-
-        return ?schema;
     };
 
 };

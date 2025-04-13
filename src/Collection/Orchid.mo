@@ -61,7 +61,8 @@ module {
         // custom types
         Blob : Nat8 = 0x5f;
         Null : Nat8 = 0x60;
-        Minimum : Nat8 = 0;
+
+        Minimum : Nat8 = 1; // avoid clashing with 0x00, which is reserved for the null terminator
         Maximum : Nat8 = 255;
 
     };
@@ -233,43 +234,13 @@ module {
                 buffer.add(0); // null terminator, helps with lexicographic comparison, if the blob ends before the other one, it will be considered smaller because the null terminator is smaller than any other byte
 
             };
-            case (#Float(f)) Debug.trap("Orchid does not support Float type");
+            case (#Float(f)) {
+                buffer.add(OrchidTypeCode.Float);
+                ByteUtils.Buffer.BigEndian.addFloat64(buffer, f);
+            };
             case (#Int(int)) {
-                buffer.add(OrchidTypeCode.Int);
-
-                let sign : Nat8 = if (int < 0) 0 else 1;
-
-                var num = Int.abs(int);
-                var size : Nat8 = 0;
-
-                while (num > 0) {
-                    num /= 255;
-                    size += 1;
-                };
-
-                buffer.add(sign);
-
-                // buffer.add(Nat8.fromNat(Nat32.toNat(size >> 24)));
-                // buffer.add(Nat8.fromNat(Nat32.toNat((size >> 16) & 0xff)));
-                // buffer.add(Nat8.fromNat(Nat32.toNat((size >> 8) & 0xff)));
-
-                buffer.add(size & 0xff);
-
-                num := Int.abs(int);
-
-                let bytes = Array.tabulate(
-                    Nat8.toNat(size),
-                    func(i : Nat) : Nat8 {
-                        let tmp = num % 255;
-                        num /= 255;
-                        Nat8.fromNat(tmp);
-                    },
-                );
-
-                for (i in Itertools.range(0, bytes.size())) {
-                    buffer.add(bytes[bytes.size() - 1 - i]);
-                };
-
+                let int64 = Int64.fromInt(int);
+                encode(buffer, #Int64(int64));
             };
             case (#Int64(i)) {
                 buffer.add(OrchidTypeCode.Int64);
@@ -356,36 +327,8 @@ module {
                 buffer.add(n);
             };
             case (#Nat(n)) {
-                buffer.add(OrchidTypeCode.Nat);
-                var num = n;
-                var size : Nat8 = 0;
-
-                while (num > 0) {
-                    num /= 255;
-                    size += 1;
-                };
-
-                // buffer.add(Nat8.fromNat(Nat32.toNat(size >> 24)));
-                // buffer.add(Nat8.fromNat(Nat32.toNat((size >> 16) & 0xff)));
-                // buffer.add(Nat8.fromNat(Nat32.toNat((size >> 8) & 0xff)));
-                // nat is limited to (2 ^ (255 * 8)) - 1
-                buffer.add(size & 0xff);
-
-                num := n;
-
-                let bytes = Array.tabulate(
-                    Nat8.toNat(size),
-                    func(i : Nat) : Nat8 {
-                        let tmp = num % 255;
-                        num /= 255;
-                        Nat8.fromNat(tmp);
-                    },
-                );
-
-                for (i in Itertools.range(0, bytes.size())) {
-                    buffer.add(bytes[bytes.size() - 1 - i]);
-                };
-
+                let n64 = Nat64.fromNat(n);
+                encode(buffer, #Nat64(n64));
             };
             case (#Bool(b)) {
                 buffer.add(OrchidTypeCode.Bool);

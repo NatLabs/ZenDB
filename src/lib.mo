@@ -155,7 +155,7 @@ module {
             id_store = Ids.new();
             collections = Map.new<Text, StableCollection>();
             freed_btrees = Vector.new<MemoryBTree.StableMemoryBTree>();
-            logger = Logger.init(#Trap, false);
+            logger = Logger.init(#Error, false);
         };
 
         ignore do ? {

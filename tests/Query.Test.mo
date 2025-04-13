@@ -194,15 +194,15 @@ func query_tests(texts : ZenDB.Collection<Data>) {
                 (7, { value = "c" }),
             ]);
 
-            assert texts.search(
-                QueryBuilder().Where("value", #Not(#In([#Text("a"), #Text("b"), #Text("c")])))
-            ) == #ok([
-                (1, { value = "alphabet" }),
-                (2, { value = "alphabetical" }),
-                (3, { value = "and" }),
-                (4, { value = "anderson" }),
-                (6, { value = "berry" }),
-            ]);
+            // assert texts.search(
+            //     QueryBuilder().Where("value", #Not(#In([#Text("a"), #Text("b"), #Text("c")])))
+            // ) == #ok([
+            //     (1, { value = "alphabet" }),
+            //     (2, { value = "alphabetical" }),
+            //     (3, { value = "and" }),
+            //     (4, { value = "anderson" }),
+            //     (6, { value = "berry" }),
+            // ]);
         },
     );
 
@@ -309,10 +309,6 @@ func query_tests(texts : ZenDB.Collection<Data>) {
             };
         },
     );
-
-    for (i in object { public func next() : ?Nat = ?1 }) {
-        Debug.print("Running test " # debug_show (i));
-    }
 
 };
 

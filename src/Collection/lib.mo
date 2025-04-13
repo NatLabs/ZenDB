@@ -102,6 +102,29 @@ module {
             MemoryBTree.keys(collection.main, main_btree_utils);
         };
 
+        public func vals() : Iter<Record> {
+            let iter = MemoryBTree.vals(collection.main, main_btree_utils);
+            let records = Iter.map<Blob, Record>(
+                iter,
+                func(candid_blob : Blob) {
+                    blobify.from_blob(candid_blob);
+                },
+            );
+            records;
+        };
+
+        public func entries() : Iter<(Nat, Record)> {
+            let iter = MemoryBTree.entries(collection.main, main_btree_utils);
+
+            let records = Iter.map<(Nat, Blob), (Nat, Record)>(
+                iter,
+                func((id, candid_blob) : (Nat, Blob)) {
+                    (id, blobify.from_blob(candid_blob));
+                },
+            );
+            records;
+        };
+
         public func filter_iter(condition : (Record) -> Bool) : Iter<Record> {
 
             let iter = MemoryBTree.vals(collection.main, main_btree_utils);

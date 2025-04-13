@@ -840,6 +840,7 @@ module {
 
         ?{ bitmap; opt_filter_bounds };
     };
+
     public func generate_record_ids_for_query_plan_with_and_operation(
         collection : T.StableCollection,
         query_plan : T.QueryPlan,
@@ -849,34 +850,20 @@ module {
         assert query_plan.is_and_operation;
         let requires_sorting = Option.isSome(opt_sort_column);
 
-        let log_thread = Logger.Thread(collection.logger, "QueryExecution.generate_record_ids_for_query_plan_with_and_operation()", null);
-
-        log_thread.log(
-            "Processing AND query plan with "
-            # Nat.toText(query_plan.scans.size()) # " scans and "
-            # Nat.toText(query_plan.subplans.size()) # " subplans"
-            # (if (requires_sorting) ", sorting required" else "")
-        );
-
         if (query_plan.scans.size() == 1 and query_plan.subplans.size() == 0) {
-            log_thread.log("Single scan, no subplans");
 
             switch (query_plan.scans[0]) {
                 case (#IndexScan({ requires_additional_sorting; requires_additional_filtering; interval; index; sorted_in_reverse })) {
                     if (not requires_additional_sorting and not requires_additional_filtering) {
-                        log_thread.log(
-                            "Direct index access on '"
-                            # index.name # "', no filtering or sorting needed"
-                        );
                         return #Interval(index.name, [interval], sorted_in_reverse);
                     };
                 };
                 case (#FullScan({ requires_additional_sorting; requires_additional_filtering })) {
                     if (not requires_additional_sorting and not requires_additional_filtering) {
-                        log_thread.log("Direct full scan, no filtering or sorting needed");
                         // return all records as an interval;
                         return #Interval(C.RECORD_ID_FIELD, [(0, MemoryBTree.size(collection.main))], false);
                     };
+
                 };
             };
         };
@@ -887,17 +874,12 @@ module {
         let full_scan_details_buffer = Buffer.Buffer<T.FullScanDetails>(8);
         let bitmaps = Buffer.Buffer<T.BitMap>(8);
 
-        log_thread.log(
-            "Processing "
-            # Nat.toText(query_plan.scans.size()) # " scans"
-        );
-
         for (scan_details in query_plan.scans.vals()) switch (scan_details) {
             case (#FullScan(full_scan_details)) {
-                log_thread.log("Adding full scan details to buffer");
                 full_scan_details_buffer.add(full_scan_details);
             };
             case (#IndexScan(index_scan_details)) {
+
                 let {
                     index;
                     requires_additional_filtering;
@@ -908,123 +890,103 @@ module {
                     filter_bounds;
                 } = index_scan_details;
 
-                log_thread.log(
-                    "Processing index scan on '"
-                    # index.name # "', filtering=" # debug_show requires_additional_filtering
-                    # ", sorting=" # debug_show requires_additional_sorting
-                );
-
                 if (requires_additional_sorting or requires_additional_filtering) {
-                    log_thread.log(
-                        "Retrieving record IDs from index '"
-                        # index.name # "' interval " # debug_show interval
-                    );
 
                     var record_ids : Iter<Nat> = CollectionUtils.record_ids_from_index_intervals(collection, index.name, [interval], sorted_in_reverse);
 
                     if (requires_additional_filtering) {
-                        log_thread.log("Applying additional filtering");
+                        // let { bitmap; opt_filter_bounds } = index_based_interval_filtering(collection, index_scan_details, opt_sort_column);
+
+                        // switch (opt_filter_bounds) {
+                        //     case (?filter_bounds) {
+                        //         record_ids := CollectionUtils.multi_filter(collection, bitmap.vals(), Buffer.fromArray([filter_bounds]), query_plan.is_and_operation);
+                        //     };
+                        //     case (null) if (requires_sorting or requires_additional_sorting) {
+
+                        //         let record_ids_copy = record_ids;
+
+                        //         // Itertools.takeIf
+                        //         record_ids := object {
+                        //             public func next() : ?Nat {
+                        //                 for (id in record_ids_copy) {
+                        //                     if (bitmap.get(id)) return ?id;
+                        //                 };
+                        //                 return null;
+                        //             };
+                        //         };
+
+                        //     } else {
+                        //         bitmaps.add(bitmap);
+                        //     };
+                        // };
+
                         record_ids := CollectionUtils.multi_filter(collection, record_ids, Buffer.fromArray([filter_bounds]), query_plan.is_and_operation);
                     };
 
                     if (requires_additional_sorting) {
-                        log_thread.log("Applying additional sorting");
                         if (sorted_records_from_iter.size() == 0) {
                             Utils.buffer_add_all(sorted_records_from_iter, record_ids);
-                            log_thread.log(
-                                "Sorting "
-                                # Nat.toText(sorted_records_from_iter.size()) # " records"
-                            );
+
                             sorted_records_from_iter.sort(sort_records_by_field_cmp);
                             record_ids := sorted_records_from_iter.vals();
                         };
+
                     };
 
-                    log_thread.log("Adding filtered/sorted record IDs to iterators");
                     iterators.add(record_ids);
+
                 } else {
-                    log_thread.log(
-                        "Adding direct interval for index '"
-                        # index.name # "'"
-                    );
                     add_interval(intervals_by_index, index.name, interval, sorted_in_reverse);
                 };
             };
         };
 
-        log_thread.log(
-            "Processing "
-            # Nat.toText(query_plan.subplans.size()) # " subplans"
-        );
-
         for (or_operation_subplan in query_plan.subplans.vals()) {
-            log_thread.log("Processing OR subplan");
             let eval_result = generate_record_ids_for_query_plan_with_or_operation(collection, or_operation_subplan, opt_sort_column, sort_records_by_field_cmp);
 
             switch (eval_result) {
-                case (#Empty) {
-                    log_thread.log("Subplan returned empty result, early return");
-                    return #Empty; // return early if we encounter an empty set
-                };
+                case (#Empty) return #Empty; // return early if we encounter an empty set
                 case (#Ids(iter)) {
                     if (requires_sorting) {
-                        log_thread.log("Adding sorted iterator from subplan");
                         iterators.add(iter);
                     } else {
-                        log_thread.log("Creating bitmap from subplan iterator");
                         let bitmap = BitMap.fromIter(iter);
                         bitmaps.add(bitmap);
                     };
                 };
                 case (#BitMap(bitmap)) {
                     if (requires_sorting) Debug.trap("Should only return sorted iterators when sorting is required");
-                    log_thread.log(
-                        "Adding bitmap from subplan with "
-                        # Nat.toText(bitmap.size()) # " records"
-                    );
+
                     bitmaps.add(bitmap);
                 };
                 case (#Interval(index, intervals, is_reversed)) {
-                    log_thread.log(
-                        "Adding "
-                        # Nat.toText(intervals.size()) # " intervals from subplan on index '" # index # "'"
-                    );
                     for (interval in intervals.vals()) {
                         add_interval(intervals_by_index, index, interval, is_reversed);
                     };
                 };
             };
+
         };
 
-        log_thread.log(
-            "Processing "
-            # Nat.toText(Map.size(intervals_by_index)) # " index interval sets"
-        );
-
         for ((index_name, interval_details) in Map.entries(intervals_by_index)) {
-            log_thread.log(
-                "Intersecting intervals for index '"
-                # index_name # "', count=" # Nat.toText(interval_details.intervals.size())
-            );
-
+            // Debug.print("index_name: " # debug_show index_name);
+            // Debug.print("interval_details: " # debug_show Buffer.toArray(interval_details.intervals));
             switch (Intervals.intervals_intersect(interval_details.intervals)) {
                 case (?interval) {
-                    log_thread.log(
-                        "Intervals intersect to "
-                        # debug_show interval
-                    );
                     interval_details.intervals.clear();
                     interval_details.intervals.add(interval);
                 };
-                case (null) {
-                    log_thread.log("Intervals have empty intersection, removing index");
-                    ignore Map.remove(intervals_by_index, thash, index_name);
-                };
+                case (null) ignore Map.remove(intervals_by_index, thash, index_name);
             };
         };
 
+        // Debug.print("intervals_by_index: " # debug_show Map.size(intervals_by_index));
+        // Debug.print("iterators: " # debug_show iterators.size());
+        // Debug.print("full_scan_details_buffer: " # debug_show full_scan_details_buffer.size());
+        // Debug.print("bitmaps: " # debug_show bitmaps.size());
+        // Debug.print("sorted_records_from_iter: " # debug_show sorted_records_from_iter.size());
+
         if (bitmaps.size() == 0 and full_scan_details_buffer.size() == 0 and iterators.size() == 0 and Map.size(intervals_by_index) <= 1) {
-            log_thread.log("Simple result case");
 
             let merged_results : EvalResult = if (Map.size(intervals_by_index) == 1) {
                 let ?(index_name, interval_details) = Map.entries(intervals_by_index).next() else Debug.trap("No elements in map when size is greater than 0");
@@ -1033,21 +995,16 @@ module {
                     case (?sorted_in_reverse) sorted_in_reverse;
                     case (null) false;
                 };
-
-                log_thread.log(
-                    "Returning direct interval on index '"
-                    # index_name # "': " # debug_show interval
-                );
                 #Interval(index_name, [interval], sorted_in_reverse);
             } else {
-                log_thread.log("Returning empty result");
                 #Empty;
             };
 
             return merged_results;
+
         };
 
-        log_thread.log("Processing mixed result types");
+        // Debug.print("not a single index with intervals");
 
         for ((index_name, interval_details) in Map.entries(intervals_by_index)) {
             let interval = interval_details.intervals.get(0); // #And operations only have one interval
@@ -1055,45 +1012,42 @@ module {
 
             let sorted_in_reverse = Option.get(interval_details.sorted_in_reverse, false);
 
-            log_thread.log(
-                "Processing interval on index '"
-                # index_name # "': " # debug_show interval
-            );
-
             let record_ids = CollectionUtils.record_ids_from_index_intervals(collection, index.name, [interval], sorted_in_reverse);
 
             if (requires_sorting and sorted_records_from_iter.size() == 0) {
-                log_thread.log("Collecting sorted records");
 
                 for (id in record_ids) {
                     sorted_records_from_iter.add(id);
                 };
 
-                if (sorted_records_from_iter.size() == 0) {
-                    log_thread.log("No records in interval, returning empty result");
-                    return #Empty;
-                };
+                if (sorted_records_from_iter.size() == 0) return #Empty;
 
                 iterators.add(sorted_records_from_iter.vals());
+
             } else {
-                log_thread.log("Creating bitmap from index interval records");
                 let bitmap = BitMap.fromIter(record_ids);
                 bitmaps.add(bitmap);
+
             };
+
         };
 
+        // ! - feature: reduce full scan range by only scanning the intersection with the smallest interval range
+        /**
+        var smallest_interval_start = 0;
+        var smallest_interval_end = 2 ** 64;
+
+        var index_with_smallest_interval_range = "";
+                    */
+
         if (full_scan_details_buffer.size() > 0) {
-            log_thread.log(
-                "Processing "
-                # Nat.toText(full_scan_details_buffer.size()) # " full scan operations"
-            );
+            // Debug.print("requires full scan");
 
             var smallest_interval_index = "";
             var smallest_interval_start = 0;
             var smallest_interval_end = 0;
 
             if (Map.size(intervals_by_index) > 0) {
-                log_thread.log("Finding smallest interval to optimize full scan");
 
                 var smallest_interval_range = 2 ** 64;
 
@@ -1104,13 +1058,9 @@ module {
                     if (range < smallest_interval_range) {
                         smallest_interval_range := range;
                         smallest_interval_index := index_name;
+
                         smallest_interval_start := interval.0;
                         smallest_interval_end := interval.1;
-
-                        log_thread.log(
-                            "New smallest interval on '"
-                            # index_name # "': " # debug_show interval # ", range=" # Nat.toText(range)
-                        );
                     };
                 };
             };
@@ -1122,84 +1072,69 @@ module {
             };
 
             let filtered_ids = if (smallest_interval_index == "") {
-                log_thread.log("Performing full scan with filtering");
                 let main_btree_utils = CollectionUtils.get_main_btree_utils();
-                CollectionUtils.multi_filter(
+                let filtered_ids = CollectionUtils.multi_filter(
                     collection,
                     MemoryBTree.keys(collection.main, main_btree_utils),
                     full_scan_filter_bounds,
                     query_plan.is_and_operation,
                 );
             } else {
-                log_thread.log(
-                    "Optimizing full scan with interval from index '"
-                    # smallest_interval_index # "': " # debug_show (smallest_interval_start, smallest_interval_end)
-                );
+                let record_ids_in_interval = CollectionUtils.record_ids_from_index_intervals(collection, smallest_interval_index, [(smallest_interval_start, smallest_interval_end)], false);
 
-                let record_ids_in_interval = CollectionUtils.record_ids_from_index_intervals(
-                    collection,
-                    smallest_interval_index,
-                    [(smallest_interval_start, smallest_interval_end)],
-                    false,
-                );
-
-                CollectionUtils.multi_filter(collection, record_ids_in_interval, full_scan_filter_bounds, query_plan.is_and_operation);
+                let filtered_ids = CollectionUtils.multi_filter(collection, record_ids_in_interval, full_scan_filter_bounds, query_plan.is_and_operation);
             };
+
+            // if (not requires_sorting and and_operations == []) return #Ids(filtered_ids);
 
             if (requires_sorting and sorted_records_from_iter.size() == 0) {
                 assert iterators.size() == 0;
                 assert bitmaps.size() == 0;
                 assert Map.size(intervals_by_index) == 0;
 
-                log_thread.log("Sorting full scan results");
+                // we need to sort the filtered_ids
+                // the other record ids loaded into the buffer were sorted because they were from nested operations
+                // however, a full scan is a new operation that is not sorted by default
 
                 for (id in filtered_ids) {
                     sorted_records_from_iter.add(id);
                 };
 
-                if (sorted_records_from_iter.size() == 0) {
-                    log_thread.log("No records match full scan, returning empty result");
-                    return #Empty;
-                };
+                if (sorted_records_from_iter.size() == 0) return #Empty;
 
                 sorted_records_from_iter.sort(sort_records_by_field_cmp);
-                log_thread.log(
-                    "Returning sorted records from full scan, count="
-                    # Nat.toText(sorted_records_from_iter.size())
-                );
 
                 return #Ids(sorted_records_from_iter.vals());
+
+                // iterators.add(sorted_records_from_iter.vals()); - not needed since it will load it into the bitmap on the next line
+
             };
 
-            log_thread.log("Creating bitmap from full scan results");
+            // Debug.print("added full scan bounds to bitmaps");
+            // Debug.print("too bad it requires sorting: " # debug_show requires_sorting);
+            // Debug.print("query_plan.subplans.size() : " # debug_show query_plan.subplans.size());
+            // Debug.print("query_plan.scans.size() : " # debug_show query_plan.scans.size());
+
             let bitmap = BitMap.fromIter(filtered_ids);
-            log_thread.log(
-                "Full scan bitmap contains "
-                # Nat.toText(bitmap.size()) # " records: " # debug_show Iter.toArray(
-                    bitmap.vals()
-                )
-            );
             bitmaps.add(bitmap);
+
+            // Debug.print("created bitmap from full scan bounds");
+
+            // full_scan_details.clear();
         };
 
         if (iterators.size() == 1) {
-            log_thread.log("Returning single iterator");
+            // Debug.print("single iterator");
             return #Ids(iterators.get(0));
         };
 
         if (iterators.size() > 1) {
-            log_thread.log(
-                "Converting "
-                # Nat.toText(iterators.size()) # " iterators to bitmaps"
-            );
-
             var fill_sorted_records_from_iter = if (sorted_records_from_iter.size() > 0) {
                 false;
             } else { true };
 
             for (_iter in iterators.vals()) {
                 let iter = if (fill_sorted_records_from_iter) {
-                    log_thread.log("Filling sorted records buffer");
                     for (id in _iter) {
                         sorted_records_from_iter.add(id);
                     };
@@ -1208,39 +1143,32 @@ module {
 
                 let bitmap = BitMap.fromIter(iter);
                 bitmaps.add(bitmap);
+
                 fill_sorted_records_from_iter := false;
             };
+
         };
 
         if (bitmaps.size() == 0) {
-            log_thread.log("No bitmaps to process, returning empty result");
             return #Empty;
         };
-
-        log_thread.log(
-            "Intersecting "
-            # Nat.toText(bitmaps.size()) # " bitmaps"
-        );
 
         let bitmap = if (bitmaps.size() == 1) {
             bitmaps.get(0);
         } else { BitMap.multiIntersect(bitmaps.vals()) };
 
         if (sorted_records_from_iter.size() > 0) {
-            log_thread.log("Filtering sorted records with bitmap");
             let sorted_bitmap_vals = Iter.filter<Nat>(
                 sorted_records_from_iter.vals(),
                 func(id : Nat) : Bool = bitmap.get(id),
             );
 
             #Ids(sorted_bitmap_vals);
+
         } else {
-            log_thread.log(
-                "Returning bitmap with "
-                # Nat.toText(bitmap.size()) # " records"
-            );
             #BitMap(bitmap);
         };
+
     };
 
     public func generate_record_ids_for_query_plan_with_or_operation(
@@ -1252,32 +1180,18 @@ module {
         assert not query_plan.is_and_operation;
         let requires_sorting = Option.isSome(opt_sort_column);
 
-        let log_thread = Logger.Thread(collection.logger, "QueryExecution.generate_record_ids_for_query_plan_with_or_operation()", null);
-
-        log_thread.log(
-            "Processing OR query plan with "
-            # Nat.toText(query_plan.scans.size()) # " scans and "
-            # Nat.toText(query_plan.subplans.size()) # " subplans"
-            # (if (requires_sorting) ", sorting required" else "")
-        );
-
         let bitmaps = Buffer.Buffer<T.BitMap>(8);
         let intervals_by_index = Map.new<Text, IndexDetails>();
 
         let iterators = Buffer.Buffer<Iter<Nat>>(8);
         let full_scan_details_buffer = Buffer.Buffer<T.FullScanDetails>(8);
 
-        log_thread.log(
-            "Processing "
-            # Nat.toText(query_plan.scans.size()) # " scans"
-        );
-
         for (scan_details in query_plan.scans.vals()) switch (scan_details) {
             case (#FullScan(full_scan_details)) {
-                log_thread.log("Adding full scan details to buffer");
                 full_scan_details_buffer.add(full_scan_details);
             };
             case (#IndexScan(index_scan_details)) {
+
                 let {
                     index;
                     requires_additional_filtering;
@@ -1288,33 +1202,18 @@ module {
                     filter_bounds;
                 } = index_scan_details;
 
-                log_thread.log(
-                    "Processing index scan on '"
-                    # index.name # "', filtering=" # debug_show requires_additional_filtering
-                    # ", sorting=" # debug_show requires_additional_sorting
-                );
-
                 if (not requires_additional_filtering and not requires_additional_sorting) {
-                    log_thread.log(
-                        "Adding direct interval for index '"
-                        # index.name # "': " # debug_show interval
-                    );
                     add_interval(intervals_by_index, index.name, interval, sorted_in_reverse);
-                } else {
-                    log_thread.log(
-                        "Retrieving record IDs from index '"
-                        # index.name # "' interval " # debug_show interval
-                    );
 
+                } else {
                     var record_ids : Iter<Nat> = CollectionUtils.record_ids_from_index_intervals(collection, index.name, [interval], sorted_in_reverse);
 
                     if (requires_additional_filtering) {
-                        log_thread.log("Applying additional filtering");
                         record_ids := CollectionUtils.multi_filter(collection, record_ids, Buffer.fromArray([filter_bounds]), query_plan.is_and_operation);
                     };
 
                     if (requires_additional_sorting) {
-                        log_thread.log("Sorting index scan results");
+
                         let buffer = Buffer.Buffer<Nat>(8);
 
                         for (id in record_ids) {
@@ -1323,50 +1222,34 @@ module {
 
                         buffer.sort(sort_records_by_field_cmp);
                         record_ids := buffer.vals();
+
                     };
 
-                    log_thread.log("Adding filtered/sorted record IDs to iterators");
                     iterators.add(record_ids);
+
                 };
+
             };
         };
 
-        log_thread.log(
-            "Processing "
-            # Nat.toText(query_plan.subplans.size()) # " subplans"
-        );
-
         for (and_operation_subplan in query_plan.subplans.vals()) {
-            log_thread.log("Processing AND subplan");
             let eval_result = generate_record_ids_for_query_plan_with_and_operation(collection, and_operation_subplan, opt_sort_column, sort_records_by_field_cmp);
 
             switch (eval_result) {
-                case (#Empty) {
-                    log_thread.log("Subplan returned empty result, skipping");
-                };
+                case (#Empty) {}; // do nothing if empty set
                 case (#Ids(iter)) {
                     if (requires_sorting) {
-                        log_thread.log("Adding sorted iterator from subplan");
                         iterators.add(iter);
                     } else {
-                        log_thread.log("Creating bitmap from subplan iterator");
                         let bitmap = BitMap.fromIter(iter);
                         bitmaps.add(bitmap);
                     };
                 };
                 case (#BitMap(bitmap)) {
                     if (requires_sorting) Debug.trap("Should only return sorted iterators when sorting is required");
-                    log_thread.log(
-                        "Adding bitmap from subplan with "
-                        # Nat.toText(bitmap.size()) # " records"
-                    );
                     bitmaps.add(bitmap);
                 };
                 case (#Interval(index, intervals, is_reversed)) {
-                    log_thread.log(
-                        "Adding "
-                        # Nat.toText(intervals.size()) # " intervals from subplan on index '" # index # "'"
-                    );
                     for (interval in intervals.vals()) {
                         add_interval(intervals_by_index, index, interval, is_reversed);
                     };
@@ -1391,108 +1274,67 @@ module {
 
             let index_key = index.key_details.get(0).0;
 
-            log_thread.log(
-                "Comparing sort field '"
-                # sort_field # "' with index key '" # index_key # "'"
-            );
-
             sort_field != index_key;
         };
-
-        log_thread.log(
-            "Merging intervals for "
-            # Nat.toText(Map.size(intervals_by_index)) # " indexes"
-        );
 
         // merge overlapping intervals
         for ((index_name, interval_details) in Map.entries(intervals_by_index)) {
             let should_call_union = not requires_additional_sorting_between_intervals(collection, index_name, interval_details.intervals, opt_sort_column);
 
             if (should_call_union) {
-                log_thread.log(
-                    "Merging overlapping intervals for index '"
-                    # index_name # "', before: " # Nat.toText(interval_details.intervals.size()) # " intervals"
-                );
                 Intervals.intervals_union(interval_details.intervals);
-                log_thread.log(
-                    "After merge: "
-                    # Nat.toText(interval_details.intervals.size()) # " intervals"
-                );
-            } else {
-                log_thread.log(
-                    "Not merging intervals for index '"
-                    # index_name # "' due to sorting requirements"
-                );
             };
         };
 
         if (bitmaps.size() == 0 and full_scan_details_buffer.size() == 0 and iterators.size() == 0 and Map.size(intervals_by_index) <= 1) {
-            log_thread.log("Simple result case");
-
-            if (Map.size(intervals_by_index) == 0) {
-                log_thread.log("No results, returning empty");
-                return #Empty;
-            };
+            if (Map.size(intervals_by_index) == 0) return #Empty;
 
             let ?(index_name, interval_details) = Map.entries(intervals_by_index).next() else Debug.trap("No elements in map when size is greater than 0");
+
             let intervals = Buffer.toArray(interval_details.intervals);
+
             let ?index = Map.get(collection.indexes, thash, index_name) else Debug.trap("Unreachable: IndexMap not found for index: " # index_name);
 
             let should_return_as_interval = not requires_additional_sorting_between_intervals(collection, index_name, interval_details.intervals, opt_sort_column);
-            log_thread.log("Should return as interval: " # debug_show should_return_as_interval);
+
+            // Debug.print("should_return_as_interval: " # debug_show should_return_as_interval);
+            // Debug.print("intervals: " # debug_show (index.key_details, (intervals)));
 
             if (should_return_as_interval) {
+
                 let is_reversed = switch (interval_details.sorted_in_reverse) {
                     case (?sorted_in_reverse) sorted_in_reverse;
                     case (null) false;
                 };
 
-                log_thread.log(
-                    "Returning "
-                    # Nat.toText(intervals.size()) # " intervals from index '" # index_name # "'"
-                );
                 return #Interval(index_name, intervals, is_reversed);
             };
-            // moves on to the next block to handle multiple intervals that require sorting
-        };
 
-        log_thread.log("Processing mixed result types");
+            // moves on to the next block to handle multiple intervals that require sorting
+
+        };
 
         for ((index_name, interval_details) in Map.entries(intervals_by_index)) {
             let ?index = Map.get(collection.indexes, thash, index_name) else Debug.trap("Unreachable: IndexMap not found for index: " # index_name);
             let index_data_utils = CollectionUtils.get_index_data_utils();
 
-            log_thread.log(
-                "Processing "
-                # Nat.toText(interval_details.intervals.size()) # " intervals for index '" # index_name # "'"
-            );
-
             for (interval in interval_details.intervals.vals()) {
-                let sorted_in_reverse = Option.get(interval_details.sorted_in_reverse, false);
 
-                log_thread.log(
-                    "Retrieving record IDs for interval "
-                    # debug_show interval # (if (sorted_in_reverse) " (reversed)" else "")
-                );
+                let sorted_in_reverse = Option.get(interval_details.sorted_in_reverse, false);
 
                 let record_ids = CollectionUtils.record_ids_from_index_intervals(collection, index_name, [interval], sorted_in_reverse);
 
                 if (requires_sorting) {
-                    log_thread.log("Adding record IDs to iterators for sorting");
                     iterators.add(record_ids);
                 } else {
-                    log_thread.log("Creating bitmap from record IDs");
                     let bitmap = BitMap.fromIter(record_ids);
                     bitmaps.add(bitmap);
                 };
+
             };
         };
 
         if (full_scan_details_buffer.size() > 0) {
-            log_thread.log(
-                "Processing "
-                # Nat.toText(full_scan_details_buffer.size()) # " full scan operations"
-            );
 
             let full_scan_filter_bounds = Buffer.Buffer<T.Bounds>(full_scan_details_buffer.size());
 
@@ -1500,13 +1342,11 @@ module {
                 full_scan_filter_bounds.add(full_scan_details.filter_bounds);
             };
 
-            log_thread.log("Performing full scan with filtering");
             let main_btree_utils = CollectionUtils.get_main_btree_utils();
             let record_ids = MemoryBTree.keys(collection.main, main_btree_utils);
             let filtered_ids = CollectionUtils.multi_filter(collection, record_ids, full_scan_filter_bounds, query_plan.is_and_operation);
 
             if (requires_sorting) {
-                log_thread.log("Sorting full scan results");
                 let buffer = Buffer.Buffer<Nat>(8);
                 for (id in filtered_ids) {
                     buffer.add(id);
@@ -1514,21 +1354,17 @@ module {
 
                 buffer.sort(sort_records_by_field_cmp);
                 iterators.add(buffer.vals());
+
             } else {
-                log_thread.log("Creating bitmap from full scan results");
                 let bitmap = BitMap.fromIter(filtered_ids);
-                log_thread.log(
-                    "Full scan bitmap contains "
-                    # Nat.toText(bitmap.size()) # " records: " # debug_show Iter.toArray(
-                        bitmap.vals()
-                    )
-                );
                 bitmaps.add(bitmap);
             };
+
         };
 
-        func deduplicate_record_ids_iter(record_ids_iter : Iter<Nat>) : Iter<Nat> {
-            log_thread.log("Creating deduplicating iterator");
+        func deduplicate_record_ids_iter(
+            record_ids_iter : Iter<Nat>
+        ) : Iter<Nat> {
             let dedup_bitmap = BitMap.BitMap(1024);
 
             object {
@@ -1548,46 +1384,27 @@ module {
 
         if (requires_sorting) {
             assert bitmaps.size() == 0;
-            log_thread.log("Processing sorted results");
 
-            if (iterators.size() == 0) {
-                log_thread.log("No iterators to merge, returning empty");
-                return #Empty;
-            };
+            if (iterators.size() == 0) return #Empty;
 
-            log_thread.log(
-                "Merging "
-                # Nat.toText(iterators.size()) # " sorted iterators"
-            );
-
+            // Debug.print("Running kmerge on " # debug_show iterators.size() # " iterators");
             let merged_iterators = Itertools.kmerge<Nat>(Buffer.toArray(iterators), sort_records_by_field_cmp);
+
             let deduped_iter = deduplicate_record_ids_iter(merged_iterators);
 
-            log_thread.log("Returning deduplicated sorted iterator");
             return #Ids(deduped_iter);
+
         };
 
         assert iterators.size() == 0;
-        log_thread.log("Processing bitmap results");
 
         if (bitmaps.size() == 0) {
-            log_thread.log("No bitmaps to merge, returning empty");
             #Empty;
         } else {
-            log_thread.log(
-                "Merging "
-                # Nat.toText(bitmaps.size()) # " bitmaps"
-            );
-
             let bitmap = BitMap.multiUnion(bitmaps.vals());
-
-            log_thread.log(
-                "Returning bitmap with "
-                # Nat.toText(bitmap.size()) # " records"
-            );
-
             #BitMap(bitmap);
         };
+
     };
 
     public func generate_record_ids_for_query_plan(
@@ -1604,40 +1421,42 @@ module {
             generate_record_ids_for_query_plan_with_or_operation(collection, query_plan, opt_sort_column, sort_records_by_field_cmp);
         };
 
+        let elapsed = 0;
+
         switch (result) {
             case (#Empty) {
                 Logger.info(
                     collection.logger,
-                    "QueryExecution.generate_record_ids_for_query_plan(): Query returned empty result  ",
+                    "QueryExecution.generate_record_ids_for_query_plan(): Query returned empty result in "
+                    # debug_show elapsed # " instructions",
                 );
             };
             case (#BitMap(bitmap)) {
                 Logger.info(
                     collection.logger,
                     "QueryExecution.generate_record_ids_for_query_plan(): Query returned "
-                    # debug_show bitmap.size() # " records in bitmap ",
+                    # debug_show bitmap.size() # " records in bitmap in " # debug_show elapsed # " instructions",
                 );
             };
             case (#Ids(iter)) {
                 Logger.info(
                     collection.logger,
-                    "QueryExecution.generate_record_ids_for_query_plan(): Query returned iterator ",
+                    "QueryExecution.generate_record_ids_for_query_plan(): Query returned iterator in "
+                    # debug_show elapsed # " instructions",
                 );
             };
             case (#Interval(index_name, intervals, is_reversed)) {
-                Logger.info(collection.logger, debug_show ({ intervals; is_reversed }));
-
                 var total = 0;
                 for (interval in intervals.vals()) {
                     total += interval.1 - interval.0;
                 };
-
                 Logger.info(
                     collection.logger,
                     "QueryExecution.generate_record_ids_for_query_plan(): Query returned "
                     # debug_show total # " records from " # debug_show intervals.size()
                     # " intervals on index '" # index_name # "'"
-                    # (if (is_reversed) " (reversed order)" else ""),
+                    # (if (is_reversed) " (reversed order)" else "")
+                    # " in " # debug_show elapsed # " instructions",
                 );
             };
         };

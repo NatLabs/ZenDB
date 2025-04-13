@@ -154,7 +154,6 @@ module {
         // Debug.print("end_query: " # debug_show end_query);
 
         let index_data_utils = CollectionUtils.get_index_data_utils();
-        Debug.print(debug_show (index.key_details));
 
         func sort_by_key_details(a : (Text, Any), b : (Text, Any)) : Order {
             let pos_a = switch (Array.indexOf<(Text, SortDirection)>((a.0, #Ascending), index.key_details, Utils.tuple_eq(Text.equal))) {
