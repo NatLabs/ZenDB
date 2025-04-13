@@ -840,6 +840,7 @@ module {
 
         ?{ bitmap; opt_filter_bounds };
     };
+
     public func generate_record_ids_for_query_plan_with_and_operation(
         collection : T.StableCollection,
         query_plan : T.QueryPlan,
@@ -1081,6 +1082,14 @@ module {
                 bitmaps.add(bitmap);
             };
         };
+
+        // ! - feature: reduce full scan range by only scanning the intersection with the smallest interval range
+        /**
+        var smallest_interval_start = 0;
+        var smallest_interval_end = 2 ** 64;
+
+        var index_with_smallest_interval_range = "";
+                    */
 
         if (full_scan_details_buffer.size() > 0) {
             log_thread.log(
@@ -1604,40 +1613,42 @@ module {
             generate_record_ids_for_query_plan_with_or_operation(collection, query_plan, opt_sort_column, sort_records_by_field_cmp);
         };
 
+        let elapsed = 0;
+
         switch (result) {
             case (#Empty) {
                 Logger.info(
                     collection.logger,
-                    "QueryExecution.generate_record_ids_for_query_plan(): Query returned empty result  ",
+                    "QueryExecution.generate_record_ids_for_query_plan(): Query returned empty result in "
+                    # debug_show elapsed # " instructions",
                 );
             };
             case (#BitMap(bitmap)) {
                 Logger.info(
                     collection.logger,
                     "QueryExecution.generate_record_ids_for_query_plan(): Query returned "
-                    # debug_show bitmap.size() # " records in bitmap ",
+                    # debug_show bitmap.size() # " records in bitmap in " # debug_show elapsed # " instructions",
                 );
             };
             case (#Ids(iter)) {
                 Logger.info(
                     collection.logger,
-                    "QueryExecution.generate_record_ids_for_query_plan(): Query returned iterator ",
+                    "QueryExecution.generate_record_ids_for_query_plan(): Query returned iterator in "
+                    # debug_show elapsed # " instructions",
                 );
             };
             case (#Interval(index_name, intervals, is_reversed)) {
-                Logger.info(collection.logger, debug_show ({ intervals; is_reversed }));
-
                 var total = 0;
                 for (interval in intervals.vals()) {
                     total += interval.1 - interval.0;
                 };
-
                 Logger.info(
                     collection.logger,
                     "QueryExecution.generate_record_ids_for_query_plan(): Query returned "
                     # debug_show total # " records from " # debug_show intervals.size()
                     # " intervals on index '" # index_name # "'"
-                    # (if (is_reversed) " (reversed order)" else ""),
+                    # (if (is_reversed) " (reversed order)" else "")
+                    # " in " # debug_show elapsed # " instructions",
                 );
             };
         };

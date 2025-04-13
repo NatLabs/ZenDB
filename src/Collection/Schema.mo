@@ -418,4 +418,38 @@ module {
             };
         };
     };
+
+    public func get_nested_candid_type(_schema : Schema, key : Text) : ?Schema {
+        let nested_field_keys = Text.split(key, #text("."));
+
+        var schema = _schema;
+        var has_option_in_path = false;
+
+        for (key in nested_field_keys) {
+            let #Record(record_fields) or #Option(#Record(record_fields)) or #Variant(record_fields) or #Option(#Variant(record_fields)) = schema else return null;
+
+            switch (schema) {
+                case (#Option(_)) has_option_in_path := true;
+                case (_) {};
+            };
+
+            let ?found_field = Array.find<(Text, Schema)>(
+                record_fields,
+                func((variant_name, _) : (Text, Schema)) : Bool {
+                    variant_name == key;
+                },
+            ) else return null;
+
+            schema := found_field.1;
+        };
+
+        if (has_option_in_path) {
+            return switch (schema) {
+                case (#Option(_)) ?schema;
+                case (_) ?#Option(schema);
+            };
+        };
+
+        return ?schema;
+    };
 };
