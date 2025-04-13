@@ -1,4 +1,6 @@
 // @testmode wasi
+// crafted by claude-3-sonnet-20240229
+
 import Blob "mo:base/Blob";
 import Debug "mo:base/Debug";
 import Array "mo:base/Array";

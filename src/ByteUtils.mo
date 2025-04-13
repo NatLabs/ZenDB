@@ -28,12 +28,9 @@ module ByteUtils {
         };
     };
 
-    func buffer_add_all<A>(buffer : B.Buffer<A>, iter : Iter.Iter<A>) {
-        for (elem in iter) { buffer.add(elem) };
-    };
-
     public type BufferLike<A> = {
         add : (A) -> ();
+        get : (Nat) -> A;
     };
 
     public module LittleEndian {
@@ -91,51 +88,6 @@ module ByteUtils {
             Int64.fromNat64(nat64);
         };
 
-        // public func toNat(bytes : Bytes) : Nat {
-        //     var n = 0;
-        //     let bytes_arr : [Nat8] = Iter.toArray(bytes);
-
-        //     var j = bytes_arr.size();
-
-        //     while (j > 0) {
-        //         let byte = bytes_arr.get(j - 1);
-        //         n *= 255;
-        //         n += Nat8.toNat(byte);
-
-        //         j -= 1;
-        //     };
-
-        //     n;
-        // };
-
-        // public func toInt(bytes : Bytes) : Int {
-        //     let bytes_arr : [Nat8] = Iter.toArray(bytes);
-
-        //     var num = 0;
-        //     var is_negative = false;
-
-        //     var j = bytes_arr.size();
-
-        //     while (j > 0) {
-        //         let byte = bytes_arr.get(j - 1);
-        //         if (j == 1) {
-        //             is_negative := Nat8.toNat(byte) == 1;
-        //         } else {
-        //             num *= 255;
-        //             num += Nat8.toNat(byte);
-        //         };
-
-        //         j -= 1;
-        //     };
-
-        //     if (is_negative) {
-        //         -(num);
-        //     } else {
-        //         (num);
-        //     };
-
-        // };
-
         public func toFloat64(bytes : Bytes) : Float {
             let ?fx = FloatX.decode(bytes, #f64, #lsb) else Debug.trap("ByteUtils: failed to decode float64");
             FloatX.toFloat(fx);
@@ -147,8 +99,8 @@ module ByteUtils {
 
         public func fromNat16(n : Nat16) : [Nat8] {
             [
-                Nat16.toNat8(n),
-                Nat16.toNat8(n >> 8),
+                Nat16.toNat8(n & 0xff),
+                Nat16.toNat8((n >> 8) & 0xff),
             ];
         };
 
@@ -174,29 +126,6 @@ module ByteUtils {
             ];
         };
 
-        // public func fromNat(n : Nat) : [Nat8] {
-        //     var num = n;
-        //     var nbytes = 0;
-
-        //     while (num > 0) {
-        //         num /= 255;
-        //         nbytes += 1;
-        //     };
-
-        //     num := n;
-
-        //     let arr = Array.tabulate(
-        //         nbytes,
-        //         func(_ : Nat) : Nat8 {
-        //             let tmp = num % 255;
-        //             num /= 255;
-        //             Nat8.fromNat(tmp);
-        //         },
-        //     );
-
-        //     arr;
-        // };
-
         public func fromInt8(i : Int8) : [Nat8] {
             [Int8.toNat8(i)];
         };
@@ -215,33 +144,6 @@ module ByteUtils {
             let nat64 = Int64.toNat64(i);
             fromNat64(nat64);
         };
-
-        // public func fromInt(i : Int) : [Nat8] {
-        //     let is_negative = i < 0;
-
-        //     var num : Nat = Int.abs(i);
-        //     var nbytes = 0;
-
-        //     while (num > 0) {
-        //         num /= 255;
-        //         nbytes += 1;
-        //     };
-
-        //     num := Int.abs(i);
-
-        //     let arr = Array.tabulate(
-        //         nbytes + 1,
-        //         func(i : Nat) : Nat8 {
-        //             if (i == nbytes) return Nat8.fromNat(if (is_negative) 1 else 0);
-
-        //             let tmp = num % 255;
-        //             num /= 255;
-        //             Nat8.fromNat(tmp);
-        //         },
-        //     );
-
-        //     arr;
-        // };
 
         public func fromFloat64(f : Float) : [Nat8] {
             let fx = FloatX.fromFloat(f, #f64);
@@ -305,50 +207,6 @@ module ByteUtils {
             Int64.fromNat64(nat64);
         };
 
-        // public func toNat(bytes : Bytes) : Nat {
-        //     var n = 0;
-        //     let bytes_arr : [Nat8] = Iter.toArray(bytes);
-
-        //     var j = bytes_arr.size();
-
-        //     while (j > 0) {
-        //         let byte = bytes_arr.get(j - 1);
-        //         n *= 255;
-        //         n += Nat8.toNat(byte);
-
-        //         j -= 1;
-        //     };
-
-        //     n;
-        // };
-
-        // public func toInt(bytes : Bytes) : Int {
-        //     let bytes_arr : [Nat8] = Iter.toArray(bytes);
-
-        //     var num = 0;
-        //     var is_negative = false;
-
-        //     var j = bytes_arr.size();
-
-        //     while (j > 0) {
-        //         let byte = bytes_arr.get(j - 1);
-        //         if (j == 1) {
-        //             is_negative := Nat8.toNat(byte) == 1;
-        //         } else {
-        //             num *= 255;
-        //             num += Nat8.toNat(byte);
-        //         };
-
-        //         j -= 1;
-        //     };
-
-        //     if (is_negative) {
-        //         -(num);
-        //     } else {
-        //         (num);
-        //     };
-        // };
-
         public func toFloat64(bytes : Bytes) : Float {
             let ?fx = FloatX.decode(bytes, #f64, #msb) else Debug.trap("ByteUtils: failed to decode float64");
             FloatX.toFloat(fx);
@@ -360,8 +218,8 @@ module ByteUtils {
 
         public func fromNat16(n : Nat16) : [Nat8] {
             [
-                Nat16.toNat8(n >> 8),
-                Nat16.toNat8(n),
+                Nat16.toNat8((n >> 8) & 0xff),
+                Nat16.toNat8(n & 0xff),
             ];
         };
 
@@ -387,29 +245,6 @@ module ByteUtils {
             ];
         };
 
-        // public func fromNat(n : Nat) : [Nat8] {
-        //     var num = n;
-        //     var nbytes = 0;
-
-        //     while (num > 0) {
-        //         num /= 255;
-        //         nbytes += 1;
-        //     };
-
-        //     num := n;
-
-        //     let arr = Array.tabulate(
-        //         nbytes,
-        //         func(_ : Nat) : Nat8 {
-        //             let tmp = num % 255;
-        //             num /= 255;
-        //             Nat8.fromNat(tmp);
-        //         },
-        //     );
-
-        //     Array.reverse(arr);
-        // };
-
         public func fromInt8(i : Int8) : [Nat8] {
             [Int8.toNat8(i)];
         };
@@ -429,33 +264,6 @@ module ByteUtils {
             fromNat64(nat64);
         };
 
-        // public func fromInt(i : Int) : [Nat8] {
-        //     let is_negative = i < 0;
-
-        //     var num : Nat = Int.abs(i);
-        //     var nbytes = 0;
-
-        //     while (num > 0) {
-        //         num /= 255;
-        //         nbytes += 1;
-        //     };
-
-        //     num := Int.abs(i);
-
-        //     let arr = Array.tabulate(
-        //         nbytes + 1,
-        //         func(i : Nat) : Nat8 {
-        //             if (i == 0) return Nat8.fromNat(if (is_negative) 1 else 0);
-
-        //             let tmp = num % 255;
-        //             num /= 255;
-        //             Nat8.fromNat(tmp);
-        //         },
-        //     );
-
-        //     Array.reverse(arr);
-        // };
-
         public func fromFloat64(f : Float) : [Nat8] {
             let fx = FloatX.fromFloat(f, #f64);
             let buffer = B.Buffer<Nat8>(8);
@@ -468,19 +276,36 @@ module ByteUtils {
     public let LE = LittleEndian;
     public let BE = BigEndian;
 
-    public func leb128_64(n64 : Nat64) : [Nat8] {
+    public func toLEB128_64(n64 : Nat64) : [Nat8] {
         let buffer = B.Buffer<Nat8>(10);
-        Buffer.leb128_64(buffer, n64);
+        Buffer.writeLEB128_64(buffer, n64);
         B.toArray(buffer);
     };
 
-    public func sleb128_64(n : Int64) : [Nat8] {
+    public func fromLEB128_64(bytes : Bytes) : Nat64 {
         let buffer = B.Buffer<Nat8>(10);
-        Buffer.sleb128_64(buffer, n);
+        for (byte in bytes) { buffer.add(byte) };
+        Buffer.readLEB128_64(buffer);
+    };
+
+    public func toSLEB128_64(n : Int64) : [Nat8] {
+        let buffer = B.Buffer<Nat8>(10);
+        Buffer.writeSLEB128_64(buffer, n);
         B.toArray(buffer);
+    };
+
+    public func fromSLEB128_64(bytes : Bytes) : Int64 {
+        let buffer = B.Buffer<Nat8>(10);
+        for (byte in bytes) { buffer.add(byte) };
+        Buffer.readSLEB128_64(buffer);
     };
 
     public module Buffer {
+
+        public func addBytes(buffer : B.Buffer<Nat8>, iter : Iter.Iter<Nat8>) {
+            for (elem in iter) { buffer.add(elem) };
+        };
+
         public module LittleEndian {
             // Rename existing write methods to add methods (add to end of buffer)
             public func addNat8(buffer : B.Buffer<Nat8>, n : Nat8) {
@@ -488,8 +313,8 @@ module ByteUtils {
             };
 
             public func addNat16(buffer : B.Buffer<Nat8>, n : Nat16) {
-                buffer.add(Nat16.toNat8(n));
-                buffer.add(Nat16.toNat8(n >> 8));
+                buffer.add(Nat16.toNat8(n & 0xff));
+                buffer.add(Nat16.toNat8(n >> 8) & 0xff);
             };
 
             public func addNat32(buffer : B.Buffer<Nat8>, n : Nat32) {
@@ -540,8 +365,8 @@ module ByteUtils {
             };
 
             public func writeNat16(buffer : B.Buffer<Nat8>, offset : Nat, n : Nat16) {
-                buffer.put(offset, Nat16.toNat8(n));
-                buffer.put(offset + 1, Nat16.toNat8(n >> 8));
+                buffer.put(offset, Nat16.toNat8(n & 0xff));
+                buffer.put(offset + 1, Nat16.toNat8((n >> 8) & 0xff));
             };
 
             public func writeNat32(buffer : B.Buffer<Nat8>, offset : Nat, n : Nat32) {
@@ -652,8 +477,8 @@ module ByteUtils {
             };
 
             public func addNat16(buffer : B.Buffer<Nat8>, n : Nat16) {
-                buffer.add(Nat16.toNat8(n >> 8));
-                buffer.add(Nat16.toNat8(n));
+                buffer.add(Nat16.toNat8((n >> 8) & 0xff));
+                buffer.add(Nat16.toNat8(n & 0xff));
             };
 
             public func addNat32(buffer : B.Buffer<Nat8>, n : Nat32) {
@@ -704,8 +529,8 @@ module ByteUtils {
             };
 
             public func writeNat16(buffer : B.Buffer<Nat8>, offset : Nat, n : Nat16) {
-                buffer.put(offset, Nat16.toNat8(n >> 8));
-                buffer.put(offset + 1, Nat16.toNat8(n));
+                buffer.put(offset, Nat16.toNat8((n >> 8) & 0xff));
+                buffer.put(offset + 1, Nat16.toNat8(n & 0xff));
             };
 
             public func writeNat32(buffer : B.Buffer<Nat8>, offset : Nat, n : Nat32) {
@@ -811,10 +636,12 @@ module ByteUtils {
         public let LE = LittleEndian;
         public let BE = BigEndian;
 
+        // Encodings that have a consistent endianness
+
         // https://en.wikipedia.org/wiki/LEB128
         // limited to 64-bit unsigned integers
         // more performant than the general unsigned_leb128
-        public func leb128_64(buffer : BufferLike<Nat8>, n : Nat64) {
+        public func writeLEB128_64(buffer : BufferLike<Nat8>, n : Nat64) {
             var n64 : Nat64 = n;
 
             loop {
@@ -830,35 +657,93 @@ module ByteUtils {
         // https://en.wikipedia.org/wiki/LEB128
         // limited to 64-bit signed integers
         // more performant than the general signed_leb128
-        public func sleb128_64(buffer : BufferLike<Nat8>, _n : Int64) {
-            let num = Int64.toInt(_n);
+        public func writeSLEB128_64(buffer : BufferLike<Nat8>, _n : Int64) {
+            let n = Int64.toInt(_n);
+            let is_negative = n < 0;
 
-            let is_negative = num < 0;
+            // Convert to correct absolute value representation first
+            var value : Nat64 = if (is_negative) {
+                // For negative numbers in two's complement: bitwise NOT of abs(n)-1
+                Nat64.fromNat(Int.abs(n) - 1);
+            } else {
+                Nat64.fromNat(Int.abs(n));
+            };
 
-            // because we extract bytes in multiple of 7 bits
-            // to extract the 64th bit we pad the number with 6 extra bits
-            // to make it 70 which is a multiple of 7
-            // however, because nat64 is bounded by 64 bits
-            // the extra 6 bits are not flipped which leads to an incorrect result
+            var more = true;
 
-            var n64 = Nat64.fromNat(Int.abs(num));
+            while (more) {
+                // Get lowest 7 bits
+                var byte : Nat8 = Nat8.fromNat(Nat64.toNat(value & 0x7F));
 
-            let bit_length = Nat64.toNat(64 - Nat64.bitcountLeadingZero(n64));
-            var n7bits = (bit_length / 7) + 1;
-            if (is_negative) n64 := Nat64.fromNat(Int.abs(num) - 1);
+                // Shift for next iteration
+                value >>= 7;
 
-            loop {
-                var word = if (is_negative) ^n64 else n64;
-                var byte = word & 0x7F |> Nat64.toNat(_) |> Nat8.fromNat(_);
-                n64 >>= 7;
-                n7bits -= 1;
+                // Determine if we need more bytes
+                if (
+                    (value == 0 and (byte & 0x40) == 0) or
+                    (is_negative and value == Nat64.fromNat(Int.abs(Int64.toInt(Int64.maximumValue))) and (byte & 0x40) != 0)
+                ) {
+                    more := false;
+                } else {
+                    byte |= 0x80; // Set continuation bit
+                };
 
-                if (n7bits > 0) byte := (byte | 0x80);
+                // For negative numbers, invert bits (apply two's complement)
+                if (is_negative) {
+                    byte := byte ^ 0x7F;
+                };
+
                 buffer.add(byte);
+            };
+        };
 
-            } while (n7bits > 0);
-            return;
+        // https://en.wikipedia.org/wiki/LEB128
+        public func readLEB128_64(buffer : BufferLike<Nat8>) : Nat64 {
+            var n64 : Nat64 = 0;
+            var shift : Nat64 = 0;
+            var i = 0;
 
+            label decoding_leb loop {
+                let byte = buffer.get(i);
+                i += 1;
+
+                n64 |= (Nat64.fromNat(Nat8.toNat(byte & 0x7f)) << shift);
+
+                if (byte & 0x80 == 0) break decoding_leb;
+                shift += 7;
+
+            };
+
+            n64;
+        };
+
+        public func readSLEB128_64(buffer : BufferLike<Nat8>) : Int64 {
+            var result : Nat64 = 0;
+            var shift : Nat64 = 0;
+            var byte : Nat8 = 0;
+            var i = 0;
+
+            label analyzing loop {
+                byte := buffer.get(i);
+                i += 1;
+
+                // Add this byte's 7 bits to the result
+                result |= Nat64.fromNat(Nat8.toNat(byte & 0x7F)) << shift;
+                shift += 7;
+
+                // If continuation bit is not set, we're done reading bytes
+                if ((byte & 0x80) == 0) {
+                    break analyzing;
+                };
+            };
+
+            // Sign extend if this is a negative number
+            if (byte & 0x40 != 0 and shift < 64) {
+                // Fill the rest with 1s (sign extension)
+                result |= ^((Nat64.fromNat(1) << shift) - 1);
+            };
+
+            Int64.fromNat64(result);
         };
 
     };
