@@ -169,9 +169,9 @@ module {
             "update() -> #div amt /= 2",
             "update() -> #mul amt *= 2",
             "update() -> #set amt = 100",
-            "update() -> #doc -> replace tx with new tx",
-            // "update() -> #ops -> [#add, #div, #mul, #div] on tx.amt",
-            // "update() -> #ops -> [#add, #div, #mul, #div, #set] on diff fields",
+            "replaceRecord() -> replace half the tx with new tx",
+            // "update() ->  -> [#add, #div, #mul, #div] on tx.amt",
+            // "update() ->  -> [#add, #div, #mul, #div, #set] on diff fields",
 
         ]);
 
@@ -211,25 +211,21 @@ module {
         );
 
         let predefined_txs = Buffer.Buffer<Tx>(limit);
+        let tx_ids = Buffer.Buffer<Nat>(limit);
 
         for (i in Iter.range(0, limit - 1)) {
             let tx = new_tx(fuzz, principals);
             predefined_txs.add(tx);
         };
 
-        let defaultIndexName = "default_index";
-        let defaultIndexField = ("default_field", #Ascending);
-
-        let #ok(_) = txs.create_index(defaultIndexName, [defaultIndexField]);
-
         bench.runner(
             func(col, row) = switch (row) {
 
                 case ("(index intersection, -> array)") {
-                    index_intersection(txs, col, limit, predefined_txs, principals, candid_principals, principals_0_10, fuzz);
+                    index_intersection(txs, col, limit, predefined_txs, principals, candid_principals, principals_0_10, tx_ids, fuzz);
                 };
                 case ("(full scan, -> array)") {
-                    full_scan(txs, col, limit, predefined_txs, principals, candid_principals, principals_0_10);
+                    full_scan(txs, col, limit, predefined_txs, principals, candid_principals, principals_0_10, tx_ids);
                 };
                 case ("(skip_limit_pagination limit = 100, -> array") {
                     paginated_queries(txs, col, limit, predefined_txs, principals, candid_principals, principals_0_10, #Ascending, 100);
@@ -244,7 +240,17 @@ module {
         bench;
     };
 
-    func index_intersection(txs : ZenDB.Collection<Tx>, section : Text, limit : Nat, predefined_txs : Buffer.Buffer<Tx>, principals : [Principal], candid_principals : [ZenDB.Candid], principals_0_10 : [Principal], fuzz : Fuzz.Fuzzer) {
+    func index_intersection(
+        txs : ZenDB.Collection<Tx>,
+        section : Text,
+        limit : Nat,
+        predefined_txs : Buffer.Buffer<Tx>,
+        principals : [Principal],
+        candid_principals : [ZenDB.Candid],
+        principals_0_10 : [Principal],
+        tx_ids : Buffer.Buffer<Nat>,
+        fuzz : Fuzz.Fuzzer,
+    ) {
         switch (section) {
             case ("insert") {
                 // re-use the predefined txs
@@ -359,39 +365,36 @@ module {
             };
 
             case ("update() -> #add amt += 100") {
-                for (i in Iter.range(0, limit - 1)) {
-                    switch (txs.updateById(i, #ops([("tx.amt", #add(#Nat(100)))]))) {
-                        case (#ok(_)) Debug.print("Successfully updated tx " # debug_show i);
+                for (i in tx_ids.vals()) {
+                    switch (txs.updateById(i, ([("tx.amt", #add(#Nat(100)))]))) {
+                        case (#ok(_)) {};
                         case (#err(msg)) Debug.trap("Error updating tx: " # debug_show msg);
                     };
                 };
             };
             case ("update() -> #sub amt -= 100") {
-                for (i in Iter.range(0, limit - 1)) {
-                    let #ok(_) = txs.updateById(i, #ops([("tx.amt", #sub(#Nat(100)))]));
+                for (i in tx_ids.vals()) {
+                    let #ok(_) = txs.updateById(i, ([("tx.amt", #sub(#Nat(100)))]));
                 };
             };
             case ("update() -> #div amt /= 2") {
-                for (i in Iter.range(0, limit - 1)) {
-                    let #ok(_) = txs.updateById(i, #ops([("tx.amt", #div(#Nat(2)))]));
+                for (i in tx_ids.vals()) {
+                    let #ok(_) = txs.updateById(i, ([("tx.amt", #div(#Nat(2)))]));
                 };
             };
             case ("update() -> #mul amt *= 2") {
-                for (i in Iter.range(0, limit - 1)) {
-                    let #ok(_) = txs.updateById(i, #ops([("tx.amt", #mul(#Nat(2)))]));
+                for (i in tx_ids.vals()) {
+                    let #ok(_) = txs.updateById(i, ([("tx.amt", #mul(#Nat(2)))]));
                 };
             };
             case ("update() -> #set amt = 100") {
-                for (i in Iter.range(0, limit - 1)) {
-                    let #ok(_) = txs.updateById(i, #ops([("tx.amt", #set(#val(#Nat(100))))]));
+                for (i in tx_ids.vals()) {
+                    let #ok(_) = txs.updateById(i, ([("tx.amt", #set(#Nat(100)))]));
                 };
             };
-            case ("update() -> #doc -> replace tx with new tx") {
-                for (i in Iter.range(0, limit - 1)) {
-                    let #ok(_) = txs.updateById(
-                        i,
-                        #doc(new_tx(fuzz, principals)),
-                    );
+            case ("replaceRecord() -> replace half the tx with new tx") {
+                for (i in Itertools.take(tx_ids.vals(), limit / 2)) {
+                    let #ok(_) = txs.replaceRecord(i, new_tx(fuzz, principals));
                 };
             };
 
@@ -401,7 +404,16 @@ module {
         };
     };
 
-    func full_scan(txs : ZenDB.Collection<Tx>, section : Text, limit : Nat, predefined_txs : Buffer.Buffer<Tx>, principals : [Principal], candid_principals : [ZenDB.Candid], principals_0_10 : [Principal]) {
+    func full_scan(
+        txs : ZenDB.Collection<Tx>,
+        section : Text,
+        limit : Nat,
+        predefined_txs : Buffer.Buffer<Tx>,
+        principals : [Principal],
+        candid_principals : [ZenDB.Candid],
+        principals_0_10 : [Principal],
+        tx_ids : Buffer.Buffer<Nat>,
+    ) {
         switch (section) {
 
             case ("insert") {
@@ -427,7 +439,8 @@ module {
 
                 for (i in Iter.range(0, limit - 1)) {
                     let tx = predefined_txs.get(i);
-                    let #ok(_) = txs.insert(tx);
+                    let #ok(id) = txs.insert(tx);
+                    tx_ids.add(id);
                 };
             };
 
@@ -556,7 +569,7 @@ module {
             case ("update() -> #div amt /= 2") {};
             case ("update() -> #mul amt *= 2") {};
             case ("update() -> #set amt = 100") {};
-            case ("update() -> #doc -> replace tx with new tx") {};
+            case ("replaceRecord() -> replace half the tx with new tx") {};
 
             case (_) {
                 Debug.trap("Should be unreachable:\n row = zenDB (full scan, -> array) and col = \"" # debug_show section # "\"");
@@ -566,7 +579,17 @@ module {
 
     };
 
-    func paginated_queries(txs : ZenDB.Collection<Tx>, section : Text, limit : Nat, predefined_txs : Buffer.Buffer<Tx>, principals : [Principal], candid_principals : [ZenDB.Candid], principals_0_10 : [Principal], sort_direction : ZenDB.SortDirection, pagination_limit : Nat) {
+    func paginated_queries(
+        txs : ZenDB.Collection<Tx>,
+        section : Text,
+        limit : Nat,
+        predefined_txs : Buffer.Buffer<Tx>,
+        principals : [Principal],
+        candid_principals : [ZenDB.Candid],
+        principals_0_10 : [Principal],
+        sort_direction : ZenDB.SortDirection,
+        pagination_limit : Nat,
+    ) {
 
         func skip_limit_paginated_query(db_query : ZenDB.QueryBuilder) {
             ignore db_query.Limit(pagination_limit);
