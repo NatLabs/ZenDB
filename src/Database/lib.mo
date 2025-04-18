@@ -65,7 +65,7 @@ module {
             };
         };
 
-        func validate_candify<A>(schema : T.Schema, external_candify : T.Candify<A>) : Result<T.InternalCandify<A>, Text> {
+        func validate_candify<A>(collection_name : Text, schema : T.Schema, external_candify : T.Candify<A>) : Result<T.InternalCandify<A>, Text> {
 
             let default_candid_value : T.Candid = switch (Schema.generate_default_value(schema)) {
                 case (#ok(default_candid)) default_candid;
@@ -88,7 +88,7 @@ module {
                 };
             };
 
-            let internal_candify = convert_to_internal_candify(external_candify);
+            let internal_candify : T.InternalCandify<A> = convert_to_internal_candify<A>(collection_name, external_candify);
 
             #ok(internal_candify);
 
@@ -96,7 +96,7 @@ module {
 
         public func create_collection<Record>(name : Text, schema : T.Schema, external_candify : T.Candify<Record>) : Result<Collection<Record>, Text> {
 
-            let internal_candify : T.InternalCandify<Record> = switch (validate_candify(schema, external_candify)) {
+            let internal_candify : T.InternalCandify<Record> = switch (validate_candify(name, schema, external_candify)) {
                 case (#ok(internal_candify)) internal_candify;
                 case (#err(msg)) return #err(msg);
             };
@@ -126,7 +126,7 @@ module {
                         Collection.Collection<Record>(
                             name,
                             stable_collection,
-                            convert_to_internal_candify(external_candify),
+                            convert_to_internal_candify(name, external_candify),
                         )
                     );
                 };
