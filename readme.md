@@ -13,7 +13,7 @@ A single canister, document database that natively supports candid encoding, ins
 - Importing and initializing the ZenDB library
 
 ```motoko
-import ZenDB "zendb";
+import ZenDB "mo:zendb";
 
 stable var zendb_sstore = ZenDB.init_stable_store();
 zendb_sstore := ZenDB.upgrade(zendb_sstore);
