@@ -132,7 +132,15 @@ module {
             case (#Null, #Null) #ok;
             case (#Text, #Text(_)) #ok;
             case (#Nat, #Nat(_)) #ok;
+            case (#Nat8, #Nat8(_)) #ok;
+            case (#Nat16, #Nat16(_)) #ok;
+            case (#Nat32, #Nat32(_)) #ok;
+            case (#Nat64, #Nat64(_)) #ok;
             case (#Int, #Int(_)) #ok;
+            case (#Int8, #Int8(_)) #ok;
+            case (#Int16, #Int16(_)) #ok;
+            case (#Int32, #Int32(_)) #ok;
+            case (#Int64, #Int64(_)) #ok;
             case (#Float, #Float(_)) #ok;
             case (#Bool, #Bool(_)) #ok;
             case (#Principal, #Principal(_)) #ok;

@@ -194,6 +194,7 @@ func query_tests(texts : ZenDB.Collection<Data>) {
                 (7, { value = "c" }),
             ]);
 
+            //! Executes very slowly
             // assert texts.search(
             //     QueryBuilder().Where("value", #Not(#In([#Text("a"), #Text("b"), #Text("c")])))
             // ) == #ok([

@@ -28,10 +28,6 @@ module ByteUtils {
         };
     };
 
-    func buffer_add_all<A>(buffer : B.Buffer<A>, iter : Iter.Iter<A>) {
-        for (elem in iter) { buffer.add(elem) };
-    };
-
     public type BufferLike<A> = {
         add : (A) -> ();
         get : (Nat) -> A;

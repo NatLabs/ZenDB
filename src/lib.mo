@@ -57,6 +57,8 @@ module {
     public type ZenQueryLang = ZT.ZenQueryLang;
     public type ZqlOperators = ZT.ZqlOperators;
 
+    public let Types = ZT;
+
     public module Schema {
         public func Tuple(a : Schema, b : Schema) : Schema {
             #Tuple([a, b]);

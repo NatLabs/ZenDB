@@ -179,6 +179,24 @@ module {
 
     };
 
+    func utf8_plus_1(text : Text) : [Nat8] {
+        let utf8 = Text.encodeUtf8(text);
+        let bytes = Blob.toArray(utf8);
+        Array.map(bytes, func(b : Nat8) : Nat8 { b + 1 });
+    };
+
+    func arbitrary_bytes_to_utf8_plus_1(bytes : [Nat8]) : [Nat8] {
+        var t = "";
+
+        for (i in Itertools.range(0, bytes.size())) {
+            let byte = bytes[i];
+            let char = byte |> Nat8.toNat(_) |> Nat32.fromNat(_) |> Char.fromNat32(_);
+            t #= Char.toText(char);
+        };
+
+        utf8_plus_1(t);
+    };
+
     func encode(buffer : Buffer.Buffer<Nat8>, candid : CandidQuery) {
 
         switch (candid) {
@@ -193,7 +211,7 @@ module {
                 buffer.add(OrchidTypeCode.Principal);
 
                 let blob = Principal.toBlob(p);
-                let bytes = Blob.toArray(blob);
+                let bytes = arbitrary_bytes_to_utf8_plus_1(Blob.toArray(blob));
 
                 ByteUtils.Buffer.addBytes(buffer, bytes.vals());
 
@@ -201,8 +219,7 @@ module {
 
             };
             case (#Text(t)) {
-                let utf8 = Text.encodeUtf8(t);
-                let bytes = Blob.toArray(utf8);
+                let bytes = utf8_plus_1(t);
                 // let size = Nat8.fromNat(utf8.size()); -> the size will throw of the comparison, because text should be compared in lexicographic order and not by size
                 buffer.add(OrchidTypeCode.Text);
 
@@ -217,7 +234,7 @@ module {
             };
             case (#Blob(b)) {
 
-                let bytes = Blob.toArray(b);
+                let bytes = arbitrary_bytes_to_utf8_plus_1(Blob.toArray(b));
 
                 buffer.add(OrchidTypeCode.Blob);
 
