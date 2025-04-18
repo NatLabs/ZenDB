@@ -59,9 +59,8 @@ let TxSchema : ZenDB.Schema = #Record([
 ]);
 
 let candify_tx = {
-    from_blob = func(blob : Blob) : Tx {
-        let ?c : ?Tx = from_candid (blob);
-        c;
+    from_blob = func(blob : Blob) : ?Tx {
+        from_candid (blob);
     };
     to_blob = func(c : Tx) : Blob { to_candid (c) };
 };

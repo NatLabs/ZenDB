@@ -36,7 +36,7 @@ import Logger "../Logger";
 
 module {
 
-    public type Candify<T> = ZT.Candify<T>;
+    public type InternalCandify<T> = ZT.InternalCandify<T>;
     public type Map<K, V> = Map.Map<K, V>;
     public type Set<K> = Set.Set<K>;
     let { thash; bhash } = Map;

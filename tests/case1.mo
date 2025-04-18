@@ -27,17 +27,15 @@ type User2 = {
 };
 
 let candify_user = {
-    from_blob = func(blob : Blob) : User {
-        let ?c : ?User = from_candid (blob);
-        c;
+    from_blob = func(blob : Blob) : ?User {
+        from_candid (blob);
     };
     to_blob = func(c : User) : Blob { to_candid (c) };
 };
 
 let candify_user2 = {
-    from_blob = func(blob : Blob) : User2 {
-        let ?c : ?User2 = from_candid (blob);
-        c;
+    from_blob = func(blob : Blob) : ?User2 {
+        from_candid (blob);
     };
     to_blob = func(c : User2) : Blob { to_candid (c) };
 };

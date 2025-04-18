@@ -110,10 +110,7 @@ module {
 
     public type Candid = Serde.Candid;
 
-    public type Candify<A> = {
-        from_blob : Blob -> A;
-        to_blob : A -> Blob;
-    };
+    public type Candify<A> = ZT.Candify<A>;
 
     // func eq_candid(a : Candid, b : Candid) : Bool {
     //     cmp_candid(a, b) == 0;

@@ -64,7 +64,7 @@ module {
     public type State<R> = T.State<R>;
     public type ZenQueryLang = T.ZenQueryLang;
 
-    public type Candify<A> = T.Candify<A>;
+    public type InternalCandify<A> = T.InternalCandify<A>;
 
     public type StableCollection = T.StableCollection;
 

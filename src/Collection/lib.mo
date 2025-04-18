@@ -81,7 +81,7 @@ module {
     public type State<R> = ZT.State<R>;
     public type ZenQueryLang = ZT.ZenQueryLang;
 
-    public type Candify<A> = ZT.Candify<A>;
+    public type InternalCandify<A> = ZT.InternalCandify<A>;
 
     public type StableCollection = ZT.StableCollection;
 
@@ -91,7 +91,9 @@ module {
     let MAX_QUERY_INSTRUCTIONS : Nat64 = 5_000_000_000;
     let MAX_UPDATE_INSTRUCTIONS : Nat64 = 40_000_000_000;
 
-    public class Collection<Record>(collection_name : Text, collection : StableCollection, blobify : ZT.Candify<Record>) = self {
+    public class Collection<Record>(collection_name : Text, collection : StableCollection, blobify : ZT.InternalCandify<Record>) = self {
+
+        
 
         public func name() : Text = collection_name;
         public func size() : Nat = MemoryBTree.size(collection.main);

@@ -84,11 +84,8 @@ let candify_data = {
     to_blob = func(data : SupportedIndexTypes) : Blob {
         to_candid (data);
     };
-    from_blob = func(blob : Blob) : SupportedIndexTypes {
-        switch (from_candid (blob) : ?SupportedIndexTypes) {
-            case (?data) data;
-            case (_) Debug.trap("Failed to decode SupportedIndexTypes");
-        };
+    from_blob = func(blob : Blob) : ?SupportedIndexTypes {
+        from_candid (blob);
     };
 };
 
@@ -276,11 +273,8 @@ suite(
             to_blob = func(user : User) : Blob {
                 to_candid (user);
             };
-            from_blob = func(blob : Blob) : User {
-                switch (from_candid (blob) : ?User) {
-                    case (?user) user;
-                    case (_) Debug.trap("Failed to decode user");
-                };
+            from_blob = func(blob : Blob) : ?User {
+                from_candid (blob);
             };
         };
 
@@ -353,11 +347,8 @@ suite(
 //             to_blob = func(data : TestRecord) : Blob {
 //                 to_candid (data);
 //             };
-//             from_blob = func(blob : Blob) : TestRecord {
-//                 switch (from_candid (blob) : ?TestRecord) {
-//                     case (?data) data;
-//                     case (_) Debug.trap("Failed to decode TestRecord");
-//                 };
+//             from_blob = func(blob : Blob) : ?TestRecord {
+//                 from_candid (blob)
 //             };
 //         };
 
@@ -545,11 +536,8 @@ suite(
 //             to_blob = func(data : CompositeRecord) : Blob {
 //                 to_candid (data);
 //             };
-//             from_blob = func(blob : Blob) : CompositeRecord {
-//                 switch (from_candid (blob) : ?CompositeRecord) {
-//                     case (?data) data;
-//                     case (_) Debug.trap("Failed to decode CompositeRecord");
-//                 };
+//             from_blob = func(blob : Blob) : ?CompositeRecord {
+//                  from_candid (blob)
 //             };
 //         };
 
@@ -646,11 +634,8 @@ suite(
 //             to_blob = func(data : BoundaryRecord) : Blob {
 //                 to_candid (data);
 //             };
-//             from_blob = func(blob : Blob) : BoundaryRecord {
-//                 switch (from_candid (blob) : ?BoundaryRecord) {
-//                     case (?data) data;
-//                     case (_) Debug.trap("Failed to decode BoundaryRecord");
-//                 };
+//             from_blob = func(blob : Blob) : ?BoundaryRecord {
+//                  from_candid (blob)
 //             };
 //         };
 

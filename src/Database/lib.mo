@@ -29,8 +29,10 @@ import Int8Cmp "mo:memory-collection/TypeUtils/Int8Cmp";
 import Collection "../Collection";
 import Utils "../Utils";
 import T "../Types";
+import Schema "../Collection/Schema";
 
 import StableDatabase "StableDatabase";
+
 module {
 
     public type Candify<T> = T.Candify<T>;
@@ -44,23 +46,68 @@ module {
     public type RevIter<A> = RevIter.RevIter<A>;
 
     public type StableCollection = T.StableCollection;
-
-    // public type ZenDB = {
-    //     collections : Map<Text, Collection>;
-    // };
-
     public type Collection<Record> = Collection.Collection<Record>;
 
     public class Database(zendb : T.ZenDB) = self {
 
-        public func create_collection<Record>(name : Text, schema : T.Schema, blobify : T.Candify<Record>) : Result<Collection<Record>, Text> {
+        func convert_to_internal_candify<A>(collection_name : Text, external_candify : T.Candify<A>) : T.InternalCandify<A> {
+            {
+                from_blob = func(blob : Blob) : A {
+                    switch (external_candify.from_blob(blob)) {
+                        case (?record) record;
+                        case (null) Debug.trap("
+                        Could not convert candid blob (" # debug_show blob # ") to motoko using the '" # collection_name # "' collection's schema.
+                        If the schema and the candify encoding function are correct, then the blob might be corrupted or not a valid candid blob.
+                        Please report this issue to the developers by creating a new issue on the GitHub repository.  ");
+                    };
+                };
+                to_blob = external_candify.to_blob;
+            };
+        };
+
+        func validate_candify<A>(schema : T.Schema, external_candify : T.Candify<A>) : Result<T.InternalCandify<A>, Text> {
+
+            let default_candid_value : T.Candid = switch (Schema.generate_default_value(schema)) {
+                case (#ok(default_candid)) default_candid;
+                case (#err(msg)) return #err("Failed to generate default value for schema for candify validation: " # msg);
+            };
+
+            let default_candid_blob = switch (Serde.Candid.encodeOne(default_candid_value, null)) {
+                case (#ok(blob)) blob;
+                case (#err(msg)) return #err("Failed to encode generated schema record to Candid blob using serde: " # msg);
+            };
+
+            let opt_deserialized_candid_value = external_candify.from_blob(default_candid_blob);
+
+            switch (opt_deserialized_candid_value) {
+                case (?deserialized_candid_value) {}; // successful round trip encoding
+                case (null) {
+                    return #err("Failed to deserialize the default candid value. There are a few reasons why this might happen:
+                        - The motoko type does not match the given schema: " # debug_show schema # "
+                        - The candify function uses a different encoding format other than candid");
+                };
+            };
+
+            let internal_candify = convert_to_internal_candify(external_candify);
+
+            #ok(internal_candify);
+
+        };
+
+        public func create_collection<Record>(name : Text, schema : T.Schema, external_candify : T.Candify<Record>) : Result<Collection<Record>, Text> {
+
+            let internal_candify : T.InternalCandify<Record> = switch (validate_candify(schema, external_candify)) {
+                case (#ok(internal_candify)) internal_candify;
+                case (#err(msg)) return #err(msg);
+            };
+
             switch (StableDatabase.create_collection(zendb, name, schema)) {
                 case (#ok(stable_collection)) {
                     #ok(
                         Collection.Collection<Record>(
                             name,
                             stable_collection,
-                            blobify,
+                            internal_candify,
                         )
                     );
                 };
@@ -70,7 +117,7 @@ module {
 
         public func get_collection<Record>(
             name : Text,
-            blobify : T.Candify<Record>,
+            external_candify : T.Candify<Record>,
         ) : Result<Collection<Record>, Text> {
 
             switch (StableDatabase.get_collection(zendb, name)) {
@@ -79,7 +126,7 @@ module {
                         Collection.Collection<Record>(
                             name,
                             stable_collection,
-                            blobify,
+                            convert_to_internal_candify(external_candify),
                         )
                     );
                 };

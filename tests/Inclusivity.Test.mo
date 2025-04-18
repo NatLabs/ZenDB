@@ -90,25 +90,22 @@ type EdgeDoc = {
 
 // Create candify functions
 let candify_numeric = {
-    from_blob = func(blob : Blob) : NumericDoc {
-        let ?doc : ?NumericDoc = from_candid (blob);
-        doc;
+    from_blob = func(blob : Blob) : ?NumericDoc {
+        from_candid (blob);
     };
     to_blob = func(doc : NumericDoc) : Blob { to_candid (doc) };
 };
 
 let candify_text = {
-    from_blob = func(blob : Blob) : TextDoc {
-        let ?doc : ?TextDoc = from_candid (blob);
-        doc;
+    from_blob = func(blob : Blob) : ?TextDoc {
+        from_candid (blob);
     };
     to_blob = func(doc : TextDoc) : Blob { to_candid (doc) };
 };
 
 let candify_edge = {
-    from_blob = func(blob : Blob) : EdgeDoc {
-        let ?doc : ?EdgeDoc = from_candid (blob);
-        doc;
+    from_blob = func(blob : Blob) : ?EdgeDoc {
+        from_candid (blob);
     };
     to_blob = func(doc : EdgeDoc) : Blob { to_candid (doc) };
 };

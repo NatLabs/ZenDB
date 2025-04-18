@@ -460,4 +460,77 @@ module {
 
         return ?schema;
     };
+
+    public func generate_default_value(schema : Schema) : Result<Candid, Text> {
+        let candid : Candid = switch (schema) {
+            case (#Empty) #Empty;
+            case (#Null) #Null;
+            case (#Text) #Text("");
+            case (#Nat) #Nat(0);
+            case (#Nat8) #Nat8(0);
+            case (#Nat16) #Nat16(0);
+            case (#Nat32) #Nat32(0);
+            case (#Nat64) #Nat64(0);
+            case (#Int) #Int(0);
+            case (#Int8) #Int8(0);
+            case (#Int16) #Int16(0);
+            case (#Int32) #Int32(0);
+            case (#Int64) #Int64(0);
+            case (#Float) #Float(0.0);
+            case (#Bool) #Bool(false);
+            case (#Principal) #Principal(Principal.fromBlob("\04")); // anonymous principal
+            case (#Blob) #Blob("");
+            case (#Option(inner)) switch (generate_default_value(inner)) {
+                case (#ok(value)) #Option(value);
+                case (#err(err)) return #err(err);
+            };
+            case (#Array(inner)) #Array([]);
+            case (#Tuple(tuples)) {
+
+                let buffer = Buffer.Buffer<Candid>(tuples.size());
+
+                for (i in Itertools.range(0, tuples.size())) {
+                    let tuple_type = tuples[i];
+                    let value = switch (generate_default_value(tuple_type)) {
+                        case (#ok(value)) value;
+                        case (#err(err)) return #err(err);
+                    };
+
+                    buffer.add(value);
+                };
+
+                #Tuple(Buffer.toArray(buffer))
+
+            };
+            case (#Record(fields) or #Map(fields)) {
+
+                let buffer = Buffer.Buffer<(Text, Candid)>(fields.size());
+                for (i in Itertools.range(0, fields.size())) {
+                    let (name, record_type) = fields[i];
+                    let value = switch (generate_default_value(record_type)) {
+                        case (#ok(value)) value;
+                        case (#err(err)) return #err(err);
+                    };
+
+                    buffer.add((name, value));
+                };
+
+                #Record(Buffer.toArray(buffer));
+
+            };
+
+            case (#Variant(variants)) {
+                let (name, variant_type) = variants[0];
+
+                switch (generate_default_value(variant_type)) {
+                    case (#ok(value)) #Variant((name, value));
+                    case (#err(err)) return #err(err);
+                };
+            };
+
+            case (_) return #err("generate_default_value: unexpected schema type " # debug_show (schema));
+        };
+
+        #ok(candid);
+    };
 };

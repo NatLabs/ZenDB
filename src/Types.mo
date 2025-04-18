@@ -46,9 +46,15 @@ module T {
     public type Interval = (Nat, Nat);
 
     public type Candify<A> = {
+        from_blob : Blob -> ?A;
+        to_blob : A -> Blob;
+    };
+
+    public type InternalCandify<A> = {
         from_blob : Blob -> A;
         to_blob : A -> Blob;
     };
+
     public type Map<K, V> = Map.Map<K, V>;
     public type Set<K> = Set.Set<K>;
     let { thash; bhash } = Map;

@@ -69,7 +69,7 @@ module CollectionUtils {
     public type State<R> = T.State<R>;
     public type ZenQueryLang = T.ZenQueryLang;
 
-    public type Candify<A> = T.Candify<A>;
+    public type InternalCandify<A> = T.InternalCandify<A>;
 
     public type StableCollection = T.StableCollection;
 
@@ -140,7 +140,7 @@ module CollectionUtils {
 
     };
 
-    public func lookup_record<Record>(collection : T.StableCollection, blobify : T.Candify<Record>, id : Nat) : Record {
+    public func lookup_record<Record>(collection : T.StableCollection, blobify : T.InternalCandify<Record>, id : Nat) : Record {
 
         let ?record_details = MemoryBTree.get(collection.main, get_main_btree_utils(), id);
         let record = blobify.from_blob(record_details);

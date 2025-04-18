@@ -64,11 +64,8 @@ actor class Backend() {
     ]);
 
     let CandifyBlock : ZenDB.Candify<Block> = {
-        from_blob = func(blob : Blob) : Block {
-            switch (from_candid (blob) : ?Block) {
-                case (?block) block;
-                case (null) Debug.trap("failed to decode block from blob");
-            };
+        from_blob = func(blob : Blob) : ?Block {
+            from_candid (blob);
         };
         to_blob = func(block : Block) : Blob {
             to_candid (block);

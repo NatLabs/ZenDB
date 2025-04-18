@@ -69,10 +69,7 @@ let DocSchema : ZenDB.Schema = #Record([(
 )]);
 
 let data_type_to_candid : ZenDB.Candify<Doc> = {
-    from_blob = func(blob : Blob) : Doc {
-        let ?c : ?Doc = from_candid (blob);
-        c;
-    };
+    from_blob = func(blob : Blob) : ?Doc { from_candid (blob) };
     to_blob = func(c : Doc) : Blob { to_candid (c) };
 };
 

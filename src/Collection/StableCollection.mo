@@ -83,7 +83,7 @@ module {
     public type State<R> = ZT.State<R>;
     public type ZenQueryLang = ZT.ZenQueryLang;
 
-    public type Candify<A> = ZT.Candify<A>;
+    public type InternalCandify<A> = ZT.InternalCandify<A>;
 
     public type StableCollection = ZT.StableCollection;
 
@@ -975,7 +975,7 @@ module {
         };
     };
 
-    public func id_to_record_iter<Record>(collection : StableCollection, blobify : Candify<Record>, iter : Iter<Nat>) : Iter<(Nat, Record)> {
+    public func id_to_record_iter<Record>(collection : StableCollection, blobify : InternalCandify<Record>, iter : Iter<Nat>) : Iter<(Nat, Record)> {
         Iter.map<Nat, (Nat, Record)>(
             iter,
             func(id : Nat) : (Nat, Record) {

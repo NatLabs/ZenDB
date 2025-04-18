@@ -41,11 +41,8 @@ let candify_data = {
     to_blob = func(data : Data) : Blob {
         to_candid (data);
     };
-    from_blob = func(blob : Blob) : Data {
-        switch (from_candid (blob) : ?Data) {
-            case (?data) data;
-            case (_) Debug.trap("Failed to decode data");
-        };
+    from_blob = func(blob : Blob) : ?Data {
+        from_candid (blob);
     };
 };
 
