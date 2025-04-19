@@ -37,10 +37,6 @@ module {
         var _direction : PaginationDirection = #Forward;
         var sort_by : ?(Text, T.SortDirection) = null; // only support sorting by one field for now
 
-        public func Where(key : Text, op : ZqlOperators) : QueryBuilder {
-            return And(key, op);
-        };
-
         func update_query(new_is_and : Bool) {
             let old_is_and = is_and;
 
@@ -166,6 +162,18 @@ module {
                     buffer.add(#Operation(key, op));
                 };
             };
+        };
+
+        public func RawQuery(query_lang : T.ZenQueryLang) : QueryBuilder {
+            update_query(true);
+            buffer.add(query_lang);
+
+            self;
+
+        };
+
+        public func Where(key : Text, op : ZqlOperators) : QueryBuilder {
+            return And(key, op);
         };
 
         public func And(key : Text, op : ZqlOperators) : QueryBuilder {
@@ -304,7 +312,10 @@ module {
         func handle_operation(field : Text, op : T.ZqlOperators) : T.Result<T.ZenQueryLang, Text> {
             // Debug.print(debug_show (Set.toArray(collection.schema_keys_set)));
             let ?candid_type = Schema.get_nested_candid_type(collection.schema, field) else {
-                Logger.log(collection.logger, "Field '" # field # "' not found in schema");
+                Logger.lazyLog(
+                    collection.logger,
+                    func() = "Field '" # field # "' not found in schema",
+                );
                 return #err("Field '" # field # "' not found in schema");
             };
 

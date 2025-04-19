@@ -253,10 +253,7 @@ type CompositeDoc = {
 
 // Create candify function
 let candify_composite = {
-    from_blob = func(blob : Blob) : CompositeDoc {
-        let ?doc : ?CompositeDoc = from_candid (blob);
-        doc;
-    };
+    from_blob = func(blob : Blob) : ?CompositeDoc { from_candid (blob) };
     to_blob = func(doc : CompositeDoc) : Blob { to_candid (doc) };
 };
 

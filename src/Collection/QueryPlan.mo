@@ -47,18 +47,18 @@ module {
         cursor_record : ?(Nat, Candid.Candid),
         cursor_map : CandidMap.CandidMap,
     ) : QueryPlan {
-        Logger.log(
+        Logger.lazyLog(
             collection.logger,
-            "QueryPlan.query_plan_from_and_operation(): Creating query plan for AND operation with " #
+            func() = "QueryPlan.query_plan_from_and_operation(): Creating query plan for AND operation with " #
             Nat.toText(query_statements.size()) # " statements",
         );
 
         let requires_sorting : Bool = Option.isSome(sort_column);
         if (requires_sorting) {
             let (sort_field, direction) = Option.unwrap(sort_column);
-            Logger.log(
+            Logger.lazyLog(
                 collection.logger,
-                "QueryPlan.query_plan_from_and_operation(): Sorting required on field '" #
+                func() = "QueryPlan.query_plan_from_and_operation(): Sorting required on field '" #
                 sort_field # "' in " # debug_show direction # " order",
             );
         };
@@ -94,9 +94,9 @@ module {
         for (query_statement in query_statements.vals()) {
             switch (query_statement) {
                 case (#Operation(field, op)) {
-                    Logger.log(
+                    Logger.lazyLog(
                         collection.logger,
-                        "QueryPlan.query_plan_from_and_operation(): Adding simple operation on field '" #
+                        func() = "QueryPlan.query_plan_from_and_operation(): Adding simple operation on field '" #
                         field # "': " # debug_show op,
                     );
                     simple_operations.add((field, op));
@@ -111,9 +111,9 @@ module {
             switch (query_statement) {
 
                 case (#Or(nested_or_operations)) {
-                    Logger.log(
+                    Logger.lazyLog(
                         collection.logger,
-                        "QueryPlan.query_plan_from_and_operation(): Processing nested OR operation with " #
+                        func() = "QueryPlan.query_plan_from_and_operation(): Processing nested OR operation with " #
                         Nat.toText(nested_or_operations.size()) # " statements",
                     );
 
@@ -135,6 +135,16 @@ module {
             };
         };
 
+        // consider query: (0 < x < 5 or y = 6) and (x = 3)
+        // we want to reduce the query so the scan size of the #Or operations are smaller
+        // so apply the #And operations on the #Or operations to get:
+        //  -> (0 < x < 5 and x = 3) or (y = 6 and x = 3)
+        // which then can be reduced to:
+        //  -> (x = 3) or (y = 6 and x = 3 )
+        //
+        // in terms of size of each operation, the first statement has been reduced from scanning a range of 5 values to only scanning 1 value in the btree
+        //
+        // the actual feature for reducing the query is implemented in the query_plan_from_or_operation function where the parent_simple_and_operations from this function is passed in. Here we just remove dangling #And operations that will be applied to the #Or operations, by leaving scans empty
         // consider query: (0 < x < 5 or y = 6) and (x = 3)
         // we want to reduce the query so the scan size of the #Or operations are smaller
         // so apply the #And operations on the #Or operations to get:
@@ -167,7 +177,11 @@ module {
                 subplans = Buffer.toArray(sub_query_plans);
                 simple_operations = [];
                 scans = [];
+
+                // if there where #Operation types in the operations
             };
+
+            // if there where #Operation types in the operations
         };
 
         // if there where #Operation types in the operations
@@ -400,13 +414,16 @@ module {
         cursor_record : ?(Nat, Candid.Candid),
         cursor_map : CandidMap.CandidMap,
     ) : QueryPlan {
-        Logger.info(collection.logger, "QueryPlan.create_query_plan(): Creating query plan");
+        Logger.lazyInfo(
+            collection.logger,
+            func() = "QueryPlan.create_query_plan(): Creating query plan",
+        );
 
         let query_plan = switch (db_query) {
             case (#And(operations)) {
-                Logger.log(
+                Logger.lazyLog(
                     collection.logger,
-                    "QueryPlan.create_query_plan(): Processing top-level AND query with " #
+                    func() = "QueryPlan.create_query_plan(): Processing top-level AND query with " #
                     Nat.toText(operations.size()) # " operations",
                 );
 
@@ -419,9 +436,9 @@ module {
                 );
             };
             case (#Or(operations)) {
-                Logger.log(
+                Logger.lazyLog(
                     collection.logger,
-                    "QueryPlan.create_query_plan(): Processing top-level OR query with " #
+                    func() = "QueryPlan.create_query_plan(): Processing top-level OR query with " #
                     Nat.toText(operations.size()) # " operations",
                 );
 
@@ -435,12 +452,18 @@ module {
                 );
             };
             case (_) {
-                Logger.error(collection.logger, "QueryPlan.create_query_plan(): Unsupported query type: " # debug_show db_query);
+                Logger.lazyError(
+                    collection.logger,
+                    func() = "QueryPlan.create_query_plan(): Unsupported query type: " # debug_show db_query,
+                );
                 Debug.trap("create_query_plan(): Unsupported query type");
             };
         };
 
-        Logger.info(collection.logger, "QueryPlan.create_query_plan(): Query plan created successfully");
+        Logger.lazyInfo(
+            collection.logger,
+            func() = "QueryPlan.create_query_plan(): Query plan created successfully",
+        );
         query_plan;
     };
 

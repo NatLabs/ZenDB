@@ -125,9 +125,13 @@ module {
         let is_compatible = Schema.is_schema_backward_compatible(collection.schema, schema);
         if (not is_compatible) return #err("Schema is not backward compatible");
 
-        collection.schema := schema;
-        collection.formatted_schema := Candid.formatCandidType([schema], null)[0];
-        Logger.info(collection.logger, "Updating schema to: " # debug_show collection.formatted_schema);
+        let formatted_schema = Candid.formatCandidType([schema], null)[0];
+
+        collection.schema := formatted_schema;
+        Logger.lazyInfo(
+            collection.logger,
+            func() = "Updating schema to: " # debug_show formatted_schema,
+        );
         #ok;
     };
 
@@ -166,18 +170,26 @@ module {
 
         switch (Map.get(collection.indexes, thash, index_name)) {
             case (?_) {
-                // doesn't fail if index already exists, just returns ok, because this is likely to be called in the top level actor block and will be executed multiple times during upgrades
-                Logger.info(collection.logger, "Index '" # index_name # "' already exists");
+                Logger.lazyInfo(
+                    collection.logger,
+                    func() = "Index '" # index_name # "' already exists",
+                );
                 return #ok();
             };
             case (null) {};
         };
 
-        Logger.info(collection.logger, "Creating index '" # index_name # "' with key details: " # debug_show index_key_details);
+        Logger.lazyInfo(
+            collection.logger,
+            func() = "Creating index '" # index_name # "' with key details: " # debug_show index_key_details,
+        );
 
         let index_data : MemoryBTree.StableMemoryBTree = switch (Vector.removeLast(collection.freed_btrees)) {
             case (?btree) {
-                Logger.log(collection.logger, "Using recycled BTree for index: " # index_name);
+                Logger.lazyLog(
+                    collection.logger,
+                    func() = "Using recycled BTree for index: " # index_name,
+                );
                 btree;
             };
             case (null) MemoryBTree.new(?C.DEFAULT_BTREE_ORDER);
@@ -190,7 +202,10 @@ module {
         };
 
         ignore Map.put<Text, Index>(collection.indexes, thash, index_name, index);
-        Logger.info(collection.logger, "Successfully created index: " # index_name);
+        Logger.lazyInfo(
+            collection.logger,
+            func() = "Successfully created index: " # index_name,
+        );
 
         #ok();
     };
@@ -236,7 +251,10 @@ module {
         indexes : Buffer.Buffer<Index>,
         entries : Iter<(Nat, Blob)>,
     ) : Result<(), Text> {
-        Logger.info(collection.logger, "Populating " # debug_show indexes.size() # " indexes");
+        Logger.lazyInfo(
+            collection.logger,
+            func() = "Populating " # debug_show indexes.size() # " indexes",
+        );
 
         var count = 0;
         for ((id, candid_blob) in entries) {
@@ -246,7 +264,10 @@ module {
             for (index in indexes.vals()) {
                 switch (insert_into_index(collection, index, id, candid_map)) {
                     case (#err(err)) {
-                        Logger.error(collection.logger, "Failed to insert into index '" # index.name # "': " # err);
+                        Logger.lazyError(
+                            collection.logger,
+                            func() = "Failed to insert into index '" # index.name # "': " # err,
+                        );
                         return #err(err);
                     };
                     case (#ok(_)) {};
@@ -255,7 +276,10 @@ module {
             count += 1;
         };
 
-        Logger.info(collection.logger, "Successfully populated indexes with " # debug_show count # " records");
+        Logger.lazyInfo(
+            collection.logger,
+            func() = "Successfully populated indexes with " # debug_show count # " records",
+        );
         #ok();
     };
 
@@ -289,19 +313,28 @@ module {
         index_names : [Text],
     ) : Result<(), Text> {
 
-        Logger.info(collection.logger, "Starting to populate indexes: " # debug_show index_names);
+        Logger.lazyInfo(
+            collection.logger,
+            func() = "Starting to populate indexes: " # debug_show index_names,
+        );
         let indexes = Buffer.Buffer<Index>(index_names.size());
 
         for (index_name in index_names.vals()) {
             let ?index = Map.get(collection.indexes, thash, index_name) else {
-                Logger.error(collection.logger, "Index '" # index_name # "' does not exist");
+                Logger.lazyError(
+                    collection.logger,
+                    func() = "Index '" # index_name # "' does not exist",
+                );
                 return #err("Index '" # index_name # "' does not exist");
             };
 
             indexes.add(index);
         };
 
-        Logger.log(collection.logger, "Collected " # debug_show indexes.size() # " indexes to populate");
+        Logger.lazyLog(
+            collection.logger,
+            func() = "Collected " # debug_show indexes.size() # " indexes to populate",
+        );
 
         internal_populate_indexes(
             collection,
@@ -372,18 +405,79 @@ module {
         index_name : Text,
     ) : Result<(), Text> {
         Logger.info(collection.logger, "Deleting index: " # index_name);
+
+        // public func async_populate_indexes(
+        //     collection : StableCollection,
+        //     _main_btree_utils : BTreeUtils<Nat, Blob>,
+        //     indexes_key_details : [[Text]],
+        //     opt_batch_size : ?Nat,
+        // ) : async* Result<(), Text> {
+
+        //     let recommended_batch_size = recommended_entries_to_populate_based_on_benchmarks(indexes_key_details.size());
+
+        //     let BATCH_SIZE = Option.get(opt_batch_size, recommended_batch_size);
+
+        //     let indexes = Buffer.Buffer<Index>(indexes_key_details.size());
+
+        //     for (index_key_details in indexes_key_details.vals()) {
+        //         let index_name = Text.join(
+        //             "_",
+        //             Iter.map<Text, Text>(
+        //                 index_key_details.vals(),
+        //                 func(key : Text) : Text {
+        //                     key;
+        //                 },
+        //             ),
+        //         );
+
+        //         let ?index = Map.get(collection.indexes, thash, index_name) else return #err("Index with key_details '" # debug_show index_key_details # "' does not exist");
+
+        //         indexes.add(index);
+        //     };
+
+        //     var size = 0;
+
+        //     while (size < MemoryBTree.size(collection.main)) {
+
+        //         let start = size;
+        //         let end = Nat.min(size + BATCH_SIZE, MemoryBTree.size(collection.main));
+
+        //         let res = await internal_populate_indexes(
+        //             collection,
+        //             indexes,
+        //             MemoryBTree.range(collection.main, _main_btree_utils, start, end),
+        //         );
+
+        //         switch (res) {
+        //             case (#err(err)) return #err(err);
+        //             case (#ok(_)) {};
+        //         };
+
+        //         size += BATCH_SIZE;
+
+        //     };
+
+        //     #ok()
+
+        // };
         let opt_index = Map.remove(collection.indexes, thash, index_name);
 
         switch (opt_index) {
             case (?index) {
-                Logger.log(collection.logger, "Clearing and recycling BTree for index: " # index_name);
+                Logger.lazyLog(
+                    collection.logger,
+                    func() = "Clearing and recycling BTree for index: " # index_name,
+                );
                 MemoryBTree.clear(index.data);
                 Vector.add(collection.freed_btrees, index.data);
 
                 #ok();
             };
             case (null) {
-                Logger.error(collection.logger, "Index not found: " # index_name);
+                Logger.lazyError(
+                    collection.logger,
+                    func() = "Index not found: " # index_name,
+                );
                 #err("Index not found");
             };
         };
@@ -446,7 +540,10 @@ module {
         candid_blob : ZT.CandidBlob,
     ) : Result<(), Text> {
 
-        Logger.info(collection.logger, "ZenDB Collection.put_with_id(): Inserting record with id " # debug_show id);
+        Logger.lazyInfo(
+            collection.logger,
+            func() = "ZenDB Collection.put_with_id(): Inserting record with id " # debug_show id,
+        );
 
         let candid = CollectionUtils.decode_candid_blob(collection, candid_blob);
 
@@ -455,14 +552,20 @@ module {
             case (_) return #err("Values inserted into the collection must be #Records");
         };
 
-        Logger.log(collection.logger, "ZenDB Collection.put_with_id(): Inserting record with id " # debug_show id # " and candid " # debug_show candid);
+        Logger.lazyLog(
+            collection.logger,
+            func() = "ZenDB Collection.put_with_id(): Inserting record with id " # debug_show id # " and candid " # debug_show candid,
+        );
 
         switch (Schema.validate_record(collection.schema, candid)) {
             case (#ok(_)) {};
             case (#err(msg)) {
                 let err_msg = "Schema validation failed: " # msg;
 
-                Logger.error(collection.logger, err_msg);
+                Logger.lazyError(
+                    collection.logger,
+                    func() = err_msg,
+                );
                 return #err(err_msg);
             };
         };
@@ -482,7 +585,17 @@ module {
             case (?prev) {
                 ignore MemoryBTree.insert(collection.main, main_btree_utils, id, prev);
                 let error_msg = "Record with id " # debug_show id # " already exists";
-                Logger.error(collection.logger, error_msg);
+                Logger.error(
+                    collection.logger,
+                    // if this fails, it means the id already exists
+                    // insert() - should to used to update existing records
+                    //
+                    // also note that although we have already inserted the value into the main btree
+                    // the inserted value will be discarded because the call fails
+                    // meaning the canister state will not be updated
+                    // at least that's what I think - need to confirm
+                    error_msg,
+                );
                 return #err(error_msg);
             };
         };
@@ -501,29 +614,36 @@ module {
             let #ok(_) = update_indexed_record_fields(collection, index, id, candid_map, null);
         };
 
-        //  Debug.print("finished adding to indexes");
-
         #ok();
     };
 
-    public func replace_record_by_id<Record>(collection : StableCollection, main_btree_utils : BTreeUtils<Nat, Blob>, id : Nat, new_candid_blob : ZT.CandidBlob) : Result<(), Text> {
+    public func replace_record_by_id<Record>(
+        collection : StableCollection,
+        main_btree_utils : BTreeUtils<Nat, Blob>,
+        id : Nat,
+        new_candid_blob : ZT.Cand
+        // should change getId to getPointer
+        // let ?ref_pointer = MemoryBTree.getId(collection.main, main_btree_utils, id);
+        // assert MemoryBTree.getId(collection.main, main_btree_utils, id) == ?id;
+        idBlob,
+    ) : Result<(), Text>
+    //  Debug.print("adding to indexes");
+    {
         Logger.info(collection.logger, "Replacing record with id: " # debug_show id);
 
         let ?prev_candid_blob = MemoryBTree.get(collection.main, main_btree_utils, id) else return #err("Record for id '" # debug_show (id) # "' not found");
-        //    Debug.print("retrieved prev_candid_blob");
         let prev_candid = CollectionUtils.decode_candid_blob(collection, prev_candid_blob);
-        //    Debug.print("decoded prev_candid_blob");
         let prev_candid_map = CandidMap.CandidMap(collection.schema, prev_candid);
-        //    Debug.print("created prev_candid_map");
-
-        //    Debug.print(debug_show ({ prev_candid_blob; prev_candid }));
 
         let new_candid_value = CollectionUtils.decode_candid_blob(collection, new_candid_blob);
         let new_candid_map = CandidMap.CandidMap(collection.schema, new_candid_value);
 
         switch (Schema.validate_record(collection.schema, new_candid_value)) {
             case (#err(msg)) {
-                Logger.error(collection.logger, "Schema validation failed: " # msg);
+                Logger.lazyError(
+                    collection.logger,
+                    func() = "Schema validation failed: " # msg,
+                );
                 return #err("Schema validation failed: " # msg);
             };
             case (#ok(_)) {};
@@ -533,12 +653,18 @@ module {
 
         for (index in Map.vals(collection.indexes)) {
             let #ok(_) = update_indexed_record_fields(collection, index, id, new_candid_map, ?prev_candid_map) else {
-                Logger.error(collection.logger, "Failed to update index data for index: " # index.name);
+                Logger.lazyError(
+                    collection.logger,
+                    func() = "Failed to update index data for index: " # index.name,
+                );
                 return #err("Failed to update index data");
             };
         };
 
-        Logger.info(collection.logger, "Successfully replaced record with id: " # debug_show id);
+        Logger.lazyInfo(
+            collection.logger,
+            func() = "Successfully replaced record with id: " # debug_show id,
+        );
         #ok();
     };
 
@@ -668,10 +794,6 @@ module {
             case (#err(msg)) return #err(msg);
         };
 
-        //    Debug.print("updated field: " # field_name # " -> " # debug_show candid_map.get(field_name));
-
-        //    Debug.print("new value: " # debug_show new_value);
-
         #ok(new_value);
     };
 
@@ -702,8 +824,6 @@ module {
     func handle_nestable_field_update_operation_in_multi_update_operation(
         candid_map : CandidMap.CandidMap,
         field_type : ZT.CandidType,
-        // should be ZT.FieldUpdateOperations, but this method allows us to reuse this function
-        // in handle_multi_field_update_operations() and work around the type checker
         op : ZT.MultiFieldUpdateOperations,
     ) : Result<Candid, Text> {
 
@@ -814,31 +934,38 @@ module {
     };
 
     public func update_by_id<Record>(collection : StableCollection, main_btree_utils : BTreeUtils<Nat, Blob>, id : Nat, field_updates : [(Text, ZT.FieldUpdateOperations)]) : Result<(), Text> {
-        Logger.info(collection.logger, "Updating record with id: " # debug_show id);
+        Logger.lazyInfo(
+            collection.logger,
+            func() = "Updating record with id: " # debug_show id,
+        );
 
         let ?prev_candid_blob = MemoryBTree.get(collection.main, main_btree_utils, id) else return #err("Record for id '" # debug_show (id) # "' not found");
-        //    Debug.print("retrieved prev_candid_blob");
         let prev_candid = CollectionUtils.decode_candid_blob(collection, prev_candid_blob);
-        //    Debug.print("decoded prev_candid_blob");
         let prev_candid_map = CandidMap.CandidMap(collection.schema, prev_candid);
-        //    Debug.print("created prev_candid_map");
 
-        //    Debug.print(debug_show ({ prev_candid_blob; prev_candid }));
-
-        Logger.log(collection.logger, "Performing partial update on fields: " # debug_show (Array.map<(Text, Any), Text>(field_updates, func(k, _) = k)));
+        Logger.lazyLog(
+            collection.logger,
+            func() = "Performing partial update on fields: " # debug_show (Array.map<(Text, Any), Text>(field_updates, func(k, _) = k)),
+        );
         let new_candid_map = prev_candid_map.clone();
 
         let new_candid_record = switch (partially_update_doc(new_candid_map, field_updates)) {
             case (#ok(new_candid_record)) new_candid_record;
             case (#err(msg)) {
-                Logger.error(collection.logger, "Failed to update fields: " # msg);
+                Logger.lazyError(
+                    collection.logger,
+                    func() = "Failed to update fields: " # msg,
+                );
                 return #err(msg);
             };
         };
 
         switch (Schema.validate_record(collection.schema, new_candid_record)) {
             case (#err(msg)) {
-                Logger.error(collection.logger, "Schema validation failed: " # msg);
+                Logger.lazyError(
+                    collection.logger,
+                    func() = "Schema validation failed: " # msg,
+                );
                 return #err("Schema validation failed: " # msg);
             };
             case (#ok(_)) {};
@@ -847,7 +974,7 @@ module {
         let #ok(new_candid_blob) = Candid.encodeOne(
             new_candid_record,
             ?{
-                Candid.defaultOptions with types = ?[collection.formatted_schema];
+                Candid.defaultOptions with types = ?[collection.schema];
             },
         );
 
@@ -859,11 +986,17 @@ module {
         );
 
         let #ok(_) = update_indexed_data_on_updated_fields(collection, id, prev_candid_map, new_candid_map, updated_keys) else {
-            Logger.error(collection.logger, "Failed to update indexes for updated fields");
+            Logger.lazyError(
+                collection.logger,
+                func() = "Failed to update indexes for updated fields",
+            );
             return #err("Failed to update index data");
         };
 
-        Logger.info(collection.logger, "Successfully updated record with id: " # debug_show id);
+        Logger.lazyInfo(
+            collection.logger,
+            func() = "Successfully updated record with id: " # debug_show id,
+        );
         #ok();
     };
 
@@ -896,25 +1029,36 @@ module {
         main_btree_utils : BTreeUtils<Nat, Blob>,
         query_builder : QueryBuilder,
     ) : Result<[(ZT.WrapId<ZT.CandidBlob>)], Text> {
-        Logger.log(collection.logger, "Executing search with query: " # debug_show (query_builder.build()));
+        Logger.lazyLog(
+            collection.logger,
+            func() = "Executing search with query: " # debug_show (query_builder.build()),
+        );
 
         switch (internal_search(collection, query_builder)) {
             case (#err(err)) {
-                Logger.error(collection.logger, "Search failed: " # err);
+                Logger.lazyError(
+                    collection.logger,
+                    func() = "Search failed: " # err,
+                );
                 return #err(err);
             };
             case (#ok(record_ids_iter)) {
                 let candid_blob_iter = id_to_candid_blob_iter(collection, record_ids_iter);
                 let candid_blobs = Iter.toArray(candid_blob_iter);
-                Logger.log(collection.logger, "Search completed, found " # debug_show (candid_blobs.size()) # " results");
+                Logger.lazyLog(
+                    collection.logger,
+                    func() = "Search completed, found " # debug_show (candid_blobs.size()) # " results",
+                );
                 #ok(candid_blobs);
             };
         };
     };
 
-    /// Evaluates a query and returns an iterator of record ids.
     public func evaluate_query(collection : StableCollection, stable_query : ZT.StableQuery) : Result<Iter<Nat>, Text> {
-        Logger.log(collection.logger, "Evaluating query with operations: " # debug_show (stable_query.query_operations));
+        Logger.lazyLog(
+            collection.logger,
+            func() = "Evaluating query with operations: " # debug_show (stable_query.query_operations),
+        );
 
         let query_operations = stable_query.query_operations;
         let sort_by = stable_query.sort_by;
@@ -932,20 +1076,22 @@ module {
 
         switch (Query.validate_query(collection, stable_query.query_operations)) {
             case (#err(err)) {
-                Logger.error(collection.logger, "Invalid Query: " # err);
+                Logger.lazyError(
+                    collection.logger,
+                    func() = "Invalid Query: " # err,
+                );
                 return #err("Invalid Query: " # err);
             };
             case (#ok(_)) ();
         };
 
         let #ok(formatted_query_operations) = Query.process_query(collection, query_operations) else {
-            Logger.error(collection.logger, "Failed to process query operations");
+            Logger.lazyError(
+                collection.logger,
+                func() = "Failed to process query operations",
+            );
             return #err("Failed to process query operations");
         };
-
-        // Debug.print("stable_query: " # debug_show stable_query);
-        // Debug.print("pagination: " # debug_show pagination);
-        // Debug.print("cursor_record: " # debug_show (opt_cursor));
 
         let query_plan : ZT.QueryPlan = QueryPlan.create_query_plan(
             collection,
@@ -963,7 +1109,10 @@ module {
         let eval = QueryExecution.generate_record_ids_for_query_plan(collection, query_plan, sort_by, sort_records_by_field_cmp);
         let iter = paginate(collection, eval, Option.get(pagination.skip, 0), pagination.limit);
 
-        Logger.log(collection.logger, "Query evaluation completed");
+        Logger.lazyLog(
+            collection.logger,
+            func() = "Query evaluation completed",
+        );
         return #ok((iter));
     };
 
@@ -1119,7 +1268,6 @@ module {
             case (#BitMap(bitmap)) bitmap.size();
             case (#Ids(iter)) Iter.size(iter);
             case (#Interval(_index_name, intervals, _sorted_in_reverse)) {
-                // Debug.print("count intervals: " # debug_show intervals);
 
                 var i = 0;
                 var sum = 0;
@@ -1173,10 +1321,16 @@ module {
     };
 
     public func delete_by_id(collection : StableCollection, main_btree_utils : BTreeUtils<Nat, Blob>, id : Nat) : Result<(ZT.CandidBlob), Text> {
-        Logger.info(collection.logger, "Deleting record with id: " # debug_show id);
+        Logger.lazyInfo(
+            collection.logger,
+            func() = "Deleting record with id: " # debug_show id,
+        );
 
         let ?prev_candid_blob = MemoryBTree.remove(collection.main, main_btree_utils, id) else {
-            Logger.error(collection.logger, "Record with id " # debug_show id # " not found for deletion");
+            Logger.lazyError(
+                collection.logger,
+                func() = "Record with id " # debug_show id # " not found for deletion",
+            );
             return #err("Record not found");
         };
 
@@ -1184,25 +1338,33 @@ module {
         let prev_candid_map = CandidMap.CandidMap(collection.schema, prev_candid);
 
         let #Record(prev_records) = prev_candid else {
-            Logger.error(collection.logger, "Invalid record format when deleting id: " # debug_show id);
+            Logger.lazyError(
+                collection.logger,
+                func() = "Invalid record format when deleting id: " # debug_show id,
+            );
             return #err("Couldn't get records");
         };
 
-        // Remove from all indexes
         for (index in Map.vals(collection.indexes)) {
             let prev_index_key_values = CollectionUtils.get_index_columns(collection, index.key_details, id, prev_candid_map);
             let index_data_utils = CollectionUtils.get_index_data_utils();
 
             let removed_id = MemoryBTree.remove(index.data, index_data_utils, prev_index_key_values);
             if (removed_id != ?id) {
-                Logger.error(collection.logger, "Failed to remove id " # debug_show id # " from index " # index.name);
+                Logger.lazyError(
+                    collection.logger,
+                    func() = "Failed to remove id " # debug_show id # " from index " # index.name,
+                );
             };
         };
 
         let candid_blob = prev_candid_blob;
         Ids.Gen.release(collection.ids, id);
 
-        Logger.info(collection.logger, "Successfully deleted record with id: " # debug_show id);
+        Logger.lazyInfo(
+            collection.logger,
+            func() = "Successfully deleted record with id: " # debug_show id,
+        );
         #ok(candid_blob);
     };
 

@@ -264,33 +264,36 @@ module {
         let sorted_start_query = sort_and_fill_query_entries(start_query, opt_cursor_with_direction, true);
         let sorted_end_query = sort_and_fill_query_entries(end_query, opt_cursor_with_direction, false);
 
-        Logger.log(collection.logger, "scan after sort and fill: " # debug_show (sorted_start_query, sorted_end_query));
+        Logger.lazyLog(
+            collection.logger,
+            func() = "scan after sort and fill: " # debug_show (sorted_start_query, sorted_end_query),
+        );
 
         let start_query_values = format_query_entries(sorted_start_query, true);
         let end_query_values = format_query_entries(sorted_end_query, false);
 
-        Logger.log(collection.logger, "scan after format: " # debug_show (start_query_values, end_query_values));
+        Logger.lazyLog(
+            collection.logger,
+            func() = "scan after format: " # debug_show (start_query_values, end_query_values),
+        );
 
-        Logger.log(collection.logger, "encoded start_query_values: " # debug_show (Orchid.blobify.to_blob(start_query_values)));
-        Logger.log(collection.logger, "encoded end_query_values: " # debug_show (Orchid.blobify.to_blob(end_query_values)));
+        Logger.lazyLog(
+            collection.logger,
+            func() = "encoded start_query_values: " # debug_show (Orchid.blobify.to_blob(start_query_values)),
+        );
+        Logger.lazyLog(
+            collection.logger,
+            func() = "encoded end_query_values: " # debug_show (Orchid.blobify.to_blob(end_query_values)),
+        );
 
         let scans = CollectionUtils.memorybtree_scan_interval(index.data, index_data_utils, ?start_query_values, ?end_query_values);
 
-        Logger.log(collection.logger, "scan interval results: " # debug_show scans);
+        Logger.lazyLog(
+            collection.logger,
+            func() = "scan interval results: " # debug_show scans,
+        );
 
-        scans
-
-        // let records_iter = MemoryBTree.scan(index.data, index_data_utils, ?full_start_query, ?full_end_query);
-
-        // let record_ids_iter = Iter.map<([Candid], Nat), Nat>(
-        //     records_iter,
-        //     func((_, id) : ([Candid], Nat)) : (Nat) { id },
-        // );
-
-        // record_ids_iter;
-
-        // return id_to_record_iter(collection, blobify,record_ids_iter );
-
+        scans;
     };
 
     public func extract_scan_and_filter_bounds(lower : Map<Text, T.CandidInclusivityQuery>, upper : Map<Text, T.CandidInclusivityQuery>, opt_index_key_details : ?[(Text, T.SortDirection)], opt_fully_covered_equality_and_range_fields : ?Set.Set<Text>) : (Bounds, Bounds) {
