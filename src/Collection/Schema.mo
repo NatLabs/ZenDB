@@ -126,6 +126,7 @@ module {
     };
 
     public func validate(schema : Schema, record : Candid) : Result<(), Text> {
+        Debug.print("calling validate: " # debug_show (schema, record));
 
         switch (schema, record) {
             case (#Empty, #Empty) #ok;

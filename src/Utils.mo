@@ -24,6 +24,7 @@ import Decoder "mo:serde/Candid/Blob/Decoder";
 import Candid "mo:serde/Candid";
 import Itertools "mo:itertools/Iter";
 import RevIter "mo:itertools/RevIter";
+import Logger "Logger";
 
 import MemoryBTree "mo:memory-collection/MemoryBTree/Stable";
 import TypeUtils "mo:memory-collection/TypeUtils";
@@ -34,6 +35,17 @@ import ByteUtils "ByteUtils";
 
 module {
     type Order = Order.Order;
+
+    /// Generic helper function to handle Result types with consistent error logging
+    public func handleResult<T>(logger : T.Logger, res : T.Result<T, Text>, context : Text) : T.Result<T, Text> {
+        switch (res) {
+            case (#ok(success)) #ok(success);
+            case (#err(errorMsg)) {
+                Logger.lazyError(logger, func() = context # ": " # errorMsg);
+                #err(errorMsg);
+            };
+        };
+    };
 
     public func log2(n : Float) : Float {
         Float.log(n) / Float.log(2);
@@ -116,6 +128,29 @@ module {
         switch (res) {
             case (#ok(_)) ();
             case (#err(err)) Debug.trap("assert_result: " # err);
+        };
+    };
+
+    public func log_error_msg<A>(logger : T.Logger, err_msg : Text) : T.Result<A, Text> {
+        Logger.lazyError(logger, func() = err_msg);
+        #err(err_msg);
+    };
+
+    public func log_error<A>(logger : T.Logger, res : T.Result<A, Text>, opt_prefix_msg : ?Text) : T.Result<A, Text> {
+        switch (res) {
+            case (#ok(success)) #ok(success);
+            case (#err(errorMsg)) {
+                Logger.lazyError(
+                    logger,
+                    func() {
+                        switch (opt_prefix_msg) {
+                            case (?prefix) prefix # ": " # errorMsg;
+                            case (null) errorMsg;
+                        };
+                    },
+                );
+                #err(errorMsg);
+            };
         };
     };
 

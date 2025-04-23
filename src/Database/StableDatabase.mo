@@ -36,6 +36,8 @@ import Logger "../Logger";
 
 module {
 
+    let { log_error_msg } = Utils;
+
     public type InternalCandify<T> = ZT.InternalCandify<T>;
     public type Map<K, V> = Map.Map<K, V>;
     public type Set<K> = Set.Set<K>;
@@ -48,66 +50,72 @@ module {
 
     public type StableCollection = ZT.StableCollection;
 
-    public func create_collection(zendb : ZT.ZenDB, name : Text, schema : ZT.Schema) : Result<StableCollection, Text> {
+    public func size(db : ZT.StableDatabase) : Nat {
+        let size = Map.size<Text, StableCollection>(db.collections);
+        Logger.lazyInfo(db.logger, func() = "StableDatabase.size(): Number of collections: " # debug_show size);
+        size;
+    };
+
+    public func create_collection(db : ZT.StableDatabase, name : Text, schema : ZT.Schema) : Result<StableCollection, Text> {
         Logger.lazyInfo(
-            zendb.logger,
+            db.logger,
             func() = "StableDatabase.create_collection(): Creating collection '" # name # "'",
         );
 
         let processed_schema = Schema.process_schema(schema);
 
-        switch (Map.get<Text, StableCollection>(zendb.collections, thash, name)) {
+        switch (Map.get<Text, StableCollection>(db.collections, thash, name)) {
             case (?stable_collection) {
                 Logger.lazyLog(
-                    zendb.logger,
+                    db.logger,
                     func() = "StableDatabase.create_collection(): Collection '" # name # "' already exists, checking schema compatibility",
                 );
                 if (stable_collection.schema != processed_schema) {
                     Logger.lazyError(
-                        zendb.logger,
+                        db.logger,
                         func() = "StableDatabase.create_collection(): Schema mismatch for existing collection '" # name # "'",
                     );
-                    return #err("Schema error: collection already exists with different schema");
+                    return log_error_msg(db.logger, "Schema error: collection already exists with different schema");
                 };
 
                 Logger.lazyInfo(
-                    zendb.logger,
+                    db.logger,
                     func() = "StableDatabase.create_collection(): Returning existing collection '" # name # "'",
                 );
                 return #ok(stable_collection);
             };
             case (null) {
                 Logger.lazyLog(
-                    zendb.logger,
+                    db.logger,
                     func() = "StableDatabase.create_collection(): Collection '" # name # "' does not exist, creating new one",
                 );
             };
         };
 
-        let #Record(_) = processed_schema else return #err("Schema error: schema type is not a record");
+        let #Record(_) = processed_schema else return log_error_msg(db.logger, "Schema error: schema type is not a record");
 
         let schema_keys = Utils.extract_schema_keys(processed_schema);
 
         let stable_collection = {
-            ids = Ids.create(zendb.id_store, name);
+            ids = Ids.create(db.id_store, name);
             var schema = processed_schema;
             schema_keys;
             schema_keys_set = Set.fromIter(schema_keys.vals(), thash);
             main = MemoryBTree.new(?C.DEFAULT_BTREE_ORDER);
             indexes = Map.new<Text, ZT.Index>();
 
-            // zendb references
-            freed_btrees = zendb.freed_btrees;
-            logger = zendb.logger;
+            // db references
+            freed_btrees = db.freed_btrees;
+            logger = db.logger;
         };
 
-        ignore Map.put<Text, StableCollection>(zendb.collections, thash, name, stable_collection);
+        ignore Map.put<Text, StableCollection>(db.collections, thash, name, stable_collection);
         Logger.lazyInfo(
-            zendb.logger,
+            db.logger,
             func() = "StableDatabase.create_collection(): Created collection '" # name # "' successfully",
         );
         Logger.lazyLog(
-            zendb.logger,
+            db.logger,
             func() = "StableDatabase.create_collection(): Schema for collection '" # name # "': " # debug_show schema,
         );
 
@@ -115,26 +123,26 @@ module {
 
     };
 
-    public func get_collection(zendb : ZT.ZenDB, name : Text) : Result<StableCollection, Text> {
+    public func get_collection(db : ZT.StableDatabase, name : Text) : Result<StableCollection, Text> {
         Logger.lazyLog(
-            zendb.logger,
+            db.logger,
             func() = "StableDatabase.get_collection(): Getting collection '" # name # "'",
         );
 
-        let stable_collection = switch (Map.get<Text, StableCollection>(zendb.collections, thash, name)) {
+        let stable_collection = switch (Map.get<Text, StableCollection>(db.collections, thash, name)) {
             case (?collection) {
                 Logger.lazyLog(
-                    zendb.logger,
+                    db.logger,
                     func() = "StableDatabase.get_collection(): Found collection '" # name # "'",
                 );
                 collection;
             };
             case (null) {
                 Logger.lazyWarn(
-                    zendb.logger,
+                    db.logger,
                     func() = "StableDatabase.get_collection(): Collection '" # name # "' not found",
                 );
-                return #err("ZenDB Database.get_collection(): Collection " # debug_show name # " not found");
+                return log_error_msg(db.logger, "ZenDB Database.get_collection(): Collection " # debug_show name # " not found");
             };
         };
 
@@ -142,44 +150,44 @@ module {
     };
 
     public func get_or_create_collection<Record>(
-        zendb : ZT.ZenDB,
+        db : ZT.StableDatabase,
         name : Text,
         schema : ZT.Schema,
     ) : Result<StableCollection, Text> {
         Logger.lazyInfo(
-            zendb.logger,
+            db.logger,
             func() = "StableDatabase.get_or_create_collection(): Getting or creating collection '" # name # "'",
         );
 
-        switch (create_collection(zendb, name, schema)) {
+        switch (create_collection(db, name, schema)) {
             case (#ok(collection)) {
                 Logger.lazyInfo(
-                    zendb.logger,
+                    db.logger,
                     func() = "StableDatabase.get_or_create_collection(): Created collection '" # name # "'",
                 );
                 #ok(collection);
             };
             case (#err(msg)) {
                 Logger.lazyLog(
-                    zendb.logger,
+                    db.logger,
                     func() = "StableDatabase.get_or_create_collection(): Failed to create collection '" #
                     name # "', trying to get existing collection. Error: " # msg,
                 );
 
-                switch (get_collection(zendb, name)) {
+                switch (get_collection(db, name)) {
                     case (#ok(collection)) {
                         Logger.lazyInfo(
-                            zendb.logger,
+                            db.logger,
                             func() = "StableDatabase.get_or_create_collection(): Found existing collection '" # name # "'",
                         );
                         #ok(collection);
                     };
                     case (#err(_)) {
                         Logger.lazyError(
-                            zendb.logger,
+                            db.logger,
                             func() = "StableDatabase.get_or_create_collection(): Failed to get or create collection '" # name # "': " # msg,
                         );
-                        #err(msg);
+                        return log_error_msg(db.logger, msg);
                     };
                 };
             };

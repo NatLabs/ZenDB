@@ -107,7 +107,6 @@ module T {
     public type StableCollection = {
         ids : Ids.Generator;
         var schema : Schema;
-        var formatted_schema : Schema;
         schema_keys : [Text];
         schema_keys_set : Set<Text>;
         main : MemoryBTree.StableMemoryBTree;
@@ -115,6 +114,23 @@ module T {
 
         // reference to the freed btrees to the same variable in
         // the ZenDB database record
+        freed_btrees : Vector.Vector<MemoryBTree.StableMemoryBTree>;
+        logger : Logger;
+    };
+
+    public type StableDatabase = {
+        collections : Map<Text, StableCollection>;
+
+        // reference to the freed btrees to the same variable in
+        // the ZenDB database record
+        freed_btrees : Vector.Vector<MemoryBTree.StableMemoryBTree>;
+        logger : Logger;
+        id_store : Ids.Ids;
+    };
+
+    public type ZenDB = {
+        id_store : Ids.Ids;
+        databases : Map<Text, StableDatabase>;
         freed_btrees : Vector.Vector<MemoryBTree.StableMemoryBTree>;
         logger : Logger;
     };
@@ -131,13 +147,6 @@ module T {
         var log_level : LogLevel;
         var next_thread_id : Nat;
         var is_running_locally : Bool;
-    };
-
-    public type ZenDB = {
-        id_store : Ids.Ids;
-        collections : Map<Text, StableCollection>;
-        freed_btrees : Vector.Vector<MemoryBTree.StableMemoryBTree>;
-        logger : Logger;
     };
 
     public type IndexKeyFields = [(Text, Candid)];
@@ -268,33 +277,38 @@ module T {
         score : Float;
     };
 
-    // These operations use the current value of the field to perform the operation
-    // e.g. #add(1) will add 1 to the current value of the field
-    public type NonNestableFieldUpdateOperations = {
-        #add : (Candid);
-        #sub : (Candid);
-        #mul : (Candid);
-        #div : (Candid);
-    };
-
-    // These operations overwrite the current value of the field
-    // e.g. #set(#Nat(1)) will set the field to 1
-    // e.g. #get("field_name") will set the field to the value of the field_name
-
-    public type NestableFieldUpdateOperations = {
-        #set : (Candid);
-        #val : (Candid);
+    public type FieldUpdateOperations = {
+        #currValue : (); // refers to the current (prior to the update) of the field you are updating
         #get : (Text);
 
-        #op : (MultiFieldUpdateOperations);
-    };
+        // multi-value operations
+        #addAll : [FieldUpdateOperations];
+        #subAll : [FieldUpdateOperations];
+        #mulAll : [FieldUpdateOperations];
+        #divAll : [FieldUpdateOperations];
 
-    public type FieldUpdateOperations = NonNestableFieldUpdateOperations or NestableFieldUpdateOperations;
+        // Number operations
+        #add : (FieldUpdateOperations, FieldUpdateOperations);
+        #sub : (FieldUpdateOperations, FieldUpdateOperations);
+        #mul : (FieldUpdateOperations, FieldUpdateOperations);
+        #div : (FieldUpdateOperations, FieldUpdateOperations);
+        #abs : (FieldUpdateOperations);
+        #neg : (FieldUpdateOperations);
+        #floor : (FieldUpdateOperations);
+        #ceil : (FieldUpdateOperations);
+        #sqrt : (FieldUpdateOperations);
+        #pow : (FieldUpdateOperations, FieldUpdateOperations);
+        #min : (FieldUpdateOperations, FieldUpdateOperations);
+        #max : (FieldUpdateOperations, FieldUpdateOperations);
+        #mod : (FieldUpdateOperations, FieldUpdateOperations);
 
-    public type MultiFieldUpdateOperations = {
-        #add : [MultiFieldUpdateOperations];
-        #sub : [MultiFieldUpdateOperations];
-        #mul : [MultiFieldUpdateOperations];
-        #div : [MultiFieldUpdateOperations];
-    } or NestableFieldUpdateOperations;
+        // Text operations
+        #trim : (FieldUpdateOperations, Text);
+        #lowercase : (FieldUpdateOperations);
+        #uppercase : (FieldUpdateOperations);
+        #replaceSubText : (FieldUpdateOperations, Text, Text);
+        #slice : (FieldUpdateOperations, Nat, Nat);
+        #concat : (FieldUpdateOperations, FieldUpdateOperations);
+
+    } or Candid;
 };

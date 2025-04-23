@@ -150,12 +150,21 @@ module {
     };
 
     public func newStableStore(settings : ?Settings) : ZenDB {
-        let zendb = {
+        let zendb : ZenDB = {
             id_store = Ids.new();
-            collections = Map.new<Text, StableCollection>();
+            databases = Map.new<Text, StableDatabase>();
             freed_btrees = Vector.new<MemoryBTree.StableMemoryBTree>();
             logger = Logger.init(#Error, false);
         };
+
+        let default_db : StableDatabase = {
+            id_store = zendb.id_store;
+            collections = Map.new<Text, StableCollection>();
+            freed_btrees = zendb.freed_btrees;
+            logger = zendb.logger;
+        };
+
+        ignore Map.put(zendb.databases, ZT.thash, "default", default_db);
 
         ignore do ? {
             let log_settings = settings!.logging!;
@@ -171,8 +180,20 @@ module {
     //     newStableStore();
     // };
 
-    public func launch(sstore : ZenDB) : Database.Database {
-        Database.Database(sstore);
+    public func launchDefaultDB(sstore : ZenDB) : Database.Database {
+        let ?default_db = Map.get<Text, StableDatabase>(sstore.databases, thash, "default") else Debug.trap("Default database not found");
+        Database.Database(default_db);
+    };
+
+    public class ZenDB(sstore : StableStore) {
+
+        public func setLogLevel(log_level : Logger.LogLevel) {
+            Logger.setLogLevel(zendb.logger, log_level);
+        };
+
+        public func setIsRunLocally(is_running_locally : Bool) {
+            Logger.setIsRunLocally(zendb.logger, is_running_locally);
+        };
     };
 
     public func setLogLevel(zendb : ZenDB, log_level : Logger.LogLevel) {

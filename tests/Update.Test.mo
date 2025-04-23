@@ -18,7 +18,7 @@ let zendb_sstore = let sstore = ZenDB.newStableStore(
         };
     }
 );
-let zendb = ZenDB.launch(zendb_sstore);
+let zendb = ZenDB.launchDefaultDB(zendb_sstore);
 
 type SizeVariant = {
     #known : Nat;
@@ -26,7 +26,8 @@ type SizeVariant = {
 };
 
 type Version = {
-    #v1 : { a : Nat; b : Text };
+    #v0 : { decimal : Float };
+    #v1 : { a : Int; b : Text };
     #v2 : { c : Text; d : Bool };
     #v3 : { size : SizeVariant };
     #v4 : {
@@ -42,9 +43,10 @@ type Doc = {
 let DocSchema : ZenDB.Schema = #Record([(
     "version",
     #Variant([
+        ("v0", #Record([("decimal", #Float)])),
         (
             "v1",
-            #Record([("a", #Nat), ("b", #Text)]),
+            #Record([("a", #Int), ("b", #Text)]),
         ),
         (
             "v2",
@@ -73,7 +75,10 @@ let data_type_to_candid : ZenDB.Candify<Doc> = {
     to_blob = func(c : Doc) : Blob { to_candid (c) };
 };
 
+assert zendb.size() == 0;
 let #ok(data) = zendb.create_collection<Doc>("data", DocSchema, data_type_to_candid);
+assert zendb.size() == 1;
+
 let #ok(_) = data.create_index("index_1", [("version", #Ascending)]);
 let #ok(_) = data.create_index("index_2", [("version.v1.a", #Ascending)]);
 let #ok(_) = data.create_index("index_3", [("version.v3.size.known", #Ascending)]);
@@ -101,20 +106,29 @@ suite(
         test(
             "replaceRecord",
             func() {
+                data.search(
+                    ZenDB.QueryBuilder().Where("version.v1.a", #eq(#Int(42)))
+                ) |> Debug.print(debug_show _);
 
                 assert #ok([(item1_id, item1)]) == data.search(
-                    ZenDB.QueryBuilder().Where("version.v1.a", #eq(#Nat(42)))
+                    ZenDB.QueryBuilder().Where("version.v1.a", #eq(#Int(42)))
                 );
 
-                let new_doc : Doc = { version = #v1({ a = 0; b = "text" }) };
+                let new_doc : Doc = { version = #v1({ a = 33; b = "text" }) };
                 let #ok(_) = data.replaceRecord(item1_id, (new_doc));
 
                 assert #ok([]) == data.search(
-                    ZenDB.QueryBuilder().Where("version.v1.a", #eq(#Nat(42)))
+                    ZenDB.QueryBuilder().Where("version.v1.a", #eq(#Int(42)))
                 );
 
                 assert data.search(
-                    ZenDB.QueryBuilder().Where("version.v1.b", #eq(#Text("text")))
+                    ZenDB.QueryBuilder().Where(
+                        "version.v1.b",
+                        #eq(#Text("text")),
+                    ).And(
+                        "version.v1.a",
+                        #eq(#Int(33)),
+                    )
                 ) == #ok([(item1_id, new_doc)]);
 
                 item1 := new_doc;
@@ -123,31 +137,52 @@ suite(
         );
 
         test(
-            "#add field",
+            "replace field value",
+            func() {
+                assert #ok([(item1_id, item1)]) == data.search(
+                    ZenDB.QueryBuilder().Where("version.v1.a", #eq(#Int(33)))
+                );
+
+                let #ok(_) = data.updateById(
+                    item1_id,
+                    [("version.v1.a", #Nat(0))],
+                );
+
+                item1 := { version = #v1({ a = 0; b = "text" }) };
+                Debug.print("item1 updated: " # debug_show (data.get(item1_id)));
+
+                assert data.search(
+                    ZenDB.QueryBuilder().Where("version.v1.a", #eq(#Int(0)))
+                ) == #ok([(item1_id, item1)]);
+            },
+        );
+
+        test(
+            "#addAll field",
             func() {
 
                 assert #ok([(item1_id, item1)]) == data.search(
-                    ZenDB.QueryBuilder().Where("version.v1.a", #eq(#Nat(0)))
+                    ZenDB.QueryBuilder().Where("version.v1.a", #eq(#Int(0)))
                 );
 
                 let #ok(_) = data.updateById(
                     item1_id,
                     [
-                        ("version.v1.a", #add(#Nat(1))),
-                        ("version.v1.a", #add(#Nat(1))),
+                        ("version.v1.a", #add(#Nat(1), #currValue)),
+                        ("version.v1.a", #addAll([#Nat(1), #currValue])),
                     ],
                 );
 
                 item1 := { version = #v1({ a = 2; b = "text" }) };
 
                 assert data.search(
-                    ZenDB.QueryBuilder().Where("version.v1.a", #eq(#Nat(2)))
+                    ZenDB.QueryBuilder().Where("version.v1.a", #eq(#Int(2)))
                 ) == #ok([(item1_id, item1)]);
             },
         );
 
         test(
-            "#sub field",
+            "#subAll field",
             func() {
 
                 assert #ok([(item3_id, item3)]) == data.search(
@@ -157,8 +192,8 @@ suite(
                 let #ok(_) = data.updateById(
                     item3_id,
                     [
-                        ("version.v3.size.known", #sub(#Nat(1))),
-                        ("version.v3.size.known", #sub(#Nat(1))),
+                        ("version.v3.size.known", #sub(#currValue, #Nat(1))),
+                        ("version.v3.size.known", #subAll([#currValue, #Nat(1)])),
                     ],
                 );
 
@@ -172,7 +207,7 @@ suite(
         );
 
         test(
-            " #mul field",
+            " #mulAll field",
             func() {
 
                 assert #ok([(item3_id, item3)]) == data.search(
@@ -182,8 +217,8 @@ suite(
                 let #ok(_) = data.updateById(
                     item3_id,
                     [
-                        ("version.v3.size.known", #mul(#Nat(2))),
-                        ("version.v3.size.known", #mul(#Nat(2))),
+                        ("version.v3.size.known", #mulAll([#Nat(2), #currValue()])),
+                        ("version.v3.size.known", #mulAll([#Nat(2), #currValue()])),
                     ],
                 );
 
@@ -197,7 +232,7 @@ suite(
         );
 
         test(
-            "#div field",
+            "#divAll field",
             func() {
 
                 assert #ok([(item3_id, item3)]) == data.search(
@@ -207,8 +242,8 @@ suite(
                 let #ok(_) = data.updateById(
                     item3_id,
                     ([
-                        ("version.v3.size.known", #div(#Nat(2))),
-                        ("version.v3.size.known", #div(#Nat(2))),
+                        ("version.v3.size.known", #div(#currValue, #Nat(2))),
+                        ("version.v3.size.known", #divAll([#currValue(), #Nat(2)])),
                     ]),
                 );
 
@@ -222,34 +257,34 @@ suite(
         );
 
         test(
-            "[#add, #sub, #mul, #div]",
+            "[#addAll, #subAll, #mulAll, #divAll]",
             func() {
 
                 assert #ok([(item1_id, item1)]) == data.search(
-                    ZenDB.QueryBuilder().Where("version.v1.a", #eq(#Nat(2)))
+                    ZenDB.QueryBuilder().Where("version.v1.a", #eq(#Int(2)))
                 );
 
                 let #ok(_) = data.updateById(
                     item1_id,
                     [
-                        ("version.v1.a", #mul(#Nat(9))),
-                        ("version.v1.a", #add(#Nat(2))),
-                        ("version.v1.a", #div(#Nat(5))),
-                        ("version.v1.a", #sub(#Nat(1))),
+                        ("version.v1.a", #mulAll([#currValue(), #Nat(9)])),
+                        ("version.v1.a", #addAll([#currValue(), #Nat(2)])),
+                        ("version.v1.a", #divAll([#currValue(), #Nat(5)])),
+                        ("version.v1.a", #subAll([#currValue(), #Nat(1)])),
                     ],
                 );
 
                 item1 := { version = #v1({ a = 3; b = "text" }) };
 
                 assert data.search(
-                    ZenDB.QueryBuilder().Where("version.v1.a", #eq(#Nat(3)))
+                    ZenDB.QueryBuilder().Where("version.v1.a", #eq(#Int(3)))
                 ) == #ok([(item1_id, item1)]);
 
             },
         );
 
         test(
-            "#set compound fields",
+            "compound fields",
             func() {
 
                 assert #ok([(item3_id, item3)]) == data.search(
@@ -262,7 +297,7 @@ suite(
                         (
                             "version",
                             // set to #v3({ size = #known(42) })
-                            #set(#Variant("v3", #Record([("size", #Variant("known", #Nat(42)))]))),
+                            (#Variant("v3", #Record([("size", #Variant("known", #Int(42)))]))),
                         ),
                     ],
                 );
@@ -270,10 +305,10 @@ suite(
         );
 
         suite(
-            "#op: multi and nested operations",
+            ": multi and nested operations",
             func() {
                 test(
-                    "multi #add",
+                    "multi #addAll",
                     func() {
                         assert #ok([(item5_id, item5)]) == data.search(
                             ZenDB.QueryBuilder().Where("version.v4.units.products", #eq(#Nat(1000)))
@@ -284,8 +319,8 @@ suite(
                             [
                                 (
                                     "version.v4.total",
-                                    #op(
-                                        #add([
+                                    (
+                                        #addAll([
                                             #get("version.v4.units.products"),
                                             #get("version.v4.units.sales"),
                                             #get("version.v4.units.customers"),
@@ -316,7 +351,7 @@ suite(
                 );
 
                 test(
-                    "#multi #sub",
+                    "#mulAllti #subAll",
                     func() {
 
                         // fails because sales is greater than products and the type is Nat
@@ -326,8 +361,8 @@ suite(
                             [
                                 (
                                     "version.v4.total",
-                                    #op(
-                                        #sub([
+                                    (
+                                        #subAll([
                                             #get("version.v4.units.products"),
                                             #get("version.v4.units.sales"),
                                             #get("version.v4.units.customers"),
@@ -337,7 +372,7 @@ suite(
                             ],
                         );
 
-                        Debug.print("#sub update error msg: " # debug_show (msg));
+                        Debug.print("#subAll update error msg: " # debug_show (msg));
 
                         assert data.get(item5_id) == #ok(item5);
 
@@ -346,8 +381,8 @@ suite(
                             [
                                 (
                                     "version.v4.total",
-                                    #op(
-                                        #sub([
+                                    (
+                                        #subAll([
                                             #get("version.v4.units.sales"),
                                             #get("version.v4.units.products"),
                                         ])
@@ -370,16 +405,17 @@ suite(
                         assert data.get(item5_id) == #ok(item5);
                     },
                 );
+
                 test(
-                    "multi #mul",
+                    "multi #mulAll",
                     func() {
                         let #ok(_) = data.updateById(
                             item5_id,
                             [
                                 (
                                     "version.v4.total",
-                                    #op(
-                                        #mul([
+                                    (
+                                        #mulAll([
                                             #get("version.v4.units.products"),
                                             #get("version.v4.units.sales"),
                                             #get("version.v4.units.customers"),
@@ -403,15 +439,15 @@ suite(
                 );
 
                 test(
-                    "multi #div",
+                    "multi #divAll",
                     func() {
                         let #ok(_) = data.updateById(
                             item5_id,
                             [
                                 (
                                     "version.v4.total",
-                                    #op(
-                                        #div([
+                                    (
+                                        #divAll([
                                             #get("version.v4.units.products"),
                                             #get("version.v4.units.sales"),
                                             #get("version.v4.units.customers"),
@@ -439,8 +475,8 @@ suite(
                             ([
                                 (
                                     "version.v4.total",
-                                    #op(
-                                        #div([
+                                    (
+                                        #divAll([
                                             #get("version.v4.units.sales"),
                                             #get("version.v4.units.customers"),
                                         ])
@@ -463,25 +499,25 @@ suite(
                 );
 
                 test(
-                    "#set: multi #add, #sub, #mul, #div, #val, #get",
+                    ": multi #addAll, #subAll, #mulAll, #divAll, , #get",
                     func() {
                         let #ok(_) = data.updateById(
                             item5_id,
                             ([
                                 (
                                     "version.v4.total",
-                                    #op(
-                                        #add([
-                                            #sub([
-                                                #mul([
+                                    (
+                                        #addAll([
+                                            #subAll([
+                                                #mulAll([
                                                     #get("version.v4.units.products"),
                                                     #get("version.v4.units.sales"),
                                                     #get("version.v4.units.customers"),
                                                 ]),
-                                                #mul([
+                                                #mulAll([
                                                     #get("version.v4.total"),
-                                                    #div([
-                                                        #add([
+                                                    #divAll([
+                                                        #addAll([
                                                             #get("version.v4.units.products"),
                                                             #get("version.v4.units.sales"),
                                                             #get("version.v4.units.customers"),
@@ -490,7 +526,7 @@ suite(
                                                     ]),
                                                 ]),
                                             ]),
-                                            #val(#Int(-400_000_000)),
+                                            (#Int(-400_000_000)),
                                         ])
                                     ),
                                 ),
@@ -514,7 +550,343 @@ suite(
 
             }
 
-        )
+        );
 
+        test(
+            "#neg operation",
+            func() {
+                let #ok(_) = data.updateById(
+                    item1_id,
+                    [("version.v1.a", (#neg(#Nat(10))))],
+                );
+
+                assert data.get(item1_id) == #ok({
+                    version = #v1({ a = -10; b = "text" });
+                });
+
+                // Reset
+                let #ok(_) = data.replaceRecord(item1_id, item1);
+            },
+        );
+
+        suite(
+            "Number Operations",
+            func() {
+                test(
+                    "#abs operation",
+                    func() {
+                        // First set a negative value
+                        let new_doc : Doc = {
+                            version = #v1({ a = 0; b = "text" });
+                        };
+                        let #ok(_) = data.replaceRecord(item1_id, new_doc);
+
+                        // Apply negative operation
+                        let #ok(_) = data.updateById(
+                            item1_id,
+                            [("version.v1.a", (#neg(#Int(42))))],
+                        );
+
+                        // Apply absolute value operation
+                        let #ok(_) = data.updateById(
+                            item1_id,
+                            [("version.v1.a", (#abs(#get("version.v1.a"))))],
+                        );
+
+                        assert data.get(item1_id) == #ok({
+                            version = #v1({ a = 42; b = "text" });
+                        });
+
+                        // Reset for other tests
+                        item1 := { version = #v1({ a = 42; b = "text" }) };
+                    },
+                );
+
+                test(
+                    " #floor, #ceil operations",
+                    func() {
+                        // Create a temporary document with decimal values
+                        let temp_doc : Doc = {
+                            version = #v0({ decimal = 7.6 });
+                        };
+                        let #ok(temp_id) = data.insert(temp_doc);
+
+                        // Test floor operation
+                        let #ok(_) = data.updateById(
+                            temp_id,
+                            [("version.v0.decimal", (#floor(#currValue)))],
+                        );
+
+                        assert data.get(temp_id) == #ok({
+                            version = #v0({ decimal = 7.0 });
+                        });
+
+                        // Reset and test ceil
+                        let #ok(_) = data.updateById(
+                            temp_id,
+                            [("version.v0.decimal", (#Float(9.2)))],
+                        );
+
+                        Debug.print("result after update: " # debug_show (data.get(temp_id)));
+                        assert data.get(temp_id) == #ok({
+                            version = #v0({ decimal = 9.2 });
+                        });
+
+                        let #ok(_) = data.updateById(
+                            temp_id,
+                            [("version.v0.decimal", (#ceil(#currValue)))],
+                        );
+
+                        Debug.print("Ceil result: " # debug_show (data.get(temp_id)));
+                        assert data.get(temp_id) == #ok({
+                            version = #v0({ decimal = 10.0 });
+                        });
+
+                        // Clean up
+                        let #ok(_) = data.deleteById(temp_id);
+                    },
+                );
+
+                test(
+                    "#sqrt operation",
+                    func() {
+                        // Set value to square number
+                        let #ok(_) = data.updateById(
+                            item1_id,
+                            [("version.v1.a", (#Nat(64)))],
+                        );
+
+                        // Apply square root
+                        let #ok(_) = data.updateById(
+                            item1_id,
+                            [("version.v1.a", (#sqrt(#get("version.v1.a"))))],
+                        );
+
+                        assert data.get(item1_id) == #ok({
+                            version = #v1({ a = 8; b = "text" });
+                        });
+
+                        // Reset
+                        let #ok(_) = data.replaceRecord(item1_id, item1);
+                    },
+                );
+
+                test(
+                    "#pow operation",
+                    func() {
+                        let #ok(_) = data.updateById(
+                            item1_id,
+                            [("version.v1.a", (#pow(#Nat(2), #Nat(5))))],
+                        );
+
+                        assert data.get(item1_id) == #ok({
+                            version = #v1({ a = 32; b = "text" });
+                        });
+
+                        // Reset
+                        let #ok(_) = data.replaceRecord(item1_id, item1);
+                    },
+                );
+
+                test(
+                    "#min and #max operations",
+                    func() {
+                        // Test min
+                        let #ok(_) = data.updateById(
+                            item1_id,
+                            [("version.v1.a", (#min(#Nat(10), #Int(42))))],
+                        );
+
+                        assert data.get(item1_id) == #ok({
+                            version = #v1({ a = 10; b = "text" });
+                        });
+
+                        // Test max
+                        let #ok(_) = data.updateById(
+                            item1_id,
+                            [("version.v1.a", (#max((#Nat(10)), (#Int(42)))))],
+                        );
+
+                        assert data.get(item1_id) == #ok({
+                            version = #v1({ a = 42; b = "text" });
+                        });
+
+                        // Reset
+                        let #ok(_) = data.replaceRecord(item1_id, item1);
+                    },
+                );
+
+                test(
+                    "#mod operation",
+                    func() {
+                        let #ok(_) = data.updateById(
+                            item1_id,
+                            [("version.v1.a", #mod(#Int(42), #Nat(10)))],
+                        );
+
+                        assert data.get(item1_id) == #ok({
+                            version = #v1({ a = 2; b = "text" });
+                        });
+
+                        // Reset
+                        let #ok(_) = data.replaceRecord(item1_id, item1);
+                    },
+                );
+            },
+        );
+
+        suite(
+            "Text Operations",
+            func() {
+                test(
+                    "#trim operation",
+                    func() {
+                        // Set text with whitespace
+                        let #ok(_) = data.updateById(
+                            item1_id,
+                            [("version.v1.b", (#Text("  trimmed text  ")))],
+                        );
+
+                        // Apply trim
+                        let #ok(_) = data.updateById(
+                            item1_id,
+                            [("version.v1.b", (#trim(#currValue, " ")))],
+                        );
+
+                        assert data.get(item1_id) == #ok({
+                            version = #v1({ a = 42; b = "trimmed text" });
+                        });
+
+                        // Set text with dashes
+                        let #ok(_) = data.updateById(
+                            item1_id,
+                            [("version.v1.b", (#Text("----===trimmed text===----")))],
+                        );
+
+                        // Apply trim
+                        let #ok(_) = data.updateById(
+                            item1_id,
+                            [("version.v1.b", (#trim(#currValue, "-")))],
+                        );
+
+                        assert data.get(item1_id) == #ok({
+                            version = #v1({ a = 42; b = "===trimmed text===" });
+                        });
+
+                        // Reset
+                        let #ok(_) = data.replaceRecord(item1_id, item1);
+                    },
+                );
+
+                test(
+                    "#lowercase and #uppercase operations",
+                    func() {
+                        // Set mixed case text
+                        let #ok(_) = data.updateById(
+                            item1_id,
+                            [("version.v1.b", (#Text("MiXeD CaSe")))],
+                        );
+
+                        // Test lowercase
+                        let #ok(_) = data.updateById(
+                            item1_id,
+                            [("version.v1.b", (#lowercase(#currValue)))],
+                        );
+
+                        assert data.get(item1_id) == #ok({
+                            version = #v1({ a = 42; b = "mixed case" });
+                        });
+
+                        // Test uppercase
+                        let #ok(_) = data.updateById(
+                            item1_id,
+                            [("version.v1.b", (#uppercase(#currValue)))],
+                        );
+
+                        assert data.get(item1_id) == #ok({
+                            version = #v1({ a = 42; b = "MIXED CASE" });
+                        });
+
+                        // Reset
+                        let #ok(_) = data.replaceRecord(item1_id, item1);
+                    },
+                );
+
+                test(
+                    "#replaceSubText operations",
+                    func() {
+                        // Set text with repeated pattern
+                        let #ok(_) = data.updateById(
+                            item1_id,
+                            [("version.v1.b", ((#Text("apple banana apple orange"))))],
+                        );
+
+                        // Test replaceSubText (all occurrences)
+                        let #ok(_) = data.updateById(
+                            item1_id,
+                            [("version.v1.b", (#replaceSubText(#currValue, "apple", "kiwi")))],
+                        );
+
+                        assert data.get(item1_id) == #ok({
+                            version = #v1({
+                                a = 42;
+                                b = "kiwi banana kiwi orange";
+                            });
+                        });
+
+                        // Reset
+                        let #ok(_) = data.replaceRecord(item1_id, item1);
+                    },
+                );
+
+                test(
+                    "#slice operation",
+                    func() {
+                        // Set sample text
+                        let #ok(_) = data.updateById(
+                            item1_id,
+                            [("version.v1.b", (#Text("abcdefghijklmnopqrstuvwxyz")))],
+                        );
+
+                        // Test slice (extract substring)
+                        let #ok(_) = data.updateById(
+                            item1_id,
+                            [("version.v1.b", (#slice(#currValue, 3, 8)))],
+                        );
+
+                        assert data.get(item1_id) == #ok({
+                            version = #v1({ a = 42; b = "defgh" });
+                        });
+
+                        // Reset
+                        let #ok(_) = data.replaceRecord(item1_id, item1);
+                    },
+                );
+
+                test(
+                    "#concat operation",
+                    func() {
+                        // Set initial text
+                        let #ok(_) = data.updateById(
+                            item1_id,
+                            [("version.v1.b", (#Text("Hello")))],
+                        );
+
+                        // Test concatenation
+                        let #ok(_) = data.updateById(
+                            item1_id,
+                            [("version.v1.b", (#concat(#currValue, (#Text(" World!")))))],
+                        );
+
+                        assert data.get(item1_id) == #ok({
+                            version = #v1({ a = 42; b = "Hello World!" });
+                        });
+
+                        // Reset
+                        let #ok(_) = data.replaceRecord(item1_id, item1);
+                    },
+                );
+            },
+        );
     },
 );

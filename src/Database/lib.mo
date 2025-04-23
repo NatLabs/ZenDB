@@ -94,9 +94,18 @@ module {
 
         };
 
-        public func create_collection<Record>(name : Text, schema : T.Schema, external_candify : T.Candify<Record>) : Result<Collection<Record>, Text> {
+        public func size() : Nat {
+            StableDatabase.size(zendb);
+        };
 
-            let internal_candify : T.InternalCandify<Record> = switch (validate_candify(name, schema, external_candify)) {
+        public func create_collection<Record>(name : Text, schema : T.Schema, external_candify : T.Candify<Record>) : Result<Collection<Record>, Text> {
+            let validate_candify_result = Utils.handleResult(
+                zendb.logger,
+                validate_candify(name, schema, external_candify),
+                "Failed to validate candify function: ",
+            );
+
+            let internal_candify : T.InternalCandify<Record> = switch (validate_candify_result) {
                 case (#ok(internal_candify)) internal_candify;
                 case (#err(msg)) return #err(msg);
             };

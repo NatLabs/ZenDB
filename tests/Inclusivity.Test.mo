@@ -35,7 +35,7 @@ let zendb_sstore = ZenDB.newStableStore(
     }
 );
 
-let zendb = ZenDB.launch(zendb_sstore);
+let zendb = ZenDB.launchDefaultDB(zendb_sstore);
 
 // Define schemas for test collections
 let NumericSchema : ZenDB.Schema = #Record([

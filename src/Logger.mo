@@ -1,3 +1,4 @@
+import Prim "mo:prim";
 import Debug "mo:base/Debug";
 import Nat "mo:base/Nat";
 import Array "mo:base/Array";
@@ -104,7 +105,7 @@ module Logger {
         logAtLevel(logger, #Error, msg);
     };
 
-    public func trap(msg : Text) {
+    public func trap(msg : Text) : None {
         Debug.trap(msg);
     };
 
@@ -182,14 +183,16 @@ module Logger {
         // the thread should be logged as individual messages not linked to the thread
         // Each of these logs will include the name of the thread at the start
 
-        public func logAtLevel(log_level : LogLevel, msg : Text) {
-            let text_format = if (LogLevel.compare(#Info, logger.log_level) == #less) {
-                name # ": " # msg;
+        public func format_thread_msg(msg : Text) : Text {
+            if (LogLevel.compare(#Info, logger.log_level) == #less) {
+                return name # ": " # msg;
             } else {
-                "[Thread: " # debug_show (thread_id) # "] " # msg;
+                return "[Thread: " # debug_show (thread_id) # "] " # msg;
             };
+        };
 
-            Logger.logAtLevel(logger, log_level, text_format);
+        public func logAtLevel(log_level : LogLevel, msg : Text) {
+            Logger.logAtLevel(logger, log_level, format_thread_msg(msg));
         };
 
         public func log(msg : Text) {
@@ -208,8 +211,8 @@ module Logger {
             logAtLevel(#Error, msg);
         };
 
-        public func trap(msg : Text) {
-            logAtLevel(#Trap, msg);
+        public func trap(msg : Text) : None {
+            Debug.trap(format_thread_msg(msg));
         };
 
         public func end() {
@@ -226,11 +229,7 @@ module Logger {
                 logger,
                 log_level,
                 func() {
-                    if (LogLevel.compare(#Info, logger.log_level) == #less) {
-                        name # ": " # msgFn();
-                    } else {
-                        "[Thread: " # debug_show (thread_id) # "] " # msgFn();
-                    };
+                    format_thread_msg(msgFn());
                 },
             );
         };

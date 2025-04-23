@@ -186,7 +186,7 @@ module {
             }
         );
 
-        let db = ZenDB.launch(db_sstore);
+        let db = ZenDB.launchDefaultDB(db_sstore);
 
         let #ok(txs) = db.create_collection<Tx>("transactions", TxSchema, candify_tx);
 
@@ -365,7 +365,7 @@ module {
 
             case ("update() -> #add amt += 100") {
                 for (i in tx_ids.vals()) {
-                    switch (txs.updateById(i, ([("tx.amt", #add(#Nat(100)))]))) {
+                    switch (txs.updateById(i, ([("tx.amt", #add(#currValue, #Nat(100)))]))) {
                         case (#ok(_)) {};
                         case (#err(msg)) Debug.trap("Error updating tx: " # debug_show msg);
                     };
@@ -373,22 +373,22 @@ module {
             };
             case ("update() -> #sub amt -= 100") {
                 for (i in tx_ids.vals()) {
-                    let #ok(_) = txs.updateById(i, ([("tx.amt", #sub(#Nat(100)))]));
+                    let #ok(_) = txs.updateById(i, ([("tx.amt", #sub(#currValue, #Nat(100)))]));
                 };
             };
             case ("update() -> #div amt /= 2") {
                 for (i in tx_ids.vals()) {
-                    let #ok(_) = txs.updateById(i, ([("tx.amt", #div(#Nat(2)))]));
+                    let #ok(_) = txs.updateById(i, ([("tx.amt", #div(#currValue, #Nat(2)))]));
                 };
             };
             case ("update() -> #mul amt *= 2") {
                 for (i in tx_ids.vals()) {
-                    let #ok(_) = txs.updateById(i, ([("tx.amt", #mul(#Nat(2)))]));
+                    let #ok(_) = txs.updateById(i, ([("tx.amt", #mul(#currValue, #Nat(2)))]));
                 };
             };
             case ("update() -> #set amt = 100") {
                 for (i in tx_ids.vals()) {
-                    let #ok(_) = txs.updateById(i, ([("tx.amt", #set(#Nat(100)))]));
+                    let #ok(_) = txs.updateById(i, ([("tx.amt", #Nat(100))]));
                 };
             };
             case ("replaceRecord() -> replace half the tx with new tx") {

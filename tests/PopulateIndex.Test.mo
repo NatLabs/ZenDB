@@ -156,7 +156,7 @@ let db_sstore = let sstore = ZenDB.newStableStore(
         };
     }
 );
-let db = ZenDB.launch(db_sstore);
+let db = ZenDB.launchDefaultDB(db_sstore);
 
 let #ok(txs) = db.create_collection<Tx>("transactions", TxSchema, candify_tx);
 

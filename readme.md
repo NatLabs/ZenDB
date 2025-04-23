@@ -18,7 +18,7 @@ import ZenDB "mo:zendb";
 stable var zendb_sstore = ZenDB.init_stable_store();
 zendb_sstore := ZenDB.upgrade(zendb_sstore);
 
-let zendb = ZenDB.launch(zendb_sstore);
+let zendb = ZenDB.launchDefaultDB(zendb_sstore);
 ```
 
 - Creating a collection

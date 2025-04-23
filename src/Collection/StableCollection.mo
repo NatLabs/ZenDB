@@ -54,6 +54,7 @@ import QueryExecution "QueryExecution";
 import Intervals "Intervals";
 import CandidMod "../CandidMod";
 import Logger "../Logger";
+import UpdateOps "UpdateOps";
 
 module {
 
@@ -123,7 +124,7 @@ module {
     public func update_schema(collection : StableCollection, schema : ZT.Schema) : Result<(), Text> {
 
         let is_compatible = Schema.is_schema_backward_compatible(collection.schema, schema);
-        if (not is_compatible) return #err("Schema is not backward compatible");
+        if (not is_compatible) return Utils.log_error_msg(collection.logger, "Schema is not backward compatible");
 
         let formatted_schema = Candid.formatCandidType([schema], null)[0];
 
@@ -239,7 +240,7 @@ module {
 
         switch (Map.get(collection.indexes, thash, index_name)) {
             case (?index) MemoryBTree.clear(index.data);
-            case (null) return #err("Index not found");
+            case (null) return Utils.log_error_msg(collection.logger, "Index not found");
         };
 
         #ok()
@@ -268,7 +269,7 @@ module {
                             collection.logger,
                             func() = "Failed to insert into index '" # index.name # "': " # err,
                         );
-                        return #err(err);
+                        return Utils.log_error_msg(collection.logger, err);
                     };
                     case (#ok(_)) {};
                 };
@@ -325,7 +326,7 @@ module {
                     collection.logger,
                     func() = "Index '" # index_name # "' does not exist",
                 );
-                return #err("Index '" # index_name # "' does not exist");
+                return Utils.log_error_msg(collection.logger, "Index '" # index_name # "' does not exist");
             };
 
             indexes.add(index);
@@ -368,7 +369,7 @@ module {
     //             ),
     //         );
 
-    //         let ?index = Map.get(collection.indexes, thash, index_name) else return #err("Index with key_details '" # debug_show index_key_details # "' does not exist");
+    //         let ?index = Map.get(collection.indexes, thash, index_name) else return Utils.log_error_msg(collection.logger, "Index with key_details '" # debug_show index_key_details # "' does not exist");
 
     //         indexes.add(index);
     //     };
@@ -387,7 +388,7 @@ module {
     //         );
 
     //         switch (res) {
-    //             case (#err(err)) return #err(err);
+    //             case (#err(err)) return Utils.log_error_msg(collection.logger, err);
     //             case (#ok(_)) {};
     //         };
 
@@ -430,7 +431,7 @@ module {
         //             ),
         //         );
 
-        //         let ?index = Map.get(collection.indexes, thash, index_name) else return #err("Index with key_details '" # debug_show index_key_details # "' does not exist");
+        //         let ?index = Map.get(collection.indexes, thash, index_name) else return Utils.log_error_msg(collection.logger, "Index with key_details '" # debug_show index_key_details # "' does not exist");
 
         //         indexes.add(index);
         //     };
@@ -449,7 +450,7 @@ module {
         //         );
 
         //         switch (res) {
-        //             case (#err(err)) return #err(err);
+        //             case (#err(err)) return Utils.log_error_msg(collection.logger, err);
         //             case (#ok(_)) {};
         //         };
 
@@ -478,7 +479,7 @@ module {
                     collection.logger,
                     func() = "Index not found: " # index_name,
                 );
-                #err("Index not found");
+                return Utils.log_error_msg(collection.logger, "Index not found");
             };
         };
     };
@@ -549,7 +550,7 @@ module {
 
         switch (candid) {
             case (#Record(_)) {};
-            case (_) return #err("Values inserted into the collection must be #Records");
+            case (_) return Utils.log_error_msg(collection.logger, "Values inserted into the collection must be #Records");
         };
 
         Logger.lazyLog(
@@ -566,17 +567,9 @@ module {
                     collection.logger,
                     func() = err_msg,
                 );
-                return #err(err_msg);
+                return Utils.log_error_msg(collection.logger, err_msg);
             };
         };
-
-        // if this fails, it means the id already exists
-        // insert() - should to used to update existing records
-        //
-        // also note that although we have already inserted the value into the main btree
-        // the inserted value will be discarded because the call fails
-        // meaning the canister state will not be updated
-        // at least that's what I think - need to confirm
 
         let opt_prev = MemoryBTree.insert(collection.main, main_btree_utils, id, candid_blob);
 
@@ -587,26 +580,13 @@ module {
                 let error_msg = "Record with id " # debug_show id # " already exists";
                 Logger.error(
                     collection.logger,
-                    // if this fails, it means the id already exists
-                    // insert() - should to used to update existing records
-                    //
-                    // also note that although we have already inserted the value into the main btree
-                    // the inserted value will be discarded because the call fails
-                    // meaning the canister state will not be updated
-                    // at least that's what I think - need to confirm
                     error_msg,
                 );
-                return #err(error_msg);
+                return Utils.log_error_msg(collection.logger, error_msg);
             };
         };
 
-        // should change getId to getPointer
-        // let ?ref_pointer = MemoryBTree.getId(collection.main, main_btree_utils, id);
-        // assert MemoryBTree.getId(collection.main, main_btree_utils, id) == ?id;
-
         if (Map.size(collection.indexes) == 0) return #ok();
-
-        //  Debug.print("adding to indexes");
 
         let candid_map = CandidMap.CandidMap(collection.schema, candid);
 
@@ -621,17 +601,11 @@ module {
         collection : StableCollection,
         main_btree_utils : BTreeUtils<Nat, Blob>,
         id : Nat,
-        new_candid_blob : ZT.Cand
-        // should change getId to getPointer
-        // let ?ref_pointer = MemoryBTree.getId(collection.main, main_btree_utils, id);
-        // assert MemoryBTree.getId(collection.main, main_btree_utils, id) == ?id;
-        idBlob,
-    ) : Result<(), Text>
-    //  Debug.print("adding to indexes");
-    {
+        new_candid_blob : ZT.CandidBlob,
+    ) : Result<(), Text> {
         Logger.info(collection.logger, "Replacing record with id: " # debug_show id);
 
-        let ?prev_candid_blob = MemoryBTree.get(collection.main, main_btree_utils, id) else return #err("Record for id '" # debug_show (id) # "' not found");
+        let ?prev_candid_blob = MemoryBTree.get(collection.main, main_btree_utils, id) else return Utils.log_error_msg(collection.logger, "Record for id '" # debug_show (id) # "' not found");
         let prev_candid = CollectionUtils.decode_candid_blob(collection, prev_candid_blob);
         let prev_candid_map = CandidMap.CandidMap(collection.schema, prev_candid);
 
@@ -640,11 +614,7 @@ module {
 
         switch (Schema.validate_record(collection.schema, new_candid_value)) {
             case (#err(msg)) {
-                Logger.lazyError(
-                    collection.logger,
-                    func() = "Schema validation failed: " # msg,
-                );
-                return #err("Schema validation failed: " # msg);
+                return Utils.log_error_msg(collection.logger, "Schema validation failed: " # msg);
             };
             case (#ok(_)) {};
         };
@@ -653,11 +623,7 @@ module {
 
         for (index in Map.vals(collection.indexes)) {
             let #ok(_) = update_indexed_record_fields(collection, index, id, new_candid_map, ?prev_candid_map) else {
-                Logger.lazyError(
-                    collection.logger,
-                    func() = "Failed to update index data for index: " # index.name,
-                );
-                return #err("Failed to update index data");
+                return Utils.log_error_msg(collection.logger, "Failed to update index data");
             };
         };
 
@@ -668,226 +634,31 @@ module {
         #ok();
     };
 
-    // func handle_update_field_set_operation(
-    //     candid_map : CandidMap.CandidMap,
-    //     op : ZT.UpdateFieldSetOperations,
-    // ) : Result<Candid, Text> {
-
-    //     func handle_nested_operations(
-    //         nested_operations : [ZT.UpdateFieldSetOperations],
-    //         operation_handler : (Iter<Candid>) -> Result<Candid, Text>,
-    //     ) : Result<Candid, Text> {
-    //         let candid_values = Array.init<Candid>(nested_operations.size(), #Null);
-
-    //         for ((i, nested_op) in Itertools.enumerate(nested_operations.vals())) {
-
-    //             switch (handle_update_field_set_operation(candid_map, nested_op)) {
-    //                 case (#ok(candid_value)) candid_values[i] := candid_value;
-    //                 case (#err(msg)) return #err(debug_show (nested_operations) # " failed: " # msg);
-    //             };
-
-    //         };
-
-    //         operation_handler(candid_values.vals());
-    //     };
-
-    //     let new_value = switch (op) {
-    //         case (#get(field_name)) {
-    //             let ?value = candid_map.get(field_name) else return #err("Field '" # field_name # "' not found in record");
-    //             #ok(value);
-    //         };
-    //         case (#add(nested_operations)) {
-    //             handle_nested_operations(nested_operations, CandidMod.Multi.add);
-    //         };
-    //         case (#sub(nested_operations)) {
-    //             handle_nested_operations(nested_operations, CandidMod.Multi.sub);
-    //         };
-    //         case (#mul(nested_operations)) {
-    //             handle_nested_operations(nested_operations, CandidMod.Multi.mul);
-
-    //         };
-    //         case (#div(nested_operations)) {
-    //             handle_nested_operations(nested_operations, CandidMod.Multi.div);
-
-    //         };
-    //         case (#val(candid)) { #ok(candid) };
-    //     };
-
-    //     new_value;
-    // };
-
-    func handle_multi_field_update_operations(
-        candid_map : CandidMap.CandidMap,
-        field_type : ZT.CandidType,
-        op : ZT.MultiFieldUpdateOperations,
-    ) : Result<Candid, Text> {
-
-        func handle_nested_operations(
-            candid_map : CandidMap.CandidMap,
-            nested_operations : [ZT.MultiFieldUpdateOperations],
-            operation_handler : (Iter<Candid>) -> Result<Candid, Text>,
-        ) : Result<Candid, Text> {
-            let candid_values = Array.init<Candid>(nested_operations.size(), #Null);
-
-            for ((i, nested_op) in Itertools.enumerate(nested_operations.vals())) {
-
-                switch (handle_multi_field_update_operations(candid_map, field_type, nested_op)) {
-                    case (#ok(candid_value)) candid_values[i] := candid_value;
-                    case (#err(msg)) return #err(debug_show (nested_operations) # " failed: " # msg);
-                };
-
-            };
-
-            operation_handler(candid_values.vals());
-        };
-
-        let res = switch (op) {
-            case (#add(nested_operations)) {
-                handle_nested_operations(candid_map, nested_operations, CandidMod.Multi.add);
-            };
-            case (#sub(nested_operations)) {
-                handle_nested_operations(candid_map, nested_operations, CandidMod.Multi.sub);
-            };
-            case (#mul(nested_operations)) {
-                handle_nested_operations(candid_map, nested_operations, CandidMod.Multi.mul);
-            };
-            case (#div(nested_operations)) {
-                handle_nested_operations(candid_map, nested_operations, CandidMod.Multi.div);
-            };
-            case (#op(nested_operations)) {
-                handle_multi_field_update_operations(candid_map, field_type, nested_operations);
-            };
-            case (#set(_) or #val(_) or #get(_)) {
-                handle_nestable_field_update_operation_in_multi_update_operation(candid_map, field_type, op);
-            };
-        };
-
-        res;
-    };
-
-    func handle_non_nestable_field_update_operation(
-        candid_map : CandidMap.CandidMap,
-        field_type : ZT.CandidType,
-        prev_field_value : Candid,
-        op : ZT.FieldUpdateOperations,
-    ) : Result<Candid, Text> {
-
-        let res = switch (op) {
-
-            case (#add(candid_value)) {
-                CandidMod.add(prev_field_value, candid_value);
-            };
-            case (#sub(candid_value)) {
-                CandidMod.sub(prev_field_value, candid_value);
-            };
-            case (#mul(candid_value)) {
-                CandidMod.mul(prev_field_value, candid_value);
-            };
-            case (#div(candid_value)) {
-                CandidMod.div(prev_field_value, candid_value);
-            };
-
-        };
-
-        let new_value : Candid = switch (res) {
-            case (#ok(new_value)) new_value;
-            case (#err(msg)) return #err(msg);
-        };
-
-        #ok(new_value);
-    };
-
-    func handle_nestable_field_update_operation(
-        candid_map : CandidMap.CandidMap,
-        field_type : ZT.CandidType,
-        op : ZT.FieldUpdateOperations,
-    ) : Result<Candid, Text> {
-
-        let res : Result<Candid, Text> = switch (op) {
-            case (#set(candid) or #val(candid)) { #ok(candid) };
-            case (#get(requested_field_name)) {
-                let ?value = candid_map.get(requested_field_name) else return #err("Field '" # requested_field_name # "' not found in record");
-                #ok(value);
-            };
-
-            case (#op(nested_operations)) {
-                handle_multi_field_update_operations(candid_map, field_type, nested_operations);
-            };
-            case (_) {
-                Debug.trap("Invalid FieldUpdateOperations in handle_nestable_field_update_operation(): " # debug_show op);
-            };
-        };
-
-        res;
-    };
-
-    func handle_nestable_field_update_operation_in_multi_update_operation(
-        candid_map : CandidMap.CandidMap,
-        field_type : ZT.CandidType,
-        op : ZT.MultiFieldUpdateOperations,
-    ) : Result<Candid, Text> {
-
-        let res : Result<Candid, Text> = switch (op) {
-            case (#set(candid) or #val(candid)) { #ok(candid) };
-            case (#get(requested_field_name)) {
-                let ?value = candid_map.get(requested_field_name) else return #err("Field '" # requested_field_name # "' not found in record");
-                #ok(value);
-            };
-
-            case (#op(nested_operations)) {
-                handle_multi_field_update_operations(candid_map, field_type, nested_operations);
-            };
-            case (_) {
-                Debug.trap("Invalid FieldUpdateOperations in handle_nestable_field_update_operation(): " # debug_show op);
-            };
-        };
-
-        res;
-    };
-
-    func handle_field_update_operation(
-        candid_map : CandidMap.CandidMap,
-        field_type : ZT.CandidType,
-        prev_field_value : Candid,
-        op : ZT.FieldUpdateOperations,
-    ) : Result<Candid, Text> {
-        switch (op) {
-            case (#set(_) or #get(_) or #op(_)) {
-                handle_nestable_field_update_operation(candid_map, field_type, op);
-            };
-            case (_) {
-                handle_non_nestable_field_update_operation(candid_map, field_type, prev_field_value, op);
-            };
-        };
-    };
-
-    func partially_update_doc(candid_map : CandidMap.CandidMap, update_operations : [(Text, ZT.FieldUpdateOperations)]) : Result<Candid, Text> {
+    func partially_update_doc(collection : StableCollection, candid_map : CandidMap.CandidMap, update_operations : [(Text, ZT.FieldUpdateOperations)]) : Result<Candid, Text> {
+        Debug.print("Partially updating doc with operations: " # debug_show update_operations);
 
         for ((field_name, op) in update_operations.vals()) {
-            let ?field_type = candid_map.get_type(field_name) else return #err("Field type '" # field_name # "' not found in record");
-            let ?prev_candid = candid_map.get(field_name) else return #err("Field '" # field_name # "' not found in record");
+            let ?field_type = candid_map.get_type(field_name) else return Utils.log_error_msg(collection.logger, "Field type '" # field_name # "' not found in record");
+            let ?prev_candid = candid_map.get(field_name) else return Utils.log_error_msg(collection.logger, "Field '" # field_name # "' not found in record");
 
-            let #ok(new_value) = handle_field_update_operation(candid_map, field_type, prev_candid, op) else return #err("Failed to update field '" # field_name # "'");
-
-            let new_value_cast_to_type = switch (Schema.validate(field_type, new_value)) {
-                case (#ok(_)) { new_value };
+            let new_value = switch (UpdateOps.handle_field_update_operation(collection, candid_map, field_type, prev_candid, op)) {
+                case (#ok(new_value)) new_value;
                 case (#err(msg)) {
-                    switch (CandidMod.cast(field_type, new_value)) {
-                        case (#ok(new_value_cast_to_type)) new_value_cast_to_type;
-                        case (#err(err)) {
-                            let err_msg = "Failed to cast field '" # field_name # "' to type '" # debug_show field_type # "': " # err;
-                            return #err(err_msg);
-                        };
-                    };
+                    return Utils.log_error_msg(
+                        collection.logger,
+                        "Failed to update field '" # field_name # "' with operation '" # debug_show op # "': " # msg,
+                    );
                 };
-
             };
 
-            switch (candid_map.set(field_name, new_value_cast_to_type)) {
-                case (#err(err)) return #err("Failed to update field '" # field_name # "': " # err);
+            switch (candid_map.set(field_name, new_value)) {
+                case (#err(err)) return Utils.log_error_msg(collection.logger, "Failed to update field '" # field_name # "' with new value (" # debug_show new_value # "): " # err);
                 case (#ok(_)) {};
             };
         };
+
+        Debug.print("Updated candid map: ");
+        Debug.print("About to extract candid");
 
         let candid = candid_map.extract_candid();
 
@@ -907,9 +678,9 @@ module {
         let new_index_key_values = CollectionUtils.get_index_columns(collection, index.key_details, id, new_record_candid_map);
         ignore MemoryBTree.insert(index.data, index_data_utils, new_index_key_values, id);
 
-        Logger.log(
+        Logger.lazyLog(
             collection.logger,
-            "Storing record with id " # debug_show id # " in index " # index.name # ", originally "
+            func() = "Storing record with id " # debug_show id # " in index " # index.name # ", originally "
             # debug_show (new_index_key_values) # ", now encoded as  as " # debug_show (index_data_utils.key.blobify.to_blob(new_index_key_values)),
         );
 
@@ -925,7 +696,7 @@ module {
 
                 // only updates the fields that were changed
                 if (Set.has(updated_fields_set, thash, index_key)) {
-                    let #ok(_) = update_indexed_record_fields(collection, index, id, new_record_candid_map, ?prev_record_candid_map) else return #err("Failed to update index data");
+                    let #ok(_) = update_indexed_record_fields(collection, index, id, new_record_candid_map, ?prev_record_candid_map) else return Utils.log_error_msg(collection.logger, "Failed to update index data");
                 };
             };
         };
@@ -939,7 +710,8 @@ module {
             func() = "Updating record with id: " # debug_show id,
         );
 
-        let ?prev_candid_blob = MemoryBTree.get(collection.main, main_btree_utils, id) else return #err("Record for id '" # debug_show (id) # "' not found");
+        let ?prev_candid_blob = MemoryBTree.get(collection.main, main_btree_utils, id) else return Utils.log_error_msg(collection.logger, "Record for id '" # debug_show (id) # "' not found");
+
         let prev_candid = CollectionUtils.decode_candid_blob(collection, prev_candid_blob);
         let prev_candid_map = CandidMap.CandidMap(collection.schema, prev_candid);
 
@@ -947,36 +719,31 @@ module {
             collection.logger,
             func() = "Performing partial update on fields: " # debug_show (Array.map<(Text, Any), Text>(field_updates, func(k, _) = k)),
         );
+
         let new_candid_map = prev_candid_map.clone();
 
-        let new_candid_record = switch (partially_update_doc(new_candid_map, field_updates)) {
+        let new_candid_record = switch (partially_update_doc(collection, new_candid_map, field_updates)) {
             case (#ok(new_candid_record)) new_candid_record;
             case (#err(msg)) {
-                Logger.lazyError(
-                    collection.logger,
-                    func() = "Failed to update fields: " # msg,
-                );
-                return #err(msg);
+                return Utils.log_error_msg(collection.logger, "Failed to update fields: " # msg);
             };
         };
 
+        Debug.print("Updated candid map: " # debug_show new_candid_record);
+
         switch (Schema.validate_record(collection.schema, new_candid_record)) {
             case (#err(msg)) {
-                Logger.lazyError(
-                    collection.logger,
-                    func() = "Schema validation failed: " # msg,
-                );
-                return #err("Schema validation failed: " # msg);
+                return Utils.log_error_msg(collection.logger, "Schema validation failed: " # msg);
             };
             case (#ok(_)) {};
         };
 
-        let #ok(new_candid_blob) = Candid.encodeOne(
-            new_candid_record,
-            ?{
-                Candid.defaultOptions with types = ?[collection.schema];
-            },
-        );
+        let new_candid_blob = switch (Candid.encodeOne(new_candid_record, ?{ Candid.defaultOptions with types = ?[collection.schema] })) {
+            case (#ok(new_candid_blob)) new_candid_blob;
+            case (#err(msg)) {
+                return Utils.log_error_msg(collection.logger, "Failed to encode new candid blob: " # msg);
+            };
+        };
 
         assert ?prev_candid_blob == MemoryBTree.insert(collection.main, main_btree_utils, id, new_candid_blob);
 
@@ -986,11 +753,7 @@ module {
         );
 
         let #ok(_) = update_indexed_data_on_updated_fields(collection, id, prev_candid_map, new_candid_map, updated_keys) else {
-            Logger.lazyError(
-                collection.logger,
-                func() = "Failed to update indexes for updated fields",
-            );
-            return #err("Failed to update index data");
+            return Utils.log_error_msg(collection.logger, "Failed to update index data");
         };
 
         Logger.lazyInfo(
@@ -1008,7 +771,7 @@ module {
         let id = Ids.Gen.next(collection.ids);
 
         switch (put_with_id(collection, main_btree_utils, id, candid_blob)) {
-            case (#err(msg)) return #err(msg);
+            case (#err(msg)) return Utils.log_error_msg(collection.logger, msg);
             case (#ok(_)) {};
         };
 
@@ -1020,7 +783,7 @@ module {
         main_btree_utils : BTreeUtils<Nat, Blob>,
         id : Nat,
     ) : Result<ZT.CandidBlob, Text> {
-        let ?record_details = MemoryBTree.get(collection.main, main_btree_utils, id) else return #err("Record not found");
+        let ?record_details = MemoryBTree.get(collection.main, main_btree_utils, id) else return Utils.log_error_msg(collection.logger, "Record not found");
         #ok(record_details);
     };
 
@@ -1036,11 +799,7 @@ module {
 
         switch (internal_search(collection, query_builder)) {
             case (#err(err)) {
-                Logger.lazyError(
-                    collection.logger,
-                    func() = "Search failed: " # err,
-                );
-                return #err(err);
+                return Utils.log_error_msg(collection.logger, "Search failed: " # err);
             };
             case (#ok(record_ids_iter)) {
                 let candid_blob_iter = id_to_candid_blob_iter(collection, record_ids_iter);
@@ -1076,21 +835,13 @@ module {
 
         switch (Query.validate_query(collection, stable_query.query_operations)) {
             case (#err(err)) {
-                Logger.lazyError(
-                    collection.logger,
-                    func() = "Invalid Query: " # err,
-                );
-                return #err("Invalid Query: " # err);
+                return Utils.log_error_msg(collection.logger, "Invalid Query: " # err);
             };
             case (#ok(_)) ();
         };
 
         let #ok(formatted_query_operations) = Query.process_query(collection, query_operations) else {
-            Logger.lazyError(
-                collection.logger,
-                func() = "Failed to process query operations",
-            );
-            return #err("Failed to process query operations");
+            return Utils.log_error_msg(collection.logger, "Failed to process query operations");
         };
 
         let query_plan : ZT.QueryPlan = QueryPlan.create_query_plan(
@@ -1119,7 +870,7 @@ module {
     public func internal_search(collection : StableCollection, query_builder : QueryBuilder) : Result<Iter<Nat>, Text> {
         let stable_query = query_builder.build();
         switch (evaluate_query(collection, stable_query)) {
-            case (#err(err)) #err(err);
+            case (#err(err)) return Utils.log_error_msg(collection.logger, err);
             case (#ok(eval_result)) #ok(eval_result);
         };
     };
@@ -1150,7 +901,7 @@ module {
         query_builder : QueryBuilder,
     ) : Result<Iter<ZT.WrapId<ZT.CandidBlob>>, Text> {
         switch (internal_search(collection, query_builder)) {
-            case (#err(err)) return #err(err);
+            case (#err(err)) return Utils.log_error_msg(collection.logger, err);
             case (#ok(record_ids_iter)) {
                 let record_iter = id_to_candid_blob_iter(collection, record_ids_iter);
                 #ok(record_iter);
@@ -1327,22 +1078,14 @@ module {
         );
 
         let ?prev_candid_blob = MemoryBTree.remove(collection.main, main_btree_utils, id) else {
-            Logger.lazyError(
-                collection.logger,
-                func() = "Record with id " # debug_show id # " not found for deletion",
-            );
-            return #err("Record not found");
+            return Utils.log_error_msg(collection.logger, "Record not found");
         };
 
         let prev_candid = CollectionUtils.decode_candid_blob(collection, prev_candid_blob);
         let prev_candid_map = CandidMap.CandidMap(collection.schema, prev_candid);
 
         let #Record(prev_records) = prev_candid else {
-            Logger.lazyError(
-                collection.logger,
-                func() = "Invalid record format when deleting id: " # debug_show id,
-            );
-            return #err("Couldn't get records");
+            return Utils.log_error_msg(collection.logger, "Couldn't get records");
         };
 
         for (index in Map.vals(collection.indexes)) {

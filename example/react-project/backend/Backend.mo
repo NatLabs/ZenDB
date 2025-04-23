@@ -26,7 +26,7 @@ actor class Backend() {
 
     stable let db_sstore = ZenDB.new();
     // Debug.print("db_sstore: " # debug_show (db_sstore));
-    let db = ZenDB.launch(db_sstore);
+    let db = ZenDB.launchDefaultDB(db_sstore);
 
     let ledger : Ledger.Service = actor ("ryjl3-tyaaa-aaaaa-aaaba-cai");
 

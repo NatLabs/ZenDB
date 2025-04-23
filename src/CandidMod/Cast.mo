@@ -1,3 +1,4 @@
+import Array "mo:base/Array";
 import Debug "mo:base/Debug";
 import Text "mo:base/Text";
 import Nat32 "mo:base/Nat32";
@@ -25,6 +26,7 @@ module Cast {
     type CandidType = T.CandidType;
     type Candid = T.Candid;
     type Result<A, B> = T.Result<A, B>;
+    type Schema = T.Schema;
 
     public func cast_to_nat(candid : Candid) : Result<Candid, Text> {
 
@@ -60,6 +62,140 @@ module Cast {
         #ok(converted);
     };
 
+    public func cast_to_nat8(candid : Candid) : Result<Candid, Text> {
+
+        let converted = switch (candid) {
+            case (#Nat8(n)) candid;
+            case (#Nat(n)) #Nat8(Nat8.fromNat(n));
+            case (#Int(int)) #Nat8(Nat8.fromNat(Int.abs(int)));
+
+            case (unsupported_nat_cast_types) return #err(
+                "Can't convert " # debug_show (unsupported_nat_cast_types) # " to #Nat8()"
+            );
+
+        };
+
+        #ok(converted);
+
+    };
+
+    public func cast_to_nat16(candid : Candid) : Result<Candid, Text> {
+
+        let converted = switch (candid) {
+            case (#Nat16(n)) candid;
+            case (#Nat(n)) #Nat16(Nat16.fromNat(n));
+            case (#Int(int)) #Nat16(Nat16.fromNat(Int.abs(int)));
+            case (unsupported_nat_cast_types) return #err(
+                "Can't convert " # debug_show (unsupported_nat_cast_types) # " to #Nat16()"
+            );
+        };
+
+        #ok(converted);
+    };
+
+    public func cast_to_nat32(candid : Candid) : Result<Candid, Text> {
+
+        let converted = switch (candid) {
+            case (#Nat32(n)) candid;
+            case (#Nat(n)) #Nat32(Nat32.fromNat(n));
+            case (#Int(int)) #Nat32(Nat32.fromNat(Int.abs(int)));
+            case (unsupported_nat_cast_types) return #err(
+                "Can't convert " # debug_show (unsupported_nat_cast_types) # " to #Nat32()"
+            );
+        };
+
+        #ok(converted);
+    };
+
+    public func cast_to_nat64(candid : Candid) : Result<Candid, Text> {
+
+        let converted = switch (candid) {
+            case (#Nat64(n)) candid;
+            case (#Nat(n)) #Nat64(Nat64.fromNat(n));
+            case (#Int(int)) #Nat64(Nat64.fromNat(Int.abs(int)));
+            case (unsupported_nat_cast_types) return #err(
+                "Can't convert " # debug_show (unsupported_nat_cast_types) # " to #Nat64()"
+            );
+        };
+
+        #ok(converted);
+    };
+
+    public func cast_to_int8(candid : Candid) : Result<Candid, Text> {
+
+        let converted = switch (candid) {
+            case (#Int8(n)) candid;
+            case (#Int(n)) #Int8(Int8.fromInt(n));
+            case (#Nat(n)) #Int8(Int8.fromInt(n));
+            case (unsupported_int_cast_types) return #err(
+                "Can't convert " # debug_show (unsupported_int_cast_types) # " to #Int8()"
+            );
+        };
+
+        #ok(converted);
+
+    };
+
+    public func cast_to_int16(candid : Candid) : Result<Candid, Text> {
+
+        let converted = switch (candid) {
+            case (#Int16(n)) candid;
+            case (#Int(n)) #Int16(Int16.fromInt(n));
+            case (#Nat(n)) #Int16(Int16.fromInt(n));
+            case (unsupported_int_cast_types) return #err(
+                "Can't convert " # debug_show (unsupported_int_cast_types) # " to #Int16()"
+            );
+        };
+
+        #ok(converted);
+
+    };
+
+    public func cast_to_int32(candid : Candid) : Result<Candid, Text> {
+
+        let converted = switch (candid) {
+            case (#Int32(n)) candid;
+            case (#Int(n)) #Int32(Int32.fromInt(n));
+            case (#Nat(n)) #Int32(Int32.fromInt(n));
+            case (unsupported_int_cast_types) return #err(
+                "Can't convert " # debug_show (unsupported_int_cast_types) # " to #Int32()"
+            );
+        };
+
+        #ok(converted)
+
+    };
+
+    public func cast_to_int64(candid : Candid) : Result<Candid, Text> {
+
+        let converted = switch (candid) {
+            case (#Int64(n)) candid;
+            case (#Int(n)) #Int64(Int64.fromInt(n));
+            case (#Nat(n)) #Int64(Int64.fromInt(n));
+            case (unsupported_int_cast_types) return #err(
+                "Can't convert " # debug_show (unsupported_int_cast_types) # " to #Int64()"
+            );
+        };
+
+        #ok(converted)
+
+    };
+
+    public func cast_to_float(candid : Candid) : Result<Candid, Text> {
+
+        let converted = switch (candid) {
+            case (#Float(n)) candid;
+            case (#Int(n)) #Float(Float.fromInt(n));
+            case (#Nat(n)) #Float(Float.fromInt(n));
+            case (unsupported_float_cast_types) return #err(
+                "Can't convert " # debug_show (unsupported_float_cast_types) # " to #Float()"
+            );
+        };
+
+        #ok(converted)
+
+    };
+
     public func cast_to_int(candid : Candid) : Result<Candid, Text> {
 
         let converted = switch (candid) {
@@ -67,7 +203,7 @@ module Cast {
             case (#Int8(n)) #Int(Int8.toInt(n));
             case (#Int16(n)) #Int(Int16.toInt(n));
             case (#Int32(n)) #Int(Int32.toInt(n));
-            case (#Int63(n)) #Int(Int64.toInt(n));
+            case (#Int64(n)) #Int(Int64.toInt(n));
 
             case (#Nat(n)) #Int(n);
             case (#Nat8(n)) #Int(Nat8.toNat(n));
@@ -87,15 +223,6 @@ module Cast {
 
     };
 
-    // public func cast_to_nat8(candid : Candid) : Result<Candid, Text> {
-
-    //     switch (candid) {
-    //         case ()
-
-    //     }
-
-    // };
-
     public func cast_to_text(candid : Candid) : Result<Candid, Text> {
         let converted = switch (candid) {
             case (#Text(_)) candid;
@@ -111,17 +238,140 @@ module Cast {
 
     };
 
+    public func cast_to_blob(candid : Candid) : Result<Candid, Text> {
+        let converted = switch (candid) {
+            case (#Blob(b)) candid;
+            case (#Text(t)) #Blob(Text.encodeUtf8(t));
+            case (_) return #err("cast_to_blob: Can't convert " # debug_show candid # " to #Blob");
+        };
+
+        #ok(converted);
+
+    };
+
     public func cast(candid_type : CandidType, value_to_cast : Candid) : Result<Candid, Text> {
 
         switch (candid_type) {
             case (#Nat(_)) cast_to_nat(value_to_cast);
+            case (#Nat8(_)) cast_to_nat8(value_to_cast);
+            case (#Nat16(_)) cast_to_nat16(value_to_cast);
+            case (#Nat32(_)) cast_to_nat32(value_to_cast);
+            case (#Nat64(_)) cast_to_nat64(value_to_cast);
+            case (#Int8(_)) cast_to_int8(value_to_cast);
+            case (#Int16(_)) cast_to_int16(value_to_cast);
+            case (#Int32(_)) cast_to_int32(value_to_cast);
+            case (#Int64(_)) cast_to_int64(value_to_cast);
             case (#Int(_)) cast_to_int(value_to_cast);
+            case (#Float(_)) cast_to_float(value_to_cast);
+            case (#Text(_)) cast_to_text(value_to_cast);
+            case (#Blob(_)) cast_to_blob(value_to_cast);
             case (#Option(inner)) {
                 switch (value_to_cast) {
                     case (#Null) #ok(#Null);
                     case (_) switch (cast(inner, value_to_cast)) {
                         case (#ok(c)) #ok(#Option(c));
                         case (#err(e)) #err(e);
+                    };
+                };
+            };
+            // case (schema, #Option(inner)) {
+            //     if (inner == #Null) return #ok;
+
+            //     validate(schema, inner);
+            // };
+            // case (#Tuple(tuples), #Record(records)) {
+            //     if (records.size() != tuples.size()) return #err("Tuple size mismatch: expected " # debug_show (tuples.size()) # ", got " # debug_show (records.size()));
+
+            //     for ((i, (key, _)) in Itertools.enumerate(records.vals())) {
+            //         if (key != Nat.toText(i)) return #err("Tuple key mismatch: expected " # Nat.toText(i) # ", got " # debug_show (key));
+            //     };
+
+            //     for ((i, (key, value)) in Itertools.enumerate(records.vals())) {
+            //         let res = validate(tuples[i], value);
+            //         let #ok(_) = res else return send_error(res);
+            //     };
+
+            //     #ok;
+
+            // };
+            case (#Record(fields)) {
+                let #Record(records) = value_to_cast else return #err("Expected a record");
+
+                if (fields.size() != records.size()) {
+                    return #err("Record size mismatch: " # debug_show (("schema", fields.size()), ("record", records.size())));
+                };
+
+                let sorted_fields = Array.sort(
+                    fields,
+                    func(a : (Text, Schema), b : (Text, Schema)) : T.Order {
+                        Text.compare(a.0, b.0);
+                    },
+                );
+
+                let sorted_records = Array.sort(
+                    records,
+                    func(a : (Text, Candid), b : (Text, Candid)) : T.Order {
+                        Text.compare(a.0, b.0);
+                    },
+                );
+
+                let buffer = Buffer.Buffer<(Text, Candid)>(records.size());
+
+                // should sort fields and records
+                var i = 0;
+                while (i < fields.size()) {
+                    let field = sorted_fields[i];
+                    let record = sorted_records[i];
+
+                    if (field.0 != record.0) return #err("Record field mismatch: " # debug_show (("field", field.0), ("record", record.0)) # debug_show (fields, records));
+
+                    let value = switch (cast(field.1, record.1)) {
+                        case (#ok(c)) c;
+                        case (#err(e)) return #err(e);
+                    };
+
+                    buffer.add((field.0, value));
+
+                    i += 1;
+                };
+
+                #ok(#Record(Buffer.toArray(buffer)));
+            };
+            case (#Array(inner)) {
+                let #Array(records) = value_to_cast else return #err("Expected an array");
+                var i = 0;
+                let buffer = Buffer.Buffer<Candid>(records.size());
+                while (i < records.size()) {
+                    let val = switch (cast(inner, records[i])) {
+                        case (#ok(c)) c;
+                        case (#err(e)) return #err(e);
+                    };
+                    buffer.add(val);
+
+                    i += 1;
+                };
+
+                #ok(#Array(Buffer.toArray(buffer)));
+
+            };
+            case (#Variant(variants)) {
+                let #Variant((record_key, nested_record)) = value_to_cast else return #err("Expected a variant");
+
+                let result = Array.find<(Text, T.Schema)>(
+                    variants,
+                    func((variant_name, _) : (Text, Schema)) : Bool {
+                        variant_name == record_key;
+                    },
+                );
+
+                // Debug.print("schema: " # debug_show (schema));
+                // Debug.print("record: " # debug_show (record));
+
+                switch (result) {
+                    case (null) return #err("Variant not found in schema");
+                    case (?(name, variant)) switch (cast(variant, nested_record)) {
+                        case (#ok(c)) #ok(#Variant((name, c)));
+                        case (#err(e)) return #err(e);
                     };
                 };
             };

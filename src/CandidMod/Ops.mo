@@ -1,3 +1,4 @@
+import Array "mo:base/Array";
 import Debug "mo:base/Debug";
 import Text "mo:base/Text";
 import Nat32 "mo:base/Nat32";
@@ -89,9 +90,8 @@ module CandidOps {
 
         let c = a + b;
 
-        let candid = from_float(self, c);
-
-        #ok(candid);
+        // let candid = from_float(self, c);
+        #ok(#Float(c));
 
     };
 
@@ -106,8 +106,8 @@ module CandidOps {
 
         let c = a - b;
 
-        let res = from_float(self, c);
-        #ok(res)
+        // let candid = from_float(self, c);
+        #ok(#Float(c));
 
     };
 
@@ -118,9 +118,8 @@ module CandidOps {
 
         let c = a * b;
 
-        let res = from_float(self, c);
-
-        #ok(res)
+        // let candid = from_float(self, c);
+        #ok(#Float(c));
 
     };
 
@@ -135,8 +134,243 @@ module CandidOps {
 
         let c = a / b;
 
+        // let candid = from_float(self, c);
+        #ok(#Float(c));
+
+    };
+
+    public func mod(self : Candid, other : Candid) : Result<Candid, Text> {
+
+        let a = to_float(self);
+        let b = to_float(other);
+
+        if (b == 0) {
+            return #err("Cannot complete #mod operation because " # debug_show (self) # " cannot be divided by zero - " # debug_show (other));
+        };
+
+        let c = a % b;
+
+        // let candid = from_float(self, c);
+        #ok(#Float(c));
+
+    };
+
+    public func pow(self : Candid, other : Candid) : Result<Candid, Text> {
+
+        let a = to_float(self);
+        let b = to_float(other);
+
+        let c = a ** b;
+
+        // let candid = from_float(self, c);
+        #ok(#Float(c));
+
+    };
+
+    public func sqrt(self : Candid) : Result<Candid, Text> {
+
+        let a = to_float(self);
+
+        if (a < 0) {
+            return #err("Cannot complete #sqrt operation because " # debug_show (self) # " is negative");
+        };
+
+        let c = Float.sqrt(a);
+
+        // let candid = from_float(self, c);
+        #ok(#Float(c));
+
+    };
+
+    public func abs(self : Candid) : Result<Candid, Text> {
+
+        let a = to_float(self);
+
+        let c = Float.abs(a);
+
         let res = from_float(self, c);
         #ok(res);
+
+    };
+
+    public func neg(self : Candid) : Result<Candid, Text> {
+
+        let a = to_float(self);
+
+        let c = Float.neg(a);
+
+        // let candid = from_float(self, c);
+        #ok(#Float(c));
+
+    };
+
+    public func floor(self : Candid) : Result<Candid, Text> {
+
+        let a = to_float(self);
+
+        let c = Float.floor(a);
+
+        let res = from_float(self, c);
+        #ok(res);
+
+    };
+
+    public func ceil(self : Candid) : Result<Candid, Text> {
+
+        let a = to_float(self);
+
+        let c = Float.ceil(a);
+
+        // let candid = from_float(self, c);
+        #ok(#Float(c));
+
+    };
+
+    public func min(self : Candid, other : Candid) : Result<Candid, Text> {
+
+        let a = to_float(self);
+        let b = to_float(other);
+
+        let c = Float.min(a, b);
+
+        // let candid = from_float(self, c);
+        #ok(#Float(c));
+
+    };
+
+    public func max(self : Candid, other : Candid) : Result<Candid, Text> {
+
+        let a = to_float(self);
+        let b = to_float(other);
+
+        let c = Float.max(a, b);
+
+        // let candid = from_float(self, c);
+        #ok(#Float(c));
+
+    };
+
+    public func trim(self : Candid, toTrim : Text) : Result<Candid, Text> {
+        switch (self) {
+            case (#Text(text)) {
+                let trimmed = Text.trim(text, #text(toTrim));
+                #ok(#Text(trimmed));
+            };
+            case (other) {
+                return #err("Cannot complete #trim operation on " # debug_show (self) # ". Only text is supported");
+            };
+        };
+
+    };
+
+    public func lowercase(self : Candid) : Result<Candid, Text> {
+        switch (self) {
+            case (#Text(text)) {
+                let lower = Text.toLowercase(text);
+                #ok(#Text(lower));
+            };
+            case (other) {
+                return #err("Cannot complete #lowercase operation on " # debug_show (self) # ". Only text is supported");
+            };
+        };
+
+    };
+
+    public func uppercase(self : Candid) : Result<Candid, Text> {
+        switch (self) {
+            case (#Text(text)) {
+                let upper = Text.toUppercase(text);
+                #ok(#Text(upper));
+            };
+            case (other) {
+                return #err("Cannot complete #uppercase operation on " # debug_show (self) # ". Only text is supported");
+            };
+        };
+
+    };
+
+    public func trimStart(self : Candid, toTrim : Text) : Result<Candid, Text> {
+        switch (self) {
+            case (#Text(text)) {
+                let trimmed = Text.trimStart(text, #text(toTrim));
+                #ok(#Text(trimmed));
+            };
+            case (other) {
+                return #err("Cannot complete #trim_start operation on " # debug_show (self) # ". Only text is supported");
+            };
+        };
+
+    };
+
+    public func trimEnd(self : Candid, toTrim : Text) : Result<Candid, Text> {
+        switch (self) {
+            case (#Text(text)) {
+                let trimmed = Text.trimEnd(text, #text(toTrim));
+                #ok(#Text(trimmed));
+            };
+            case (other) {
+                return #err("Cannot complete #trim_end operation on " # debug_show (self) # ". Only text is supported");
+            };
+        };
+
+    };
+
+    public func replaceSubText(self : Candid, toReplace : Text, replacement : Text) : Result<Candid, Text> {
+        switch (self) {
+            case (#Text(text)) {
+                let replaced = Text.replace(text, #text(toReplace), replacement);
+                #ok(#Text(replaced));
+            };
+            case (other) {
+                return #err("Cannot complete #replace_sub_texts operation on " # debug_show (self) # ". Only text is supported");
+            };
+        };
+
+    };
+
+    public func slice(self : Candid, start : Nat, end : Nat) : Result<Candid, Text> {
+        switch (self) {
+            case (#Text(text)) {
+                let chars_iter = text.chars();
+                let chars = Array.tabulate(
+                    text.size(),
+                    func(_ : Nat) : Char {
+                        switch (chars_iter.next()) {
+                            case (?char) char;
+                            case (none) Debug.trap("Unexpected end of chars iterator");
+                        };
+                    },
+                );
+
+                let sub_chars = Iter.map(Array.slice(chars, start, end), Text.fromChar);
+                let sub_text = Text.join("", sub_chars);
+
+                #ok(#Text(sub_text));
+            };
+            case (#Blob(blob)) {
+                let bytes = Blob.toArray(blob);
+                let sub_bytes_iter = Array.slice(bytes, start, end);
+                let sub_bytes_array = Iter.toArray(sub_bytes_iter);
+                let sub_blob = Blob.fromArray(sub_bytes_array);
+                #ok(#Blob(sub_blob));
+            };
+            case (other) {
+                return #err("Cannot complete #slice operation on " # debug_show (self) # ". Only text is supported");
+            };
+        };
+
+    };
+
+    public func concat(self : Candid, other : Candid) : Result<Candid, Text> {
+        switch (self, other) {
+            case (#Text(text), #Text(other_text)) {
+                let concatenated = text # other_text;
+                #ok(#Text(concatenated));
+            };
+            case (other) {
+                return #err("Cannot complete #concat operation on " # debug_show (self, other) # ". Only text is supported");
+            };
+        };
 
     };
 
@@ -144,7 +378,7 @@ module CandidOps {
         public func add(values : Iter<Candid>) : Result<Candid, Text> {
 
             let floats = Iter.toArray(Iter.map(values, to_float));
-         //    Debug.print("floats: " # debug_show floats);
+            //    Debug.print("floats: " # debug_show floats);
             let res = Itertools.fold(floats.vals(), 0.0, Float.add);
 
             #ok(#Float(res))

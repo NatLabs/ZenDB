@@ -22,28 +22,22 @@ import Nat8 "mo:base/Nat8";
 import Char "mo:base/Char";
 import Principal "mo:base/Principal";
 
-import Cast "Cast";
-import Ops "Ops";
+import CastModule "Cast";
+import OpsModule "Ops";
 
 import T "../Types";
 
 module {
-    public let {
-        cast;
-        cast_to_nat;
-        cast_to_int;
-        cast_to_text;
-    } = Cast;
+    // public let {
+    //     cast;
+    //     cast_to_nat;
+    //     cast_to_int;
+    //     cast_to_text;
+    // } = Cast;
 
-    public let {
-        to_float;
-        from_float;
-        add;
-        sub;
-        mul;
-        div;
-        Multi;
-    } = Ops;
+    public let Ops = OpsModule;
+    public let MultiOps = OpsModule.Multi;
+    public let Cast = CastModule;
 
     // todo: should consider moving this to the Orchid module so we can directly encode these values
     public func get_next_value(value : T.CandidQuery) : T.CandidQuery {
@@ -167,4 +161,5 @@ module {
         };
 
     };
+
 };

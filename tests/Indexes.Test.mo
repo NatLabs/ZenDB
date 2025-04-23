@@ -42,7 +42,7 @@ let sstore = ZenDB.newStableStore(
     }
 );
 
-let zendb = ZenDB.launch(sstore);
+let zendb = ZenDB.launchDefaultDB(sstore);
 
 type SupportedIndexTypes = {
     text : Text;

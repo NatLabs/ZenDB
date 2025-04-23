@@ -27,7 +27,7 @@ let sstore = ZenDB.newStableStore(
     }
 );
 
-let zendb = ZenDB.launch(sstore);
+let zendb = ZenDB.launchDefaultDB(sstore);
 
 let limit = 10_000;
 

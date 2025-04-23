@@ -74,7 +74,7 @@ module {
         var num_of_nested_or_operations = 0;
 
         if (query_statements.size() == 0 and not requires_sorting) {
-            Logger.log(collection.logger, "QueryPlan.query_plan_from_and_operation(): Empty query with no sorting, using full scan");
+            Logger.lazyLog(collection.logger, func() = "QueryPlan.query_plan_from_and_operation(): Empty query with no sorting, using full scan");
 
             return {
                 is_and_operation = true;
@@ -156,20 +156,20 @@ module {
         //
         // the actual feature for reducing the query is implemented in the query_plan_from_or_operation function where the parent_simple_and_operations from this function is passed in. Here we just remove dangling #And operations that will be applied to the #Or operations, by leaving scans empty
         if (sub_query_plans.size() > 0) {
-            Logger.log(
+            Logger.lazyLog(
                 collection.logger,
-                "QueryPlan.query_plan_from_and_operation(): Query has " #
+                func() = "QueryPlan.query_plan_from_and_operation(): Query has " #
                 Nat.toText(sub_query_plans.size()) # " nested OR subplans",
             );
 
             if (sub_query_plans.size() == 1) {
-                Logger.log(collection.logger, "QueryPlan.query_plan_from_and_operation(): Single subplan, returning it directly");
+                Logger.lazyLog(collection.logger, func() = "QueryPlan.query_plan_from_and_operation(): Single subplan, returning it directly");
                 return sub_query_plans.get(0);
             };
 
-            Logger.log(
+            Logger.lazyLog(
                 collection.logger,
-                "QueryPlan.query_plan_from_and_operation(): Returning combined AND plan with " #
+                func() = "QueryPlan.query_plan_from_and_operation(): Returning combined AND plan with " #
                 Nat.toText(sub_query_plans.size()) # " OR subplans",
             );
             return {
@@ -180,15 +180,13 @@ module {
 
                 // if there where #Operation types in the operations
             };
-
-            // if there where #Operation types in the operations
         };
 
         // if there where #Operation types in the operations
 
         let best_index_result = switch (Index.get_best_index(collection, Buffer.toArray(operations), sort_column)) {
             case (null) {
-                Logger.log(collection.logger, "QueryPlan.query_plan_from_and_operation(): No suitable index found, using full scan");
+                Logger.lazyLog(collection.logger, func() = "QueryPlan.query_plan_from_and_operation(): No suitable index found, using full scan");
                 let (scan_bounds, filter_bounds) = Index.convert_simple_operations_to_scan_and_filter_bounds(true, Buffer.toArray(simple_operations), null, null);
 
                 return {
@@ -207,9 +205,9 @@ module {
 
             };
             case (?best_index_result) {
-                Logger.log(
+                Logger.lazyLog(
                     collection.logger,
-                    "QueryPlan.query_plan_from_and_operation(): Found best index: '" #
+                    func() = "QueryPlan.query_plan_from_and_operation(): Found best index: '" #
                     best_index_result.index.name # "'",
                 );
                 best_index_result;
@@ -221,9 +219,9 @@ module {
         let requires_additional_sorting = best_index_result.requires_additional_sorting;
         let sorted_in_reverse = best_index_result.sorted_in_reverse;
 
-        Logger.log(
+        Logger.lazyLog(
             collection.logger,
-            "QueryPlan.query_plan_from_and_operation(): Index details - " #
+            func() = "QueryPlan.query_plan_from_and_operation(): Index details - " #
             "requires_additional_filtering: " # debug_show requires_additional_filtering # ", " #
             "requires_additional_sorting: " # debug_show requires_additional_sorting # ", " #
             "sorted_in_reverse: " # debug_show sorted_in_reverse,
@@ -233,16 +231,16 @@ module {
 
         let (scan_bounds, filter_bounds) = Index.convert_simple_operations_to_scan_and_filter_bounds(true, Buffer.toArray(simple_operations), ?index.key_details, ?best_index_result.fully_covered_equality_and_range_fields);
 
-        Logger.log(
+        Logger.lazyLog(
             collection.logger,
-            "QueryPlan.query_plan_from_and_operation(): Scan bounds - " #
+            func() = "QueryPlan.query_plan_from_and_operation(): Scan bounds - " #
             "lower: " # debug_show scan_bounds.0 # ", " #
             "upper: " # debug_show scan_bounds.1,
         );
 
         var interval = Index.scan(collection, index, scan_bounds.0, scan_bounds.1, cursor_record);
 
-        Logger.log(collection.logger, "QueryPlan.query_plan_from_and_operation(): Index scan intervals: " # debug_show interval);
+        Logger.lazyLog(collection.logger, func() = "QueryPlan.query_plan_from_and_operation(): Index scan intervals: " # debug_show interval);
 
         if (requires_additional_filtering) {
             // we need to do index interval intersection with the filter bounds
@@ -267,7 +265,7 @@ module {
             ];
         };
 
-        Logger.log(collection.logger, "QueryPlan.query_plan_from_and_operation(): Created index scan query plan using index '" # index.name # "'");
+        Logger.lazyLog(collection.logger, func() = "QueryPlan.query_plan_from_and_operation(): Created index scan query plan using index '" # index.name # "'");
         return query_plan;
 
     };
@@ -280,18 +278,18 @@ module {
         cursor_map : CandidMap.CandidMap,
         parent_simple_and_operations : [(Text, T.ZqlOperators)],
     ) : QueryPlan {
-        Logger.log(
+        Logger.lazyLog(
             collection.logger,
-            "QueryPlan.query_plan_from_or_operation(): Creating query plan for OR operation with " #
+            func() = "QueryPlan.query_plan_from_or_operation(): Creating query plan for OR operation with " #
             Nat.toText(query_statements.size()) # " statements and " # Nat.toText(parent_simple_and_operations.size()) # " parent AND operations",
         );
 
         let requires_sorting : Bool = Option.isSome(sort_column);
         if (requires_sorting) {
             let (sort_field, direction) = Option.unwrap(sort_column);
-            Logger.log(
+            Logger.lazyLog(
                 collection.logger,
-                "QueryPlan.query_plan_from_or_operation(): Sorting required on field '" #
+                func() = "QueryPlan.query_plan_from_or_operation(): Sorting required on field '" #
                 sort_field # "' in " # debug_show direction # " order",
             );
         };
@@ -304,9 +302,9 @@ module {
             switch (query_statement) {
                 case (#Or(_)) Debug.trap("Directly nested #Or not allowed in this context");
                 case (#Operation(field, op)) {
-                    Logger.log(
+                    Logger.lazyLog(
                         collection.logger,
-                        "QueryPlan.query_plan_from_or_operation(): Processing operation on field '" #
+                        func() = "QueryPlan.query_plan_from_or_operation(): Processing operation on field '" #
                         field # "': " # debug_show op,
                     );
 
@@ -315,7 +313,7 @@ module {
 
                     let scan_details = switch (opt_index) {
                         case (null) {
-                            Logger.log(collection.logger, "QueryPlan.query_plan_from_or_operation(): No suitable index found for operation, using full scan");
+                            Logger.lazyLog(collection.logger, func() = "QueryPlan.query_plan_from_or_operation(): No suitable index found for operation, using full scan");
                             let (scan_bounds, filter_bounds) = Index.convert_simple_operations_to_scan_and_filter_bounds(false, operations, null, null);
 
                             let scan_details : ScanDetails = #FullScan({
@@ -327,9 +325,9 @@ module {
 
                         };
                         case (?best_index_info) {
-                            Logger.log(
+                            Logger.lazyLog(
                                 collection.logger,
-                                "QueryPlan.query_plan_from_or_operation(): Found best index for operation: '" #
+                                func() = "QueryPlan.query_plan_from_or_operation(): Found best index for operation: '" #
                                 best_index_info.index.name # "'",
                             );
 
@@ -338,9 +336,9 @@ module {
                             let requires_additional_sorting = best_index_info.requires_additional_sorting;
                             let sorted_in_reverse = best_index_info.sorted_in_reverse;
 
-                            Logger.log(
+                            Logger.lazyLog(
                                 collection.logger,
-                                "QueryPlan.query_plan_from_or_operation(): Index details - " #
+                                func() = "QueryPlan.query_plan_from_or_operation(): Index details - " #
                                 "requires_additional_filtering: " # debug_show requires_additional_filtering # ", " #
                                 "requires_additional_sorting: " # debug_show requires_additional_sorting # ", " #
                                 "sorted_in_reverse: " # debug_show sorted_in_reverse,
@@ -354,7 +352,7 @@ module {
                             );
 
                             let interval = Index.scan(collection, index, scan_bounds.0, scan_bounds.1, cursor_record);
-                            Logger.log(collection.logger, "QueryPlan.query_plan_from_or_operation(): Index scan intervals: " # debug_show interval);
+                            Logger.lazyLog(collection.logger, func() = "QueryPlan.query_plan_from_or_operation(): Index scan intervals: " # debug_show interval);
 
                             let scan_details : ScanDetails = #IndexScan({
                                 index;
@@ -372,9 +370,9 @@ module {
                     scans.add(scan_details);
                 };
                 case (#And(nested_query_statements)) {
-                    Logger.log(
+                    Logger.lazyLog(
                         collection.logger,
-                        "QueryPlan.query_plan_from_or_operation(): Processing nested AND operation with " #
+                        func() = "QueryPlan.query_plan_from_or_operation(): Processing nested AND operation with " #
                         Nat.toText(nested_query_statements.size()) # " statements",
                     );
 
@@ -398,9 +396,9 @@ module {
             scans = Buffer.toArray(scans);
         };
 
-        Logger.log(
+        Logger.lazyLog(
             collection.logger,
-            "QueryPlan.query_plan_from_or_operation(): Created OR query plan with " #
+            func() = "QueryPlan.query_plan_from_or_operation(): Created OR query plan with " #
             Nat.toText(sub_query_plans.size()) # " AND subplans and " # Nat.toText(scans.size()) # " scans",
         );
 

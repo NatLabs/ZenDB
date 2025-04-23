@@ -17,7 +17,7 @@ let zendb_sstore = let sstore = ZenDB.newStableStore(
         };
     }
 );
-let zendb = ZenDB.launch(zendb_sstore);
+let zendb = ZenDB.launchDefaultDB(zendb_sstore);
 
 type SizeVariant = {
     #known : Nat;
