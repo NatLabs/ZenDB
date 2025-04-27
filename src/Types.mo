@@ -32,8 +32,6 @@ import Int8Cmp "mo:memory-collection/TypeUtils/Int8Cmp";
 module T {
     public type BitMap = BitMap.BitMap;
 
-    // public type ZenDB = ZenDB.ZenDB;
-
     public type Candid = Serde.Candid;
 
     public type CandidQuery = Serde.Candid or {
@@ -57,7 +55,7 @@ module T {
 
     public type Map<K, V> = Map.Map<K, V>;
     public type Set<K> = Set.Set<K>;
-    let { thash; bhash } = Map;
+    public let { thash; bhash; nhash } = Map;
 
     public type Result<A, B> = Result.Result<A, B>;
     public type Buffer<A> = Buffer.Buffer<A>;
@@ -102,15 +100,29 @@ module T {
         name : Text;
         key_details : [(Text, SortDirection)];
         data : MemoryBTree.StableMemoryBTree;
+        used_internally : Bool; // cannot be deleted by user if true
+    };
+
+    public type SchemaMap = Map<Text, Schema>;
+
+    public type ResolvedConstraints = {
+
     };
 
     public type StableCollection = {
         ids : Ids.Generator;
-        var schema : Schema;
+        name : Text;
+        schema : Schema;
+        schema_map : SchemaMap;
         schema_keys : [Text];
         schema_keys_set : Set<Text>;
+
         main : MemoryBTree.StableMemoryBTree;
         indexes : Map<Text, Index>;
+
+        field_constraints : Map<Text, [SchemaFieldConstraint]>;
+        unique_constraints : [([Text], Index)];
+        fields_with_unique_constraints : Map<Text, Set<Nat>>; // the value is the index of the unique constraint in the unique_constraints list
 
         // reference to the freed btrees to the same variable in
         // the ZenDB database record
@@ -128,7 +140,7 @@ module T {
         id_store : Ids.Ids;
     };
 
-    public type ZenDB = {
+    public type StableStore = {
         id_store : Ids.Ids;
         databases : Map<Text, StableDatabase>;
         freed_btrees : Vector.Vector<MemoryBTree.StableMemoryBTree>;
@@ -311,4 +323,17 @@ module T {
         #concat : (FieldUpdateOperations, FieldUpdateOperations);
 
     } or Candid;
+
+    public type SchemaFieldConstraint = {
+        #Min : Float;
+        #Max : Float;
+        #Size : (min_size : Nat, max_size : Nat);
+        #MinSize : Nat;
+        #MaxSize : Nat;
+    };
+
+    public type SchemaConstraint = {
+        #Unique : [Text];
+        #Field : (Text, [SchemaFieldConstraint]);
+    };
 };

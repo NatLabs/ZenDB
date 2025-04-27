@@ -46,7 +46,7 @@ let AccountSchema = #Record([
     ("sub_account", #Option(#Blob)),
 ]);
 
-let TxSchema : ZenDB.Schema = #Record([
+let TxSchema : ZenDB.Types.Schema = #Record([
     ("btype", #Text),
     ("phash", #Blob),
     ("ts", #Nat),
@@ -158,7 +158,7 @@ let db_sstore = let sstore = ZenDB.newStableStore(
 );
 let db = ZenDB.launchDefaultDB(db_sstore);
 
-let #ok(txs) = db.create_collection<Tx>("transactions", TxSchema, candify_tx);
+let #ok(txs) = db.create_collection<Tx>("transactions", TxSchema, candify_tx, []);
 
 let limit = 1000;
 let pagination_limit = 3;
@@ -196,7 +196,7 @@ type Options = {
             max : ?Nat;
         };
     };
-    sort : ?(Text, ZenDB.SortDirection);
+    sort : ?(Text, ZenDB.Types.SortDirection);
     pagination : ?{
         limit : Nat;
         offset : Nat;
@@ -212,7 +212,7 @@ func options_to_query(options : Options) : ZenDB.QueryBuilder {
 
         if (options.filter.btype != null) {
             let btypes = options.filter.btype!;
-            let values = Array.map<Text, ZenDB.Candid>(btypes, func(btype : Text) : ZenDB.Candid = #Text(btype));
+            let values = Array.map<Text, ZenDB.Types.Candid>(btypes, func(btype : Text) : ZenDB.Types.Candid = #Text(btype));
 
             ignore Query.Where("btype", #In(values));
         };
@@ -391,10 +391,10 @@ func cursor_paginated_query(db_query : ZenDB.QueryBuilder, pagination_limit : Na
 type TestQuery = {
     query_name : Text;
     db_query : ZenDB.QueryBuilder;
-    expected_query_resolution : ZenDB.ZenQueryLang;
+    expected_query_resolution : ZenDB.Types.ZenQueryLang;
     check_if_result_matches_query : (Nat, Tx) -> Bool;
     display_record : Tx -> Text;
-    sort : [(Text, ZenDB.SortDirection)];
+    sort : [(Text, ZenDB.Types.SortDirection)];
     check_if_results_are_sorted : (Tx, Tx) -> Bool;
 };
 

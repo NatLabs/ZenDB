@@ -5,10 +5,11 @@ import Char "mo:base/Char";
 
 import { test; suite } "mo:test";
 import Candid "mo:serde/Candid";
+import SchemaMap "../src/Collection/SchemaMap";
 import CandidMap "../src/CandidMap";
 import ZenDB "../src";
 
-let schema : ZenDB.Schema = #Record([
+let schema : ZenDB.Types.Schema = #Record([
     ("name", #Text),
     ("age", #Nat),
     ("email", #Text),
@@ -38,6 +39,8 @@ let schema : ZenDB.Schema = #Record([
     ("tags", #Array(#Text)),
     ("comments", #Array(#Record([("content", #Text), ("created_at", #Nat)]))),
 ]);
+
+let schema_map = SchemaMap.new(schema);
 
 let candid : Candid.Candid = #Record([
     ("name", #Text("Alice")),

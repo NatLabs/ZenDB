@@ -3,12 +3,14 @@ import Debug "mo:base/Debug";
 import Buffer "mo:base/Buffer";
 import Blob "mo:base/Blob";
 import Text "mo:base/Text";
+import Array "mo:base/Array";
 
 import ZenDB "../src";
 
 import { test; suite } "mo:test";
 import Itertools "mo:itertools/Iter";
 import Record "mo:serde/Candid/Text/Parser/Record";
+import Map "mo:map/Map";
 
 let zendb_sstore = let sstore = ZenDB.newStableStore(
     ?{
@@ -40,7 +42,7 @@ type Doc = {
     version : Version;
 };
 
-let DocSchema : ZenDB.Schema = #Record([(
+let DocSchema : ZenDB.Types.Schema = #Record([(
     "version",
     #Variant([
         ("v0", #Record([("decimal", #Float)])),
@@ -70,18 +72,27 @@ let DocSchema : ZenDB.Schema = #Record([(
     ]),
 )]);
 
-let data_type_to_candid : ZenDB.Candify<Doc> = {
+let data_type_to_candid : ZenDB.Types.Candify<Doc> = {
     from_blob = func(blob : Blob) : ?Doc { from_candid (blob) };
     to_blob = func(c : Doc) : Blob { to_candid (c) };
 };
 
 assert zendb.size() == 0;
-let #ok(data) = zendb.create_collection<Doc>("data", DocSchema, data_type_to_candid);
+let #ok(data) = zendb.create_collection<Doc>("data", DocSchema, data_type_to_candid, []);
 assert zendb.size() == 1;
 
 let #ok(_) = data.create_index("index_1", [("version", #Ascending)]);
 let #ok(_) = data.create_index("index_2", [("version.v1.a", #Ascending)]);
 let #ok(_) = data.create_index("index_3", [("version.v3.size.known", #Ascending)]);
+
+let stable_data_collection = data._get_stable_state();
+for ((key, c_type) in Map.entries(stable_data_collection.schema_map)) {
+    Debug.print("key: " # debug_show (key));
+    Debug.print("c_type: " # debug_show (c_type));
+};
+
+Debug.print("unique_constraints: " # debug_show (Array.map(stable_data_collection.unique_constraints, func((x, _) : (x : [Text], Any)) : [Text] { x })));
+Debug.print("field_constraints: " # debug_show (Map.toArray(stable_data_collection.field_constraints)));
 
 var item1 : Doc = { version = #v1({ a = 42; b = "hello" }) };
 var item2 : Doc = { version = #v2({ c = "world"; d = true }) };
@@ -185,6 +196,14 @@ suite(
             "#subAll field",
             func() {
 
+                Debug.print(
+                    "#subAll item: " # debug_show (
+                        data.search(
+                            ZenDB.QueryBuilder().Where("version.v3.size.known", #eq(#Option(#Nat(32))))
+                        )
+                    )
+                );
+
                 assert #ok([(item3_id, item3)]) == data.search(
                     ZenDB.QueryBuilder().Where("version.v3.size.known", #eq(#Nat(32)))
                 );
@@ -207,7 +226,7 @@ suite(
         );
 
         test(
-            " #mulAll field",
+            "#mulAll field",
             func() {
 
                 assert #ok([(item3_id, item3)]) == data.search(
@@ -305,7 +324,7 @@ suite(
         );
 
         suite(
-            ": multi and nested operations",
+            "multi and nested operations",
             func() {
                 test(
                     "multi #addAll",
@@ -499,7 +518,7 @@ suite(
                 );
 
                 test(
-                    ": multi #addAll, #subAll, #mulAll, #divAll, , #get",
+                    "multi #addAll, #subAll, #mulAll, #divAll, #get",
                     func() {
                         let #ok(_) = data.updateById(
                             item5_id,
@@ -603,7 +622,7 @@ suite(
                 );
 
                 test(
-                    " #floor, #ceil operations",
+                    "#floor, #ceil operations",
                     func() {
                         // Create a temporary document with decimal values
                         let temp_doc : Doc = {

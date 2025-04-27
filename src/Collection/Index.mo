@@ -185,10 +185,10 @@ module {
                     let index_key_tuple = index.key_details[i];
 
                     switch (opt_cursor) {
-                        case (?(id, pagination_direction)) if (index.key_details[i].0 == C.RECORD_ID_FIELD) {
-                            // RECORD_ID_FIELD is only added in the query if it is a cursor
+                        case (?(id, pagination_direction)) if (index.key_details[i].0 == C.RECORD_ID) {
+                            // RECORD_ID is only added in the query if it is a cursor
                             // todo: update based on pagination_direction and is_lower_bound
-                            return (C.RECORD_ID_FIELD, ?#Inclusive(#Nat(id + 1)));
+                            return (C.RECORD_ID, ?#Inclusive(#Nat(id + 1)));
                         };
                         case (null) {};
                     };
@@ -522,7 +522,7 @@ module {
             label scoring_indexes for ((index_key, direction) in index.key_details.vals()) {
                 index_key_details_position += 1;
 
-                if (index_key == C.RECORD_ID_FIELD) break scoring_indexes;
+                if (index_key == C.RECORD_ID) break scoring_indexes;
 
                 var matches_at_least_one_column = false;
 
@@ -750,7 +750,7 @@ module {
     //         label scoring_indexes for ((index_key, direction) in index.key_details.vals()) {
     //             index_key_details_position += 1;
 
-    //             if (index_key == C.RECORD_ID_FIELD) break scoring_indexes;
+    //             if (index_key == C.RECORD_ID) break scoring_indexes;
 
     //             var matches_at_least_one_column = false;
 

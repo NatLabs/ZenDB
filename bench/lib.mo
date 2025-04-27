@@ -89,7 +89,7 @@ module {
             to_blob = func(c : StoreItem) : Blob { to_candid (c) };
         };
 
-        let item_schema : ZenDB.Schema = #Record([
+        let item_schema : ZenDB.Types.Schema = #Record([
             ("name", #Text),
             ("store", #Text),
             ("months_in_stock", #Nat),
@@ -100,7 +100,7 @@ module {
             ("in_stock", #Bool),
             (
                 "address",
-                ZenDB.Schema.Quadruple(
+                ZenDB.Types.Schema.Quadruple(
                     #Text, // street
                     #Text, // city
                     #Text, // state

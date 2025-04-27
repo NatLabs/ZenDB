@@ -374,6 +374,22 @@ module CandidOps {
 
     };
 
+    public func compare(self : Candid, other : Candid) : T.Order {
+        let a = to_float(self);
+        let b = to_float(other);
+
+        Float.compare(a, b);
+    };
+
+    public func size(self : Candid) : Nat {
+        switch (self) {
+            case (#Text(text)) text.size();
+            case (#Blob(blob)) blob.size();
+            case (#Array(array)) array.size();
+            case (other) Debug.trap("Cannot get size of " # debug_show (self));
+        };
+    };
+
     public module Multi {
         public func add(values : Iter<Candid>) : Result<Candid, Text> {
 

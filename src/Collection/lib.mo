@@ -38,7 +38,7 @@ import MemoryBTree "mo:memory-collection/MemoryBTree/Stable";
 import TypeUtils "mo:memory-collection/TypeUtils";
 import Int8Cmp "mo:memory-collection/TypeUtils/Int8Cmp";
 
-import ZT "../Types";
+import T "../Types";
 import Query "../Query";
 import Utils "../Utils";
 import CandidMap "../CandidMap";
@@ -75,23 +75,27 @@ module {
 
     public type Schema = Candid.CandidType;
 
-    public type Index = ZT.Index;
-    public type Candid = ZT.Candid;
-    public type SortDirection = ZT.SortDirection;
-    public type State<R> = ZT.State<R>;
-    public type ZenQueryLang = ZT.ZenQueryLang;
+    public type Index = T.Index;
+    public type Candid = T.Candid;
+    public type SortDirection = T.SortDirection;
+    public type State<R> = T.State<R>;
+    public type ZenQueryLang = T.ZenQueryLang;
 
-    public type InternalCandify<A> = ZT.InternalCandify<A>;
+    public type InternalCandify<A> = T.InternalCandify<A>;
 
-    public type StableCollection = ZT.StableCollection;
+    public type StableCollection = T.StableCollection;
 
-    public type IndexKeyFields = ZT.IndexKeyFields;
+    public type IndexKeyFields = T.IndexKeyFields;
 
     let DEFAULT_BTREE_ORDER = 256;
     let MAX_QUERY_INSTRUCTIONS : Nat64 = 5_000_000_000;
     let MAX_UPDATE_INSTRUCTIONS : Nat64 = 40_000_000_000;
 
-    public class Collection<Record>(collection_name : Text, collection : StableCollection, blobify : ZT.InternalCandify<Record>) = self {
+    public class Collection<Record>(
+        collection_name : Text,
+        collection : StableCollection,
+        blobify : T.InternalCandify<Record>,
+    ) = self {
 
         /// Generic helper function to handle Result types with consistent error logging
         private func handleResult<T>(res : Result<T, Text>, context : Text) : Result<T, Text> {
@@ -104,15 +108,26 @@ module {
             };
         };
 
+        /// for debugging
+        public func _get_schema() : T.Schema { collection.schema };
+        public func _get_schema_map() : T.SchemaMap { collection.schema_map };
+        public func _get_indexes() : Map<Text, Index> { collection.indexes };
+        public func _get_stable_state() : StableCollection { collection };
+
+        /// Returns the collection name.
         public func name() : Text = collection_name;
+
+        /// Returns the number of records in the collection.
         public func size() : Nat = MemoryBTree.size(collection.main);
 
         let main_btree_utils : MemoryBTree.BTreeUtils<Nat, Blob> = CollectionUtils.get_main_btree_utils();
 
+        /// Returns an iterator over all the record ids in the collection.
         public func keys() : Iter<Nat> {
             MemoryBTree.keys(collection.main, main_btree_utils);
         };
 
+        /// Returns an iterator over all the records in the collection.
         public func vals() : Iter<Record> {
             let iter = MemoryBTree.vals(collection.main, main_btree_utils);
             let records = Iter.map<Blob, Record>(
@@ -124,6 +139,7 @@ module {
             records;
         };
 
+        /// Returns an iterator over a tuple containing the id and record for all entries in the collection.
         public func entries() : Iter<(Nat, Record)> {
             let iter = MemoryBTree.entries(collection.main, main_btree_utils);
 
@@ -162,17 +178,22 @@ module {
             };
         };
 
-        public func update_schema(schema : Schema) : Result<(), Text> {
-            handleResult(StableCollection.update_schema(collection, schema), "Failed to update schema");
-        };
+        // public func update_schema(schema : Schema) : Result<(), Text> {
+        //     handleResult(StableCollection.update_schema(collection, schema), "Failed to update schema");
+        // };
 
+        /// Creates a new index on the collection.
         public func create_index(name : Text, index_key_details : [(Text, SortDirection)]) : Result<(), Text> {
-            handleResult(
-                StableCollection.create_index(collection, main_btree_utils, name, index_key_details),
-                "Failed to create index: " # name,
-            );
+            switch (StableCollection.create_index(collection, main_btree_utils, name, index_key_details)) {
+                case (#ok(success)) #ok();
+                case (#err(errorMsg)) {
+                    return Utils.log_error_msg(collection.logger, "Failed to create index (" # name # "): " # errorMsg);
+                };
+            };
+
         };
 
+        /// Deletes an index from the collection that is not used internally.
         public func delete_index(name : Text) : Result<(), Text> {
             handleResult(
                 StableCollection.delete_index(collection, main_btree_utils, name),
@@ -180,6 +201,7 @@ module {
             );
         };
 
+        /// Clears an index from the collection that is not used internally.
         public func clear_index(name : Text) : Result<(), Text> {
             handleResult(
                 StableCollection.clear_index(collection, main_btree_utils, name),
@@ -247,8 +269,8 @@ module {
             };
         };
 
-        type RecordLimits = [(Text, ?State<ZT.CandidQuery>)];
-        type FieldLimit = (Text, ?State<ZT.CandidQuery>);
+        type RecordLimits = [(Text, ?State<T.CandidQuery>)];
+        type FieldLimit = (Text, ?State<T.CandidQuery>);
 
         type Bounds = (RecordLimits, RecordLimits);
 
@@ -259,7 +281,7 @@ module {
 
         type Iter<A> = Iter.Iter<A>;
 
-        public func search_iter(query_builder : QueryBuilder) : Result<Iter<ZT.WrapId<Record>>, Text> {
+        public func search_iter(query_builder : QueryBuilder) : Result<Iter<T.WrapId<Record>>, Text> {
             switch (
                 handleResult(
                     StableCollection.internal_search(collection, query_builder),
@@ -274,7 +296,7 @@ module {
             };
         };
 
-        public func search(query_builder : QueryBuilder) : Result<[ZT.WrapId<Record>], Text> {
+        public func search(query_builder : QueryBuilder) : Result<[T.WrapId<Record>], Text> {
             switch (
                 handleResult(
                     StableCollection.internal_search(collection, query_builder),
@@ -317,7 +339,7 @@ module {
 
         // };
 
-        // public func async_find(query_builder : QueryBuilder, buffer : Buffer<ZT.WrapId<Record>>) : async* Result<(), Text> {
+        // public func async_find(query_builder : QueryBuilder, buffer : Buffer<T.WrapId<Record>>) : async* Result<(), Text> {
         //     switch (search_iter(query_builder)) {
         //         case (#err(err)) #err(err);
         //         case (#ok(records)) {
@@ -329,7 +351,7 @@ module {
         //     };
         // };
 
-        public func stats() : ZT.CollectionStats {
+        public func stats() : T.CollectionStats {
             StableCollection.stats(collection);
         };
 
@@ -356,17 +378,18 @@ module {
                     case (#err(err)) return #err(err);
                 };
             };
+
             #ok();
         };
 
-        public func updateById(id : Nat, update_operations : [(Text, ZT.FieldUpdateOperations)]) : Result<(), Text> {
+        public func updateById(id : Nat, update_operations : [(Text, T.FieldUpdateOperations)]) : Result<(), Text> {
             handleResult(
                 StableCollection.update_by_id(collection, main_btree_utils, id, update_operations),
                 "Failed to update record with id: " # debug_show (id),
             );
         };
 
-        public func update(query_builder : QueryBuilder, update_operations : [(Text, ZT.FieldUpdateOperations)]) : Result<(), Text> {
+        public func update(query_builder : QueryBuilder, update_operations : [(Text, T.FieldUpdateOperations)]) : Result<(), Text> {
             let records_iter = switch (
                 handleResult(
                     StableCollection.internal_search(collection, query_builder),

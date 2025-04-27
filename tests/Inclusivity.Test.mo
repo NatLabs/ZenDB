@@ -38,7 +38,7 @@ let zendb_sstore = ZenDB.newStableStore(
 let zendb = ZenDB.launchDefaultDB(zendb_sstore);
 
 // Define schemas for test collections
-let NumericSchema : ZenDB.Schema = #Record([
+let NumericSchema : ZenDB.Types.Schema = #Record([
     ("id", #Nat),
     ("int_val", #Int),
     ("float_val", #Float),
@@ -47,14 +47,14 @@ let NumericSchema : ZenDB.Schema = #Record([
     ("unindexed_float", #Float),
 ]);
 
-let TextSchema : ZenDB.Schema = #Record([
+let TextSchema : ZenDB.Types.Schema = #Record([
     ("id", #Nat),
     ("text_val", #Text),
     ("unindexed_text", #Text),
     ("case_sensitive", #Text),
 ]);
 
-let EdgeCaseSchema : ZenDB.Schema = #Record([
+let EdgeCaseSchema : ZenDB.Types.Schema = #Record([
     ("id", #Nat),
     ("opt_field", #Option(#Nat)),
     ("text_field", #Text),
@@ -111,9 +111,9 @@ let candify_edge = {
 };
 
 // Create collections
-let #ok(numeric_collection) = zendb.create_collection<NumericDoc>("numeric_test", NumericSchema, candify_numeric);
-let #ok(text_collection) = zendb.create_collection<TextDoc>("text_test", TextSchema, candify_text);
-let #ok(edge_collection) = zendb.create_collection<EdgeDoc>("edge_test", EdgeCaseSchema, candify_edge);
+let #ok(numeric_collection) = zendb.create_collection<NumericDoc>("numeric_test", NumericSchema, candify_numeric, []);
+let #ok(text_collection) = zendb.create_collection<TextDoc>("text_test", TextSchema, candify_text, []);
+let #ok(edge_collection) = zendb.create_collection<EdgeDoc>("edge_test", EdgeCaseSchema, candify_edge, []);
 
 // Create indexes
 let #ok(_) = numeric_collection.create_index("id_index", [("id", #Ascending)]);
@@ -237,7 +237,7 @@ let #ok(edge_id_2) = edge_collection.insert({
 });
 
 // Create a new collection for testing composite keys
-let CompositeSchema : ZenDB.Schema = #Record([
+let CompositeSchema : ZenDB.Types.Schema = #Record([
     ("id", #Nat),
     ("category", #Text),
     ("number", #Nat),
@@ -258,7 +258,7 @@ let candify_composite = {
 };
 
 // Create collection
-let #ok(composite_collection) = zendb.create_collection<CompositeDoc>("composite_test", CompositeSchema, candify_composite);
+let #ok(composite_collection) = zendb.create_collection<CompositeDoc>("composite_test", CompositeSchema, candify_composite, []);
 
 // Create composite index
 let #ok(_) = composite_collection.create_index("composite_index", [("category", #Ascending), ("number", #Ascending)]);

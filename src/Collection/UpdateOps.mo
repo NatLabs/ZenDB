@@ -4,7 +4,7 @@ import Nat "mo:base/Nat";
 
 import Itertools "mo:itertools/Iter";
 
-import ZT "../Types";
+import T "../Types";
 import CandidMod "../CandidMod";
 import CandidMap "../CandidMap";
 import Utils "../Utils";
@@ -12,19 +12,19 @@ import Utils "../Utils";
 module {
 
     func handle_multi_field_update_operations(
-        collection : ZT.StableCollection,
+        collection : T.StableCollection,
         candid_map : CandidMap.CandidMap,
-        field_type : ZT.CandidType,
-        field_value : ZT.Candid,
-        op : ZT.FieldUpdateOperations,
-    ) : ZT.Result<ZT.Candid, Text> {
+        field_type : T.CandidType,
+        field_value : T.Candid,
+        op : T.FieldUpdateOperations,
+    ) : T.Result<T.Candid, Text> {
 
         func handle_nested_operations(
             candid_map : CandidMap.CandidMap,
-            nested_operations : [ZT.FieldUpdateOperations],
-            operation_handler : (ZT.Iter<ZT.Candid>) -> ZT.Result<ZT.Candid, Text>,
-        ) : ZT.Result<ZT.Candid, Text> {
-            let candid_values = Array.init<ZT.Candid>(nested_operations.size(), #Null);
+            nested_operations : [T.FieldUpdateOperations],
+            operation_handler : (T.Iter<T.Candid>) -> T.Result<T.Candid, Text>,
+        ) : T.Result<T.Candid, Text> {
+            let candid_values = Array.init<T.Candid>(nested_operations.size(), #Null);
 
             for ((i, nested_op) in Itertools.enumerate(nested_operations.vals())) {
 
@@ -60,17 +60,17 @@ module {
     };
 
     func handle_single_field_update_operation(
-        collection : ZT.StableCollection,
+        collection : T.StableCollection,
         candid_map : CandidMap.CandidMap,
-        field_type : ZT.CandidType,
-        field_value : ZT.Candid,
-        op : ZT.FieldUpdateOperations,
-    ) : ZT.Result<ZT.Candid, Text> {
+        field_type : T.CandidType,
+        field_value : T.Candid,
+        op : T.FieldUpdateOperations,
+    ) : T.Result<T.Candid, Text> {
 
         func extract_candid_and_apply_fn_to_one_parameter(
-            op : ZT.FieldUpdateOperations,
-            fn : (ZT.Candid) -> ZT.Result<ZT.Candid, Text>,
-        ) : ZT.Result<ZT.Candid, Text> {
+            op : T.FieldUpdateOperations,
+            fn : (T.Candid) -> T.Result<T.Candid, Text>,
+        ) : T.Result<T.Candid, Text> {
             let candid = switch (handle_field_update_operation_helper(collection, candid_map, field_type, field_value, op)) {
                 case (#ok(candid)) candid;
                 case (#err(msg)) return #err("Failed to handle single field update operation: " # msg);
@@ -80,10 +80,10 @@ module {
         };
 
         func extract_candid_and_apply_fn_to_two_parameters(
-            op1 : ZT.FieldUpdateOperations,
-            op2 : ZT.FieldUpdateOperations,
-            fn : (ZT.Candid, ZT.Candid) -> ZT.Result<ZT.Candid, Text>,
-        ) : ZT.Result<ZT.Candid, Text> {
+            op1 : T.FieldUpdateOperations,
+            op2 : T.FieldUpdateOperations,
+            fn : (T.Candid, T.Candid) -> T.Result<T.Candid, Text>,
+        ) : T.Result<T.Candid, Text> {
             let candid1 = switch (handle_field_update_operation_helper(collection, candid_map, field_type, field_value, op1)) {
                 case (#ok(candid)) candid;
                 case (#err(msg)) return #err("Failed to handle first parameter: " # msg);
@@ -97,7 +97,7 @@ module {
             fn(candid1, candid2);
         };
 
-        let res : ZT.Result<ZT.Candid, Text> = switch (op) {
+        let res : T.Result<T.Candid, Text> = switch (op) {
             case (#currValue) { return #ok(field_value) };
             case (#get(requested_field_name)) {
                 let ?value = candid_map.get(requested_field_name) else return #err("Field '" # requested_field_name # "' not found in record");
@@ -150,7 +150,7 @@ module {
             case (#trim(inner_op, toTrim)) {
                 extract_candid_and_apply_fn_to_one_parameter(
                     inner_op,
-                    func(candid : ZT.Candid) : ZT.Result<ZT.Candid, Text> {
+                    func(candid : T.Candid) : T.Result<T.Candid, Text> {
                         CandidMod.Ops.trim(candid, toTrim);
                     },
                 );
@@ -164,7 +164,7 @@ module {
             case (#replaceSubText(inner_op, search, replacement)) {
                 extract_candid_and_apply_fn_to_one_parameter(
                     inner_op,
-                    func(candid : ZT.Candid) : ZT.Result<ZT.Candid, Text> {
+                    func(candid : T.Candid) : T.Result<T.Candid, Text> {
                         CandidMod.Ops.replaceSubText(candid, search, replacement);
                     },
                 );
@@ -172,7 +172,7 @@ module {
             case (#slice(inner_op, start, end)) {
                 extract_candid_and_apply_fn_to_one_parameter(
                     inner_op,
-                    func(candid : ZT.Candid) : ZT.Result<ZT.Candid, Text> {
+                    func(candid : T.Candid) : T.Result<T.Candid, Text> {
                         CandidMod.Ops.slice(candid, start, end);
                     },
                 );
@@ -189,7 +189,7 @@ module {
         res;
     };
 
-    func is_candid(op : ZT.FieldUpdateOperations) : Bool {
+    func is_candid(op : T.FieldUpdateOperations) : Bool {
         switch (op) {
             case (
                 #Text(_) or #Nat(_) or #Nat8(_) or #Nat16(_) or
@@ -202,7 +202,7 @@ module {
         };
     };
 
-    func to_candid_value(op : ZT.FieldUpdateOperations) : ZT.Result<ZT.Candid, Text> {
+    func to_candid_value(op : T.FieldUpdateOperations) : T.Result<T.Candid, Text> {
         let candid = switch (op) {
             case (#Text(value)) #Text(value);
             case (#Nat(value)) #Nat(value);
@@ -229,7 +229,7 @@ module {
         return #ok(candid);
     };
 
-    func is_single_operation(op : ZT.FieldUpdateOperations) : Bool {
+    func is_single_operation(op : T.FieldUpdateOperations) : Bool {
         switch (op) {
             case (
                 #concat(_, _) or #get(_) or
@@ -243,12 +243,12 @@ module {
     };
 
     func handle_field_update_operation_helper(
-        collection : ZT.StableCollection,
+        collection : T.StableCollection,
         candid_map : CandidMap.CandidMap,
-        field_type : ZT.CandidType,
-        field_value : ZT.Candid,
-        op : ZT.FieldUpdateOperations,
-    ) : ZT.Result<ZT.Candid, Text> {
+        field_type : T.CandidType,
+        field_value : T.Candid,
+        op : T.FieldUpdateOperations,
+    ) : T.Result<T.Candid, Text> {
 
         if (is_candid(op)) {
             Debug.print("handle_field_update_operation_helper: op is candid: " # debug_show (op));
@@ -266,12 +266,12 @@ module {
     };
 
     public func handle_field_update_operation(
-        collection : ZT.StableCollection,
+        collection : T.StableCollection,
         candid_map : CandidMap.CandidMap,
-        field_type : ZT.CandidType,
-        field_value : ZT.Candid,
-        op : ZT.FieldUpdateOperations,
-    ) : ZT.Result<ZT.Candid, Text> {
+        field_type : T.CandidType,
+        field_value : T.Candid,
+        op : T.FieldUpdateOperations,
+    ) : T.Result<T.Candid, Text> {
 
         let new_value = switch (handle_field_update_operation_helper(collection, candid_map, field_type, field_value, op)) {
             case (#ok(new_value)) new_value;

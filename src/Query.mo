@@ -13,6 +13,7 @@ import Set "mo:map/Set";
 import T "Types";
 import Logger "Logger";
 import Schema "Collection/Schema";
+import SchemaMap "Collection/SchemaMap";
 
 module {
 
@@ -311,7 +312,7 @@ module {
 
         func handle_operation(field : Text, op : T.ZqlOperators) : T.Result<T.ZenQueryLang, Text> {
             // Debug.print(debug_show (Set.toArray(collection.schema_keys_set)));
-            let ?candid_type = Schema.get_nested_candid_type(collection.schema, field) else {
+            let ?candid_type = SchemaMap.get_type(collection.schema_map, field) else {
                 Logger.lazyLog(
                     collection.logger,
                     func() = "Field '" # field # "' not found in schema",
