@@ -66,9 +66,9 @@ Debug.print("stable_data_collection.schema_map: " # debug_show (Map.toArray(stab
 Debug.print("unique_constraints: " # debug_show (Array.map(stable_data_collection.unique_constraints, func((x, _) : (x : [Text], Any)) : [Text] { x })));
 Debug.print("field_constraints: " # debug_show (Map.toArray(stable_data_collection.field_constraints)));
 
-let #ok(_) = data.create_index("index_1", [("version", #Ascending)]);
-let #ok(_) = data.create_index("index_2", [("version.v1.a", #Ascending)]);
-let #ok(_) = data.create_index("index_3", [("version.v3.size.known", #Ascending)]);
+let #ok(_) = data.create_index("index_1", [("version", #Ascending)], false);
+let #ok(_) = data.create_index("index_2", [("version.v1.a", #Ascending)], false);
+let #ok(_) = data.create_index("index_3", [("version.v3.size.known", #Ascending)], false);
 
 let #ok(_) = data.insert({ version = #v1({ a = 42; b = "hello" }) });
 let #ok(_) = data.insert({ version = #v2({ c = "world"; d = true }) });

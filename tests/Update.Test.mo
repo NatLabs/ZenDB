@@ -81,9 +81,9 @@ assert zendb.size() == 0;
 let #ok(data) = zendb.create_collection<Doc>("data", DocSchema, data_type_to_candid, []);
 assert zendb.size() == 1;
 
-let #ok(_) = data.create_index("index_1", [("version", #Ascending)]);
-let #ok(_) = data.create_index("index_2", [("version.v1.a", #Ascending)]);
-let #ok(_) = data.create_index("index_3", [("version.v3.size.known", #Ascending)]);
+let #ok(_) = data.create_index("index_1", [("version", #Ascending)], false);
+let #ok(_) = data.create_index("index_2", [("version.v1.a", #Ascending)], false);
+let #ok(_) = data.create_index("index_3", [("version.v3.size.known", #Ascending)], false);
 
 let stable_data_collection = data._get_stable_state();
 for ((key, c_type) in Map.entries(stable_data_collection.schema_map)) {

@@ -144,21 +144,21 @@ suite(
     "Serialized values are orderd correctly",
     func() {
 
-        let #ok(_) = sorted_index_types.create_index("text", [("text", #Ascending)]);
-        let #ok(_) = sorted_index_types.create_index("nat", [("nat", #Ascending)]);
-        let #ok(_) = sorted_index_types.create_index("nat8", [("nat8", #Ascending)]);
-        let #ok(_) = sorted_index_types.create_index("nat16", [("nat16", #Ascending)]);
-        let #ok(_) = sorted_index_types.create_index("nat32", [("nat32", #Ascending)]);
-        let #ok(_) = sorted_index_types.create_index("nat64", [("nat64", #Ascending)]);
-        let #ok(_) = sorted_index_types.create_index("int", [("int", #Ascending)]);
-        let #ok(_) = sorted_index_types.create_index("int8", [("int8", #Ascending)]);
-        let #ok(_) = sorted_index_types.create_index("int16", [("int16", #Ascending)]);
-        let #ok(_) = sorted_index_types.create_index("int32", [("int32", #Ascending)]);
-        let #ok(_) = sorted_index_types.create_index("int64", [("int64", #Ascending)]);
-        let #ok(_) = sorted_index_types.create_index("float", [("float", #Ascending)]);
-        let #ok(_) = sorted_index_types.create_index("principal", [("principal", #Ascending)]);
-        let #ok(_) = sorted_index_types.create_index("blob", [("blob", #Ascending)]);
-        let #ok(_) = sorted_index_types.create_index("bool", [("bool", #Ascending)]);
+        let #ok(_) = sorted_index_types.create_index("text", [("text", #Ascending)], false);
+        let #ok(_) = sorted_index_types.create_index("nat", [("nat", #Ascending)], false);
+        let #ok(_) = sorted_index_types.create_index("nat8", [("nat8", #Ascending)], false);
+        let #ok(_) = sorted_index_types.create_index("nat16", [("nat16", #Ascending)], false);
+        let #ok(_) = sorted_index_types.create_index("nat32", [("nat32", #Ascending)], false);
+        let #ok(_) = sorted_index_types.create_index("nat64", [("nat64", #Ascending)], false);
+        let #ok(_) = sorted_index_types.create_index("int", [("int", #Ascending)], false);
+        let #ok(_) = sorted_index_types.create_index("int8", [("int8", #Ascending)], false);
+        let #ok(_) = sorted_index_types.create_index("int16", [("int16", #Ascending)], false);
+        let #ok(_) = sorted_index_types.create_index("int32", [("int32", #Ascending)], false);
+        let #ok(_) = sorted_index_types.create_index("int64", [("int64", #Ascending)], false);
+        let #ok(_) = sorted_index_types.create_index("float", [("float", #Ascending)], false);
+        let #ok(_) = sorted_index_types.create_index("principal", [("principal", #Ascending)], false);
+        let #ok(_) = sorted_index_types.create_index("blob", [("blob", #Ascending)], false);
+        let #ok(_) = sorted_index_types.create_index("bool", [("bool", #Ascending)], false);
 
         let sorted_texts = Buffer.Buffer<Nat>(inputs.size());
         let sorted_nats = Buffer.Buffer<Nat>(inputs.size());
@@ -280,7 +280,7 @@ suite(
         };
 
         let #ok(users) = zendb.create_collection("users", UserSchema, candify_user, []);
-        let #ok(_) = users.create_index("name_id", [("name", #Ascending), ("id", #Ascending)]);
+        let #ok(_) = users.create_index("name_id", [("name", #Ascending), ("id", #Ascending)], false);
         let user_0 = { name = "a"; id = 0 };
 
         let text_1 = Text.fromIter(
@@ -467,8 +467,99 @@ suite(
                         assert Result.isOk(test_collection.insert(valid_values));
                     },
                 );
+
+                test(
+                    "Fails with invalid values",
+                    func() {
+                        let invalid_values : TestRecord = {
+                            valid_values with text = "hi";
+                        };
+
+                        assert Result.isErr(test_collection.insert(invalid_values));
+
+                        let invalid_values_2 : TestRecord = {
+                            valid_values with text = "hello world";
+                        };
+
+                        assert Result.isErr(test_collection.insert(invalid_values_2));
+
+                        let invalid_values_3 : TestRecord = {
+                            valid_values with blob = Blob.fromArray([0, 1, 2, 3, 4, 5]);
+                        };
+
+                        assert Result.isErr(test_collection.insert(invalid_values_3));
+
+                        let invalid_values_4 : TestRecord = {
+                            valid_values with blob = Blob.fromArray([0]);
+                        };
+
+                        // let invalid_values_5 : TestRecord = {
+                        //     valid_values with array = [1, 2, 3, 4, 5, 6];
+                        // };
+
+                        // assert Result.isErr(test_collection.insert(invalid_values_5));
+
+                    },
+                );
             }
 
+        );
+
+        suite(
+            "#Unique constraints",
+            func() {
+                type TestRecord = {
+                    text : Text;
+                    nat : Nat;
+                    compound : (Text, Nat);
+                };
+
+                let TestSchema : ZenDB.Types.Schema = #Record([
+                    ("text", #Text),
+                    ("nat", #Nat),
+                    ("compound", #Tuple([#Text, #Nat])),
+                ]);
+
+                let candify_test = {
+                    to_blob = func(data : TestRecord) : Blob {
+                        to_candid (data);
+                    };
+                    from_blob = func(blob : Blob) : ?TestRecord {
+                        from_candid (blob);
+                    };
+                };
+
+                let schema_constraints : [ZenDB.Types.SchemaConstraint] = [
+                    #Unique(["text"]),
+                    #Unique(["nat"]),
+                    #Unique(["compound.0", "compound.1"]),
+                ];
+
+                let #ok(test_collection) = zendb.create_collection("schema_constraints_test_3", TestSchema, candify_test, schema_constraints);
+
+                test(
+                    "Succeeds with unique values",
+                    func() {
+                        assert Result.isOk(test_collection.insert({ text = "a"; nat = 1; compound = ("a", 1) }));
+                        assert Result.isOk(test_collection.insert({ text = "b"; nat = 2; compound = ("b", 2) }));
+                        assert Result.isOk(test_collection.insert({ text = "z"; nat = 10; compound = ("c", 3) }));
+                        assert Result.isOk(test_collection.insert({ text = "zz"; nat = 100; compound = ("z", 10) }));
+
+                    },
+                );
+
+                test(
+                    "Fails with duplicate values",
+                    func() {
+                        assert Result.isErr(test_collection.insert({ text = "a"; nat = 3; compound = ("d", 4) })); // text is duplicate
+                        assert Result.isErr(test_collection.insert({ text = "bbb"; nat = 2; compound = ("e", 6) })); // nat is duplicate
+                        assert Result.isErr(test_collection.insert({ text = "c"; nat = 4; compound = ("a", 1) })); // compound is duplicate
+
+                        assert Result.isErr(test_collection.insert({ text = "a"; nat = 2; compound = ("b", 2) })); // all duplicated
+
+                    },
+                );
+            },
         )
 
     },

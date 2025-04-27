@@ -238,6 +238,18 @@ module {
                             //     ignore Map.put(nested_map, thash, IS_OPTIONAL, #Candid(#Bool, #True));
                             // };
                         };
+                        case (#Tuple(tuple_types), #Record(records)) {
+                            let tuples = Array.tabulate(
+                                tuple_types.size(),
+                                func(i : Nat) : Candid {
+                                    let (field, record_value) = records[i];
+                                    assert field == Nat.toText(i);
+                                    record_value;
+                                },
+                            );
+
+                            return handle_candid(#Tuple(tuple_types), #Tuple(tuples), is_parent_optional);
+                        };
                         case (#Array(array_type), #Array(array_values)) {
                             let nested_map = Map.new<Text, NestedCandid>();
 
@@ -274,6 +286,8 @@ module {
                     true;
                 };
 
+                // Debug.print("candid[0]: " # debug_show (candid));
+                // Debug.print("map[0]: " # debug_show (Map.toArray(map)));
                 switch (candid) {
                     case (#CandidMap(nested_map)) {
                         //    Debug.print("nested_map: " # debug_show (Map.toArray(nested_map)));
@@ -300,6 +314,9 @@ module {
                         };
                     };
                 };
+
+                // Debug.print("candid[+1]: " # debug_show (candid));
+                // Debug.print("map[+1]: " # debug_show (Map.toArray(map)));
             };
 
             if (Set.has(paths_with_optional_fields, thash, prefix_path)) {
@@ -342,15 +359,15 @@ module {
                 case (_) return null;
             };
 
-            //    Debug.print("map: " # debug_show Map.toArray(map));
-            //    Debug.print("is_optional: " # debug_show is_optional);
+            // Debug.print("map: " # debug_show Map.toArray(map));
+            // Debug.print("is_optional: " # debug_show is_optional);
 
             let field = fields[fields.size() - 1];
             current_field := field;
             prefix_path := if (prefix_path == "") field else prefix_path # "." # field;
 
-            //    Debug.print("field: " # debug_show field);
-            //    Debug.print("opt_candid: " # debug_show Map.get(map, thash, field));
+            // Debug.print("field: " # debug_show field);
+            // Debug.print("opt_candid: " # debug_show Map.get(map, thash, field));
 
             let ?candid = Map.get(map, thash, field) else return null;
 

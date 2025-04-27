@@ -86,6 +86,7 @@ suite(
                 assert candid_map.get("tuple.0") == ?#Nat(1);
                 assert candid_map.get("tuple.1") == ?#Text("text");
                 assert candid_map.get("tuple.2") == null;
+
             },
         );
 

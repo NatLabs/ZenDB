@@ -182,9 +182,10 @@ module {
         //     handleResult(StableCollection.update_schema(collection, schema), "Failed to update schema");
         // };
 
-        /// Creates a new index on the collection.
-        public func create_index(name : Text, index_key_details : [(Text, SortDirection)]) : Result<(), Text> {
-            switch (StableCollection.create_index(collection, main_btree_utils, name, index_key_details)) {
+        /// Creates a new index with the given index keys.
+        /// If `is_unique_on_index_keys` is true, the index will be unique on the index keys and records with duplicate index keys will be rejected.
+        public func create_index(name : Text, index_key_details : [(Text, SortDirection)], is_unique_on_index_keys : Bool) : Result<(), Text> {
+            switch (StableCollection.create_index(collection, main_btree_utils, name, index_key_details, is_unique_on_index_keys)) {
                 case (#ok(success)) #ok();
                 case (#err(errorMsg)) {
                     return Utils.log_error_msg(collection.logger, "Failed to create index (" # name # "): " # errorMsg);

@@ -100,7 +100,8 @@ module T {
         name : Text;
         key_details : [(Text, SortDirection)];
         data : MemoryBTree.StableMemoryBTree;
-        used_internally : Bool; // cannot be deleted by user if true
+        used_internally : Bool; // if true, the index cannot be deleted by user if true
+        is_unique : Bool; // if true, the index is unique and the record ids are not concatenated with the index key values to make duplicate values appear unique
     };
 
     public type SchemaMap = Map<Text, Schema>;

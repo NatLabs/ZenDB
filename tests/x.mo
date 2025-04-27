@@ -795,12 +795,18 @@ func test_suites(test_suites_names : Text) {
 
 test_suites("running txs db tests without indexing");
 
-let #ok(_) = txs.create_index(["btype", "tx.amt"]);
-let #ok(_) = txs.create_index(["btype", "ts"]);
-let #ok(_) = txs.create_index(["tx.amt"]);
-let #ok(_) = txs.create_index(["ts"]);
-let #ok(_) = txs.create_index(["tx.from.owner", "tx.from.sub_account"]);
-let #ok(_) = txs.create_index(["tx.to.owner", "tx.to.sub_account"]);
-let #ok(_) = txs.create_index(["tx.spender.owner", "tx.spender.sub_account"]);
+let #ok(_) = txs.create_index(["btype", "tx.amt"], false);
+
+let #ok(_) = txs.create_index(["btype", "ts"], false);
+
+let #ok(_) = txs.create_index(["tx.amt"], false);
+
+let #ok(_) = txs.create_index(["ts"], false);
+
+let #ok(_) = txs.create_index(["tx.from.owner", "tx.from.sub_account"], false);
+
+let #ok(_) = txs.create_index(["tx.to.owner", "tx.to.sub_account"], false);
+
+let #ok(_) = txs.create_index(["tx.spender.owner", "tx.spender.sub_account"], false);
 
 test_suites("running txs db tests with indexing");

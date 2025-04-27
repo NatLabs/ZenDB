@@ -181,14 +181,10 @@ module StableCollection {
     public func internal_create_index(
         collection : StableCollection,
         index_name : Text,
-        _index_key_details : [(Text, SortDirection)],
-        used_internally : Bool, // cannot be deleted by user if true
+        index_key_details : [(Text, SortDirection)],
+        is_unique : Bool,
+        used_internally : Bool,
     ) : Result<T.Index, Text> {
-
-        let index_key_details : [(Text, SortDirection)] = Array.append(
-            _index_key_details,
-            [(C.RECORD_ID, #Ascending)],
-        );
 
         switch (Map.get(collection.indexes, thash, index_name)) {
             case (?index) {
@@ -206,23 +202,9 @@ module StableCollection {
             func() = "Creating index '" # index_name # "' with key details: " # debug_show index_key_details,
         );
 
-        let index_data : MemoryBTree.StableMemoryBTree = switch (Vector.removeLast(collection.freed_btrees)) {
-            case (?btree) {
-                Logger.lazyLog(
-                    collection.logger,
-                    func() = "Using recycled BTree for index: " # index_name,
-                );
-                btree;
-            };
-            case (null) MemoryBTree.new(?C.DEFAULT_BTREE_ORDER);
-        };
+        let opt_recycled_btree = Vector.removeLast(collection.freed_btrees);
 
-        let index : Index = {
-            name = index_name;
-            key_details = index_key_details;
-            data = index_data;
-            used_internally;
-        };
+        let index = Index.new(index_name, index_key_details, is_unique, used_internally, opt_recycled_btree);
 
         ignore Map.put<Text, Index>(collection.indexes, thash, index_name, index);
         Logger.lazyInfo(
@@ -238,9 +220,10 @@ module StableCollection {
         main_btree_utils : BTreeUtils<Nat, Blob>,
         index_name : Text,
         _index_key_details : [(Text, SortDirection)],
+        is_unique : Bool,
     ) : Result<(T.Index), Text> {
 
-        StableCollection.internal_create_index(collection, index_name, _index_key_details, false);
+        StableCollection.internal_create_index(collection, index_name, _index_key_details, is_unique, false);
     };
 
     public func create_and_populate_index(
@@ -250,7 +233,8 @@ module StableCollection {
         index_key_details : [(Text, SortDirection)],
     ) : Result<(), Text> {
 
-        switch (create_index(collection, _main_btree_utils, index_name, index_key_details)) {
+        //! todo: update the is_unique and used_internally flags
+        switch (create_index(collection, _main_btree_utils, index_name, index_key_details, false)) {
             case (#err(err)) return #err(err);
             case (#ok(_)) {};
         };

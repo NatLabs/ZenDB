@@ -89,7 +89,7 @@ module {
 
         func extract(schema : T.Schema) {
             switch (schema) {
-                case (#Record(fields)) {
+                case (#Record(fields) or #Map(fields)) {
                     for ((name, value) in fields.vals()) {
                         buffer.add(name);
                         extract(value);

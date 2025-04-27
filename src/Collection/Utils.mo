@@ -78,6 +78,10 @@ module CollectionUtils {
 
     public let { thash; bhash } = Map;
 
+    public func new_btree() : T.MemoryBTree {
+        MemoryBTree.new(?C.DEFAULT_BTREE_ORDER);
+    };
+
     public func get_index_data_utils() : MemoryBTree.BTreeUtils<[T.CandidQuery], T.RecordId> {
 
         let key_utils = get_index_key_utils();

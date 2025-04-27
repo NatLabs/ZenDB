@@ -89,9 +89,11 @@ suite(
             },
         );
 
-        let #ok(_) = ZenDB.create_index(hydra_db, "users", [("age")]);
-        let #ok(name_index) = ZenDB.create_index(hydra_db, "users", [("name")]);
-        let #ok(_) = ZenDB.create_index(hydra_db, "users", [("email")]);
+        let #ok(_) = ZenDB.create_index(hydra_db, "users", [("age")], false);
+
+        let #ok(name_index) = ZenDB.create_index(hydra_db, "users", [("name")], false);
+
+        let #ok(_) = ZenDB.create_index(hydra_db, "users", [("email")], false);
 
         // let index_data_utils = ZenDB.get_index_data_utils(name_index.key_details);
         // let entries = MemoryBTree.scan(name_index.data, index_data_utils, ?[("name", #Text("nam-do-san")), (":record_id", #Nat(0))], ?[("name", #Text("nam-do-san")), (":record_id", #Nat(2 ** 64))]);

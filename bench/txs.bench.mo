@@ -428,13 +428,13 @@ module {
 
             case ("insert with 5 indexes") {
 
-                let #ok(_) = txs.create_index("index_1", [("btype", #Ascending), ("tx.amt", #Ascending)]);
-                let #ok(_) = txs.create_index("index_2", [("btype", #Ascending), ("ts", #Ascending)]);
-                let #ok(_) = txs.create_index("index_3", [("tx.amt", #Ascending)]);
-                let #ok(_) = txs.create_index("index_4", [("ts", #Ascending)]);
-                let #ok(_) = txs.create_index("index_5", [("tx.from.owner", #Ascending), ("tx.from.sub_account", #Ascending)]);
-                let #ok(_) = txs.create_index("index_6", [("tx.to.owner", #Ascending), ("tx.to.sub_account", #Ascending)]);
-                let #ok(_) = txs.create_index("index_7", [("tx.spender.owner", #Ascending), ("tx.spender.sub_account", #Ascending)]);
+                let #ok(_) = txs.create_index("index_1", [("btype", #Ascending), ("tx.amt", #Ascending)], false);
+                let #ok(_) = txs.create_index("index_2", [("btype", #Ascending), ("ts", #Ascending)], false);
+                let #ok(_) = txs.create_index("index_3", [("tx.amt", #Ascending)], false);
+                let #ok(_) = txs.create_index("index_4", [("ts", #Ascending)], false);
+                let #ok(_) = txs.create_index("index_5", [("tx.from.owner", #Ascending), ("tx.from.sub_account", #Ascending)], false);
+                let #ok(_) = txs.create_index("index_6", [("tx.to.owner", #Ascending), ("tx.to.sub_account", #Ascending)], false);
+                let #ok(_) = txs.create_index("index_7", [("tx.spender.owner", #Ascending), ("tx.spender.sub_account", #Ascending)], false);
 
                 for (i in Iter.range(0, limit - 1)) {
                     let tx = predefined_txs.get(i);

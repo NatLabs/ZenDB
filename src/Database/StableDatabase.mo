@@ -141,6 +141,7 @@ module {
                 "internal_index_" # debug_show (Map.size(stable_collection.indexes)) # "_unique",
                 unique_field_names_with_direction,
                 true,
+                true,
             );
 
             let index : T.Index = switch (index_res) {
