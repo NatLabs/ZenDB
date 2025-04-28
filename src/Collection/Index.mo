@@ -33,7 +33,6 @@ import { Orchid } "Orchid";
 
 import CollectionUtils "Utils";
 import Schema "Schema";
-
 module {
 
     type BestIndexResult = T.BestIndexResult;
@@ -67,6 +66,56 @@ module {
     type Order = Order.Order;
 
     let { nhash; thash } = Map;
+
+    public func new(
+        name : Text,
+        index_key_details : [(Text, SortDirection)],
+        used_internally : Bool, // cannot be deleted by user if true
+        is_unique : Bool, // if true, the index is unique and the record ids are not concatenated with the index key values to make duplicate values appear unique
+        opt_recycled_btree : ?MemoryBTree.StableMemoryBTree,
+    ) : T.Index {
+
+        let key_details : [(Text, SortDirection)] = if (is_unique) {
+            index_key_details;
+        } else {
+            Array.append(
+                index_key_details,
+                [(C.RECORD_ID, #Ascending)],
+            );
+        };
+
+        let index : Index = {
+            name;
+            key_details;
+            data = Option.get(opt_recycled_btree, CollectionUtils.new_btree());
+            used_internally;
+            is_unique;
+        };
+
+        index;
+
+    };
+
+    public func insert(
+        collection : StableCollection,
+        index : Index,
+        id : Nat,
+        candid_map : CandidMap.CandidMap,
+    ) : T.Result<?T.RecordId, Text> {
+
+        let index_key_values = CollectionUtils.get_index_columns(collection, index.key_details, id, candid_map);
+
+        let index_data_utils = CollectionUtils.get_index_data_utils();
+        let opt_prev_id = MemoryBTree.insert(index.data, index_data_utils, index_key_values, id);
+
+        Logger.lazyLog(
+            collection.logger,
+            func() = "Storing record with id " # debug_show id # " in index " # index.name # ", originally "
+            # debug_show (index_key_values) # ", now encoded as " # debug_show (index_data_utils.key.blobify.to_blob(index_key_values)),
+        );
+
+        #ok(opt_prev_id);
+    };
 
     let EQUALITY_SCORE = 4;
     let SORT_SCORE = 2;
@@ -185,10 +234,10 @@ module {
                     let index_key_tuple = index.key_details[i];
 
                     switch (opt_cursor) {
-                        case (?(id, pagination_direction)) if (index.key_details[i].0 == C.RECORD_ID_FIELD) {
-                            // RECORD_ID_FIELD is only added in the query if it is a cursor
+                        case (?(id, pagination_direction)) if (index.key_details[i].0 == C.RECORD_ID) {
+                            // RECORD_ID is only added in the query if it is a cursor
                             // todo: update based on pagination_direction and is_lower_bound
-                            return (C.RECORD_ID_FIELD, ?#Inclusive(#Nat(id + 1)));
+                            return (C.RECORD_ID, ?#Inclusive(#Nat(id + 1)));
                         };
                         case (null) {};
                     };
@@ -522,7 +571,7 @@ module {
             label scoring_indexes for ((index_key, direction) in index.key_details.vals()) {
                 index_key_details_position += 1;
 
-                if (index_key == C.RECORD_ID_FIELD) break scoring_indexes;
+                if (index_key == C.RECORD_ID) break scoring_indexes;
 
                 var matches_at_least_one_column = false;
 
@@ -750,7 +799,7 @@ module {
     //         label scoring_indexes for ((index_key, direction) in index.key_details.vals()) {
     //             index_key_details_position += 1;
 
-    //             if (index_key == C.RECORD_ID_FIELD) break scoring_indexes;
+    //             if (index_key == C.RECORD_ID) break scoring_indexes;
 
     //             var matches_at_least_one_column = false;
 

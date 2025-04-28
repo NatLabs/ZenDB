@@ -28,17 +28,19 @@ import TypeUtils "mo:memory-collection/TypeUtils";
 import Int8Cmp "mo:memory-collection/TypeUtils/Int8Cmp";
 
 import Collection "../Collection";
+import StableCollection "../Collection/StableCollection";
 import Utils "../Utils";
-import ZT "../Types";
+import T "../Types";
 import C "../Constants";
 import Schema "../Collection/Schema";
 import Logger "../Logger";
+import SchemaMap "../Collection/SchemaMap";
 
 module {
 
     let { log_error_msg } = Utils;
 
-    public type InternalCandify<T> = ZT.InternalCandify<T>;
+    public type InternalCandify<T> = T.InternalCandify<T>;
     public type Map<K, V> = Map.Map<K, V>;
     public type Set<K> = Set.Set<K>;
     let { thash; bhash } = Map;
@@ -48,15 +50,15 @@ module {
     public type Iter<A> = Iter.Iter<A>;
     public type RevIter<A> = RevIter.RevIter<A>;
 
-    public type StableCollection = ZT.StableCollection;
+    public type StableCollection = T.StableCollection;
 
-    public func size(db : ZT.StableDatabase) : Nat {
+    public func size(db : T.StableDatabase) : Nat {
         let size = Map.size<Text, StableCollection>(db.collections);
         Logger.lazyInfo(db.logger, func() = "StableDatabase.size(): Number of collections: " # debug_show size);
         size;
     };
 
-    public func create_collection(db : ZT.StableDatabase, name : Text, schema : ZT.Schema) : Result<StableCollection, Text> {
+    public func create_collection(db : T.StableDatabase, name : Text, schema : T.Schema, schema_constraints : [T.SchemaConstraint]) : Result<StableCollection, Text> {
         Logger.lazyInfo(
             db.logger,
             func() = "StableDatabase.create_collection(): Creating collection '" # name # "'",
@@ -93,23 +95,96 @@ module {
         };
 
         let #Record(_) = processed_schema else return log_error_msg(db.logger, "Schema error: schema type is not a record");
+        let schema_map = SchemaMap.new(processed_schema);
+
+        // Validate schema constraints
+        let { field_constraints; unique_constraints } = switch (SchemaMap.validate_schema_constraints(schema_map, schema_constraints)) {
+            case (#ok(res)) res;
+            case (#err(msg)) {
+                let error_msg = "StableDatabase.create_collection(): Schema constraints validation failed: " # msg;
+                return log_error_msg(db.logger, error_msg);
+            };
+        };
 
         let schema_keys = Utils.extract_schema_keys(processed_schema);
 
-        let stable_collection = {
+        var stable_collection : T.StableCollection = {
             ids = Ids.create(db.id_store, name);
-            var schema = processed_schema;
+            name;
+            schema = processed_schema;
+            schema_map = SchemaMap.new(processed_schema);
             schema_keys;
             schema_keys_set = Set.fromIter(schema_keys.vals(), thash);
             main = MemoryBTree.new(?C.DEFAULT_BTREE_ORDER);
-            indexes = Map.new<Text, ZT.Index>();
+            indexes = Map.new<Text, T.Index>();
+
+            field_constraints;
+            unique_constraints = [];
+            fields_with_unique_constraints = Map.new();
 
             // db references
             freed_btrees = db.freed_btrees;
             logger = db.logger;
         };
 
+        let unique_constraints_buffer = Buffer.Buffer<([Text], T.Index)>(8);
+
+        for (unique_field_names in unique_constraints.vals()) {
+
+            let unique_field_names_with_direction = Array.map<Text, (Text, T.SortDirection)>(
+                unique_field_names,
+                func(field_name : Text) : (Text, T.SortDirection) = (field_name, #Ascending),
+            );
+
+            let index_res = StableCollection.internal_create_index(
+                stable_collection,
+                "internal_index_" # debug_show (Map.size(stable_collection.indexes)) # "_unique",
+                unique_field_names_with_direction,
+                true,
+                true,
+            );
+
+            let index : T.Index = switch (index_res) {
+                case (#ok(index)) {
+                    Logger.lazyInfo(
+                        db.logger,
+                        func() = "StableDatabase.create_collection(): Created index for unique constraint on fields: " # debug_show unique_field_names,
+                    );
+
+                    index;
+                };
+                case (#err(msg)) {
+                    let error_msg = "StableDatabase.create_collection(): Failed to create index for unique constraint on fields: " # debug_show unique_field_names # ", error: " # msg;
+                    return log_error_msg(db.logger, error_msg);
+                };
+            };
+
+            let unique_constraint_index = unique_constraints_buffer.size();
+            unique_constraints_buffer.add((unique_field_names, index));
+
+            for (unique_field_name in unique_field_names.vals()) {
+                let set = switch (Map.get(stable_collection.fields_with_unique_constraints, T.thash, unique_field_name)) {
+                    case (?set) set;
+                    case (null) {
+                        let set = Set.new<Nat>();
+                        ignore Map.put(stable_collection.fields_with_unique_constraints, thash, unique_field_name, set);
+                        set;
+                    };
+                };
+
+                Set.add(set, T.nhash, unique_constraint_index);
+
+            };
+
+        };
+
+        stable_collection := {
+            stable_collection with
+            unique_constraints = Buffer.toArray(unique_constraints_buffer);
+        };
+
         ignore Map.put<Text, StableCollection>(db.collections, thash, name, stable_collection);
+
         Logger.lazyInfo(
             db.logger,
             func() = "StableDatabase.create_collection(): Created collection '" # name # "' successfully",
@@ -123,7 +198,7 @@ module {
 
     };
 
-    public func get_collection(db : ZT.StableDatabase, name : Text) : Result<StableCollection, Text> {
+    public func get_collection(db : T.StableDatabase, name : Text) : Result<StableCollection, Text> {
         Logger.lazyLog(
             db.logger,
             func() = "StableDatabase.get_collection(): Getting collection '" # name # "'",
@@ -150,16 +225,17 @@ module {
     };
 
     public func get_or_create_collection<Record>(
-        db : ZT.StableDatabase,
+        db : T.StableDatabase,
         name : Text,
-        schema : ZT.Schema,
+        schema : T.Schema,
+        schema_constraints : [T.SchemaConstraint],
     ) : Result<StableCollection, Text> {
         Logger.lazyInfo(
             db.logger,
             func() = "StableDatabase.get_or_create_collection(): Getting or creating collection '" # name # "'",
         );
 
-        switch (create_collection(db, name, schema)) {
+        switch (create_collection(db, name, schema, schema_constraints)) {
             case (#ok(collection)) {
                 Logger.lazyInfo(
                     db.logger,

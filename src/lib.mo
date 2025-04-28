@@ -31,115 +31,56 @@ import Int8Cmp "mo:memory-collection/TypeUtils/Int8Cmp";
 import Collection "Collection";
 import Database "Database";
 import Query "Query";
-import ZT "Types";
 import Logger "Logger";
 
+import T "Types";
+import C "Constants";
+
 module {
-    public type Map<K, V> = Map.Map<K, V>;
-    public type Set<K> = Set.Set<K>;
-    let { thash; bhash } = Map;
 
-    public type Result<A, B> = Result.Result<A, B>;
-    public type Buffer<A> = Buffer.Buffer<A>;
-    public type Iter<A> = Iter.Iter<A>;
-    public type RevIter<A> = RevIter.RevIter<A>;
+    public let Types = T;
+    public let Constants = C;
 
-    // public type MemoryBTree = MemoryBTree.VersionedMemoryBTree;
-    public type BTreeUtils<K, V> = MemoryBTree.BTreeUtils<K, V>;
-    public type TypeUtils<A> = TypeUtils.TypeUtils<A>;
-
-    public type Order = Order.Order;
-    public type Hash = Hash.Hash;
-
-    public type Schema = Candid.CandidType;
-    public type StableQuery = ZT.StableQuery;
-
-    public type ZenQueryLang = ZT.ZenQueryLang;
-    public type ZqlOperators = ZT.ZqlOperators;
-
-    public let Types = ZT;
+    public type Collection<T> = Collection.Collection<T>;
+    public type Database = Database.Database;
 
     public module Schema {
-        public func Tuple(a : Schema, b : Schema) : Schema {
+        public func Tuple(a : T.Schema, b : T.Schema) : T.Schema {
             #Tuple([a, b]);
         };
-        public func Triple(a : Schema, b : Schema, c : Schema) : Schema {
+        public func Triple(a : T.Schema, b : T.Schema, c : T.Schema) : T.Schema {
             #Tuple([a, b, c]);
         };
-        public func Quadruple(a : Schema, b : Schema, c : Schema, d : Schema) : Schema {
+        public func Quadruple(a : T.Schema, b : T.Schema, c : T.Schema, d : T.Schema) : T.Schema {
             #Tuple([a, b, c, d]);
         };
-        // public func MultiTuple(schemas: [Schema]) : Schema {
-        //     let fields = Array.map<Nat, (Text, Schema)>(schemas, func(i: Nat, schema: Schema) : (Text, Schema) {
+        // public func MultiTuple(schemas: [T.Schema]) : T.Schema {
+        //     let fields = Array.map<Nat, (Text, T.Schema)>(schemas, func(i: Nat, schema: T.Schema) : (Text, T.Schema) {
         //         (Text.fromNat(i), schema)
         //     });
         //     #Record(fields)
         // };
     };
 
-    public type Tuple<A, B> = ZT.Tuple<A, B>;
-    public func Tuple<A, B>(a : A, b : B) : ZT.Tuple<A, B> = {
+    public type Tuple<A, B> = T.Tuple<A, B>;
+    public func Tuple<A, B>(a : A, b : B) : T.Tuple<A, B> = {
         _0_ = a;
         _1_ = b;
     };
 
-    public type Triple<A, B, C> = ZT.Triple<A, B, C>;
-    public func Triple<A, B, C>(a : A, b : B, c : C) : ZT.Triple<A, B, C> = {
+    public type Triple<A, B, C> = T.Triple<A, B, C>;
+    public func Triple<A, B, C>(a : A, b : B, c : C) : T.Triple<A, B, C> = {
         _0_ = a;
         _1_ = b;
         _2_ = c;
     };
 
-    public type Quadruple<A, B, C, D> = ZT.Quadruple<A, B, C, D>;
+    public type Quadruple<A, B, C, D> = T.Quadruple<A, B, C, D>;
     public func Quadruple<A, B, C, D>(a : A, b : B, c : C, d : D) : Quadruple<A, B, C, D> = {
         _0_ = a;
         _1_ = b;
         _2_ = c;
         _3_ = d;
-    };
-
-    public type SortDirection = ZT.SortDirection;
-
-    public type Index = ZT.Index;
-
-    public type Collection<Record> = Collection.Collection<Record>;
-
-    public type ZenDB = ZT.ZenDB;
-
-    public let DEFAULT_BTREE_ORDER = 256;
-
-    public type Candid = Serde.Candid;
-
-    public type Candify<A> = ZT.Candify<A>;
-
-    // func eq_candid(a : Candid, b : Candid) : Bool {
-    //     cmp_candid(a, b) == 0;
-    // };
-    public type StableCollection = ZT.StableCollection;
-
-    func get_collection(hydra_db : ZenDB, collection_name : Text) : ?StableCollection {
-        Map.get<Text, StableCollection>(hydra_db.collections, thash, collection_name);
-    };
-
-    func reverse_order(order : Order) : Order {
-        switch (order) {
-            case (#less) #greater;
-            case (#greater) #less;
-            case (#equal) #equal;
-        };
-    };
-
-    public type IndexKeyFields = [(Text, Candid)];
-
-    // func get_btree_utils() : (BT) {
-    //     MemoryBTree.createUtils(TypeUtils.Nat, TypeUtils.Blob);
-    // };
-
-    public type WrapId<Record> = (Nat, Record);
-
-    type State<T> = {
-        #Inclusive : T;
-        #Exclusive : T;
     };
 
     public type Settings = {
@@ -149,22 +90,22 @@ module {
         };
     };
 
-    public func newStableStore(settings : ?Settings) : ZenDB {
-        let zendb : ZenDB = {
+    public func newStableStore(settings : ?Settings) : T.StableStore {
+        let zendb : T.StableStore = {
             id_store = Ids.new();
-            databases = Map.new<Text, StableDatabase>();
+            databases = Map.new<Text, T.StableDatabase>();
             freed_btrees = Vector.new<MemoryBTree.StableMemoryBTree>();
             logger = Logger.init(#Error, false);
         };
 
-        let default_db : StableDatabase = {
+        let default_db : T.StableDatabase = {
             id_store = zendb.id_store;
-            collections = Map.new<Text, StableCollection>();
+            collections = Map.new<Text, T.StableCollection>();
             freed_btrees = zendb.freed_btrees;
             logger = zendb.logger;
         };
 
-        ignore Map.put(zendb.databases, ZT.thash, "default", default_db);
+        ignore Map.put(zendb.databases, T.thash, "default", default_db);
 
         ignore do ? {
             let log_settings = settings!.logging!;
@@ -180,33 +121,27 @@ module {
     //     newStableStore();
     // };
 
-    public func launchDefaultDB(sstore : ZenDB) : Database.Database {
-        let ?default_db = Map.get<Text, StableDatabase>(sstore.databases, thash, "default") else Debug.trap("Default database not found");
+    public func launchDefaultDB(sstore : T.StableStore) : Database.Database {
+        let ?default_db = Map.get<Text, T.StableDatabase>(sstore.databases, T.thash, "default") else Debug.trap("Default database not found");
         Database.Database(default_db);
     };
 
-    public class ZenDB(sstore : StableStore) {
+    public class ZenDB(sstore : T.StableStore) {
 
         public func setLogLevel(log_level : Logger.LogLevel) {
-            Logger.setLogLevel(zendb.logger, log_level);
+            Logger.setLogLevel(sstore.logger, log_level);
         };
 
         public func setIsRunLocally(is_running_locally : Bool) {
-            Logger.setIsRunLocally(zendb.logger, is_running_locally);
+            Logger.setIsRunLocally(sstore.logger, is_running_locally);
         };
     };
 
-    public func setLogLevel(zendb : ZenDB, log_level : Logger.LogLevel) {
-        Logger.setLogLevel(zendb.logger, log_level);
+    public func setLogLevel(sstore : T.StableStore, log_level : Logger.LogLevel) {
+        Logger.setLogLevel(sstore.logger, log_level);
     };
-
-    public type Database = Database.Database;
 
     public let QueryBuilder = Query.QueryBuilder;
     public type QueryBuilder = Query.QueryBuilder;
-
-    public type CollectionStats = ZT.CollectionStats;
-    public type IndexStats = ZT.IndexStats;
-    public type MemoryStats = ZT.MemoryStats;
 
 };

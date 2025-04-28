@@ -45,7 +45,7 @@ let AccountSchema = #Record([
     ("sub_account", #Option(#Blob)),
 ]);
 
-let TxSchema : ZenDB.Schema = #Record([
+let TxSchema : ZenDB.Types.Schema = #Record([
     ("btype", #Text),
     ("phash", #Blob),
     ("ts", #Nat),
@@ -185,7 +185,7 @@ type Options = {
             max : ?Nat;
         };
     };
-    sort : ?(Text, ZenDB.SortDirection);
+    sort : ?(Text, ZenDB.Types.SortDirection);
     pagination : ?{
         limit : Nat;
         offset : Nat;
@@ -201,7 +201,7 @@ func options_to_query(options : Options) : ZenDB.QueryBuilder {
 
         if (options.filter.btype != null) {
             let btypes = options.filter.btype!;
-            let values = Array.map<Text, ZenDB.Candid>(btypes, func(btype : Text) : ZenDB.Candid = #Text(btype));
+            let values = Array.map<Text, ZenDB.Types.Candid>(btypes, func(btype : Text) : ZenDB.Types.Candid = #Text(btype));
 
             ignore Query.Where("btype", #In(values));
         };
@@ -380,10 +380,10 @@ func cursor_paginated_query(db_query : ZenDB.QueryBuilder, pagination_limit : Na
 type TestQuery = {
     query_name : Text;
     db_query : ZenDB.QueryBuilder;
-    expected_query_resolution : ZenDB.ZenQueryLang;
+    expected_query_resolution : ZenDB.Types.ZenQueryLang;
     check_if_result_matches_query : (Nat, Tx) -> Bool;
     display_record : Tx -> Text;
-    sort : [(Text, ZenDB.SortDirection)];
+    sort : [(Text, ZenDB.Types.SortDirection)];
     check_if_results_are_sorted : (Tx, Tx) -> Bool;
 };
 
@@ -795,12 +795,18 @@ func test_suites(test_suites_names : Text) {
 
 test_suites("running txs db tests without indexing");
 
-let #ok(_) = txs.create_index(["btype", "tx.amt"]);
-let #ok(_) = txs.create_index(["btype", "ts"]);
-let #ok(_) = txs.create_index(["tx.amt"]);
-let #ok(_) = txs.create_index(["ts"]);
-let #ok(_) = txs.create_index(["tx.from.owner", "tx.from.sub_account"]);
-let #ok(_) = txs.create_index(["tx.to.owner", "tx.to.sub_account"]);
-let #ok(_) = txs.create_index(["tx.spender.owner", "tx.spender.sub_account"]);
+let #ok(_) = txs.create_index(["btype", "tx.amt"], false);
+
+let #ok(_) = txs.create_index(["btype", "ts"], false);
+
+let #ok(_) = txs.create_index(["tx.amt"], false);
+
+let #ok(_) = txs.create_index(["ts"], false);
+
+let #ok(_) = txs.create_index(["tx.from.owner", "tx.from.sub_account"], false);
+
+let #ok(_) = txs.create_index(["tx.to.owner", "tx.to.sub_account"], false);
+
+let #ok(_) = txs.create_index(["tx.spender.owner", "tx.spender.sub_account"], false);
 
 test_suites("running txs db tests with indexing");

@@ -51,6 +51,14 @@ module {
         sort_candid_type(schema);
     };
 
+    // Interchangeable types
+    // - #Array(#Nat8) <-> #Blob
+    //
+    // Forward compatible types
+    // These types can be updated in the following ways but not the other way around:
+    // - A record field can be update to become optional
+    //     #Record ([("field", #Nat)]) -> #Record ([("field", #Option(#Nat))])
+
     public func is_schema_backward_compatible(curr : Schema, new : Schema) : Bool {
         switch (curr, new) {
             case (#Empty, #Empty) true;
@@ -64,6 +72,8 @@ module {
             case (#Option(inner_curr), #Option(inner_new)) is_schema_backward_compatible(inner_curr, inner_new);
             // types can be updated to become optional but not the other way around
             case (curr, #Option(inner_new)) is_schema_backward_compatible(curr, inner_new);
+            case (#Blob, #Array(#Nat8)) true;
+            case (#Array(#Nat8), #Blob) true;
             case (#Array(inner_curr), #Array(inner_new)) is_schema_backward_compatible(inner_curr, inner_new);
             case (#Tuple(curr), #Tuple(new)) {
                 if (curr.size() != new.size()) return false;
@@ -126,7 +136,6 @@ module {
     };
 
     public func validate(schema : Schema, record : Candid) : Result<(), Text> {
-        Debug.print("calling validate: " # debug_show (schema, record));
 
         switch (schema, record) {
             case (#Empty, #Empty) #ok;
@@ -534,4 +543,6 @@ module {
 
         #ok(candid);
     };
+
+    // public func validate_constraints()
 };

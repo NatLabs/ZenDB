@@ -46,6 +46,7 @@ import Orchid "Orchid";
 import Schema "Schema";
 import C "../Constants";
 import Logger "../Logger";
+import SchemaMap "SchemaMap";
 
 module CollectionUtils {
 
@@ -77,6 +78,10 @@ module CollectionUtils {
 
     public let { thash; bhash } = Map;
 
+    public func new_btree() : T.MemoryBTree {
+        MemoryBTree.new(?C.DEFAULT_BTREE_ORDER);
+    };
+
     public func get_index_data_utils() : MemoryBTree.BTreeUtils<[T.CandidQuery], T.RecordId> {
 
         let key_utils = get_index_key_utils();
@@ -98,7 +103,7 @@ module CollectionUtils {
         let buffer = Buffer.Buffer<Candid>(8);
 
         for ((index_key, dir) in index_key_details.vals()) {
-            if (index_key == C.RECORD_ID_FIELD) {
+            if (index_key == C.RECORD_ID) {
                 buffer.add(#Nat(id));
             } else {
 
@@ -106,7 +111,18 @@ module CollectionUtils {
                 get_index_columns: field '" # debug_show index_key # "' not found in record
                 candid: " # debug_show candid_map.extract_candid() # "
                 ");
-                buffer.add(candid_value);
+
+                let final_candid_value = switch (SchemaMap.get_type(collection.schema_map, index_key), candid_value) {
+                    case (?(_), #Option(_)) candid_value;
+                    case (?#Option(_), #Null) #Null;
+                    case (?#Option(_), _) #Option(candid_value);
+                    case (?(_), _) candid_value;
+                    case (null, _) Debug.trap("Error retrieving schema type for index key '" # debug_show index_key # "' in collection '" # debug_show collection.name # "'. The schema type is null.");
+                };
+
+                Debug.print("final_index_columns: " # debug_show (index_key, final_candid_value));
+
+                buffer.add(final_candid_value);
             };
         };
 
@@ -222,7 +238,7 @@ module CollectionUtils {
             _intervals;
         };
 
-        if (index_name == C.RECORD_ID_FIELD) {
+        if (index_name == C.RECORD_ID) {
             let main_btree_utils = get_main_btree_utils();
 
             let record_ids = Itertools.flatten(

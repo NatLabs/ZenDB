@@ -38,7 +38,7 @@ let zendb_sstore = ZenDB.newStableStore(
 let zendb = ZenDB.launchDefaultDB(zendb_sstore);
 
 // Define schemas for test collections
-let NumericSchema : ZenDB.Schema = #Record([
+let NumericSchema : ZenDB.Types.Schema = #Record([
     ("id", #Nat),
     ("int_val", #Int),
     ("float_val", #Float),
@@ -47,14 +47,14 @@ let NumericSchema : ZenDB.Schema = #Record([
     ("unindexed_float", #Float),
 ]);
 
-let TextSchema : ZenDB.Schema = #Record([
+let TextSchema : ZenDB.Types.Schema = #Record([
     ("id", #Nat),
     ("text_val", #Text),
     ("unindexed_text", #Text),
     ("case_sensitive", #Text),
 ]);
 
-let EdgeCaseSchema : ZenDB.Schema = #Record([
+let EdgeCaseSchema : ZenDB.Types.Schema = #Record([
     ("id", #Nat),
     ("opt_field", #Option(#Nat)),
     ("text_field", #Text),
@@ -111,20 +111,20 @@ let candify_edge = {
 };
 
 // Create collections
-let #ok(numeric_collection) = zendb.create_collection<NumericDoc>("numeric_test", NumericSchema, candify_numeric);
-let #ok(text_collection) = zendb.create_collection<TextDoc>("text_test", TextSchema, candify_text);
-let #ok(edge_collection) = zendb.create_collection<EdgeDoc>("edge_test", EdgeCaseSchema, candify_edge);
+let #ok(numeric_collection) = zendb.create_collection<NumericDoc>("numeric_test", NumericSchema, candify_numeric, []);
+let #ok(text_collection) = zendb.create_collection<TextDoc>("text_test", TextSchema, candify_text, []);
+let #ok(edge_collection) = zendb.create_collection<EdgeDoc>("edge_test", EdgeCaseSchema, candify_edge, []);
 
 // Create indexes
-let #ok(_) = numeric_collection.create_index("id_index", [("id", #Ascending)]);
-let #ok(_) = numeric_collection.create_index("int_val_index", [("int_val", #Ascending)]);
-// let #ok(_) = numeric_collection.create_index("float_val_index", [("float_val", #Ascending)]);
+let #ok(_) = numeric_collection.create_index("id_index", [("id", #Ascending)], false);
+let #ok(_) = numeric_collection.create_index("int_val_index", [("int_val", #Ascending)], false);
+// let #ok(_) = numeric_collection.create_index("float_val_index", [("float_val", #Ascending)], false);
 
-let #ok(_) = text_collection.create_index("text_val_index", [("text_val", #Ascending)]);
-let #ok(_) = text_collection.create_index("case_sensitive_index", [("case_sensitive", #Ascending)]);
+let #ok(_) = text_collection.create_index("text_val_index", [("text_val", #Ascending)], false);
+let #ok(_) = text_collection.create_index("case_sensitive_index", [("case_sensitive", #Ascending)], false);
 
-let #ok(_) = edge_collection.create_index("opt_field_index", [("opt_field", #Ascending)]);
-let #ok(_) = edge_collection.create_index("text_field_index", [("text_field", #Ascending)]);
+let #ok(_) = edge_collection.create_index("opt_field_index", [("opt_field", #Ascending)], false);
+let #ok(_) = edge_collection.create_index("text_field_index", [("text_field", #Ascending)], false);
 
 // Insert test data for numeric tests
 let #ok(numeric_id_0) = numeric_collection.insert({
@@ -237,7 +237,7 @@ let #ok(edge_id_2) = edge_collection.insert({
 });
 
 // Create a new collection for testing composite keys
-let CompositeSchema : ZenDB.Schema = #Record([
+let CompositeSchema : ZenDB.Types.Schema = #Record([
     ("id", #Nat),
     ("category", #Text),
     ("number", #Nat),
@@ -258,11 +258,11 @@ let candify_composite = {
 };
 
 // Create collection
-let #ok(composite_collection) = zendb.create_collection<CompositeDoc>("composite_test", CompositeSchema, candify_composite);
+let #ok(composite_collection) = zendb.create_collection<CompositeDoc>("composite_test", CompositeSchema, candify_composite, []);
 
 // Create composite index
-let #ok(_) = composite_collection.create_index("composite_index", [("category", #Ascending), ("number", #Ascending)]);
-let #ok(_) = composite_collection.create_index("blob_index", [("category", #Ascending), ("data", #Ascending)]);
+let #ok(_) = composite_collection.create_index("composite_index", [("category", #Ascending), ("number", #Ascending)], false);
+let #ok(_) = composite_collection.create_index("blob_index", [("category", #Ascending), ("data", #Ascending)], false);
 
 // Insert test documents
 let #ok(comp_id_1) = composite_collection.insert({

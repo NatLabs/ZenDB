@@ -20,6 +20,7 @@ import Iter "mo:base/Iter";
 import Bool "mo:base/Bool";
 import Array "mo:base/Array";
 import Char "mo:base/Char";
+import Result "mo:base/Result";
 
 import ZenDB "../src";
 
@@ -62,7 +63,7 @@ type SupportedIndexTypes = {
     bool : Bool;
 };
 
-let SupportedIndexTypes : ZenDB.Schema = #Record([
+let SupportedIndexTypes : ZenDB.Types.Schema = #Record([
     ("text", #Text),
     ("nat", #Nat),
     ("nat8", #Nat8),
@@ -89,7 +90,7 @@ let candify_data = {
     };
 };
 
-let #ok(sorted_index_types) = zendb.create_collection("sorted_index_types", SupportedIndexTypes, candify_data);
+let #ok(sorted_index_types) = zendb.create_collection("sorted_index_types", SupportedIndexTypes, candify_data, []);
 let inputs = Map.new<Nat, SupportedIndexTypes>();
 
 func get_field_and_sort_record_ids<A>(getter : (record : SupportedIndexTypes) -> A, cmp : (A, A) -> Order.Order) : ((Nat, Nat) -> Order.Order) {
@@ -143,21 +144,21 @@ suite(
     "Serialized values are orderd correctly",
     func() {
 
-        let #ok(_) = sorted_index_types.create_index("text", [("text", #Ascending)]);
-        let #ok(_) = sorted_index_types.create_index("nat", [("nat", #Ascending)]);
-        let #ok(_) = sorted_index_types.create_index("nat8", [("nat8", #Ascending)]);
-        let #ok(_) = sorted_index_types.create_index("nat16", [("nat16", #Ascending)]);
-        let #ok(_) = sorted_index_types.create_index("nat32", [("nat32", #Ascending)]);
-        let #ok(_) = sorted_index_types.create_index("nat64", [("nat64", #Ascending)]);
-        let #ok(_) = sorted_index_types.create_index("int", [("int", #Ascending)]);
-        let #ok(_) = sorted_index_types.create_index("int8", [("int8", #Ascending)]);
-        let #ok(_) = sorted_index_types.create_index("int16", [("int16", #Ascending)]);
-        let #ok(_) = sorted_index_types.create_index("int32", [("int32", #Ascending)]);
-        let #ok(_) = sorted_index_types.create_index("int64", [("int64", #Ascending)]);
-        let #ok(_) = sorted_index_types.create_index("float", [("float", #Ascending)]);
-        let #ok(_) = sorted_index_types.create_index("principal", [("principal", #Ascending)]);
-        let #ok(_) = sorted_index_types.create_index("blob", [("blob", #Ascending)]);
-        let #ok(_) = sorted_index_types.create_index("bool", [("bool", #Ascending)]);
+        let #ok(_) = sorted_index_types.create_index("text", [("text", #Ascending)], false);
+        let #ok(_) = sorted_index_types.create_index("nat", [("nat", #Ascending)], false);
+        let #ok(_) = sorted_index_types.create_index("nat8", [("nat8", #Ascending)], false);
+        let #ok(_) = sorted_index_types.create_index("nat16", [("nat16", #Ascending)], false);
+        let #ok(_) = sorted_index_types.create_index("nat32", [("nat32", #Ascending)], false);
+        let #ok(_) = sorted_index_types.create_index("nat64", [("nat64", #Ascending)], false);
+        let #ok(_) = sorted_index_types.create_index("int", [("int", #Ascending)], false);
+        let #ok(_) = sorted_index_types.create_index("int8", [("int8", #Ascending)], false);
+        let #ok(_) = sorted_index_types.create_index("int16", [("int16", #Ascending)], false);
+        let #ok(_) = sorted_index_types.create_index("int32", [("int32", #Ascending)], false);
+        let #ok(_) = sorted_index_types.create_index("int64", [("int64", #Ascending)], false);
+        let #ok(_) = sorted_index_types.create_index("float", [("float", #Ascending)], false);
+        let #ok(_) = sorted_index_types.create_index("principal", [("principal", #Ascending)], false);
+        let #ok(_) = sorted_index_types.create_index("blob", [("blob", #Ascending)], false);
+        let #ok(_) = sorted_index_types.create_index("bool", [("bool", #Ascending)], false);
 
         let sorted_texts = Buffer.Buffer<Nat>(inputs.size());
         let sorted_nats = Buffer.Buffer<Nat>(inputs.size());
@@ -264,7 +265,7 @@ suite(
             id : Nat;
         };
 
-        let UserSchema : ZenDB.Schema = #Record([
+        let UserSchema : ZenDB.Types.Schema = #Record([
             ("name", #Text),
             ("id", #Nat),
         ]);
@@ -278,8 +279,8 @@ suite(
             };
         };
 
-        let #ok(users) = zendb.create_collection("users", UserSchema, candify_user);
-        let #ok(_) = users.create_index("name_id", [("name", #Ascending), ("id", #Ascending)]);
+        let #ok(users) = zendb.create_collection("users", UserSchema, candify_user, []);
+        let #ok(_) = users.create_index("name_id", [("name", #Ascending), ("id", #Ascending)], false);
         let user_0 = { name = "a"; id = 0 };
 
         let text_1 = Text.fromIter(
@@ -326,6 +327,244 @@ suite(
     },
 );
 
+suite(
+    "Schema Constraints",
+    func() {
+
+        suite(
+            "#Min and #Max value constraints",
+            func() {
+
+                type TestRecord = {
+                    nat : Nat;
+                    int : Int;
+                    float : Float;
+                };
+
+                let TestSchema : ZenDB.Types.Schema = #Record([
+                    ("nat", #Nat),
+                    ("int", #Int),
+                    ("float", #Float),
+                ]);
+
+                let candify_test = {
+                    to_blob = func(data : TestRecord) : Blob {
+                        to_candid (data);
+                    };
+                    from_blob = func(blob : Blob) : ?TestRecord {
+                        from_candid (blob);
+                    };
+                };
+
+                let schema_constraints : [ZenDB.Types.SchemaConstraint] = [
+                    #Field("nat", [#Min(1_000), #Max(32_000)]),
+                    #Field("int", [#Min(-10), #Max(10)]),
+                    #Field("float", [#Min(-1.0), #Max(1.0)]),
+                ];
+
+                let #ok(test_collection) = zendb.create_collection("schema_constraints_test", TestSchema, candify_test, schema_constraints);
+
+                let valid_values : TestRecord = {
+                    nat = 10_000;
+                    int = 5;
+                    float = 0.5;
+                };
+
+                test(
+                    "Succeeds with valid values",
+                    func() {
+                        assert Result.isOk(test_collection.insert(valid_values));
+                    },
+                );
+
+                test(
+                    "Fails with invalid values",
+                    func() {
+                        let invalid_values : TestRecord = {
+                            valid_values with nat = 50_000;
+                        };
+
+                        assert Result.isErr(test_collection.insert(invalid_values));
+
+                        let invalid_values_2 : TestRecord = {
+                            valid_values with nat = 999;
+                        };
+
+                        assert Result.isErr(test_collection.insert(invalid_values_2));
+
+                        let invalid_values_3 : TestRecord = {
+                            valid_values with int = 20;
+                        };
+
+                        assert Result.isErr(test_collection.insert(invalid_values_3));
+
+                        let invalid_values_4 : TestRecord = {
+                            valid_values with int = -20;
+                        };
+
+                        assert Result.isErr(test_collection.insert(invalid_values_4));
+
+                        let invalid_values_5 : TestRecord = {
+                            valid_values with float = 2.0;
+                        };
+
+                        assert Result.isErr(test_collection.insert(invalid_values_5));
+
+                        let invalid_values_6 : TestRecord = {
+                            valid_values with float = -2.0;
+                        };
+
+                        assert Result.isErr(test_collection.insert(invalid_values_6));
+
+                    },
+                );
+
+            },
+        );
+
+        suite(
+            "#MinSize, #MaxSize and #Size constraints",
+            func() {
+
+                type TestRecord = {
+                    text : Text;
+                    blob : Blob;
+                    // array : [Nat];
+                };
+
+                let TestSchema : ZenDB.Types.Schema = #Record([
+                    ("text", #Text),
+                    ("blob", #Blob),
+                    // ("array", #Array(#Nat)),
+                ]);
+
+                let candify_test = {
+                    to_blob = func(data : TestRecord) : Blob {
+                        to_candid (data);
+                    };
+                    from_blob = func(blob : Blob) : ?TestRecord {
+                        from_candid (blob);
+                    };
+                };
+
+                let schema_constraints : [ZenDB.Types.SchemaConstraint] = [
+                    #Field("text", [#MinSize(5), #MaxSize(10)]),
+                    #Field("blob", [#Size(3, 5)]),
+                    // #Field("array", [#MaxSize(5)]),
+                ];
+
+                let #ok(test_collection) = zendb.create_collection("schema_constraints_test_2", TestSchema, candify_test, schema_constraints);
+
+                let valid_values : TestRecord = {
+                    text = "hello";
+                    blob = Blob.fromArray([0, 1, 2, 3, 4]);
+                    // array = [1, 2, 3];
+                };
+
+                test(
+                    "Succeeds with valid values",
+                    func() {
+                        assert Result.isOk(test_collection.insert(valid_values));
+                    },
+                );
+
+                test(
+                    "Fails with invalid values",
+                    func() {
+                        let invalid_values : TestRecord = {
+                            valid_values with text = "hi";
+                        };
+
+                        assert Result.isErr(test_collection.insert(invalid_values));
+
+                        let invalid_values_2 : TestRecord = {
+                            valid_values with text = "hello world";
+                        };
+
+                        assert Result.isErr(test_collection.insert(invalid_values_2));
+
+                        let invalid_values_3 : TestRecord = {
+                            valid_values with blob = Blob.fromArray([0, 1, 2, 3, 4, 5]);
+                        };
+
+                        assert Result.isErr(test_collection.insert(invalid_values_3));
+
+                        let invalid_values_4 : TestRecord = {
+                            valid_values with blob = Blob.fromArray([0]);
+                        };
+
+                        // let invalid_values_5 : TestRecord = {
+                        //     valid_values with array = [1, 2, 3, 4, 5, 6];
+                        // };
+
+                        // assert Result.isErr(test_collection.insert(invalid_values_5));
+
+                    },
+                );
+            }
+
+        );
+
+        suite(
+            "#Unique constraints",
+            func() {
+                type TestRecord = {
+                    text : Text;
+                    nat : Nat;
+                    compound : (Text, Nat);
+                };
+
+                let TestSchema : ZenDB.Types.Schema = #Record([
+                    ("text", #Text),
+                    ("nat", #Nat),
+                    ("compound", #Tuple([#Text, #Nat])),
+                ]);
+
+                let candify_test = {
+                    to_blob = func(data : TestRecord) : Blob {
+                        to_candid (data);
+                    };
+                    from_blob = func(blob : Blob) : ?TestRecord {
+                        from_candid (blob);
+                    };
+                };
+
+                let schema_constraints : [ZenDB.Types.SchemaConstraint] = [
+                    #Unique(["text"]),
+                    #Unique(["nat"]),
+                    #Unique(["compound.0", "compound.1"]),
+                ];
+
+                let #ok(test_collection) = zendb.create_collection("schema_constraints_test_3", TestSchema, candify_test, schema_constraints);
+
+                test(
+                    "Succeeds with unique values",
+                    func() {
+                        assert Result.isOk(test_collection.insert({ text = "a"; nat = 1; compound = ("a", 1) }));
+                        assert Result.isOk(test_collection.insert({ text = "b"; nat = 2; compound = ("b", 2) }));
+                        assert Result.isOk(test_collection.insert({ text = "z"; nat = 10; compound = ("c", 3) }));
+                        assert Result.isOk(test_collection.insert({ text = "zz"; nat = 100; compound = ("z", 10) }));
+
+                    },
+                );
+
+                test(
+                    "Fails with duplicate values",
+                    func() {
+                        assert Result.isErr(test_collection.insert({ text = "a"; nat = 3; compound = ("d", 4) })); // text is duplicate
+                        assert Result.isErr(test_collection.insert({ text = "bbb"; nat = 2; compound = ("e", 6) })); // nat is duplicate
+                        assert Result.isErr(test_collection.insert({ text = "c"; nat = 4; compound = ("a", 1) })); // compound is duplicate
+
+                        assert Result.isErr(test_collection.insert({ text = "a"; nat = 2; compound = ("b", 2) })); // all duplicated
+
+                    },
+                );
+            },
+        )
+
+    },
+);
+
 // suite(
 //     "exclusive range queries",
 //     func() {
@@ -336,7 +575,7 @@ suite(
 //             blob_val : Blob;
 //         };
 
-//         let TestSchema : ZenDB.Schema = #Record([
+//         let TestSchema : ZenDB.Types.Schema = #Record([
 //             ("text_val", #Text),
 //             ("nat_val", #Nat),
 //             ("int_val", #Int),
@@ -526,7 +765,7 @@ suite(
 //             third : Blob;
 //         };
 
-//         let CompositeSchema : ZenDB.Schema = #Record([
+//         let CompositeSchema : ZenDB.Types.Schema = #Record([
 //             ("first", #Nat),
 //             ("second", #Text),
 //             ("third", #Blob),
@@ -624,7 +863,7 @@ suite(
 //             blob_val : Blob;
 //         };
 
-//         let BoundarySchema : ZenDB.Schema = #Record([
+//         let BoundarySchema : ZenDB.Types.Schema = #Record([
 //             ("nat_val", #Nat),
 //             ("text_val", #Text),
 //             ("blob_val", #Blob),

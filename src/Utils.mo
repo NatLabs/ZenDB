@@ -89,7 +89,7 @@ module {
 
         func extract(schema : T.Schema) {
             switch (schema) {
-                case (#Record(fields)) {
+                case (#Record(fields) or #Map(fields)) {
                     for ((name, value) in fields.vals()) {
                         buffer.add(name);
                         extract(value);
@@ -117,6 +117,14 @@ module {
         Buffer.toArray(buffer);
     };
 
+    public func reverse_order(order : T.Order) : T.Order {
+        switch (order) {
+            case (#less) #greater;
+            case (#greater) #less;
+            case (#equal) #equal;
+        };
+    };
+
     public func unwrap_or_err<A>(res : T.Result<A, Text>) : A {
         switch (res) {
             case (#ok(success)) success;
@@ -132,7 +140,7 @@ module {
     };
 
     public func log_error_msg<A>(logger : T.Logger, err_msg : Text) : T.Result<A, Text> {
-        Logger.lazyError(logger, func() = err_msg);
+        Logger.error(logger, err_msg);
         #err(err_msg);
     };
 

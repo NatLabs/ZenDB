@@ -3,11 +3,13 @@ import Debug "mo:base/Debug";
 import Buffer "mo:base/Buffer";
 import Blob "mo:base/Blob";
 import Text "mo:base/Text";
+import Array "mo:base/Array";
 
 import ZenDB "../src";
 
 import { test; suite } "mo:test";
 import Itertools "mo:itertools/Iter";
+import Map "mo:map/Map";
 
 let zendb_sstore = let sstore = ZenDB.newStableStore(
     ?{
@@ -34,7 +36,7 @@ type Data = {
     version : Version;
 };
 
-let DataSchema : ZenDB.Schema = #Record([(
+let DataSchema : ZenDB.Types.Schema = #Record([(
     "version",
     #Variant([
         (
@@ -52,15 +54,21 @@ let DataSchema : ZenDB.Schema = #Record([(
     ]),
 )]);
 
-let data_type_to_candid : ZenDB.Candify<Data> = {
+let data_type_to_candid : ZenDB.Types.Candify<Data> = {
     from_blob = func(blob : Blob) : ?Data { from_candid (blob) };
     to_blob = func(c : Data) : Blob { to_candid (c) };
 };
 
-let #ok(data) = zendb.create_collection<Data>("data", DataSchema, data_type_to_candid);
-let #ok(_) = data.create_index("index_1", [("version", #Ascending)]);
-let #ok(_) = data.create_index("index_2", [("version.v1.a", #Ascending)]);
-let #ok(_) = data.create_index("index_3", [("version.v3.size.known", #Ascending)]);
+let #ok(data) = zendb.create_collection<Data>("data", DataSchema, data_type_to_candid, []);
+
+let stable_data_collection = data._get_stable_state();
+Debug.print("stable_data_collection.schema_map: " # debug_show (Map.toArray(stable_data_collection.schema_map)));
+Debug.print("unique_constraints: " # debug_show (Array.map(stable_data_collection.unique_constraints, func((x, _) : (x : [Text], Any)) : [Text] { x })));
+Debug.print("field_constraints: " # debug_show (Map.toArray(stable_data_collection.field_constraints)));
+
+let #ok(_) = data.create_index("index_1", [("version", #Ascending)], false);
+let #ok(_) = data.create_index("index_2", [("version.v1.a", #Ascending)], false);
+let #ok(_) = data.create_index("index_3", [("version.v3.size.known", #Ascending)], false);
 
 let #ok(_) = data.insert({ version = #v1({ a = 42; b = "hello" }) });
 let #ok(_) = data.insert({ version = #v2({ c = "world"; d = true }) });
@@ -70,34 +78,7 @@ let #ok(_) = data.insert({ version = #v3({ size = #unknown }) });
 suite(
     "searching with nested variant fields",
     func() {
-        test(
-            "search for variants by their tags",
-            func() {
-                assert data.search(
-                    ZenDB.QueryBuilder().Where("version", #eq(#Text("v1")))
-                ) == #ok([(0, { version = #v1({ a = 42; b = "hello" }) })]);
 
-                assert data.search(
-                    ZenDB.QueryBuilder().Where("version", #eq(#Text("v2")))
-                ) == #ok([(1, { version = #v2({ c = "world"; d = true }) })]);
-
-                assert data.search(
-                    ZenDB.QueryBuilder().Where("version", #eq(#Text("v3")))
-                ) == #ok([
-                    (2, { version = #v3({ size = #known(32) }) }),
-                    (3, { version = #v3({ size = #unknown }) }),
-                ]);
-
-                assert data.search(
-                    ZenDB.QueryBuilder().Where("version.v3.size", #eq(#Text("unknown")))
-                ) == #ok([(3, { version = #v3({ size = #unknown }) })]);
-
-                assert data.search(
-                    ZenDB.QueryBuilder().Where("version.v3.size", #eq(#Text("known")))
-                ) == #ok([(2, { version = #v3({ size = #known(32) }) })]);
-
-            },
-        );
         test(
             "search via indexed fields",
             func() {
@@ -113,6 +94,8 @@ suite(
                     (2, { version = #v3({ size = #known(32) }) }),
                     (3, { version = #v3({ size = #unknown }) }),
                 ]);
+
+                Debug.print("searching for v1.a == 32: " # debug_show (data.search(ZenDB.QueryBuilder().Where("version.v1.a", #eq(#Nat(32))))));
 
                 assert data.search(
                     ZenDB.QueryBuilder().Where("version.v3.size.known", #eq(#Nat(32)))
@@ -140,6 +123,35 @@ suite(
                 assert data.search(
                     ZenDB.QueryBuilder().Where("version.v3.size", #eq(#Text("unknown")))
                 ) == #ok([(3, { version = #v3({ size = #unknown }) })]);
+
+            },
+        );
+
+        test(
+            "search for variants by their tags (not indexed)",
+            func() {
+                assert data.search(
+                    ZenDB.QueryBuilder().Where("version", #eq(#Text("v1")))
+                ) == #ok([(0, { version = #v1({ a = 42; b = "hello" }) })]);
+
+                assert data.search(
+                    ZenDB.QueryBuilder().Where("version", #eq(#Text("v2")))
+                ) == #ok([(1, { version = #v2({ c = "world"; d = true }) })]);
+
+                assert data.search(
+                    ZenDB.QueryBuilder().Where("version", #eq(#Text("v3")))
+                ) == #ok([
+                    (2, { version = #v3({ size = #known(32) }) }),
+                    (3, { version = #v3({ size = #unknown }) }),
+                ]);
+
+                assert data.search(
+                    ZenDB.QueryBuilder().Where("version.v3.size", #eq(#Text("unknown")))
+                ) == #ok([(3, { version = #v3({ size = #unknown }) })]);
+
+                assert data.search(
+                    ZenDB.QueryBuilder().Where("version.v3.size", #eq(#Text("known")))
+                ) == #ok([(2, { version = #v3({ size = #known(32) }) })]);
 
             },
         );

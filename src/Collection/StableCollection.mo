@@ -38,7 +38,7 @@ import MemoryBTree "mo:memory-collection/MemoryBTree/Stable";
 import TypeUtils "mo:memory-collection/TypeUtils";
 import Int8Cmp "mo:memory-collection/TypeUtils/Int8Cmp";
 
-import ZT "../Types";
+import T "../Types";
 import Query "../Query";
 import Utils "../Utils";
 import CandidMap "../CandidMap";
@@ -56,7 +56,7 @@ import CandidMod "../CandidMod";
 import Logger "../Logger";
 import UpdateOps "UpdateOps";
 
-module {
+module StableCollection {
 
     public type Map<K, V> = Map.Map<K, V>;
     public type Set<K> = Set.Set<K>;
@@ -77,19 +77,40 @@ module {
 
     public type Schema = Candid.CandidType;
 
-    public type RecordId = ZT.RecordId;
-    public type Index = ZT.Index;
-    public type Candid = ZT.Candid;
-    public type SortDirection = ZT.SortDirection;
-    public type State<R> = ZT.State<R>;
-    public type ZenQueryLang = ZT.ZenQueryLang;
+    public type RecordId = T.RecordId;
+    public type Index = T.Index;
+    public type Candid = T.Candid;
+    public type SortDirection = T.SortDirection;
+    public type State<R> = T.State<R>;
+    public type ZenQueryLang = T.ZenQueryLang;
 
-    public type InternalCandify<A> = ZT.InternalCandify<A>;
+    public type InternalCandify<A> = T.InternalCandify<A>;
 
-    public type StableCollection = ZT.StableCollection;
+    public type StableCollection = T.StableCollection;
 
-    public type IndexKeyFields = ZT.IndexKeyFields;
-    type EvalResult = ZT.EvalResult;
+    public type IndexKeyFields = T.IndexKeyFields;
+    type EvalResult = T.EvalResult;
+
+    // public func new(db: ZenDB.StableDatabase) : StableCollection {
+
+    //     let #Record(_) = processed_schema else return log_error_msg(db.logger, "Schema error: schema type is not a record");
+
+    //     let schema_keys = Utils.extract_schema_keys(processed_schema);
+
+    //     let stable_collection = {
+    //         ids = Ids.create(db.id_store, name);
+    //         var schema = processed_schema;
+    //         schema_keys;
+    //         schema_keys_set = Set.fromIter(schema_keys.vals(), thash);
+    //         main = MemoryBTree.new(?C.DEFAULT_BTREE_ORDER);
+    //         indexes = Map.new<Text, T.Index>();
+
+    //         // db references
+    //         freed_btrees = db.freed_btrees;
+    //         logger = db.logger;
+    //     };
+
+    // };
 
     public func size(collection : StableCollection) : Nat {
         MemoryBTree.size(collection.main);
@@ -121,20 +142,20 @@ module {
         MemoryBTree.rangeVals(collection.main, main_btree_utils, start, end);
     };
 
-    public func update_schema(collection : StableCollection, schema : ZT.Schema) : Result<(), Text> {
+    // public func update_schema(collection : StableCollection, schema : T.Schema) : Result<(), Text> {
 
-        let is_compatible = Schema.is_schema_backward_compatible(collection.schema, schema);
-        if (not is_compatible) return Utils.log_error_msg(collection.logger, "Schema is not backward compatible");
+    //     let is_compatible = Schema.is_schema_backward_compatible(collection.schema, schema);
+    //     if (not is_compatible) return Utils.log_error_msg(collection.logger, "Schema is not backward compatible");
 
-        let formatted_schema = Candid.formatCandidType([schema], null)[0];
+    //     let formatted_schema = Candid.formatCandidType([schema], null)[0];
 
-        collection.schema := formatted_schema;
-        Logger.lazyInfo(
-            collection.logger,
-            func() = "Updating schema to: " # debug_show formatted_schema,
-        );
-        #ok;
-    };
+    //     collection.schema := formatted_schema;
+    //     Logger.lazyInfo(
+    //         collection.logger,
+    //         func() = "Updating schema to: " # debug_show formatted_schema,
+    //     );
+    //     #ok;
+    // };
 
     func insert_into_index(
         collection : StableCollection,
@@ -157,25 +178,21 @@ module {
         #ok();
     };
 
-    public func create_index(
+    public func internal_create_index(
         collection : StableCollection,
-        main_btree_utils : BTreeUtils<Nat, Blob>,
         index_name : Text,
-        _index_key_details : [(Text, SortDirection)],
-    ) : Result<(), Text> {
-
-        let index_key_details : [(Text, SortDirection)] = Array.append(
-            _index_key_details,
-            [(C.RECORD_ID_FIELD, #Ascending)],
-        );
+        index_key_details : [(Text, SortDirection)],
+        is_unique : Bool,
+        used_internally : Bool,
+    ) : Result<T.Index, Text> {
 
         switch (Map.get(collection.indexes, thash, index_name)) {
-            case (?_) {
+            case (?index) {
                 Logger.lazyInfo(
                     collection.logger,
                     func() = "Index '" # index_name # "' already exists",
                 );
-                return #ok();
+                return #ok(index);
             };
             case (null) {};
         };
@@ -185,22 +202,9 @@ module {
             func() = "Creating index '" # index_name # "' with key details: " # debug_show index_key_details,
         );
 
-        let index_data : MemoryBTree.StableMemoryBTree = switch (Vector.removeLast(collection.freed_btrees)) {
-            case (?btree) {
-                Logger.lazyLog(
-                    collection.logger,
-                    func() = "Using recycled BTree for index: " # index_name,
-                );
-                btree;
-            };
-            case (null) MemoryBTree.new(?C.DEFAULT_BTREE_ORDER);
-        };
+        let opt_recycled_btree = Vector.removeLast(collection.freed_btrees);
 
-        let index : Index = {
-            name = index_name;
-            key_details = index_key_details;
-            data = index_data;
-        };
+        let index = Index.new(index_name, index_key_details, is_unique, used_internally, opt_recycled_btree);
 
         ignore Map.put<Text, Index>(collection.indexes, thash, index_name, index);
         Logger.lazyInfo(
@@ -208,7 +212,18 @@ module {
             func() = "Successfully created index: " # index_name,
         );
 
-        #ok();
+        #ok(index);
+    };
+
+    public func create_index(
+        collection : StableCollection,
+        main_btree_utils : BTreeUtils<Nat, Blob>,
+        index_name : Text,
+        _index_key_details : [(Text, SortDirection)],
+        is_unique : Bool,
+    ) : Result<(T.Index), Text> {
+
+        StableCollection.internal_create_index(collection, index_name, _index_key_details, is_unique, false);
     };
 
     public func create_and_populate_index(
@@ -218,7 +233,8 @@ module {
         index_key_details : [(Text, SortDirection)],
     ) : Result<(), Text> {
 
-        switch (create_index(collection, _main_btree_utils, index_name, index_key_details)) {
+        //! todo: update the is_unique and used_internally flags
+        switch (create_index(collection, _main_btree_utils, index_name, index_key_details, false)) {
             case (#err(err)) return #err(err);
             case (#ok(_)) {};
         };
@@ -465,6 +481,11 @@ module {
 
         switch (opt_index) {
             case (?index) {
+
+                if (index.used_internally) {
+                    return Utils.log_error_msg(collection.logger, "Index '" # index_name # "' cannot be deleted because it is used internally");
+                };
+
                 Logger.lazyLog(
                     collection.logger,
                     func() = "Clearing and recycling BTree for index: " # index_name,
@@ -530,7 +551,168 @@ module {
 
     };
 
-    public func insert_with_id(collection : StableCollection, main_btree_utils : BTreeUtils<Nat, Blob>, id : Nat, candid_blob : ZT.CandidBlob) : Result<(), Text> {
+    public func validate_schema_constraints_on_updated_fields(
+        collection : StableCollection,
+        record_id : Nat,
+        candid_map : CandidMap.CandidMap,
+        opt_updated_fields : ?[Text],
+    ) : Result<(), Text> {
+
+        let field_constraints_iter = switch (opt_updated_fields) {
+            case (?updated_fields) {
+                let buffer = Buffer.Buffer<(Text, [T.SchemaFieldConstraint])>(updated_fields.size());
+
+                for (field_name in updated_fields.vals()) {
+
+                    switch (Map.get(collection.field_constraints, thash, field_name)) {
+                        case (?field_constraints) {
+                            buffer.add((field_name, field_constraints));
+                        };
+                        case (null) {};
+                    };
+
+                };
+
+                buffer.vals();
+            };
+            case (null) Map.entries(collection.field_constraints);
+        };
+
+        for ((field_name, field_constraints) in field_constraints_iter) {
+            let ?field_value = candid_map.get(field_name) else return Utils.log_error_msg(collection.logger, "Field '" # field_name # "' not found in record");
+
+            for (field_constraint in field_constraints.vals()) {
+                switch (field_constraint) {
+                    case (#Max(max_value)) {
+                        switch (CandidMod.Ops.compare(field_value, #Float(max_value))) {
+                            case (#greater) {
+                                let error_msg = "Field '" # field_name # "' exceeds maximum value of " # debug_show max_value;
+                                return Utils.log_error_msg(collection.logger, error_msg);
+                            };
+                            case (_) {};
+                        };
+
+                    };
+
+                    case (#Min(min_value)) {
+                        switch (CandidMod.Ops.compare(field_value, #Float(min_value))) {
+                            case (#less) {
+                                let error_msg = "Field '" # field_name # "' is less than minimum value of " # debug_show min_value;
+                                return Utils.log_error_msg(collection.logger, error_msg);
+                            };
+                            case (_) {};
+                        };
+
+                    };
+
+                    case (#MinSize(min_size)) {
+                        let field_value_size = CandidMod.Ops.size(field_value);
+
+                        switch (CandidMod.Ops.compare(#Nat(field_value_size), #Nat(min_size))) {
+                            case (#less) {
+                                let error_msg = "Field '" # field_name # "' is less than minimum size of " # debug_show min_size;
+                                return Utils.log_error_msg(collection.logger, error_msg);
+                            };
+                            case (_) {};
+                        };
+
+                    };
+
+                    case (#MaxSize(max_size)) {
+                        let field_value_size = CandidMod.Ops.size(field_value);
+
+                        switch (CandidMod.Ops.compare(#Nat(field_value_size), #Nat(max_size))) {
+                            case (#greater) {
+                                let error_msg = "Field '" # field_name # "' exceeds maximum size of " # debug_show max_size;
+                                return Utils.log_error_msg(collection.logger, error_msg);
+                            };
+                            case (_) {};
+                        };
+
+                    };
+
+                    case (#Size(min_size, max_size)) {
+                        let field_value_size = CandidMod.Ops.size(field_value);
+
+                        switch (CandidMod.Ops.compare(#Nat(field_value_size), #Nat(min_size))) {
+                            case (#less) {
+                                let error_msg = "Field '" # field_name # "' is less than minimum size of " # debug_show min_size;
+                                return Utils.log_error_msg(collection.logger, error_msg);
+                            };
+                            case (_) {};
+                        };
+
+                        switch (CandidMod.Ops.compare(#Nat(field_value_size), #Nat(max_size))) {
+                            case (#greater) {
+                                let error_msg = "Field '" # field_name # "' exceeds maximum size of " # debug_show max_size;
+                                return Utils.log_error_msg(collection.logger, error_msg);
+                            };
+                            case (_) {};
+                        };
+
+                    };
+
+                };
+            }
+
+        };
+
+        let unique_constraints_iter = switch (opt_updated_fields) {
+            case (?updated_fields) {
+                let new_unique_constraints_indexes = Set.new<Nat>();
+
+                for (field_name in updated_fields.vals()) {
+                    switch (Map.get(collection.fields_with_unique_constraints, thash, field_name)) {
+                        case (?unique_constraints_indexes_set) {
+                            for (unique_constraint_index in Set.keys(unique_constraints_indexes_set)) {
+                                Set.add(new_unique_constraints_indexes, nhash, unique_constraint_index);
+                            };
+                        };
+                        case (null) {};
+                    };
+                };
+
+                Iter.map<Nat, ([Text], Index)>(
+                    Set.keys(new_unique_constraints_indexes),
+                    func(unique_constraint_index : Nat) : ([Text], Index) {
+                        collection.unique_constraints[unique_constraint_index];
+                    },
+                );
+            };
+            case (null) collection.unique_constraints.vals();
+        };
+
+        for ((composite_field_keys, index) in unique_constraints_iter) {
+
+            let compsite_field_values = CollectionUtils.get_index_columns(collection, index.key_details, record_id, candid_map);
+            let index_data_utils = CollectionUtils.get_index_data_utils();
+
+            let opt_prev_id = MemoryBTree.get(index.data, index_data_utils, compsite_field_values);
+
+            switch (opt_prev_id) {
+                case (null) {}; // no previous value, free to insert
+                case (?prev_id) {
+
+                    if (prev_id != record_id) {
+                        let error_msg = "Unique constraint violation: Inserting new record failed because unique constraint on " # debug_show composite_field_keys # " is violated because record with id " # debug_show prev_id # " already has composite values " # debug_show compsite_field_values # " the same as the new record about to be inserted";
+                        Logger.error(
+                            collection.logger,
+                            error_msg,
+                        );
+                        return Utils.log_error_msg(collection.logger, error_msg);
+                    };
+
+                }
+
+            };
+
+        };
+
+        #ok()
+
+    };
+
+    public func insert_with_id(collection : StableCollection, main_btree_utils : BTreeUtils<Nat, Blob>, id : Nat, candid_blob : T.CandidBlob) : Result<(), Text> {
         put_with_id(collection, main_btree_utils, id, candid_blob);
     };
 
@@ -538,7 +720,7 @@ module {
         collection : StableCollection,
         main_btree_utils : BTreeUtils<Nat, Blob>,
         id : Nat,
-        candid_blob : ZT.CandidBlob,
+        candid_blob : T.CandidBlob,
     ) : Result<(), Text> {
 
         Logger.lazyInfo(
@@ -571,6 +753,16 @@ module {
             };
         };
 
+        let candid_map = CandidMap.CandidMap(collection.schema, candid);
+
+        switch (validate_schema_constraints_on_updated_fields(collection, id, candid_map, null)) {
+            case (#ok(_)) {};
+            case (#err(msg)) {
+                let err_msg = "Schema Constraint validation failed: " # msg;
+                return Utils.log_error_msg(collection.logger, err_msg);
+            };
+        };
+
         let opt_prev = MemoryBTree.insert(collection.main, main_btree_utils, id, candid_blob);
 
         switch (opt_prev) {
@@ -588,8 +780,6 @@ module {
 
         if (Map.size(collection.indexes) == 0) return #ok();
 
-        let candid_map = CandidMap.CandidMap(collection.schema, candid);
-
         for (index in Map.vals(collection.indexes)) {
             let #ok(_) = update_indexed_record_fields(collection, index, id, candid_map, null);
         };
@@ -601,7 +791,7 @@ module {
         collection : StableCollection,
         main_btree_utils : BTreeUtils<Nat, Blob>,
         id : Nat,
-        new_candid_blob : ZT.CandidBlob,
+        new_candid_blob : T.CandidBlob,
     ) : Result<(), Text> {
         Logger.info(collection.logger, "Replacing record with id: " # debug_show id);
 
@@ -619,6 +809,14 @@ module {
             case (#ok(_)) {};
         };
 
+        switch (validate_schema_constraints_on_updated_fields(collection, id, new_candid_map, null)) {
+            case (#ok(_)) {};
+            case (#err(msg)) {
+                let err_msg = "Schema Constraint validation failed: " # msg;
+                return Utils.log_error_msg(collection.logger, err_msg);
+            };
+        };
+
         assert ?prev_candid_blob == MemoryBTree.insert(collection.main, main_btree_utils, id, new_candid_blob);
 
         for (index in Map.vals(collection.indexes)) {
@@ -634,7 +832,7 @@ module {
         #ok();
     };
 
-    func partially_update_doc(collection : StableCollection, candid_map : CandidMap.CandidMap, update_operations : [(Text, ZT.FieldUpdateOperations)]) : Result<Candid, Text> {
+    func partially_update_doc(collection : StableCollection, candid_map : CandidMap.CandidMap, update_operations : [(Text, T.FieldUpdateOperations)]) : Result<Candid, Text> {
         Debug.print("Partially updating doc with operations: " # debug_show update_operations);
 
         for ((field_name, op) in update_operations.vals()) {
@@ -672,11 +870,25 @@ module {
         ignore do ? {
             let prev_record_candid_map = opt_prev_record_candid_map!;
             let prev_index_key_values = CollectionUtils.get_index_columns(collection, index.key_details, id, prev_record_candid_map);
-            ignore MemoryBTree.remove(index.data, index_data_utils, prev_index_key_values);
+            let ?prev_id = MemoryBTree.remove(index.data, index_data_utils, prev_index_key_values) else {
+                return #err("Record with id " # debug_show id # " that is about to be updates does not exist in the index " # index.name);
+            };
+
         };
 
         let new_index_key_values = CollectionUtils.get_index_columns(collection, index.key_details, id, new_record_candid_map);
-        ignore MemoryBTree.insert(index.data, index_data_utils, new_index_key_values, id);
+        Debug.print("id: " # debug_show id);
+        Debug.print("index.key_details: " # debug_show index.key_details);
+        Debug.print("new_index_key_values: " # debug_show new_index_key_values);
+        let opt_existing_id = MemoryBTree.insert(index.data, index_data_utils, new_index_key_values, id);
+        switch (opt_existing_id) {
+            case (null) {};
+            case (?existing_id) {
+                // if (existing_id != id) {
+                return #err("New record with id " # debug_show id # " conflicts with existing id " # debug_show existing_id # " which already exists in the index " # index.name # " with the same index key values " # debug_show new_index_key_values);
+                // };
+            };
+        };
 
         Logger.lazyLog(
             collection.logger,
@@ -704,7 +916,7 @@ module {
         #ok;
     };
 
-    public func update_by_id<Record>(collection : StableCollection, main_btree_utils : BTreeUtils<Nat, Blob>, id : Nat, field_updates : [(Text, ZT.FieldUpdateOperations)]) : Result<(), Text> {
+    public func update_by_id<Record>(collection : StableCollection, main_btree_utils : BTreeUtils<Nat, Blob>, id : Nat, field_updates : [(Text, T.FieldUpdateOperations)]) : Result<(), Text> {
         Logger.lazyInfo(
             collection.logger,
             func() = "Updating record with id: " # debug_show id,
@@ -715,9 +927,11 @@ module {
         let prev_candid = CollectionUtils.decode_candid_blob(collection, prev_candid_blob);
         let prev_candid_map = CandidMap.CandidMap(collection.schema, prev_candid);
 
+        let fields_with_updates = Array.map<(Text, T.FieldUpdateOperations), Text>(field_updates, func(k, _) = k);
+
         Logger.lazyLog(
             collection.logger,
-            func() = "Performing partial update on fields: " # debug_show (Array.map<(Text, Any), Text>(field_updates, func(k, _) = k)),
+            func() = "Performing partial update on fields: " # debug_show (fields_with_updates),
         );
 
         let new_candid_map = prev_candid_map.clone();
@@ -736,6 +950,14 @@ module {
                 return Utils.log_error_msg(collection.logger, "Schema validation failed: " # msg);
             };
             case (#ok(_)) {};
+        };
+
+        switch (validate_schema_constraints_on_updated_fields(collection, id, new_candid_map, ?fields_with_updates)) {
+            case (#ok(_)) {};
+            case (#err(msg)) {
+                let err_msg = "Schema Constraint validation failed: " # msg;
+                return Utils.log_error_msg(collection.logger, err_msg);
+            };
         };
 
         let new_candid_blob = switch (Candid.encodeOne(new_candid_record, ?{ Candid.defaultOptions with types = ?[collection.schema] })) {
@@ -763,11 +985,11 @@ module {
         #ok();
     };
 
-    public func insert(collection : StableCollection, main_btree_utils : BTreeUtils<Nat, Blob>, candid_blob : ZT.CandidBlob) : Result<Nat, Text> {
+    public func insert(collection : StableCollection, main_btree_utils : BTreeUtils<Nat, Blob>, candid_blob : T.CandidBlob) : Result<Nat, Text> {
         put(collection, main_btree_utils, candid_blob);
     };
 
-    public func put(collection : StableCollection, main_btree_utils : BTreeUtils<Nat, Blob>, candid_blob : ZT.CandidBlob) : Result<Nat, Text> {
+    public func put(collection : StableCollection, main_btree_utils : BTreeUtils<Nat, Blob>, candid_blob : T.CandidBlob) : Result<Nat, Text> {
         let id = Ids.Gen.next(collection.ids);
 
         switch (put_with_id(collection, main_btree_utils, id, candid_blob)) {
@@ -782,7 +1004,7 @@ module {
         collection : StableCollection,
         main_btree_utils : BTreeUtils<Nat, Blob>,
         id : Nat,
-    ) : Result<ZT.CandidBlob, Text> {
+    ) : Result<T.CandidBlob, Text> {
         let ?record_details = MemoryBTree.get(collection.main, main_btree_utils, id) else return Utils.log_error_msg(collection.logger, "Record not found");
         #ok(record_details);
     };
@@ -791,7 +1013,7 @@ module {
         collection : StableCollection,
         main_btree_utils : BTreeUtils<Nat, Blob>,
         query_builder : QueryBuilder,
-    ) : Result<[(ZT.WrapId<ZT.CandidBlob>)], Text> {
+    ) : Result<[(T.WrapId<T.CandidBlob>)], Text> {
         Logger.lazyLog(
             collection.logger,
             func() = "Executing search with query: " # debug_show (query_builder.build()),
@@ -813,7 +1035,7 @@ module {
         };
     };
 
-    public func evaluate_query(collection : StableCollection, stable_query : ZT.StableQuery) : Result<Iter<Nat>, Text> {
+    public func evaluate_query(collection : StableCollection, stable_query : T.StableQuery) : Result<Iter<Nat>, Text> {
         Logger.lazyLog(
             collection.logger,
             func() = "Evaluating query with operations: " # debug_show (stable_query.query_operations),
@@ -844,7 +1066,7 @@ module {
             return Utils.log_error_msg(collection.logger, "Failed to process query operations");
         };
 
-        let query_plan : ZT.QueryPlan = QueryPlan.create_query_plan(
+        let query_plan : T.QueryPlan = QueryPlan.create_query_plan(
             collection,
             formatted_query_operations,
             sort_by,
@@ -885,10 +1107,10 @@ module {
         );
     };
 
-    public func id_to_candid_blob_iter<Record>(collection : StableCollection, iter : Iter<Nat>) : Iter<(Nat, ZT.CandidBlob)> {
-        Iter.map<Nat, (Nat, ZT.CandidBlob)>(
+    public func id_to_candid_blob_iter<Record>(collection : StableCollection, iter : Iter<Nat>) : Iter<(Nat, T.CandidBlob)> {
+        Iter.map<Nat, (Nat, T.CandidBlob)>(
             iter,
-            func(id : Nat) : (Nat, ZT.CandidBlob) {
+            func(id : Nat) : (Nat, T.CandidBlob) {
                 let candid_blob = CollectionUtils.lookup_candid_blob(collection, id);
                 (id, candid_blob);
             },
@@ -899,7 +1121,7 @@ module {
         collection : StableCollection,
         main_btree_utils : BTreeUtils<Nat, Blob>,
         query_builder : QueryBuilder,
-    ) : Result<Iter<ZT.WrapId<ZT.CandidBlob>>, Text> {
+    ) : Result<Iter<T.WrapId<T.CandidBlob>>, Text> {
         switch (internal_search(collection, query_builder)) {
             case (#err(err)) return Utils.log_error_msg(collection.logger, err);
             case (#ok(record_ids_iter)) {
@@ -911,7 +1133,7 @@ module {
 
     public func get_sort_records_by_field_cmp(
         collection : StableCollection,
-        sort_field : (Text, ZT.SortDirection),
+        sort_field : (Text, T.SortDirection),
     ) : (Nat, Nat) -> Order {
 
         let deserialized_records_map = Map.new<Nat, Candid.Candid>();
@@ -972,7 +1194,7 @@ module {
         sort_records_by_field_cmp;
     };
 
-    public func stats(collection : StableCollection) : ZT.CollectionStats {
+    public func stats(collection : StableCollection) : T.CollectionStats {
         let main_btree_index = {
             stable_memory = {
                 metadata_bytes = MemoryBTree.metadataBytes(collection.main);
@@ -980,16 +1202,16 @@ module {
             };
         };
 
-        let indexes : [ZT.IndexStats] = Iter.toArray(
-            Iter.map<(Text, Index), ZT.IndexStats>(
+        let indexes : [T.IndexStats] = Iter.toArray(
+            Iter.map<(Text, Index), T.IndexStats>(
                 Map.entries(collection.indexes),
-                func((index_name, index) : (Text, Index)) : ZT.IndexStats {
+                func((index_name, index) : (Text, Index)) : T.IndexStats {
                     let columns : [Text] = Array.map<(Text, Any), Text>(
                         index.key_details,
                         func((key, direction) : (Text, Any)) : Text = key,
                     );
 
-                    let stable_memory : ZT.MemoryStats = {
+                    let stable_memory : T.MemoryStats = {
                         metadata_bytes = MemoryBTree.metadataBytes(index.data);
                         actual_data_bytes = MemoryBTree.bytes(index.data);
                     };
@@ -1071,7 +1293,7 @@ module {
 
     };
 
-    public func delete_by_id(collection : StableCollection, main_btree_utils : BTreeUtils<Nat, Blob>, id : Nat) : Result<(ZT.CandidBlob), Text> {
+    public func delete_by_id(collection : StableCollection, main_btree_utils : BTreeUtils<Nat, Blob>, id : Nat) : Result<(T.CandidBlob), Text> {
         Logger.lazyInfo(
             collection.logger,
             func() = "Deleting record with id: " # debug_show id,

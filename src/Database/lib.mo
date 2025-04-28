@@ -48,7 +48,7 @@ module {
     public type StableCollection = T.StableCollection;
     public type Collection<Record> = Collection.Collection<Record>;
 
-    public class Database(zendb : T.ZenDB) = self {
+    public class Database(stable_db : T.StableDatabase) = self {
 
         func convert_to_internal_candify<A>(collection_name : Text, external_candify : T.Candify<A>) : T.InternalCandify<A> {
             {
@@ -95,12 +95,12 @@ module {
         };
 
         public func size() : Nat {
-            StableDatabase.size(zendb);
+            StableDatabase.size(stable_db);
         };
 
-        public func create_collection<Record>(name : Text, schema : T.Schema, external_candify : T.Candify<Record>) : Result<Collection<Record>, Text> {
+        public func create_collection<Record>(name : Text, schema : T.Schema, external_candify : T.Candify<Record>, schema_constraints : [T.SchemaConstraint]) : Result<Collection<Record>, Text> {
             let validate_candify_result = Utils.handleResult(
-                zendb.logger,
+                stable_db.logger,
                 validate_candify(name, schema, external_candify),
                 "Failed to validate candify function: ",
             );
@@ -110,7 +110,7 @@ module {
                 case (#err(msg)) return #err(msg);
             };
 
-            switch (StableDatabase.create_collection(zendb, name, schema)) {
+            switch (StableDatabase.create_collection(stable_db, name, schema, schema_constraints)) {
                 case (#ok(stable_collection)) {
                     #ok(
                         Collection.Collection<Record>(
@@ -129,7 +129,7 @@ module {
             external_candify : T.Candify<Record>,
         ) : Result<Collection<Record>, Text> {
 
-            switch (StableDatabase.get_collection(zendb, name)) {
+            switch (StableDatabase.get_collection(stable_db, name)) {
                 case (#ok(stable_collection)) {
                     #ok(
                         Collection.Collection<Record>(
@@ -147,9 +147,10 @@ module {
             name : Text,
             schema : T.Schema,
             blobify : T.Candify<Record>,
+            schema_constraints : [T.SchemaConstraint],
         ) : Result<Collection<Record>, Text> {
 
-            switch (create_collection(name, schema, blobify)) {
+            switch (create_collection(name, schema, blobify, schema_constraints)) {
                 case (#ok(collection)) #ok(collection);
                 case (#err(msg)) {
                     switch (get_collection(name, blobify)) {

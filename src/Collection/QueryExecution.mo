@@ -117,7 +117,7 @@ module {
                 case (#FullScan({ filter_bounds; requires_additional_filtering; requires_additional_sorting })) {
                     if (not requires_additional_filtering and not requires_additional_sorting) {
                         Logger.lazyLog(collection.logger, func() = "QueryExecution.get_unique_record_ids(): Full scan with no filtering or sorting");
-                        return #Interval(C.RECORD_ID_FIELD, [(0, MemoryBTree.size(collection.main))], false);
+                        return #Interval(C.RECORD_ID, [(0, MemoryBTree.size(collection.main))], false);
                     };
                 };
             };
@@ -855,7 +855,7 @@ module {
                 };
                 case (#FullScan({ requires_additional_sorting; requires_additional_filtering })) {
                     if (not requires_additional_sorting and not requires_additional_filtering) {
-                        return #Interval(C.RECORD_ID_FIELD, [(0, MemoryBTree.size(collection.main))], false);
+                        return #Interval(C.RECORD_ID, [(0, MemoryBTree.size(collection.main))], false);
                     };
 
                 };

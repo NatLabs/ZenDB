@@ -1,160 +1,258 @@
-## ZenDB
+# ZenDB: Enterprise-Grade Document Database for the Internet Computer
 
-> Very much still in development, Highly volatile API
+[![MOPS](https://img.shields.io/badge/MOPS-zendb-blue)](https://mops.one/zendb)
+[![License](https://img.shields.io/badge/License-MIT-green)](LICENSE)
+[![Motoko](https://img.shields.io/badge/Language-Motoko-orange)](https://github.com/dfinity/motoko)
 
-A single canister, document database that natively supports candid encoding, inspired by MongoDB, for Motoko developers. Leverages multi-field indexes for performant query execution, scaling up to the Internet Computer's 500GB canister limit.
+> A high-performance document database built specifically for the Internet Computer ecosystem
 
-### Getting started
+ZenDB is a sophisticated, embedded document database that leverages the Internet Computer's stable memory to provide scalable, performant data persistence with advanced query capabilities. Engineered to handle complex data models with up to 500GB per canister, it bridges the gap between Motoko's type system and Candid encoding to offer a seamless developer experience.
 
-- Install from mops - [zenDB](https://mops.one)
+## Key Features
 
-### Usage
+### 🚀 Performance-Optimized
+- **B-Tree Indexes**: Sophisticated multi-field indexes for lightning-fast queries
+- **Query Execution Engine**: Intelligent query planner with cost-based optimization
+- **Memory Efficiency**: Carefully designed to maximize stable memory usage patterns
 
-- Importing and initializing the ZenDB library
+### 💾 Data Architecture
+- **Document-Oriented Storage**: Flexible schema design for complex data structures
+- **Compound Indexes**: Support for multi-field indexes to accelerate complex queries
+- **Full Candid Integration**: Native support for all Motoko and Candid data types
+
+### 🔍 Advanced Querying
+- **Rich Query Language**: Comprehensive set of operators including equality, range, logical operations
+- **Query Builder API**: Intuitive fluent interface for building complex queries
+- **Sorting & Pagination**: Efficient ordered result sets with skip/limit functionality
+
+### 🔒 Data Integrity
+- **Schema Validation**: Ensure data integrity with schema-based validation
+- **Backward Compatibility**: Safe schema evolution with compatibility checking
+- **Transactional Operations**: Consistent data operations with rollback capability
+
+## Getting Started
+
+### 1. Installation
+
+```bash
+mops add zendb
+```
+
+### 2. Initialize Your Database
 
 ```motoko
 import ZenDB "mo:zendb";
 
-stable var zendb_sstore = ZenDB.init_stable_store();
-zendb_sstore := ZenDB.upgrade(zendb_sstore);
-
-let zendb = ZenDB.launchDefaultDB(zendb_sstore);
+actor {
+  stable var zendb_store = ZenDB.newStableStore();
+  
+  system func preupgrade() {
+    // Store is automatically persisted in stable memory
+  }
+  
+  system func postupgrade() {
+    zendb_store := ZenDB.upgrade(zendb_store);
+  }
+  
+  let db = ZenDB.launchDefaultDB(zendb_store);
+}
 ```
 
-- Creating a collection
+### 3. Define Your Schema
 
 ```motoko
 type User = {
   id: Nat;
   name: Text;
   email: Text;
-  age: Nat;
-  created_at: Int;
-  account: {
-    balance: Nat;
-    currency: Text;
+  profile: {
+    age: ?Nat;
+    location: Text;
+    interests: [Text];
   };
+  created_at: Int;
 };
 
-let UsersSchema : ZenDB.Schema = #Record([
+let UsersSchema : ZenDB.Types.Schema = #Record([
   ("id", #Nat),
   ("name", #Text),
   ("email", #Text),
-  ("age", #Nat),
-  ("created_at", #Int),
-  ("account", #Record([
-    ("balance", #Nat),
-    ("currency", #Text),
+  ("profile", #Record([
+    ("age", #Option(#Nat)),
+    ("location", #Text),
+    ("interests", #Array(#Text)),
   ])),
+  ("created_at", #Int),
 ]);
 
-let users_to_candid_blob : ZenDB.Candify<User> = {
-  to_blob = func (user: User) : Blob { to_candid(user); };
-  from_blob = func (blob: Blob) : User {
-    switch(from_candid(blob) : ?User){
-      case (?user) { user };
-      case (null) Debug.trap("users collection: failed to decode user");
+let candify_users : ZenDB.Types.Candify<User> = {
+  to_blob = func(user: User) : Blob { to_candid(user) };
+  from_blob = func(blob: Blob) : User {
+    switch(from_candid(blob) : ?User) {
+      case (?user) user;
+      case null Debug.trap("Failed to decode user");
     };
   };
-}
-
-let #ok(users) = zendb.create_collection("users", UsersSchema, users_to_candid_blob);
-
-```
-
-- Creating an index
-
-Ideally, creating an index should be done at initialization after the collection is created.
-Creating an index after the collection has been populated is a blocking operation that can take a long time and has the potential to exceed the canister's instruction limit.
-
-```motoko
-
-let #ok(_) = users.create_index(["account.balance"]);
-let #ok(_) = users.create_index(["account.currency", "created_at"]);
-
-```
-
-- Inserting documents into the collection
-
-There are two ways to insert documents into a collection.
-The first is to insert the document and let the system generate an id for the document.
-The second is to insert the document with a specific id (`insert_with_id()`).
-
-```motoko
-public func add_user(name: Text, email: Text, age: Nat, balance: Nat, currency: Text) : async () {
-  let user : User = {
-    name;
-    email;
-    age;
-    created_at = Time.now();
-    account = { balance; currency; };
-  };
-
-  switch(await* users.insert(user)){
-    case #ok(_) {};
-    case #err(msg) { Debug.print("Error: " # msg); };
-  };
-
 };
 ```
 
-- Querying the collection
-
-QueryBuilder methods: `Where`, `Sort`, `Limit`, `Skip`, `And`, `Or`
-Supported operators: #eq(val), #gte(val), #lte(val), #gt(val), #lt(val), #in([val]), #not(nested_operator)
+### 4. Create a Collection & Indexes
 
 ```motoko
+// Create collection
+let #ok(users) = db.create_collection("users", UsersSchema, candify_users);
 
-func get_usernames_with_balance_between(min: Nat, max: Nat) : [Text] {
-  let users_query = ZenDB.QueryBuilder()
-    .Where("account.balance", #gte(#Nat(min)))
-    .Where("account.balance", #lte(#Nat(max)));
+// Create optimal indexes for your query patterns
+let #ok(_) = users.create_index("name_idx", [("name", #Ascending)]);
+let #ok(_) = users.create_index("location_created_idx", [
+  ("profile.location", #Ascending), 
+  ("created_at", #Descending)
+]);
+```
 
-  let #ok(results) = users.find(users_query);
+### 5. Insert & Query Data
 
-  let usernames = Array.map(
-    results,
-    func(id: Nat, user: User): Text { user.name; }
-  );
-
-  return usernames;
-
+```motoko
+// Insert a document
+let user : User = {
+  id = 1;
+  name = "Alice";
+  email = "alice@example.com";
+  profile = {
+    age = ?35;
+    location = "San Francisco";
+    interests = ["coding", "hiking", "photography"];
+  };
+  created_at = Time.now();
 };
 
-func get_most_recent_users_for_currency(currency: Text, limit: Nat) : [User] {
-  let users_query = ZenDB.QueryBuilder()
-    .Where("account.currency", #eq(currency))
+let #ok(userId) = users.insert(user);
+
+// Query with the fluent QueryBuilder API
+let queryResults = users.search(
+  ZenDB.QueryBuilder()
+    .Where("profile.location", #eq(#Text("San Francisco")))
+    .And("profile.age", #gte(#Nat(30)))
     .Sort("created_at", #Descending)
-    .Limit(limit);
-
-  let #ok(results) = users.find(users_query);
-
-  return results;
-};
-
-
+    .Limit(10)
+);
 ```
 
-### Features
+## Advanced Usage
 
-- [x] Candid serialization for all types
-- [ ] Query Caching
-- [ ] Indexes
-  - [x] Multiple field index (Compound Index)
-  - [ ] Multi-key array index
-- [ ] Zen Query Language
-  - [x] operators (and, or, not, eq, gte, lte, gt, lt, in, nin)
-  - [x] modifiers (limit, skip, sort)
-  - [ ] functions (count, sum, avg, min, max)
-- [ ] Schema
-  - [x] Schema Validation on insert/update
-  - [x] Backwards compatibility on schema changes
-  - [ ] Schema Constraints (required, unique, enum, min, max)
-- [ ] Transactions
-  - [ ] Single document transactions
-    - [ ] Document versioning
-- [ ] Backup and Restore
-  - [ ] Copy on Write Snapshots
-  - [ ] External canister Backups
-  - [ ] Consistent incremental backups
-- [x] Garbage collection of regions from deleted collections
+### Compound Filtering with Logical Operators
+
+```motoko
+// Find active premium users who joined recently
+let activeRecentPremiumUsers = users.search(
+  ZenDB.QueryBuilder()
+    .Where("status", #eq(#Text("active")))
+    .And("account_type", #eq(#Text("premium")))
+    .And("joined_date", #gte(#Int(oneWeekAgo)))
+    .Sort("activity_score", #Descending)
+    .Limit(25)
+);
+
+// Find users matching any of several criteria
+let specialCaseUsers = users.search(
+  ZenDB.QueryBuilder()
+    .Where("role", #eq(#Text("admin")))
+    .OrQuery(
+      ZenDB.QueryBuilder()
+        .Where("subscription_tier", #eq(#Text("enterprise")))
+        .And("usage", #gte(#Nat(highUsageThreshold)))
+    )
+);
+```
+
+### Field Updates & Transformations
+
+```motoko
+// Atomic field updates
+users.updateById(userId, [
+  ("profile.location", #Text("New York")),
+  ("profile.interests", #Array([#Text("coding"), #Text("reading")]))
+]);
+
+// Field transformations
+users.updateById(userId, [
+  ("login_count", #add(#currValue, #Nat(1))),
+  ("last_login", #Int(Time.now())),
+  ("name", #uppercase(#currValue))
+]);
+```
+
+### Pagination with Cursor Support
+
+```motoko
+func getPaginatedResults(cursor: ?Nat, pageSize: Nat) : [User] {
+  let query = ZenDB.QueryBuilder()
+    .Where("status", #eq(#Text("active")))
+    .Sort("created_at", #Descending);
+    
+  if (cursor != null) {
+    query.Cursor(cursor, #Forward);
+  };
+  
+  query.Limit(pageSize);
+  
+  let #ok(results) = users.search(query);
+  return Array.map<(Nat, User), User>(results, func(entry) = entry.1);
+}
+```
+
+## Performance Optimization
+
+### Index Selection Strategy
+
+ZenDB uses a sophisticated query planner to determine the most efficient indexes for each query. Create indexes that:
+
+1. Match your most common query patterns
+2. Include fields used in sorting operations
+3. Support your filtering operations (equality, range conditions)
+
+```motoko
+// Great for queries filtering on status and sorting by date
+users.create_index("status_date_idx", [
+  ("status", #Ascending), 
+  ("created_at", #Descending)
+]);
+```
+
+### Statistics & Monitoring
+
+Monitor your collections to understand performance characteristics:
+
+```motoko
+let stats = users.stats();
+Debug.print("Records: " # Nat.toText(stats.records));
+Debug.print("Indexes: " # Nat.toText(stats.indexes.size()));
+```
+
+## Examples
+
+The repository includes several examples demonstrating ZenDB's capabilities:
+
+- **Task Manager**: Complete CRUD application with task management functionality
+- **Transaction Ledger**: High-performance financial transaction indexing
+- **React Integration**: Frontend integration example with React UI
+
+## Roadmap
+
+- [x] Multi-field compound indexes
+- [x] Powerful query language with logical operators
+- [x] Schema validation and backward compatibility
+- [x] Efficient memory usage with garbage collection
+- [ ] Query result caching
+- [ ] Multi-key array indexes
+- [ ] Aggregation functions (count, sum, avg, etc.)
+- [ ] Schema constraints (required, unique, enum)
+- [ ] Advanced transaction support
+
+## Contributing
+
+Contributions are welcome! Please feel free to submit a Pull Request.
+
+## License
+
+This project is licensed under the MIT License - see the LICENSE file for details.

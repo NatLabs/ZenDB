@@ -43,7 +43,7 @@ actor class Backend() {
     //     ("sub_account", #Option(#Blob)),
     // ]);
 
-    let BlockSchema : ZenDB.Schema = #Record([
+    let BlockSchema : ZenDB.Types.Schema = #Record([
         ("btype", #Text),
         ("phash", #Option(#Blob)),
         ("ts", #Nat),
@@ -63,7 +63,7 @@ actor class Backend() {
         ),
     ]);
 
-    let CandifyBlock : ZenDB.Candify<Block> = {
+    let CandifyBlock : ZenDB.Types.Candify<Block> = {
         from_blob = func(blob : Blob) : ?Block {
             from_candid (blob);
         };
@@ -167,7 +167,7 @@ actor class Backend() {
 
             if (options.filter.btype != null) {
                 let btypes = options.filter.btype!;
-                let values = Array.map<Text, ZenDB.Candid>(btypes, func(btype : Text) : ZenDB.Candid = #Text(btype));
+                let values = Array.map<Text, ZenDB.Types.Candid>(btypes, func(btype : Text) : ZenDB.Types.Candid = #Text(btype));
 
                 ignore Query.Where("btype", #In(values));
             };

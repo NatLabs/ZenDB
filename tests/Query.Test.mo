@@ -35,7 +35,7 @@ type Data = {
     value : Text;
 };
 
-let DataSchema : ZenDB.Schema = #Record([("value", #Text)]);
+let DataSchema : ZenDB.Types.Schema = #Record([("value", #Text)]);
 
 let candify_data = {
     to_blob = func(data : Data) : Blob {
@@ -46,7 +46,7 @@ let candify_data = {
     };
 };
 
-let #ok(texts) = zendb.create_collection("texts", DataSchema, candify_data);
+let #ok(texts) = zendb.create_collection("texts", DataSchema, candify_data, []);
 
 let #ok(_) = texts.insert({ value = "a" });
 let #ok(_) = texts.insert({ value = "alphabet" });

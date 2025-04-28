@@ -43,7 +43,7 @@ module {
         ("sub_account", #Option(#Blob)),
     ]);
 
-    let TxSchema : ZenDB.Schema = #Record([
+    let TxSchema : ZenDB.Types.Schema = #Record([
         ("btype", #Text),
         ("phash", #Blob),
         ("ts", #Nat),
@@ -197,9 +197,9 @@ module {
             },
         );
 
-        let candid_principals = Array.map<Principal, ZenDB.Candid>(
+        let candid_principals = Array.map<Principal, ZenDB.Types.Candid>(
             Iter.toArray(Array.slice<Principal>(principals, 0, 10)),
-            func(p : Principal) : ZenDB.Candid = #Principal(p),
+            func(p : Principal) : ZenDB.Types.Candid = #Principal(p),
         );
 
         let principals_0_10 = Array.tabulate(
@@ -245,7 +245,7 @@ module {
         limit : Nat,
         predefined_txs : Buffer.Buffer<Tx>,
         principals : [Principal],
-        candid_principals : [ZenDB.Candid],
+        candid_principals : [ZenDB.Types.Candid],
         principals_0_10 : [Principal],
         tx_ids : Buffer.Buffer<Nat>,
         fuzz : Fuzz.Fuzzer,
@@ -291,9 +291,9 @@ module {
             };
 
             case ("query() -> principals[0..10] == tx.to.owner (is recipient)") {
-                let candid_principals = Array.map<Principal, ZenDB.Candid>(
+                let candid_principals = Array.map<Principal, ZenDB.Types.Candid>(
                     Iter.toArray(Array.slice<Principal>(principals, 0, 10)),
-                    func(p : Principal) : ZenDB.Candid = #Principal(p),
+                    func(p : Principal) : ZenDB.Types.Candid = #Principal(p),
                 );
 
                 let db_query = ZenDB.QueryBuilder().Where(
@@ -320,9 +320,9 @@ module {
             };
 
             case ("query() -> all txs involving principals[0..10]") {
-                let candid_principals = Array.map<Principal, ZenDB.Candid>(
+                let candid_principals = Array.map<Principal, ZenDB.Types.Candid>(
                     Iter.toArray(Array.slice(principals, 0, 10)),
-                    func(p : Principal) : ZenDB.Candid = #Principal(p),
+                    func(p : Principal) : ZenDB.Types.Candid = #Principal(p),
                 );
 
                 let db_query = ZenDB.QueryBuilder().Where(
@@ -409,7 +409,7 @@ module {
         limit : Nat,
         predefined_txs : Buffer.Buffer<Tx>,
         principals : [Principal],
-        candid_principals : [ZenDB.Candid],
+        candid_principals : [ZenDB.Types.Candid],
         principals_0_10 : [Principal],
         tx_ids : Buffer.Buffer<Nat>,
     ) {
@@ -428,13 +428,13 @@ module {
 
             case ("insert with 5 indexes") {
 
-                let #ok(_) = txs.create_index("index_1", [("btype", #Ascending), ("tx.amt", #Ascending)]);
-                let #ok(_) = txs.create_index("index_2", [("btype", #Ascending), ("ts", #Ascending)]);
-                let #ok(_) = txs.create_index("index_3", [("tx.amt", #Ascending)]);
-                let #ok(_) = txs.create_index("index_4", [("ts", #Ascending)]);
-                let #ok(_) = txs.create_index("index_5", [("tx.from.owner", #Ascending), ("tx.from.sub_account", #Ascending)]);
-                let #ok(_) = txs.create_index("index_6", [("tx.to.owner", #Ascending), ("tx.to.sub_account", #Ascending)]);
-                let #ok(_) = txs.create_index("index_7", [("tx.spender.owner", #Ascending), ("tx.spender.sub_account", #Ascending)]);
+                let #ok(_) = txs.create_index("index_1", [("btype", #Ascending), ("tx.amt", #Ascending)], false);
+                let #ok(_) = txs.create_index("index_2", [("btype", #Ascending), ("ts", #Ascending)], false);
+                let #ok(_) = txs.create_index("index_3", [("tx.amt", #Ascending)], false);
+                let #ok(_) = txs.create_index("index_4", [("ts", #Ascending)], false);
+                let #ok(_) = txs.create_index("index_5", [("tx.from.owner", #Ascending), ("tx.from.sub_account", #Ascending)], false);
+                let #ok(_) = txs.create_index("index_6", [("tx.to.owner", #Ascending), ("tx.to.sub_account", #Ascending)], false);
+                let #ok(_) = txs.create_index("index_7", [("tx.spender.owner", #Ascending), ("tx.spender.sub_account", #Ascending)], false);
 
                 for (i in Iter.range(0, limit - 1)) {
                     let tx = predefined_txs.get(i);
@@ -584,9 +584,9 @@ module {
         limit : Nat,
         predefined_txs : Buffer.Buffer<Tx>,
         principals : [Principal],
-        candid_principals : [ZenDB.Candid],
+        candid_principals : [ZenDB.Types.Candid],
         principals_0_10 : [Principal],
-        sort_direction : ZenDB.SortDirection,
+        sort_direction : ZenDB.Types.SortDirection,
         pagination_limit : Nat,
     ) {
 
@@ -677,9 +677,9 @@ module {
                 skip_limit_paginated_query(db_query);
             };
             case ("query() -> principals[0..10] == tx.to.owner (is recipient)") {
-                let candid_principals = Array.map<Principal, ZenDB.Candid>(
+                let candid_principals = Array.map<Principal, ZenDB.Types.Candid>(
                     Iter.toArray(Array.slice<Principal>(principals, 0, 10)),
-                    func(p : Principal) : ZenDB.Candid = #Principal(p),
+                    func(p : Principal) : ZenDB.Types.Candid = #Principal(p),
                 );
 
                 let db_query = ZenDB.QueryBuilder().Where(
@@ -706,9 +706,9 @@ module {
             };
 
             case ("query() -> all txs involving principals[0..10]") {
-                let candid_principals = Array.map<Principal, ZenDB.Candid>(
+                let candid_principals = Array.map<Principal, ZenDB.Types.Candid>(
                     Iter.toArray(Array.slice(principals, 0, 10)),
-                    func(p : Principal) : ZenDB.Candid = #Principal(p),
+                    func(p : Principal) : ZenDB.Types.Candid = #Principal(p),
                 );
 
                 let db_query = ZenDB.QueryBuilder().Where(
