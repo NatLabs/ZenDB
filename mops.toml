@@ -14,7 +14,6 @@ bitbuffer = "1.2.0"
 xtended-numbers = "0.3.1"
 vector = "0.4.1"
 incremental-ids = "0.0.1"
-moh = "https://github.com/NatLabs/moh#main@2d687808a07e48d983b33c63fae27700c3029731"
 new-base = "0.4.0"
 
 [dev-dependencies]
@@ -24,4 +23,4 @@ fuzz = "0.2.1"
 
 [toolchain]
 wasmtime = "14.0.4"
-moc = "0.14.7"
+moc = "0.14.9"

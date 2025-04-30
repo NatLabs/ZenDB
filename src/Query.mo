@@ -313,7 +313,7 @@ module {
         func handle_operation(field : Text, op : T.ZqlOperators) : T.Result<T.ZenQueryLang, Text> {
             // Debug.print(debug_show (Set.toArray(collection.schema_keys_set)));
             let ?candid_type = SchemaMap.get_type(collection.schema_map, field) else {
-                Logger.lazyLog(
+                Logger.lazyDebug(
                     collection.logger,
                     func() = "Field '" # field # "' not found in schema",
                 );

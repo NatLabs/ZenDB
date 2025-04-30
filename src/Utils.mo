@@ -36,6 +36,27 @@ import ByteUtils "ByteUtils";
 module {
     type Order = Order.Order;
 
+    public func ignore_this() : None {
+        Debug.trap("trap caused by ignore_this()");
+    };
+
+    public func concat_blob(blob1 : Blob, blob2 : Blob) : Blob {
+        let size = blob1.size() + blob2.size();
+        let res = Blob.fromArray(
+            Array.tabulate(
+                size,
+                func(i : Nat) : Nat8 {
+                    if (i < blob1.size()) {
+                        blob1.get(i);
+                    } else {
+                        blob2.get(i - blob1.size());
+                    };
+                },
+            )
+        );
+        res;
+    };
+
     /// Generic helper function to handle Result types with consistent error logging
     public func handleResult<T>(logger : T.Logger, res : T.Result<T, Text>, context : Text) : T.Result<T, Text> {
         switch (res) {

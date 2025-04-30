@@ -169,7 +169,7 @@ module StableCollection {
         let index_data_utils = CollectionUtils.get_index_data_utils();
         ignore MemoryBTree.insert(index.data, index_data_utils, index_key_values, id);
 
-        Logger.lazyLog(
+        Logger.lazyDebug(
             collection.logger,
             func() = "Storing record with id " # debug_show id # " in index " # index.name # ", originally "
             # debug_show (index_key_values) # ", now encoded as " # debug_show (index_data_utils.key.blobify.to_blob(index_key_values)),
@@ -348,7 +348,7 @@ module StableCollection {
             indexes.add(index);
         };
 
-        Logger.lazyLog(
+        Logger.lazyDebug(
             collection.logger,
             func() = "Collected " # debug_show indexes.size() # " indexes to populate",
         );
@@ -486,7 +486,7 @@ module StableCollection {
                     return Utils.log_error_msg(collection.logger, "Index '" # index_name # "' cannot be deleted because it is used internally");
                 };
 
-                Logger.lazyLog(
+                Logger.lazyDebug(
                     collection.logger,
                     func() = "Clearing and recycling BTree for index: " # index_name,
                 );
@@ -512,19 +512,19 @@ module StableCollection {
 
         let iter = switch (eval) {
             case (#Empty) {
-                // Debug.print("#Empty");
+                Logger.lazyDebug(collection.logger, func() = "paginate(): Empty iterator");
                 return Itertools.empty<Nat>();
             };
             case (#BitMap(bitmap)) {
-                // Debug.print("#BitMap");
+                Logger.lazyDebug(collection.logger, func() = "paginate(): Bitmap iterator");
                 bitmap.vals();
             };
             case (#Ids(iter)) {
-                // Debug.print("#Ids");
+                Logger.lazyDebug(collection.logger, func() = "paginate(): Ids iterator");
                 iter;
             };
             case (#Interval(index_name, _intervals, sorted_in_reverse)) {
-                // Debug.print("#Interval");
+                Logger.lazyDebug(collection.logger, func() = "paginate(): Interval iterator");
 
                 if (sorted_in_reverse) {
                     return Intervals.extract_intervals_in_pagination_range_for_reversed_intervals(collection, skip, opt_limit, index_name, _intervals, sorted_in_reverse);
@@ -537,7 +537,6 @@ module StableCollection {
         };
 
         let iter_with_offset = Itertools.skip(iter, skip);
-        // Debug.print("skip: " # debug_show skip);
 
         var paginated_iter = switch (opt_limit) {
             case (?limit) {
@@ -735,7 +734,7 @@ module StableCollection {
             case (_) return Utils.log_error_msg(collection.logger, "Values inserted into the collection must be #Records");
         };
 
-        Logger.lazyLog(
+        Logger.lazyDebug(
             collection.logger,
             func() = "ZenDB Collection.put_with_id(): Inserting record with id " # debug_show id # " and candid " # debug_show candid,
         );
@@ -833,7 +832,7 @@ module StableCollection {
     };
 
     func partially_update_doc(collection : StableCollection, candid_map : CandidMap.CandidMap, update_operations : [(Text, T.FieldUpdateOperations)]) : Result<Candid, Text> {
-        Debug.print("Partially updating doc with operations: " # debug_show update_operations);
+        Logger.lazyInfo(collection.logger, func() = "Partially updating record with operations: " # debug_show update_operations);
 
         for ((field_name, op) in update_operations.vals()) {
             let ?field_type = candid_map.get_type(field_name) else return Utils.log_error_msg(collection.logger, "Field type '" # field_name # "' not found in record");
@@ -855,8 +854,10 @@ module StableCollection {
             };
         };
 
-        Debug.print("Updated candid map: ");
-        Debug.print("About to extract candid");
+        Logger.lazyDebug(
+            collection.logger,
+            func() = "Updated candid map, about to extract candid",
+        );
 
         let candid = candid_map.extract_candid();
 
@@ -877,9 +878,19 @@ module StableCollection {
         };
 
         let new_index_key_values = CollectionUtils.get_index_columns(collection, index.key_details, id, new_record_candid_map);
-        Debug.print("id: " # debug_show id);
-        Debug.print("index.key_details: " # debug_show index.key_details);
-        Debug.print("new_index_key_values: " # debug_show new_index_key_values);
+        Logger.lazyDebug(
+            collection.logger,
+            func() = "Updating index for id: " # debug_show id,
+        );
+        Logger.lazyDebug(
+            collection.logger,
+            func() = "Index key details: " # debug_show index.key_details,
+        );
+        Logger.lazyDebug(
+            collection.logger,
+            func() = "New index key values: " # debug_show new_index_key_values,
+        );
+
         let opt_existing_id = MemoryBTree.insert(index.data, index_data_utils, new_index_key_values, id);
         switch (opt_existing_id) {
             case (null) {};
@@ -890,7 +901,7 @@ module StableCollection {
             };
         };
 
-        Logger.lazyLog(
+        Logger.lazyDebug(
             collection.logger,
             func() = "Storing record with id " # debug_show id # " in index " # index.name # ", originally "
             # debug_show (new_index_key_values) # ", now encoded as  as " # debug_show (index_data_utils.key.blobify.to_blob(new_index_key_values)),
@@ -929,7 +940,7 @@ module StableCollection {
 
         let fields_with_updates = Array.map<(Text, T.FieldUpdateOperations), Text>(field_updates, func(k, _) = k);
 
-        Logger.lazyLog(
+        Logger.lazyDebug(
             collection.logger,
             func() = "Performing partial update on fields: " # debug_show (fields_with_updates),
         );
@@ -943,7 +954,10 @@ module StableCollection {
             };
         };
 
-        Debug.print("Updated candid map: " # debug_show new_candid_record);
+        Logger.lazyDebug(
+            collection.logger,
+            func() = "Updated candid map: " # debug_show new_candid_record,
+        );
 
         switch (Schema.validate_record(collection.schema, new_candid_record)) {
             case (#err(msg)) {
@@ -1009,12 +1023,18 @@ module StableCollection {
         #ok(record_details);
     };
 
+    public type SearchResult = {
+        results : [(Nat, T.CandidBlob)];
+        next : () -> SearchResult;
+
+    };
+
     public func search(
         collection : StableCollection,
         main_btree_utils : BTreeUtils<Nat, Blob>,
         query_builder : QueryBuilder,
     ) : Result<[(T.WrapId<T.CandidBlob>)], Text> {
-        Logger.lazyLog(
+        Logger.lazyDebug(
             collection.logger,
             func() = "Executing search with query: " # debug_show (query_builder.build()),
         );
@@ -1026,7 +1046,7 @@ module StableCollection {
             case (#ok(record_ids_iter)) {
                 let candid_blob_iter = id_to_candid_blob_iter(collection, record_ids_iter);
                 let candid_blobs = Iter.toArray(candid_blob_iter);
-                Logger.lazyLog(
+                Logger.lazyDebug(
                     collection.logger,
                     func() = "Search completed, found " # debug_show (candid_blobs.size()) # " results",
                 );
@@ -1036,7 +1056,7 @@ module StableCollection {
     };
 
     public func evaluate_query(collection : StableCollection, stable_query : T.StableQuery) : Result<Iter<Nat>, Text> {
-        Logger.lazyLog(
+        Logger.lazyDebug(
             collection.logger,
             func() = "Evaluating query with operations: " # debug_show (stable_query.query_operations),
         );
@@ -1082,7 +1102,7 @@ module StableCollection {
         let eval = QueryExecution.generate_record_ids_for_query_plan(collection, query_plan, sort_by, sort_records_by_field_cmp);
         let iter = paginate(collection, eval, Option.get(pagination.skip, 0), pagination.limit);
 
-        Logger.lazyLog(
+        Logger.lazyDebug(
             collection.logger,
             func() = "Query evaluation completed",
         );

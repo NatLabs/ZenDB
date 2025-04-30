@@ -108,7 +108,7 @@ module {
         let index_data_utils = CollectionUtils.get_index_data_utils();
         let opt_prev_id = MemoryBTree.insert(index.data, index_data_utils, index_key_values, id);
 
-        Logger.lazyLog(
+        Logger.lazyDebug(
             collection.logger,
             func() = "Storing record with id " # debug_show id # " in index " # index.name # ", originally "
             # debug_show (index_key_values) # ", now encoded as " # debug_show (index_data_utils.key.blobify.to_blob(index_key_values)),
@@ -313,7 +313,7 @@ module {
         let sorted_start_query = sort_and_fill_query_entries(start_query, opt_cursor_with_direction, true);
         let sorted_end_query = sort_and_fill_query_entries(end_query, opt_cursor_with_direction, false);
 
-        Logger.lazyLog(
+        Logger.lazyDebug(
             collection.logger,
             func() = "scan after sort and fill: " # debug_show (sorted_start_query, sorted_end_query),
         );
@@ -321,23 +321,23 @@ module {
         let start_query_values = format_query_entries(sorted_start_query, true);
         let end_query_values = format_query_entries(sorted_end_query, false);
 
-        Logger.lazyLog(
+        Logger.lazyDebug(
             collection.logger,
             func() = "scan after format: " # debug_show (start_query_values, end_query_values),
         );
 
-        Logger.lazyLog(
+        Logger.lazyDebug(
             collection.logger,
             func() = "encoded start_query_values: " # debug_show (Orchid.blobify.to_blob(start_query_values)),
         );
-        Logger.lazyLog(
+        Logger.lazyDebug(
             collection.logger,
             func() = "encoded end_query_values: " # debug_show (Orchid.blobify.to_blob(end_query_values)),
         );
 
         let scans = CollectionUtils.memorybtree_scan_interval(index.data, index_data_utils, ?start_query_values, ?end_query_values);
 
-        Logger.lazyLog(
+        Logger.lazyDebug(
             collection.logger,
             func() = "scan interval results: " # debug_show scans,
         );

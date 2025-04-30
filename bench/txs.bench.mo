@@ -188,7 +188,7 @@ module {
 
         let db = ZenDB.launchDefaultDB(db_sstore);
 
-        let #ok(txs) = db.create_collection<Tx>("transactions", TxSchema, candify_tx);
+        let #ok(txs) = db.create_collection<Tx>("transactions", TxSchema, candify_tx, []);
 
         let principals = Array.tabulate(
             50,

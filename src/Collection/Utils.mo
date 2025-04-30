@@ -107,10 +107,7 @@ module CollectionUtils {
                 buffer.add(#Nat(id));
             } else {
 
-                let ?candid_value = candid_map.get(index_key) else Debug.trap("
-                get_index_columns: field '" # debug_show index_key # "' not found in record
-                candid: " # debug_show candid_map.extract_candid() # "
-                ");
+                let ?candid_value = candid_map.get(index_key) else Debug.trap(" get_index_columns: field '" # debug_show index_key # "' not found in record candid: " # debug_show candid_map.extract_candid());
 
                 let final_candid_value = switch (SchemaMap.get_type(collection.schema_map, index_key), candid_value) {
                     case (?(_), #Option(_)) candid_value;
@@ -120,13 +117,21 @@ module CollectionUtils {
                     case (null, _) Debug.trap("Error retrieving schema type for index key '" # debug_show index_key # "' in collection '" # debug_show collection.name # "'. The schema type is null.");
                 };
 
-                Debug.print("final_index_columns: " # debug_show (index_key, final_candid_value));
-
                 buffer.add(final_candid_value);
             };
         };
 
-        Buffer.toArray(buffer);
+        let index_key_values = Buffer.toArray(buffer);
+
+        Logger.lazyDebug(
+            collection.logger,
+            func() : Text {
+                "Retrieved index key values (" # debug_show (index_key_values) # ") for index key details (" # debug_show (index_key_details) # ") for id [" # debug_show id # "] in collection (" # debug_show collection.name # ")";
+            },
+        );
+
+        index_key_values;
+
     };
 
     public func memorybtree_scan_interval<K, V>(
@@ -157,20 +162,19 @@ module CollectionUtils {
     };
 
     public func lookup_record<Record>(collection : T.StableCollection, blobify : T.InternalCandify<Record>, id : Nat) : Record {
-
-        let ?record_details = MemoryBTree.get(collection.main, get_main_btree_utils(), id);
+        let ?record_details = MemoryBTree.get(collection.main, get_main_btree_utils(), id) else Debug.trap("lookup_record: record not found for id: " # debug_show id);
         let record = blobify.from_blob(record_details);
         record;
     };
 
     public func lookup_candid_blob(collection : StableCollection, id : Nat) : Blob {
-        let ?record_details = MemoryBTree.get(collection.main, get_main_btree_utils(), id);
+        let ?record_details = MemoryBTree.get(collection.main, get_main_btree_utils(), id) else Debug.trap("lookup_candid_blob: record not found for id: " # debug_show id);
         record_details;
     };
 
     public func decode_candid_blob(collection : StableCollection, candid_blob : Blob) : Candid.Candid {
         let candid_result = Candid.decode(candid_blob, collection.schema_keys, null);
-        let #ok(candid_values) = candid_result;
+        let #ok(candid_values) = candid_result else Debug.trap("decode_candid_blob: decoding candid blob failed: " # debug_show candid_result);
         let candid = candid_values[0];
         candid;
     };

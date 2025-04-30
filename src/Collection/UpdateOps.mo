@@ -8,6 +8,7 @@ import T "../Types";
 import CandidMod "../CandidMod";
 import CandidMap "../CandidMap";
 import Utils "../Utils";
+import Logger "../Logger";
 
 module {
 
@@ -251,16 +252,19 @@ module {
     ) : T.Result<T.Candid, Text> {
 
         if (is_candid(op)) {
-            Debug.print("handle_field_update_operation_helper: op is candid: " # debug_show (op));
+            Logger.lazyDebug(collection.logger, func() = "handle_field_update_operation_helper: op is candid: " # debug_show (op));
             return to_candid_value(op);
         } else if (is_single_operation(op)) {
-            Debug.print("handle_field_update_operation_helper: op is single operation: " # debug_show (op));
+            Logger.lazyDebug(collection.logger, func() = "handle_field_update_operation_helper: op is single operation: " # debug_show (op));
             let res = handle_single_field_update_operation(collection, candid_map, field_type, field_value, op);
-            Debug.print("res: " # debug_show (res));
+            Logger.lazyDebug(
+                collection.logger,
+                func() = "res: " # debug_show (res),
+            );
             return res;
         };
 
-        Debug.print("handle_field_update_operation_helper: op is multi operation: " # debug_show (op));
+        Logger.lazyDebug(collection.logger, func() = "handle_field_update_operation_helper: op is multi operation: " # debug_show (op));
         handle_multi_field_update_operations(collection, candid_map, field_type, field_value, op)
 
     };

@@ -68,7 +68,7 @@ module {
 
         switch (Map.get<Text, StableCollection>(db.collections, thash, name)) {
             case (?stable_collection) {
-                Logger.lazyLog(
+                Logger.lazyDebug(
                     db.logger,
                     func() = "StableDatabase.create_collection(): Collection '" # name # "' already exists, checking schema compatibility",
                 );
@@ -87,7 +87,7 @@ module {
                 return #ok(stable_collection);
             };
             case (null) {
-                Logger.lazyLog(
+                Logger.lazyDebug(
                     db.logger,
                     func() = "StableDatabase.create_collection(): Collection '" # name # "' does not exist, creating new one",
                 );
@@ -189,7 +189,7 @@ module {
             db.logger,
             func() = "StableDatabase.create_collection(): Created collection '" # name # "' successfully",
         );
-        Logger.lazyLog(
+        Logger.lazyDebug(
             db.logger,
             func() = "StableDatabase.create_collection(): Schema for collection '" # name # "': " # debug_show schema,
         );
@@ -199,14 +199,14 @@ module {
     };
 
     public func get_collection(db : T.StableDatabase, name : Text) : Result<StableCollection, Text> {
-        Logger.lazyLog(
+        Logger.lazyDebug(
             db.logger,
             func() = "StableDatabase.get_collection(): Getting collection '" # name # "'",
         );
 
         let stable_collection = switch (Map.get<Text, StableCollection>(db.collections, thash, name)) {
             case (?collection) {
-                Logger.lazyLog(
+                Logger.lazyDebug(
                     db.logger,
                     func() = "StableDatabase.get_collection(): Found collection '" # name # "'",
                 );
@@ -244,7 +244,7 @@ module {
                 #ok(collection);
             };
             case (#err(msg)) {
-                Logger.lazyLog(
+                Logger.lazyDebug(
                     db.logger,
                     func() = "StableDatabase.get_or_create_collection(): Failed to create collection '" #
                     name # "', trying to get existing collection. Error: " # msg,

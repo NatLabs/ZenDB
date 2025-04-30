@@ -93,6 +93,10 @@ module Logger {
         logAtLevel(logger, #Debug, msg);
     };
 
+    public func debugMsg(logger : Logger, msg : Text) {
+        logAtLevel(logger, #Debug, msg);
+    };
+
     public func info(logger : Logger, msg : Text) {
         logAtLevel(logger, #Info, msg);
     };
@@ -139,6 +143,10 @@ module Logger {
     };
 
     public func lazyLog(logger : Logger, msgFn : () -> Text) {
+        lazyLogAtLevel(logger, #Debug, msgFn);
+    };
+
+    public func lazyDebug(logger : Logger, msgFn : () -> Text) {
         lazyLogAtLevel(logger, #Debug, msgFn);
     };
 
@@ -199,6 +207,10 @@ module Logger {
             logAtLevel(#Debug, msg);
         };
 
+        public func debugMsg(msg : Text) {
+            logAtLevel(#Debug, msg);
+        };
+
         public func info(msg : Text) {
             logAtLevel(#Info, msg);
         };
@@ -235,6 +247,10 @@ module Logger {
         };
 
         public func lazyLog(msgFn : () -> Text) {
+            lazyLogAtLevel(#Debug, msgFn);
+        };
+
+        public func lazyDebug(msgFn : () -> Text) {
             lazyLogAtLevel(#Debug, msgFn);
         };
 

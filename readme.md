@@ -35,8 +35,10 @@ ZenDB is a sophisticated, embedded document database that leverages the Internet
 ### 1. Installation
 
 ```bash
-mops add zendb
+mops add zendb-stable-memory
 ```
+
+> Requires `moc` version `0.14.9` to run
 
 ### 2. Initialize Your Database
 
@@ -87,12 +89,7 @@ let UsersSchema : ZenDB.Types.Schema = #Record([
 
 let candify_users : ZenDB.Types.Candify<User> = {
   to_blob = func(user: User) : Blob { to_candid(user) };
-  from_blob = func(blob: Blob) : User {
-    switch(from_candid(blob) : ?User) {
-      case (?user) user;
-      case null Debug.trap("Failed to decode user");
-    };
-  };
+  from_blob = func(blob: Blob) : ?User { from_candid(blob) };
 };
 ```
 
@@ -237,6 +234,46 @@ The repository includes several examples demonstrating ZenDB's capabilities:
 - **Transaction Ledger**: High-performance financial transaction indexing
 - **React Integration**: Frontend integration example with React UI
 
+## Documentation and Core Modules
+This library is heavily inspired by mongodb's document database so you will see some of the same terms here.
+
+### Record
+A document is the smallest entity of our database. It's the data that is defined and stored by the user. 
+Documents have all the motoko types but must be defined as a record. All the other types can be used as the field types but the top layer must always be a record.
+
+### Collection
+This is the same as a table in sql databases.
+A collection is a group of records with the same schema definition
+
+#### Schema
+How to define a schema? The schema must match the motoko type you are trying to store. Our schema definition is a list of motoko types.
+
+## Limitations
+
+#### Indexes
+- Not capable of creating indexes on fields with `#Float` data type
+- Cannot create indexes on fields nested within an `#Array`
+- No support for text-based full-text search or pattern matching within indexes
+- Limited support for indexing variant types - must reference specific variant paths
+
+#### Query Execution
+- Complex queries with many OR conditions may have suboptimal performance
+- No built-in support for geospatial queries or operations
+- Computation can spike during complex sorting operations on large result sets
+- The query planner may not always select the optimal index for complex queries
+
+#### Data Management
+- No automatic schema migration tools when changing collection schemas
+- Update operations on large collections with many indexes can be resource-intensive
+- Limited batch operation support for mass updates or deletes
+- No built-in support for time-to-live (TTL) or automatic document expiration
+
+#### Resource Constraints
+- Large result sets may encounter instruction limits on query operations
+- Pagination with skip can be inefficient for large offsets - cursor-based pagination recommended
+- No built-in horizontal scaling across multiple canisters
+- Complex aggregation operations must be implemented at the application level
+
 ## Roadmap
 
 - [x] Multi-field compound indexes
@@ -251,7 +288,8 @@ The repository includes several examples demonstrating ZenDB's capabilities:
 
 ## Contributing
 
-Contributions are welcome! Please feel free to submit a Pull Request.
+Contributions are welcome! Please feel free to submit a Pull Request to fix a bug.
+For features, please create an issue first to discuss supporting it in this project.
 
 ## License
 

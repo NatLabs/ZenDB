@@ -128,7 +128,7 @@ suite(
         );
 
         test(
-            "search for variants by their tags (not indexed)",
+            "search for variants by their tags ",
             func() {
                 assert data.search(
                     ZenDB.QueryBuilder().Where("version", #eq(#Text("v1")))
