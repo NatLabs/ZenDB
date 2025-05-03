@@ -143,52 +143,84 @@ module {
         bench.description("Benchmarking the performance with 10k txs");
 
         bench.cols([
+            "#heap no index",
+            "#stableMemory no index",
 
-            "(full scan, -> array)",
-            "(index intersection, -> array)",
+            // partially covered indexes
+            "#heap 7 single field indexes",
+            "#stableMemory 7 single field indexes",
+
+            // multi-field indexes
+            "#heap 6 fully covered indexes",
+            "#stableMemory 6 fully covered indexes",
+
+            // partially covered indexes sorted by tx.amt
+            "#heap 7 single field indexes (sorted by tx.amt)",
+            "#stableMemory 7 single field indexes (sorted by tx.amt)",
+
+            // multi-field indexes sorted by timestamp
+            "#heap 6 fully covered indexes (sorted by ts)",
+            "#stableMemory 6 fully covered indexes (sorted by ts)",
+
             // "(sorted by tx.amt, ↑)",
             // "(sorted by tx.amt, ↓)",
             // "(skip_limit_pagination limit = 100, -> array"
+            // sort on fully covered indexes
+            // sort on partially covered indexes
+            // sort on non-indexed fields
+
         ]);
 
         bench.rows([
-            "insert",
-            "clear",
-            "insert with 5 indexes",
-            "query() -> btype == '1mint'",
-            "query() -> btype == '1xfer' or '2xfer'",
+            "insert with no index",
+            "create and populate indexes",
+            "clear collection entries and indexes",
+            "insert with indexes",
+
+            "query(): no filter (all txs)",
+            "query(): single field (btype = '1mint')",
+
+            // And only 2 queries on the same field -> range query
+            "query(): number range (250 < tx.amt <= 400)",
+
+            // And only, 1 query each on 2 fields (btype, amt)
+            "query(): #And (btype='1burn' AND tx.amt>=750)",
+
+            // #And only, range query on 2 fields (ts, amt)
+            "query(): #And (500_000<ts<=1_000_000 AND 200<amt<=600)",
+
+            // #Or only, 3 queries on the same field (btype == '1xfer' or '2xfer' or '1mint')",
+            "query(): #Or (btype == '1xfer' OR '2xfer' OR '1mint')",
+            // "query(): #In (btype either of ['1xfer', '2xfer', '1mint'])",
+
+            // #Or only, 1 query each on 2 different fields (btype, amt)
+            "query(): #Or (btype == '1xfer' OR tx.amt >= 500)",
+
+            // #Or only, 1 query each on 3 different fields (btype, amt, ts)
+            "query(): #Or (btype == '1xfer' OR tx.amt >= 500 OR ts > 500_000)",
+
+            // complex queries
+            // #Or, range query on 2 fields (ts, amt)
+            "query(): #Or (500_000<ts<=1_000_000 OR 200<amt<=600)",
+
+            // #Or, nested or query on 2 fields (btype, amt)
+            "query(): #Or (btype in ['1xfer', '1burn'] OR (tx.amt < 200 OR tx.amt >= 800))",
+
             "query() -> principals[0] == tx.to.owner (is recipient)",
             "query() -> principals[0..10] == tx.to.owner (is recipient)",
             "query() -> all txs involving principals[0]",
             "query() -> all txs involving principals[0..10]",
-            "query() -> 250 < tx.amt <= 400",
-            "query() -> btype == 1burn and tx.amt >= 750",
-            "update() -> #add amt += 100",
-            "update() -> #sub amt -= 100",
-            "update() -> #div amt /= 2",
-            "update() -> #mul amt *= 2",
-            "update() -> #set amt = 100",
-            "replaceRecord() -> replace half the tx with new tx",
-            // "update() ->  -> [#add, #div, #mul, #div] on tx.amt",
-            // "update() ->  -> [#add, #div, #mul, #div, #set] on diff fields",
+            // "update(): single operation -> #add amt += 100",
+            // "update(): multiple independent operations -> #add, #sub, #mul, #div on tx.amt",
+            // "update(): multiple nested operations -> #add, #sub, #mul, #div on tx.amt",
+            // "update(): multiple operations on multiple fields -> #add, #sub, #mul, #div on (tx.amt, tx.ts, fee)",
+            // "replaceRecord() -> replace half the tx with new tx",
+            // "delete()",
 
         ]);
 
-        let limit = 10_000;
+        let limit = 1_000;
         let fuzz = Fuzz.fromSeed(0x7eadbeef);
-
-        let db_sstore = ZenDB.newStableStore(
-            ?{
-                logging = ?{
-                    log_level = #Trap;
-                    is_running_locally = false;
-                };
-            }
-        );
-
-        let db = ZenDB.launchDefaultDB(db_sstore);
-
-        let #ok(txs) = db.create_collection<Tx>("transactions", TxSchema, candify_tx, []);
 
         let principals = Array.tabulate(
             50,
@@ -209,6 +241,11 @@ module {
             },
         );
 
+        let candid_principals_0_10 = Array.map<Principal, ZenDB.Types.Candid>(
+            principals_0_10,
+            func(p : Principal) : ZenDB.Types.Candid = #Principal(p),
+        );
+
         let predefined_txs = Buffer.Buffer<Tx>(limit);
         let tx_ids = Buffer.Buffer<Nat>(limit);
 
@@ -217,18 +254,210 @@ module {
             predefined_txs.add(tx);
         };
 
+        let heap_db_sstore = ZenDB.newStableStore(?{ ZenDB.defaultSettings with memory_type = ?(#heap) });
+        let heap_db = ZenDB.launchDefaultDB(heap_db_sstore);
+        let #ok(heap_no_index) = heap_db.create_collection<Tx>("heap_no_index", TxSchema, candify_tx, []);
+        let #ok(heap_single_field_indexes) = heap_db.create_collection<Tx>("heap_single_field_indexes", TxSchema, candify_tx, []);
+        let #ok(heap_fully_covered_indexes) = heap_db.create_collection<Tx>("heap_fully_covered_indexes", TxSchema, candify_tx, []);
+        let #ok(heap_sorted_single_field_indexes) = heap_db.create_collection<Tx>("heap_sorted_single_field_indexes", TxSchema, candify_tx, []);
+        let #ok(heap_sorted_fully_covered_indexes) = heap_db.create_collection<Tx>("heap_sorted_fully_covered_indexes", TxSchema, candify_tx, []);
+
+        let stable_memory_db_sstore = ZenDB.newStableStore(?{ ZenDB.defaultSettings with memory_type = ?(#stableMemory) });
+        let stable_memory_db = ZenDB.launchDefaultDB(stable_memory_db_sstore);
+        let #ok(stable_memory_no_index) = stable_memory_db.create_collection<Tx>("stable_memory_no_index", TxSchema, candify_tx, []);
+        let #ok(stable_memory_single_field_indexes) = stable_memory_db.create_collection<Tx>("stable_memory_single_field_indexes", TxSchema, candify_tx, []);
+        let #ok(stable_memory_fully_covered_indexes) = stable_memory_db.create_collection<Tx>("stable_memory_fully_covered_indexes", TxSchema, candify_tx, []);
+        let #ok(stable_memory_sorted_single_field_indexes) = stable_memory_db.create_collection<Tx>("stable_memory_sorted_single_field_indexes", TxSchema, candify_tx, []);
+        let #ok(stable_memory_sorted_fully_covered_indexes) = stable_memory_db.create_collection<Tx>("stable_memory_sorted_fully_covered_indexes", TxSchema, candify_tx, []);
+
+        func new_query() : () -> ZenDB.QueryBuilder {
+            func() { ZenDB.QueryBuilder() };
+        };
+
+        func new_sorted_query(field : Text, dir : ZenDB.Types.SortDirection) : () -> ZenDB.QueryBuilder {
+            func() { ZenDB.QueryBuilder().Sort(field, dir) };
+        };
+
+        let prev_indexes = [
+            [("btype", #Ascending), ("tx.amt", #Ascending)],
+            [("btype", #Ascending), ("ts", #Ascending)],
+            [("tx.amt", #Ascending)],
+            [("ts", #Ascending)],
+            [("tx.from.owner", #Ascending), ("tx.from.sub_account", #Ascending)],
+            [("tx.to.owner", #Ascending), ("tx.to.sub_account", #Ascending)],
+            [("tx.spender.owner", #Ascending), ("tx.spender.sub_account", #Ascending)],
+        ];
+
+        let single_field_indexes = [
+            [("btype", #Ascending)],
+            [("tx.amt", #Ascending)],
+            [("ts", #Ascending)],
+            [("tx.from.owner", #Ascending)],
+            [("tx.to.owner", #Ascending)],
+            [("tx.spender.owner", #Ascending)],
+            [("fee", #Ascending)],
+        ];
+
+        let fully_covered_indexes = [
+            [("tx.amt", #Ascending)],
+            [("ts", #Ascending)],
+            [("btype", #Ascending), ("tx.amt", #Ascending)],
+            [("btype", #Ascending), ("ts", #Ascending)],
+            [("tx.from.owner", #Ascending), ("tx.from.sub_account", #Ascending)],
+            [("tx.to.owner", #Ascending), ("tx.to.sub_account", #Ascending)],
+            [("tx.spender.owner", #Ascending), ("tx.spender.sub_account", #Ascending)],
+        ];
+
         bench.runner(
             func(col, row) = switch (row) {
+                case ("#heap no index") {
+                    run_collection_benchmarks(
+                        col,
+                        heap_no_index,
+                        [],
+                        predefined_txs,
+                        Buffer.Buffer<Nat>(limit),
+                        principals,
+                        candid_principals_0_10,
+                        new_query(),
+                        fuzz,
+                        limit,
+                    );
+                };
 
-                case ("(index intersection, -> array)") {
-                    index_intersection(txs, col, limit, predefined_txs, principals, candid_principals, principals_0_10, tx_ids, fuzz);
+                case ("#stableMemory no index") {
+                    run_collection_benchmarks(
+                        col,
+                        stable_memory_no_index,
+                        [],
+                        predefined_txs,
+                        Buffer.Buffer<Nat>(limit),
+                        principals,
+                        candid_principals_0_10,
+                        new_query(),
+                        fuzz,
+                        limit,
+                    );
                 };
-                case ("(full scan, -> array)") {
-                    full_scan(txs, col, limit, predefined_txs, principals, candid_principals, principals_0_10, tx_ids);
+
+                case ("#heap 7 single field indexes") {
+                    run_collection_benchmarks(
+                        col,
+                        heap_single_field_indexes,
+                        single_field_indexes,
+                        predefined_txs,
+                        Buffer.Buffer<Nat>(limit),
+                        principals,
+                        candid_principals_0_10,
+                        new_query(),
+                        fuzz,
+                        limit,
+                    );
                 };
-                case ("(skip_limit_pagination limit = 100, -> array") {
-                    paginated_queries(txs, col, limit, predefined_txs, principals, candid_principals, principals_0_10, #Ascending, 100);
+
+                case ("#stableMemory 7 single field indexes") {
+                    run_collection_benchmarks(
+                        col,
+                        stable_memory_single_field_indexes,
+                        single_field_indexes,
+                        predefined_txs,
+                        Buffer.Buffer<Nat>(limit),
+                        principals,
+                        candid_principals_0_10,
+                        new_query(),
+                        fuzz,
+                        limit,
+                    );
                 };
+
+                case ("#heap 6 fully covered indexes") {
+                    run_collection_benchmarks(
+                        col,
+                        heap_fully_covered_indexes,
+                        fully_covered_indexes,
+                        predefined_txs,
+                        Buffer.Buffer<Nat>(limit),
+                        principals,
+                        candid_principals_0_10,
+                        new_query(),
+                        fuzz,
+                        limit,
+                    );
+                };
+
+                case ("#stableMemory 6 fully covered indexes") {
+                    run_collection_benchmarks(
+                        col,
+                        stable_memory_fully_covered_indexes,
+                        fully_covered_indexes,
+                        predefined_txs,
+                        Buffer.Buffer<Nat>(limit),
+                        principals,
+                        candid_principals_0_10,
+                        new_query(),
+                        fuzz,
+                        limit,
+                    );
+                };
+
+                case ("#heap 7 single field indexes (sorted by tx.amt)") {
+                    run_collection_benchmarks(
+                        col,
+                        heap_sorted_single_field_indexes,
+                        single_field_indexes,
+                        predefined_txs,
+                        Buffer.Buffer<Nat>(limit),
+                        principals,
+                        candid_principals_0_10,
+                        new_sorted_query("tx.amt", #Ascending),
+                        fuzz,
+                        limit,
+                    );
+                };
+
+                case ("#stableMemory 7 single field indexes (sorted by tx.amt)") {
+                    run_collection_benchmarks(
+                        col,
+                        stable_memory_sorted_single_field_indexes,
+                        single_field_indexes,
+                        predefined_txs,
+                        Buffer.Buffer<Nat>(limit),
+                        principals,
+                        candid_principals_0_10,
+                        new_sorted_query("tx.amt", #Ascending),
+                        fuzz,
+                        limit,
+                    );
+                };
+                case ("#heap 6 fully covered indexes (sorted by ts)") {
+                    run_collection_benchmarks(
+                        col,
+                        heap_sorted_fully_covered_indexes,
+                        fully_covered_indexes,
+                        predefined_txs,
+                        Buffer.Buffer<Nat>(limit),
+                        principals,
+                        candid_principals_0_10,
+                        new_sorted_query("ts", #Ascending),
+                        fuzz,
+                        limit,
+                    );
+                };
+                case ("#stableMemory 6 fully covered indexes (sorted by ts)") {
+                    run_collection_benchmarks(
+                        col,
+                        stable_memory_sorted_fully_covered_indexes,
+                        fully_covered_indexes,
+                        predefined_txs,
+                        Buffer.Buffer<Nat>(limit),
+                        principals,
+                        candid_principals_0_10,
+                        new_sorted_query("ts", #Ascending),
+                        fuzz,
+                        limit,
+                    );
+                };
+
                 case (_) {
                     Debug.trap("Should be unreachable:\n row = \"" # debug_show row # "\" and col = \"" # debug_show col # "\"");
                 };
@@ -239,108 +468,65 @@ module {
         bench;
     };
 
-    func index_intersection(
-        txs : ZenDB.Collection<Tx>,
-        section : Text,
-        limit : Nat,
-        predefined_txs : Buffer.Buffer<Tx>,
-        principals : [Principal],
-        candid_principals : [ZenDB.Types.Candid],
-        principals_0_10 : [Principal],
+    func run_collection_benchmarks(
+        benchmark_name : Text,
+        collection : ZenDB.Collection<Tx>,
+        indexes : [[(Text, ZenDB.Types.SortDirection)]],
+        inputs : Buffer.Buffer<Tx>,
         tx_ids : Buffer.Buffer<Nat>,
+        principals : [Principal],
+        candid_principals_0_10 : [ZenDB.Types.Candid],
+        new_query : () -> ZenDB.QueryBuilder,
         fuzz : Fuzz.Fuzzer,
+        limit : Nat,
+
     ) {
-        switch (section) {
-            case ("insert") {
-                // re-use the predefined txs
+
+        switch (benchmark_name) {
+            case ("insert with no index") {
+                for (i in Iter.range(0, limit - 1)) {
+                    let tx = inputs.get(i);
+                    let #ok(_) = collection.insert(tx);
+                };
             };
 
-            case ("clear") {
-                // re-use the predefined txs
+            case ("create and populate indexes") {
+                for ((i, index_details) in Itertools.enumerate(indexes.vals())) {
+                    let #ok(_) = collection.create_and_populate_index("index_" # debug_show (i), index_details);
+                };
+
             };
 
-            case ("insert with 5 indexes") {
-                // re-use the predefined txs
+            case ("clear collection entries and indexes") {
+                collection.clear();
             };
 
-            case ("query() -> btype == '1mint'") {
-                let db_query = ZenDB.QueryBuilder().Where(
+            case ("insert with indexes") {
+                for (i in Iter.range(0, limit - 1)) {
+                    let tx = inputs.get(i);
+                    let #ok(id) = collection.insert(tx);
+                    tx_ids.add(id);
+                };
+            };
+
+            case ("query(): no filter (all txs)") {
+                let db_query = new_query();
+                let #ok(matching_txs) = collection.search(db_query);
+                // assert matching_txs.size() == limit;
+                Debug.print("matching_txs.size(): " # debug_show (matching_txs.size()));
+            };
+
+            case ("query(): single field (btype = '1mint')") {
+                let db_query = new_query().Where(
                     "btype",
                     #eq(#Text("1mint")),
                 );
 
-                let #ok(matching_txs) = txs.search(db_query);
+                let #ok(matching_txs) = collection.search(db_query);
             };
 
-            case ("query() -> btype == '1xfer' or '2xfer'") {
-                let db_query = ZenDB.QueryBuilder().Where(
-                    "btype",
-                    #In([#Text("1xfer"), #Text("2xfer")]),
-                );
-
-                let #ok(matching_txs) = txs.search(db_query);
-            };
-
-            case ("query() -> principals[0] == tx.to.owner (is recipient)") {
-                let db_query = ZenDB.QueryBuilder().Where(
-                    "tx.to.owner",
-                    #eq(#Principal(principals.get(0))),
-                );
-
-                let #ok(matching_txs) = txs.search(db_query);
-            };
-
-            case ("query() -> principals[0..10] == tx.to.owner (is recipient)") {
-                let candid_principals = Array.map<Principal, ZenDB.Types.Candid>(
-                    Iter.toArray(Array.slice<Principal>(principals, 0, 10)),
-                    func(p : Principal) : ZenDB.Types.Candid = #Principal(p),
-                );
-
-                let db_query = ZenDB.QueryBuilder().Where(
-                    "tx.to.owner",
-                    #In(candid_principals),
-                );
-
-                let #ok(matching_txs) = txs.search(db_query);
-            };
-
-            case ("query() -> all txs involving principals[0]") {
-                let db_query = ZenDB.QueryBuilder().Where(
-                    "tx.to.owner",
-                    #eq(#Principal(principals.get(0))),
-                ).Or(
-                    "tx.from.owner",
-                    #eq(#Principal(principals.get(0))),
-                ).Or(
-                    "tx.spender.owner",
-                    #eq(#Principal(principals.get(0))),
-                );
-
-                let #ok(matching_txs) = txs.search(db_query);
-            };
-
-            case ("query() -> all txs involving principals[0..10]") {
-                let candid_principals = Array.map<Principal, ZenDB.Types.Candid>(
-                    Iter.toArray(Array.slice(principals, 0, 10)),
-                    func(p : Principal) : ZenDB.Types.Candid = #Principal(p),
-                );
-
-                let db_query = ZenDB.QueryBuilder().Where(
-                    "tx.to.owner",
-                    #In(candid_principals),
-                ).Or(
-                    "tx.from.owner",
-                    #In(candid_principals),
-                ).Or(
-                    "tx.spender.owner",
-                    #In(candid_principals),
-                );
-
-                let #ok(matching_txs) = txs.search(db_query);
-            };
-
-            case ("query() -> 250 < tx.amt <= 400") {
-                let db_query = ZenDB.QueryBuilder().Where(
+            case ("query(): number range (250 < tx.amt <= 400)") {
+                let db_query = new_query().Where(
                     "tx.amt",
                     #gt(#Nat(250)),
                 ).And(
@@ -348,11 +534,11 @@ module {
                     #lte(#Nat(400)),
                 );
 
-                let #ok(matching_txs) = txs.search(db_query);
+                let #ok(matching_txs) = collection.search(db_query);
             };
 
-            case ("query() -> btype == 1burn and tx.amt >= 750") {
-                let db_query = ZenDB.QueryBuilder().Where(
+            case ("query(): #And (btype='1burn' AND tx.amt>=750)") {
+                let db_query = new_query().Where(
                     "btype",
                     #eq(#Text("1burn")),
                 ).And(
@@ -360,222 +546,204 @@ module {
                     #gte(#Nat(750)),
                 );
 
-                let #ok(matching_txs) = txs.search(db_query);
+                let #ok(matching_txs) = collection.search(db_query);
             };
 
-            case ("update() -> #add amt += 100") {
-                for (i in tx_ids.vals()) {
-                    switch (txs.updateById(i, ([("tx.amt", #add(#currValue, #Nat(100)))]))) {
-                        case (#ok(_)) {};
-                        case (#err(msg)) Debug.trap("Error updating tx: " # debug_show msg);
-                    };
-                };
-            };
-            case ("update() -> #sub amt -= 100") {
-                for (i in tx_ids.vals()) {
-                    let #ok(_) = txs.updateById(i, ([("tx.amt", #sub(#currValue, #Nat(100)))]));
-                };
-            };
-            case ("update() -> #div amt /= 2") {
-                for (i in tx_ids.vals()) {
-                    let #ok(_) = txs.updateById(i, ([("tx.amt", #div(#currValue, #Nat(2)))]));
-                };
-            };
-            case ("update() -> #mul amt *= 2") {
-                for (i in tx_ids.vals()) {
-                    let #ok(_) = txs.updateById(i, ([("tx.amt", #mul(#currValue, #Nat(2)))]));
-                };
-            };
-            case ("update() -> #set amt = 100") {
-                for (i in tx_ids.vals()) {
-                    let #ok(_) = txs.updateById(i, ([("tx.amt", #Nat(100))]));
-                };
-            };
-            case ("replaceRecord() -> replace half the tx with new tx") {
-                for (i in Itertools.take(tx_ids.vals(), limit / 2)) {
-                    let #ok(_) = txs.replaceRecord(i, new_tx(fuzz, principals));
-                };
-            };
-
-            case (_) {
-                Debug.trap("Should be unreachable:\n row = zenDB (index intersection, -> array) and col = \"" # debug_show section # "\"");
-            };
-        };
-    };
-
-    func full_scan(
-        txs : ZenDB.Collection<Tx>,
-        section : Text,
-        limit : Nat,
-        predefined_txs : Buffer.Buffer<Tx>,
-        principals : [Principal],
-        candid_principals : [ZenDB.Types.Candid],
-        principals_0_10 : [Principal],
-        tx_ids : Buffer.Buffer<Nat>,
-    ) {
-        switch (section) {
-
-            case ("insert") {
-                for (i in Iter.range(0, limit - 1)) {
-                    let tx = predefined_txs.get(i);
-                    let #ok(_) = txs.insert(tx);
-                };
-            };
-
-            case ("clear") {
-                txs.clear();
-            };
-
-            case ("insert with 5 indexes") {
-
-                let #ok(_) = txs.create_index("index_1", [("btype", #Ascending), ("tx.amt", #Ascending)], false);
-                let #ok(_) = txs.create_index("index_2", [("btype", #Ascending), ("ts", #Ascending)], false);
-                let #ok(_) = txs.create_index("index_3", [("tx.amt", #Ascending)], false);
-                let #ok(_) = txs.create_index("index_4", [("ts", #Ascending)], false);
-                let #ok(_) = txs.create_index("index_5", [("tx.from.owner", #Ascending), ("tx.from.sub_account", #Ascending)], false);
-                let #ok(_) = txs.create_index("index_6", [("tx.to.owner", #Ascending), ("tx.to.sub_account", #Ascending)], false);
-                let #ok(_) = txs.create_index("index_7", [("tx.spender.owner", #Ascending), ("tx.spender.sub_account", #Ascending)], false);
-
-                for (i in Iter.range(0, limit - 1)) {
-                    let tx = predefined_txs.get(i);
-                    let #ok(id) = txs.insert(tx);
-                    tx_ids.add(id);
-                };
-            };
-
-            case ("query() -> btype == '1mint'") {
-                let results = txs.filter(
-                    func(tx : Tx) : Bool {
-                        tx.btype == "1mint";
-                    }
+            case ("query(): #And (500_000<ts<=1_000_000 AND 200<amt<=600)") {
+                let db_query = new_query().Where(
+                    "ts",
+                    #gt(#Nat(500_000)),
+                ).And(
+                    "ts",
+                    #lte(#Nat(1_000_000)),
+                ).And(
+                    "tx.amt",
+                    #gt(#Nat(200)),
+                ).And(
+                    "tx.amt",
+                    #lte(#Nat(600)),
                 );
 
+                let #ok(matching_txs) = collection.search(db_query);
             };
 
-            case ("query() -> btype == '1xfer' or '2xfer'") {
-                let results = txs.filter(
-                    func(tx : Tx) : Bool {
-                        tx.btype == "1xfer" or tx.btype == "2xfer";
-                    }
+            case ("query(): #Or (btype == '1xfer' OR '2xfer' OR '1mint')") {
+                let db_query = new_query().Where(
+                    "btype",
+                    #In([#Text("1xfer"), #Text("2xfer"), #Text("1mint")]),
                 );
+
+                let #ok(matching_txs) = collection.search(db_query);
+            };
+
+            case ("query(): #Or (btype == '1xfer' OR tx.amt >= 500)") {
+                let db_query = new_query().Where(
+                    "btype",
+                    #eq(#Text("1xfer")),
+                ).Or(
+                    "tx.amt",
+                    #gte(#Nat(500)),
+                );
+
+                let #ok(matching_txs) = collection.search(db_query);
+            };
+
+            case ("query(): #Or (btype == '1xfer' OR tx.amt >= 500 OR ts > 500_000)") {
+                let db_query = new_query().Where(
+                    "btype",
+                    #eq(#Text("1xfer")),
+                ).Or(
+                    "tx.amt",
+                    #gte(#Nat(500)),
+                ).Or(
+                    "ts",
+                    #gt(#Nat(500_000)),
+                );
+
+                let #ok(matching_txs) = collection.search(db_query);
+            };
+
+            case ("query(): #Or (500_000<ts<=1_000_000 OR 200<amt<=600)") {
+                let db_query = new_query().Where(
+                    "ts",
+                    #gt(#Nat(500_000)),
+                ).And(
+                    "ts",
+                    #lte(#Nat(1_000_000)),
+                ).Or(
+                    "tx.amt",
+                    #gt(#Nat(200)),
+                ).And(
+                    "tx.amt",
+                    #lte(#Nat(600)),
+                );
+
+                let #ok(matching_txs) = collection.search(db_query);
+            };
+
+            case ("query(): #Or (btype in ['1xfer', '1burn'] OR (tx.amt < 200 OR tx.amt >= 800))") {
+                let db_query = new_query().Where(
+                    "btype",
+                    #In([#Text("1xfer"), #Text("1burn")]),
+                ).Or(
+                    "tx.amt",
+                    #lt(#Nat(200)),
+                ).Or(
+                    "tx.amt",
+                    #gte(#Nat(800)),
+                );
+
+                let #ok(matching_txs) = collection.search(db_query);
             };
 
             case ("query() -> principals[0] == tx.to.owner (is recipient)") {
-                let results = txs.filter(
-                    func(tx : Tx) : Bool {
-                        switch (tx.tx.to) {
-                            case (?account) {
-                                account.owner == principals.get(0);
-                            };
-                            case (_) { false };
-                        };
-                    }
+                let db_query = new_query().Where(
+                    "tx.to.owner",
+                    #eq(#Principal(principals.get(0))),
                 );
+
+                let #ok(matching_txs) = collection.search(db_query);
             };
 
             case ("query() -> principals[0..10] == tx.to.owner (is recipient)") {
-                let principals_0_10 = Array.take(principals, 10);
-
-                let results = txs.filter(
-                    func(tx : Tx) : Bool {
-                        switch (tx.tx.to) {
-                            case (?account) {
-                                (Array.find<Principal>(principals_0_10, func(p : Principal) : Bool { p == account.owner }) : ?Principal) != null;
-                            };
-                            case (_) { false };
-                        };
-                    }
+                let db_query = new_query().Where(
+                    "tx.to.owner",
+                    #In(candid_principals_0_10),
                 );
 
+                let #ok(matching_txs) = collection.search(db_query);
             };
 
             case ("query() -> all txs involving principals[0]") {
-                let results = txs.filter(
-                    func(tx : Tx) : Bool {
-
-                        switch (tx.tx.to) {
-                            case (?account) {
-                                account.owner == principals.get(0);
-                            };
-                            case (_) {
-                                switch (tx.tx.from) {
-                                    case (?account) {
-                                        account.owner == principals.get(0);
-                                    };
-                                    case (_) {
-                                        switch (tx.tx.spender) {
-                                            case (?account) {
-                                                account.owner == principals.get(0);
-                                            };
-                                            case (_) { false };
-                                        };
-                                    };
-                                };
-                            };
-                        };
-                    }
+                let db_query = new_query().Where(
+                    "tx.to.owner",
+                    #eq(#Principal(principals.get(0))),
+                ).Or(
+                    "tx.from.owner",
+                    #eq(#Principal(principals.get(0))),
+                ).Or(
+                    "tx.spender.owner",
+                    #eq(#Principal(principals.get(0))),
                 );
+
+                let #ok(matching_txs) = collection.search(db_query);
             };
 
             case ("query() -> all txs involving principals[0..10]") {
-                let principals_0_10 = Array.take(principals, 10);
 
-                let results = txs.filter(
-                    func(tx : Tx) : Bool {
-
-                        switch (tx.tx.to) {
-                            case (?account) {
-                                (Array.find<Principal>(principals_0_10, func(p : Principal) : Bool { p == account.owner }) : ?Principal) != null;
-                            };
-                            case (_) {
-                                switch (tx.tx.from) {
-                                    case (?account) {
-                                        (Array.find<Principal>(principals_0_10, func(p : Principal) : Bool { p == account.owner }) : ?Principal) != null;
-                                    };
-                                    case (_) {
-                                        switch (tx.tx.spender) {
-                                            case (?account) {
-                                                (Array.find<Principal>(principals_0_10, func(p : Principal) : Bool { p == account.owner }) : ?Principal) != null;
-                                            };
-                                            case (_) { false };
-                                        };
-                                    };
-                                };
-                            };
-                        };
-                    }
+                let db_query = new_query().Where(
+                    "tx.to.owner",
+                    #In(candid_principals_0_10),
+                ).Or(
+                    "tx.from.owner",
+                    #In(candid_principals_0_10),
+                ).Or(
+                    "tx.spender.owner",
+                    #In(candid_principals_0_10),
                 );
 
+                let #ok(matching_txs) = collection.search(db_query);
+            };
+            case ("update(): single operation -> #add amt += 100") {
+                for (i in Itertools.take(tx_ids.vals(), limit / 2)) {
+                    let #ok(_) = collection.updateById(i, [("tx.amt", #add(#currValue, #Nat(100)))]);
+                };
             };
 
-            case ("query() -> 250 < tx.amt <= 400") {
-                let results = txs.filter(
-                    func(tx : Tx) : Bool {
-                        tx.tx.amt > 250 and tx.tx.amt <= 400;
-                    }
-                );
+            case ("update(): multiple independent operations -> #add, #sub, #mul, #div on tx.amt") {
+                for (i in Itertools.take(tx_ids.vals(), limit / 2)) {
+                    let #ok(_) = collection.updateById(
+                        i,
+                        [
+                            ("tx.amt", #add(#currValue, #Nat(100))),
+                            ("tx.amt", #sub(#currValue, #Nat(50))),
+                            ("tx.amt", #mul(#currValue, #Nat(2))),
+                            ("tx.amt", #div(#currValue, #Nat(2))),
+                        ],
+                    );
+                };
             };
 
-            case ("query() -> btype == 1burn and tx.amt >= 750") {
-                let results = txs.filter(
-                    func(tx : Tx) : Bool {
-                        tx.btype == "1burn" and tx.tx.amt >= 750;
-                    }
-                );
+            case ("update(): multiple nested operations -> #add, #sub, #mul, #div on tx.amt") {
+                for (i in Itertools.take(tx_ids.vals(), limit / 2)) {
+                    let #ok(_) = collection.updateById(
+                        i,
+                        [("tx.amt", #div(#mul(#sub(#add(#currValue, #Nat(100)), #Nat(50)), #Nat(2)), #Nat(2)))],
+                    );
+                };
             };
-            case ("update() -> #add amt += 100") {};
-            case ("update() -> #sub amt -= 100") {};
-            case ("update() -> #div amt /= 2") {};
-            case ("update() -> #mul amt *= 2") {};
-            case ("update() -> #set amt = 100") {};
-            case ("replaceRecord() -> replace half the tx with new tx") {};
+
+            case ("update(): multiple operations on multiple fields -> #add, #sub, #mul, #div on (tx.amt, tx.ts, fee)") {
+                for (i in Itertools.take(tx_ids.vals(), limit / 2)) {
+                    let #ok(_) = collection.updateById(
+                        i,
+                        [
+                            ("tx.amt", #add(#currValue, #Nat(100))),
+                            ("tx.ts", #sub(#currValue, #Nat(50))),
+                            ("fee", #mul(#currValue, #Nat(2))),
+                            ("tx.amt", #div(#currValue, #Nat(2))),
+                        ],
+                    );
+                };
+            };
+
+            case ("replaceRecord() -> replace half the tx with new tx") {
+                for (i in Itertools.take(tx_ids.vals(), limit / 2)) {
+                    let #ok(_) = collection.replaceRecord(i, new_tx(fuzz, principals));
+                };
+            };
+
+            case ("delete()") {
+                for (i in Itertools.take(tx_ids.vals(), limit / 2)) {
+                    let #ok(_) = collection.deleteById(i);
+                };
+            };
 
             case (_) {
-                Debug.trap("Should be unreachable:\n row = zenDB (full scan, -> array) and col = \"" # debug_show section # "\"");
+                Debug.trap("Should be unreachable:\n row = zenDB index intersection and col = \"" # debug_show benchmark_name # "\"");
             };
 
         };
-
     };
 
     func paginated_queries(
@@ -585,7 +753,7 @@ module {
         predefined_txs : Buffer.Buffer<Tx>,
         principals : [Principal],
         candid_principals : [ZenDB.Types.Candid],
-        principals_0_10 : [Principal],
+        candid_principals_0_10 : [Principal],
         sort_direction : ZenDB.Types.SortDirection,
         pagination_limit : Nat,
     ) {
@@ -643,13 +811,13 @@ module {
         };
 
         switch (section) {
-            case ("insert") {};
+            case ("insert with no index") {};
 
-            case ("clear") {};
+            case ("clear collection entries and indexes") {};
 
-            case ("insert with 5 indexes") {};
+            case ("insert with 7 indexes") {};
 
-            case ("query() -> btype == '1mint'") {
+            case ("query(): single field (btype = '1mint')") {
                 let db_query = ZenDB.QueryBuilder().Where(
                     "btype",
                     #eq(#Text("1mint")),
@@ -659,7 +827,7 @@ module {
 
             };
 
-            case ("query() -> btype == '1xfer' or '2xfer'") {
+            case ("query(): #Or (btype == '1xfer' OR '2xfer)'") {
                 let db_query = ZenDB.QueryBuilder().Where(
                     "btype",
                     #In([#Text("1xfer"), #Text("2xfer")]),
@@ -725,7 +893,7 @@ module {
                 skip_limit_paginated_query(db_query);
             };
 
-            case ("query() -> 250 < tx.amt <= 400") {
+            case ("query(): number range (250 < tx.amt <= 400)") {
                 let db_query = ZenDB.QueryBuilder().Where(
                     "tx.amt",
                     #gt(#Nat(250)),
@@ -737,7 +905,7 @@ module {
                 skip_limit_paginated_query(db_query);
             };
 
-            case ("query() -> btype == 1burn and tx.amt >= 750") {
+            case ("query(): #And (btype='1burn' AND tx.amt>=750)") {
                 let db_query = ZenDB.QueryBuilder().Where(
                     "btype",
                     #eq(#Text("1burn")),
