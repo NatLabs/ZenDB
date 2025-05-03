@@ -18,10 +18,6 @@ import Itertools "mo:itertools/Iter";
 import RevIter "mo:itertools/RevIter";
 import BitMap "mo:bit-map";
 
-import MemoryBTree "mo:memory-collection/MemoryBTree/Stable";
-import TypeUtils "mo:memory-collection/TypeUtils";
-import Int8Cmp "mo:memory-collection/TypeUtils/Int8Cmp";
-
 import T "../Types";
 import CandidMap "../CandidMap";
 import Utils "../Utils";
@@ -33,6 +29,7 @@ import { Orchid } "Orchid";
 
 import CollectionUtils "Utils";
 import Schema "Schema";
+import BTree "../BTree";
 module {
 
     type BestIndexResult = T.BestIndexResult;
@@ -68,11 +65,11 @@ module {
     let { nhash; thash } = Map;
 
     public func new(
+        collection : StableCollection,
         name : Text,
         index_key_details : [(Text, SortDirection)],
         used_internally : Bool, // cannot be deleted by user if true
         is_unique : Bool, // if true, the index is unique and the record ids are not concatenated with the index key values to make duplicate values appear unique
-        opt_recycled_btree : ?MemoryBTree.StableMemoryBTree,
     ) : T.Index {
 
         let key_details : [(Text, SortDirection)] = if (is_unique) {
@@ -87,7 +84,7 @@ module {
         let index : Index = {
             name;
             key_details;
-            data = Option.get(opt_recycled_btree, CollectionUtils.new_btree());
+            data = CollectionUtils.new_btree(collection);
             used_internally;
             is_unique;
         };
@@ -105,13 +102,18 @@ module {
 
         let index_key_values = CollectionUtils.get_index_columns(collection, index.key_details, id, candid_map);
 
-        let index_data_utils = CollectionUtils.get_index_data_utils();
-        let opt_prev_id = MemoryBTree.insert(index.data, index_data_utils, index_key_values, id);
+        let index_data_utils = CollectionUtils.get_index_data_utils(collection);
+        let opt_prev_id = BTree.put(index.data, index_data_utils, index_key_values, id);
 
         Logger.lazyDebug(
             collection.logger,
             func() = "Storing record with id " # debug_show id # " in index " # index.name # ", originally "
-            # debug_show (index_key_values) # ", now encoded as " # debug_show (index_data_utils.key.blobify.to_blob(index_key_values)),
+            # debug_show (index_key_values) # ", now encoded as " # (
+                switch (index_data_utils) {
+                    case (#stableMemory(utils)) debug_show utils.key.blobify.to_blob(index_key_values);
+                    case (#heap(utils)) debug_show index_key_values;
+                }
+            ),
         );
 
         #ok(opt_prev_id);
@@ -202,7 +204,7 @@ module {
         // Debug.print("start_query: " # debug_show start_query);
         // Debug.print("end_query: " # debug_show end_query);
 
-        let index_data_utils = CollectionUtils.get_index_data_utils();
+        let index_data_utils = CollectionUtils.get_index_data_utils(collection);
 
         func sort_by_key_details(a : (Text, Any), b : (Text, Any)) : Order {
             let pos_a = switch (Array.indexOf<(Text, SortDirection)>((a.0, #Ascending), index.key_details, Utils.tuple_eq(Text.equal))) {
@@ -335,7 +337,7 @@ module {
             func() = "encoded end_query_values: " # debug_show (Orchid.blobify.to_blob(end_query_values)),
         );
 
-        let scans = CollectionUtils.memorybtree_scan_interval(index.data, index_data_utils, ?start_query_values, ?end_query_values);
+        let scans = BTree.getScanAsInterval(index.data, index_data_utils, ?start_query_values, ?end_query_values);
 
         Logger.lazyDebug(
             collection.logger,
@@ -343,6 +345,20 @@ module {
         );
 
         scans;
+    };
+
+    public func from_interval(
+        collection : T.StableCollection,
+        index : Index,
+        interval : (Nat, Nat),
+    ) : [([T.CandidQuery], T.RecordId)] {
+        let index_data_utils = CollectionUtils.get_index_data_utils(collection);
+
+        let (start, end) = interval;
+
+        Iter.toArray<([T.CandidQuery], T.RecordId)>(
+            BTree.range<[T.CandidQuery], T.RecordId>(index.data, index_data_utils, start, end)
+        );
     };
 
     public func extract_scan_and_filter_bounds(lower : Map<Text, T.CandidInclusivityQuery>, upper : Map<Text, T.CandidInclusivityQuery>, opt_index_key_details : ?[(Text, T.SortDirection)], opt_fully_covered_equality_and_range_fields : ?Set.Set<Text>) : (Bounds, Bounds) {

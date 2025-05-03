@@ -26,7 +26,6 @@ import Itertools "mo:itertools/Iter";
 import RevIter "mo:itertools/RevIter";
 import Logger "Logger";
 
-import MemoryBTree "mo:memory-collection/MemoryBTree/Stable";
 import TypeUtils "mo:memory-collection/TypeUtils";
 import Int8Cmp "mo:memory-collection/TypeUtils/Int8Cmp";
 

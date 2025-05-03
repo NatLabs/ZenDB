@@ -21,16 +21,13 @@ import Itertools "mo:itertools/Iter";
 import RevIter "mo:itertools/RevIter";
 import BitMap "mo:bit-map";
 
-import MemoryBTree "mo:memory-collection/MemoryBTree/Stable";
-import TypeUtils "mo:memory-collection/TypeUtils";
-import Int8Cmp "mo:memory-collection/TypeUtils/Int8Cmp";
-
 import T "../Types";
 import Query "../Query";
 import Utils "../Utils";
 import ByteUtils "../ByteUtils";
 import C "../Constants";
 import Logger "../Logger";
+import BTree "../BTree";
 
 import Index "Index";
 import Orchid "Orchid";
@@ -50,9 +47,6 @@ module {
     public type RevIter<A> = RevIter.RevIter<A>;
     type QueryBuilder = Query.QueryBuilder;
 
-    public type BTreeUtils<K, V> = MemoryBTree.BTreeUtils<K, V>;
-    public type TypeUtils<A> = TypeUtils.TypeUtils<A>;
-
     public type Order = Order.Order;
     public type Hash = Hash.Hash;
 
@@ -70,7 +64,7 @@ module {
 
     public type IndexKeyFields = T.IndexKeyFields;
 
-    let DEFAULT_BTREE_ORDER = 256;
+    let STABLE_MEMORY_BTREE_ORDER = 256;
 
     type EvalResult = T.EvalResult;
 
@@ -98,7 +92,7 @@ module {
             switch (query_plan.scans[0]) {
                 case (#IndexScan(index_scan_details)) {
                     let {
-                        index;
+                        index_name;
                         requires_additional_filtering;
                         requires_additional_sorting;
                         interval;
@@ -109,15 +103,15 @@ module {
                         Logger.lazyDebug(
                             collection.logger,
                             func() = "QueryExecution.get_unique_record_ids(): Direct interval access on index '"
-                            # index.name # "', interval: " # debug_show interval,
+                            # index_name # "', interval: " # debug_show interval,
                         );
-                        return #Interval(index.name, [interval], index_scan_details.sorted_in_reverse);
+                        return #Interval(index_name, [interval], index_scan_details.sorted_in_reverse);
                     };
                 };
                 case (#FullScan({ filter_bounds; requires_additional_filtering; requires_additional_sorting })) {
                     if (not requires_additional_filtering and not requires_additional_sorting) {
                         Logger.lazyDebug(collection.logger, func() = "QueryExecution.get_unique_record_ids(): Full scan with no filtering or sorting");
-                        return #Interval(C.RECORD_ID, [(0, MemoryBTree.size(collection.main))], false);
+                        return #Interval(C.RECORD_ID, [(0, BTree.size(collection.main))], false);
                     };
                 };
             };
@@ -130,8 +124,8 @@ module {
             let record_ids_iter = switch (scan_details) {
                 case (#FullScan({ filter_bounds; requires_additional_filtering })) {
                     Logger.lazyDebug(collection.logger, func() = "QueryExecution.get_unique_record_ids(): Processing full scan");
-                    let main_btree_utils = CollectionUtils.get_main_btree_utils();
-                    let full_scan_iter = MemoryBTree.keys(collection.main, main_btree_utils);
+                    let main_btree_utils = CollectionUtils.get_main_btree_utils(collection);
+                    let full_scan_iter = BTree.keys(collection.main, main_btree_utils);
 
                     if (requires_additional_filtering) {
                         Logger.lazyDebug(collection.logger, func() = "QueryExecution.get_unique_record_ids(): Applying filters to full scan");
@@ -142,7 +136,7 @@ module {
                 };
                 case (#IndexScan(index_scan_details)) {
                     let {
-                        index;
+                        index_name;
                         requires_additional_filtering;
                         interval;
                         filter_bounds;
@@ -151,11 +145,11 @@ module {
                     Logger.lazyDebug(
                         collection.logger,
                         func() = "QueryExecution.get_unique_record_ids(): Processing index scan on '" #
-                        index.name # "', requires_additional_filtering: " #
+                        index_name # "', requires_additional_filtering: " #
                         debug_show requires_additional_filtering,
                     );
 
-                    let index_data_utils = CollectionUtils.get_index_data_utils();
+                    let index_data_utils = CollectionUtils.get_index_data_utils(collection);
 
                     if (requires_additional_filtering) {
                         Logger.lazyDebug(collection.logger, func() = "QueryExecution.get_unique_record_ids(): Attempting index-based filtering");
@@ -193,7 +187,7 @@ module {
                                     collection.logger,
                                     func() = "QueryExecution.get_unique_record_ids(): Index-based filtering not applicable, falling back to standard approach",
                                 );
-                                let record_ids = CollectionUtils.record_ids_from_index_intervals(collection, index.name, [interval], false);
+                                let record_ids = CollectionUtils.record_ids_from_index_intervals(collection, index_name, [interval], false);
                                 CollectionUtils.multi_filter(collection, record_ids, Buffer.fromArray([filter_bounds]), query_plan.is_and_operation);
                             };
                         };
@@ -202,9 +196,9 @@ module {
                         Logger.lazyDebug(
                             collection.logger,
                             func() = "QueryExecution.get_unique_record_ids(): Adding direct interval from index '" #
-                            index.name # "': " # debug_show interval,
+                            index_name # "': " # debug_show interval,
                         );
-                        add_interval(intervals_by_index, index.name, interval, false);
+                        add_interval(intervals_by_index, index_name, interval, false);
                         continue evaluating_query_plan;
                     };
                 };
@@ -437,8 +431,8 @@ module {
         result;
     };
 
-    public func add_interval(intervals_by_index : Map<Text, IndexDetails>, index : Text, interval : (Nat, Nat), is_reversed : Bool) {
-        let details = switch (Map.get(intervals_by_index, thash, index)) {
+    public func add_interval(intervals_by_index : Map<Text, IndexDetails>, index_name : Text, interval : (Nat, Nat), is_reversed : Bool) {
+        let details = switch (Map.get(intervals_by_index, thash, index_name)) {
             case (?details) {
                 switch (details.sorted_in_reverse) {
                     case (?sorted_in_reverse) {
@@ -460,7 +454,7 @@ module {
                     intervals = buffer;
                 };
 
-                ignore Map.put(intervals_by_index, thash, index, details);
+                ignore Map.put(intervals_by_index, thash, index_name, details);
                 details;
             };
         };
@@ -681,7 +675,7 @@ module {
         );
 
         let {
-            index;
+            index_name;
             interval;
             filter_bounds;
             simple_operations = operations;
@@ -723,12 +717,12 @@ module {
             return null;
         };
 
-        switch (Map.get(intervals_map, thash, index.name)) {
+        switch (Map.get(intervals_map, thash, index_name)) {
             case (?intervals) {
                 Logger.lazyError(
                     collection.logger,
                     func() = "QueryExecution.index_based_interval_filtering(): Filtering index same as scanning index: " #
-                    index.name,
+                    index_name,
                 );
                 Debug.trap("QueryExecution.index_based_interval_filtering: this is interesting, why would the filtering index be the same as the scanning index?");
                 intervals.add(interval);
@@ -737,13 +731,13 @@ module {
                 Logger.lazyDebug(
                     collection.logger,
                     func() = "QueryExecution.index_based_interval_filtering(): Adding original scan interval for index '" #
-                    index.name # "'",
+                    index_name # "'",
                 );
 
                 ignore Map.put(
                     intervals_map,
                     thash,
-                    index.name,
+                    index_name,
                     Buffer.fromArray<(Nat, Nat)>([interval]),
                 );
             };
@@ -848,14 +842,14 @@ module {
         if (query_plan.scans.size() == 1 and query_plan.subplans.size() == 0) {
 
             switch (query_plan.scans[0]) {
-                case (#IndexScan({ requires_additional_sorting; requires_additional_filtering; interval; index; sorted_in_reverse })) {
+                case (#IndexScan({ requires_additional_sorting; requires_additional_filtering; interval; index_name; sorted_in_reverse })) {
                     if (not requires_additional_sorting and not requires_additional_filtering) {
-                        return #Interval(index.name, [interval], sorted_in_reverse);
+                        return #Interval(index_name, [interval], sorted_in_reverse);
                     };
                 };
                 case (#FullScan({ requires_additional_sorting; requires_additional_filtering })) {
                     if (not requires_additional_sorting and not requires_additional_filtering) {
-                        return #Interval(C.RECORD_ID, [(0, MemoryBTree.size(collection.main))], false);
+                        return #Interval(C.RECORD_ID, [(0, BTree.size(collection.main))], false);
                     };
 
                 };
@@ -875,7 +869,7 @@ module {
             case (#IndexScan(index_scan_details)) {
 
                 let {
-                    index;
+                    index_name;
                     requires_additional_filtering;
                     requires_additional_sorting;
                     sorted_in_reverse;
@@ -886,7 +880,7 @@ module {
 
                 if (requires_additional_sorting or requires_additional_filtering) {
 
-                    var record_ids : Iter<Nat> = CollectionUtils.record_ids_from_index_intervals(collection, index.name, [interval], sorted_in_reverse);
+                    var record_ids : Iter<Nat> = CollectionUtils.record_ids_from_index_intervals(collection, index_name, [interval], sorted_in_reverse);
 
                     if (requires_additional_filtering) {
                         record_ids := CollectionUtils.multi_filter(collection, record_ids, Buffer.fromArray([filter_bounds]), query_plan.is_and_operation);
@@ -905,7 +899,7 @@ module {
                     iterators.add(record_ids);
 
                 } else {
-                    add_interval(intervals_by_index, index.name, interval, sorted_in_reverse);
+                    add_interval(intervals_by_index, index_name, interval, sorted_in_reverse);
                 };
             };
         };
@@ -928,9 +922,9 @@ module {
 
                     bitmaps.add(bitmap);
                 };
-                case (#Interval(index, intervals, is_reversed)) {
+                case (#Interval(index_name, intervals, is_reversed)) {
                     for (interval in intervals.vals()) {
-                        add_interval(intervals_by_index, index, interval, is_reversed);
+                        add_interval(intervals_by_index, index_name, interval, is_reversed);
                     };
                 };
             };
@@ -1036,10 +1030,10 @@ module {
             };
 
             let filtered_ids = if (smallest_interval_index == "") {
-                let main_btree_utils = CollectionUtils.get_main_btree_utils();
+                let main_btree_utils = CollectionUtils.get_main_btree_utils(collection);
                 let filtered_ids = CollectionUtils.multi_filter(
                     collection,
-                    MemoryBTree.keys(collection.main, main_btree_utils),
+                    BTree.keys(collection.main, main_btree_utils),
                     full_scan_filter_bounds,
                     query_plan.is_and_operation,
                 );
@@ -1149,7 +1143,7 @@ module {
             case (#IndexScan(index_scan_details)) {
 
                 let {
-                    index;
+                    index_name;
                     requires_additional_filtering;
                     requires_additional_sorting;
                     sorted_in_reverse;
@@ -1159,10 +1153,10 @@ module {
                 } = index_scan_details;
 
                 if (not requires_additional_filtering and not requires_additional_sorting) {
-                    add_interval(intervals_by_index, index.name, interval, sorted_in_reverse);
+                    add_interval(intervals_by_index, index_name, interval, sorted_in_reverse);
 
                 } else {
-                    var record_ids : Iter<Nat> = CollectionUtils.record_ids_from_index_intervals(collection, index.name, [interval], sorted_in_reverse);
+                    var record_ids : Iter<Nat> = CollectionUtils.record_ids_from_index_intervals(collection, index_name, [interval], sorted_in_reverse);
 
                     if (requires_additional_filtering) {
                         record_ids := CollectionUtils.multi_filter(collection, record_ids, Buffer.fromArray([filter_bounds]), query_plan.is_and_operation);
@@ -1205,9 +1199,9 @@ module {
                     if (requires_sorting) Debug.trap("Should only return sorted iterators when sorting is required");
                     bitmaps.add(bitmap);
                 };
-                case (#Interval(index, intervals, is_reversed)) {
+                case (#Interval(index_name, intervals, is_reversed)) {
                     for (interval in intervals.vals()) {
-                        add_interval(intervals_by_index, index, interval, is_reversed);
+                        add_interval(intervals_by_index, index_name, interval, is_reversed);
                     };
                 };
             };
@@ -1269,7 +1263,7 @@ module {
 
         for ((index_name, interval_details) in Map.entries(intervals_by_index)) {
             let ?index = Map.get(collection.indexes, thash, index_name) else Debug.trap("Unreachable: IndexMap not found for index: " # index_name);
-            let index_data_utils = CollectionUtils.get_index_data_utils();
+            let index_data_utils = CollectionUtils.get_index_data_utils(collection);
 
             for (interval in interval_details.intervals.vals()) {
 
@@ -1295,8 +1289,8 @@ module {
                 full_scan_filter_bounds.add(full_scan_details.filter_bounds);
             };
 
-            let main_btree_utils = CollectionUtils.get_main_btree_utils();
-            let record_ids = MemoryBTree.keys(collection.main, main_btree_utils);
+            let main_btree_utils = CollectionUtils.get_main_btree_utils(collection);
+            let record_ids = BTree.keys(collection.main, main_btree_utils);
             let filtered_ids = CollectionUtils.multi_filter(collection, record_ids, full_scan_filter_bounds, query_plan.is_and_operation);
 
             if (requires_sorting) {

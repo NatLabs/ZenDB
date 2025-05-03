@@ -34,10 +34,6 @@ import BitMap "mo:bit-map";
 import Vector "mo:vector";
 import Ids "mo:incremental-ids";
 
-import MemoryBTree "mo:memory-collection/MemoryBTree/Stable";
-import TypeUtils "mo:memory-collection/TypeUtils";
-import Int8Cmp "mo:memory-collection/TypeUtils/Int8Cmp";
-
 import T "../Types";
 import Query "../Query";
 import Utils "../Utils";
@@ -55,6 +51,7 @@ import Intervals "Intervals";
 import CandidMod "../CandidMod";
 import Logger "../Logger";
 import UpdateOps "UpdateOps";
+import BTree "../BTree";
 
 module StableCollection {
 
@@ -67,10 +64,6 @@ module StableCollection {
     public type Iter<A> = Iter.Iter<A>;
     public type RevIter<A> = RevIter.RevIter<A>;
     type QueryBuilder = Query.QueryBuilder;
-
-    // public type MemoryBTree = MemoryBTree.VersionedMemoryBTree;
-    public type BTreeUtils<K, V> = MemoryBTree.BTreeUtils<K, V>;
-    public type TypeUtils<A> = TypeUtils.TypeUtils<A>;
 
     public type Order = Order.Order;
     public type Hash = Hash.Hash;
@@ -102,7 +95,7 @@ module StableCollection {
     //         var schema = processed_schema;
     //         schema_keys;
     //         schema_keys_set = Set.fromIter(schema_keys.vals(), thash);
-    //         main = MemoryBTree.new(?C.DEFAULT_BTREE_ORDER);
+    //         main = BTree.new(?C.STABLE_MEMORY_BTREE_ORDER);
     //         indexes = Map.new<Text, T.Index>();
 
     //         // db references
@@ -113,33 +106,33 @@ module StableCollection {
     // };
 
     public func size(collection : StableCollection) : Nat {
-        MemoryBTree.size(collection.main);
+        BTree.size(collection.main);
     };
 
     // BTree methods
 
-    public func entries(collection : StableCollection, main_btree_utils : BTreeUtils<Nat, Blob>) : Iter<(Nat, Blob)> {
-        MemoryBTree.entries(collection.main, main_btree_utils);
+    public func entries(collection : StableCollection, main_btree_utils : T.BTreeUtils<Nat, Blob>) : Iter<(Nat, Blob)> {
+        BTree.entries(collection.main, main_btree_utils);
     };
 
-    public func keys(collection : StableCollection, main_btree_utils : BTreeUtils<Nat, Blob>) : Iter<Nat> {
-        MemoryBTree.keys(collection.main, main_btree_utils);
+    public func keys(collection : StableCollection, main_btree_utils : T.BTreeUtils<Nat, Blob>) : Iter<Nat> {
+        BTree.keys(collection.main, main_btree_utils);
     };
 
-    public func vals(collection : StableCollection, main_btree_utils : BTreeUtils<Nat, Blob>) : Iter<Blob> {
-        MemoryBTree.vals(collection.main, main_btree_utils);
+    public func vals(collection : StableCollection, main_btree_utils : T.BTreeUtils<Nat, Blob>) : Iter<Blob> {
+        BTree.vals(collection.main, main_btree_utils);
     };
 
-    public func range(collection : StableCollection, main_btree_utils : BTreeUtils<Nat, Blob>, start : Nat, end : Nat) : Iter<(Nat, Blob)> {
-        MemoryBTree.range(collection.main, main_btree_utils, start, end);
+    public func range(collection : StableCollection, main_btree_utils : T.BTreeUtils<Nat, Blob>, start : Nat, end : Nat) : Iter<(Nat, Blob)> {
+        BTree.range(collection.main, main_btree_utils, start, end);
     };
 
-    public func rangeKeys(collection : StableCollection, main_btree_utils : BTreeUtils<Nat, Blob>, start : Nat, end : Nat) : Iter<Nat> {
-        MemoryBTree.rangeKeys(collection.main, main_btree_utils, start, end);
+    public func rangeKeys(collection : StableCollection, main_btree_utils : T.BTreeUtils<Nat, Blob>, start : Nat, end : Nat) : Iter<Nat> {
+        BTree.rangeKeys(collection.main, main_btree_utils, start, end);
     };
 
-    public func rangeVals(collection : StableCollection, main_btree_utils : BTreeUtils<Nat, Blob>, start : Nat, end : Nat) : Iter<Blob> {
-        MemoryBTree.rangeVals(collection.main, main_btree_utils, start, end);
+    public func rangeVals(collection : StableCollection, main_btree_utils : T.BTreeUtils<Nat, Blob>, start : Nat, end : Nat) : Iter<Blob> {
+        BTree.rangeVals(collection.main, main_btree_utils, start, end);
     };
 
     // public func update_schema(collection : StableCollection, schema : T.Schema) : Result<(), Text> {
@@ -166,13 +159,18 @@ module StableCollection {
 
         let index_key_values = CollectionUtils.get_index_columns(collection, index.key_details, id, candid_map);
 
-        let index_data_utils = CollectionUtils.get_index_data_utils();
-        ignore MemoryBTree.insert(index.data, index_data_utils, index_key_values, id);
+        let index_data_utils = CollectionUtils.get_index_data_utils(collection);
+        ignore BTree.put(index.data, index_data_utils, index_key_values, id);
 
         Logger.lazyDebug(
             collection.logger,
             func() = "Storing record with id " # debug_show id # " in index " # index.name # ", originally "
-            # debug_show (index_key_values) # ", now encoded as " # debug_show (index_data_utils.key.blobify.to_blob(index_key_values)),
+            # debug_show (index_key_values) # ", now encoded as " # debug_show (
+                switch (index_data_utils) {
+                    case (#stableMemory(utils)) debug_show utils.key.blobify.to_blob(index_key_values);
+                    case (#heap(utils)) debug_show index_key_values;
+                }
+            ),
         );
 
         #ok();
@@ -204,7 +202,7 @@ module StableCollection {
 
         let opt_recycled_btree = Vector.removeLast(collection.freed_btrees);
 
-        let index = Index.new(index_name, index_key_details, is_unique, used_internally, opt_recycled_btree);
+        let index = Index.new(collection, index_name, index_key_details, is_unique, used_internally);
 
         ignore Map.put<Text, Index>(collection.indexes, thash, index_name, index);
         Logger.lazyInfo(
@@ -217,7 +215,7 @@ module StableCollection {
 
     public func create_index(
         collection : StableCollection,
-        main_btree_utils : BTreeUtils<Nat, Blob>,
+        main_btree_utils : T.BTreeUtils<Nat, Blob>,
         index_name : Text,
         _index_key_details : [(Text, SortDirection)],
         is_unique : Bool,
@@ -228,7 +226,7 @@ module StableCollection {
 
     public func create_and_populate_index(
         collection : StableCollection,
-        _main_btree_utils : BTreeUtils<Nat, Blob>,
+        _main_btree_utils : T.BTreeUtils<Nat, Blob>,
         index_name : Text,
         index_key_details : [(Text, SortDirection)],
     ) : Result<(), Text> {
@@ -250,12 +248,12 @@ module StableCollection {
 
     public func clear_index(
         collection : StableCollection,
-        _main_btree_utils : BTreeUtils<Nat, Blob>,
+        _main_btree_utils : T.BTreeUtils<Nat, Blob>,
         index_name : Text,
     ) : Result<(), Text> {
 
         switch (Map.get(collection.indexes, thash, index_name)) {
-            case (?index) MemoryBTree.clear(index.data);
+            case (?index) BTree.clear(index.data);
             case (null) return Utils.log_error_msg(collection.logger, "Index not found");
         };
 
@@ -318,7 +316,7 @@ module StableCollection {
 
     public func populate_index(
         collection : StableCollection,
-        _main_btree_utils : BTreeUtils<Nat, Blob>,
+        _main_btree_utils : T.BTreeUtils<Nat, Blob>,
         index_name : Text,
     ) : Result<(), Text> {
         populate_indexes(collection, _main_btree_utils, [index_name]);
@@ -326,7 +324,7 @@ module StableCollection {
 
     public func populate_indexes(
         collection : StableCollection,
-        _main_btree_utils : BTreeUtils<Nat, Blob>,
+        _main_btree_utils : T.BTreeUtils<Nat, Blob>,
         index_names : [Text],
     ) : Result<(), Text> {
 
@@ -356,14 +354,14 @@ module StableCollection {
         internal_populate_indexes(
             collection,
             indexes,
-            MemoryBTree.entries(collection.main, _main_btree_utils),
+            BTree.entries(collection.main, _main_btree_utils),
         );
 
     };
 
     // public func async_populate_indexes(
     //     collection : StableCollection,
-    //     _main_btree_utils : BTreeUtils<Nat, Blob>,
+    //     _main_btree_utils : T.BTreeUtils<Nat, Blob>,
     //     indexes_key_details : [[Text]],
     //     opt_batch_size : ?Nat,
     // ) : async* Result<(), Text> {
@@ -392,15 +390,15 @@ module StableCollection {
 
     //     var size = 0;
 
-    //     while (size < MemoryBTree.size(collection.main)) {
+    //     while (size < BTree.size(collection.main)) {
 
     //         let start = size;
-    //         let end = Nat.min(size + BATCH_SIZE, MemoryBTree.size(collection.main));
+    //         let end = Nat.min(size + BATCH_SIZE, BTree.size(collection.main));
 
     //         let res = await internal_populate_indexes(
     //             collection,
     //             indexes,
-    //             MemoryBTree.range(collection.main, _main_btree_utils, start, end),
+    //             BTree.range(collection.main, _main_btree_utils, start, end),
     //         );
 
     //         switch (res) {
@@ -418,14 +416,14 @@ module StableCollection {
 
     public func delete_index(
         collection : StableCollection,
-        _main_btree_utils : BTreeUtils<Nat, Blob>,
+        _main_btree_utils : T.BTreeUtils<Nat, Blob>,
         index_name : Text,
     ) : Result<(), Text> {
         Logger.info(collection.logger, "Deleting index: " # index_name);
 
         // public func async_populate_indexes(
         //     collection : StableCollection,
-        //     _main_btree_utils : BTreeUtils<Nat, Blob>,
+        //     _main_btree_utils : T.BTreeUtils<Nat, Blob>,
         //     indexes_key_details : [[Text]],
         //     opt_batch_size : ?Nat,
         // ) : async* Result<(), Text> {
@@ -454,15 +452,15 @@ module StableCollection {
 
         //     var size = 0;
 
-        //     while (size < MemoryBTree.size(collection.main)) {
+        //     while (size < BTree.size(collection.main)) {
 
         //         let start = size;
-        //         let end = Nat.min(size + BATCH_SIZE, MemoryBTree.size(collection.main));
+        //         let end = Nat.min(size + BATCH_SIZE, BTree.size(collection.main));
 
         //         let res = await internal_populate_indexes(
         //             collection,
         //             indexes,
-        //             MemoryBTree.range(collection.main, _main_btree_utils, start, end),
+        //             BTree.range(collection.main, _main_btree_utils, start, end),
         //         );
 
         //         switch (res) {
@@ -490,8 +488,14 @@ module StableCollection {
                     collection.logger,
                     func() = "Clearing and recycling BTree for index: " # index_name,
                 );
-                MemoryBTree.clear(index.data);
-                Vector.add(collection.freed_btrees, index.data);
+                BTree.clear(index.data);
+
+                switch (index.data) {
+                    case (#stableMemory(btree)) {
+                        Vector.add(collection.freed_btrees, btree);
+                    };
+                    case (_) {};
+                };
 
                 #ok();
             };
@@ -684,9 +688,9 @@ module StableCollection {
         for ((composite_field_keys, index) in unique_constraints_iter) {
 
             let compsite_field_values = CollectionUtils.get_index_columns(collection, index.key_details, record_id, candid_map);
-            let index_data_utils = CollectionUtils.get_index_data_utils();
+            let index_data_utils = CollectionUtils.get_index_data_utils(collection);
 
-            let opt_prev_id = MemoryBTree.get(index.data, index_data_utils, compsite_field_values);
+            let opt_prev_id = BTree.get(index.data, index_data_utils, compsite_field_values);
 
             switch (opt_prev_id) {
                 case (null) {}; // no previous value, free to insert
@@ -711,13 +715,13 @@ module StableCollection {
 
     };
 
-    public func insert_with_id(collection : StableCollection, main_btree_utils : BTreeUtils<Nat, Blob>, id : Nat, candid_blob : T.CandidBlob) : Result<(), Text> {
+    public func insert_with_id(collection : StableCollection, main_btree_utils : T.BTreeUtils<Nat, Blob>, id : Nat, candid_blob : T.CandidBlob) : Result<(), Text> {
         put_with_id(collection, main_btree_utils, id, candid_blob);
     };
 
     public func put_with_id(
         collection : StableCollection,
-        main_btree_utils : BTreeUtils<Nat, Blob>,
+        main_btree_utils : T.BTreeUtils<Nat, Blob>,
         id : Nat,
         candid_blob : T.CandidBlob,
     ) : Result<(), Text> {
@@ -762,12 +766,12 @@ module StableCollection {
             };
         };
 
-        let opt_prev = MemoryBTree.insert(collection.main, main_btree_utils, id, candid_blob);
+        let opt_prev = BTree.put(collection.main, main_btree_utils, id, candid_blob);
 
         switch (opt_prev) {
             case (null) {};
             case (?prev) {
-                ignore MemoryBTree.insert(collection.main, main_btree_utils, id, prev);
+                ignore BTree.put(collection.main, main_btree_utils, id, prev);
                 let error_msg = "Record with id " # debug_show id # " already exists";
                 Logger.error(
                     collection.logger,
@@ -788,13 +792,13 @@ module StableCollection {
 
     public func replace_record_by_id<Record>(
         collection : StableCollection,
-        main_btree_utils : BTreeUtils<Nat, Blob>,
+        main_btree_utils : T.BTreeUtils<Nat, Blob>,
         id : Nat,
         new_candid_blob : T.CandidBlob,
     ) : Result<(), Text> {
         Logger.info(collection.logger, "Replacing record with id: " # debug_show id);
 
-        let ?prev_candid_blob = MemoryBTree.get(collection.main, main_btree_utils, id) else return Utils.log_error_msg(collection.logger, "Record for id '" # debug_show (id) # "' not found");
+        let ?prev_candid_blob = BTree.get(collection.main, main_btree_utils, id) else return Utils.log_error_msg(collection.logger, "Record for id '" # debug_show (id) # "' not found");
         let prev_candid = CollectionUtils.decode_candid_blob(collection, prev_candid_blob);
         let prev_candid_map = CandidMap.CandidMap(collection.schema, prev_candid);
 
@@ -816,7 +820,7 @@ module StableCollection {
             };
         };
 
-        assert ?prev_candid_blob == MemoryBTree.insert(collection.main, main_btree_utils, id, new_candid_blob);
+        assert ?prev_candid_blob == BTree.put(collection.main, main_btree_utils, id, new_candid_blob);
 
         for (index in Map.vals(collection.indexes)) {
             let #ok(_) = update_indexed_record_fields(collection, index, id, new_candid_map, ?prev_candid_map) else {
@@ -866,12 +870,12 @@ module StableCollection {
 
     func update_indexed_record_fields(collection : StableCollection, index : Index, id : Nat, new_record_candid_map : CandidMap.CandidMap, opt_prev_record_candid_map : ?CandidMap.CandidMap) : Result<(), Text> {
 
-        let index_data_utils = CollectionUtils.get_index_data_utils();
+        let index_data_utils = CollectionUtils.get_index_data_utils(collection);
 
         ignore do ? {
             let prev_record_candid_map = opt_prev_record_candid_map!;
             let prev_index_key_values = CollectionUtils.get_index_columns(collection, index.key_details, id, prev_record_candid_map);
-            let ?prev_id = MemoryBTree.remove(index.data, index_data_utils, prev_index_key_values) else {
+            let ?prev_id = BTree.remove(index.data, index_data_utils, prev_index_key_values) else {
                 return #err("Record with id " # debug_show id # " that is about to be updates does not exist in the index " # index.name);
             };
 
@@ -891,7 +895,7 @@ module StableCollection {
             func() = "New index key values: " # debug_show new_index_key_values,
         );
 
-        let opt_existing_id = MemoryBTree.insert(index.data, index_data_utils, new_index_key_values, id);
+        let opt_existing_id = BTree.put(index.data, index_data_utils, new_index_key_values, id);
         switch (opt_existing_id) {
             case (null) {};
             case (?existing_id) {
@@ -904,7 +908,12 @@ module StableCollection {
         Logger.lazyDebug(
             collection.logger,
             func() = "Storing record with id " # debug_show id # " in index " # index.name # ", originally "
-            # debug_show (new_index_key_values) # ", now encoded as  as " # debug_show (index_data_utils.key.blobify.to_blob(new_index_key_values)),
+            # debug_show (new_index_key_values) # ", now encoded as " # debug_show (
+                switch (index_data_utils) {
+                    case (#stableMemory(utils)) debug_show utils.key.blobify.to_blob(new_index_key_values);
+                    case (#heap(utils)) debug_show new_index_key_values;
+                }
+            ),
         );
 
         #ok;
@@ -927,13 +936,13 @@ module StableCollection {
         #ok;
     };
 
-    public func update_by_id<Record>(collection : StableCollection, main_btree_utils : BTreeUtils<Nat, Blob>, id : Nat, field_updates : [(Text, T.FieldUpdateOperations)]) : Result<(), Text> {
+    public func update_by_id<Record>(collection : StableCollection, main_btree_utils : T.BTreeUtils<Nat, Blob>, id : Nat, field_updates : [(Text, T.FieldUpdateOperations)]) : Result<(), Text> {
         Logger.lazyInfo(
             collection.logger,
             func() = "Updating record with id: " # debug_show id,
         );
 
-        let ?prev_candid_blob = MemoryBTree.get(collection.main, main_btree_utils, id) else return Utils.log_error_msg(collection.logger, "Record for id '" # debug_show (id) # "' not found");
+        let ?prev_candid_blob = BTree.get(collection.main, main_btree_utils, id) else return Utils.log_error_msg(collection.logger, "Record for id '" # debug_show (id) # "' not found");
 
         let prev_candid = CollectionUtils.decode_candid_blob(collection, prev_candid_blob);
         let prev_candid_map = CandidMap.CandidMap(collection.schema, prev_candid);
@@ -981,7 +990,7 @@ module StableCollection {
             };
         };
 
-        assert ?prev_candid_blob == MemoryBTree.insert(collection.main, main_btree_utils, id, new_candid_blob);
+        assert ?prev_candid_blob == BTree.put(collection.main, main_btree_utils, id, new_candid_blob);
 
         let updated_keys = Array.map<(Text, Any), Text>(
             field_updates,
@@ -999,11 +1008,11 @@ module StableCollection {
         #ok();
     };
 
-    public func insert(collection : StableCollection, main_btree_utils : BTreeUtils<Nat, Blob>, candid_blob : T.CandidBlob) : Result<Nat, Text> {
+    public func insert(collection : StableCollection, main_btree_utils : T.BTreeUtils<Nat, Blob>, candid_blob : T.CandidBlob) : Result<Nat, Text> {
         put(collection, main_btree_utils, candid_blob);
     };
 
-    public func put(collection : StableCollection, main_btree_utils : BTreeUtils<Nat, Blob>, candid_blob : T.CandidBlob) : Result<Nat, Text> {
+    public func put(collection : StableCollection, main_btree_utils : T.BTreeUtils<Nat, Blob>, candid_blob : T.CandidBlob) : Result<Nat, Text> {
         let id = Ids.Gen.next(collection.ids);
 
         switch (put_with_id(collection, main_btree_utils, id, candid_blob)) {
@@ -1016,10 +1025,10 @@ module StableCollection {
 
     public func get(
         collection : StableCollection,
-        main_btree_utils : BTreeUtils<Nat, Blob>,
+        main_btree_utils : T.BTreeUtils<Nat, Blob>,
         id : Nat,
     ) : Result<T.CandidBlob, Text> {
-        let ?record_details = MemoryBTree.get(collection.main, main_btree_utils, id) else return Utils.log_error_msg(collection.logger, "Record not found");
+        let ?record_details = BTree.get(collection.main, main_btree_utils, id) else return Utils.log_error_msg(collection.logger, "Record not found");
         #ok(record_details);
     };
 
@@ -1031,7 +1040,7 @@ module StableCollection {
 
     public func search(
         collection : StableCollection,
-        main_btree_utils : BTreeUtils<Nat, Blob>,
+        main_btree_utils : T.BTreeUtils<Nat, Blob>,
         query_builder : QueryBuilder,
     ) : Result<[(T.WrapId<T.CandidBlob>)], Text> {
         Logger.lazyDebug(
@@ -1139,7 +1148,7 @@ module StableCollection {
 
     public func search_iter(
         collection : StableCollection,
-        main_btree_utils : BTreeUtils<Nat, Blob>,
+        main_btree_utils : T.BTreeUtils<Nat, Blob>,
         query_builder : QueryBuilder,
     ) : Result<Iter<T.WrapId<T.CandidBlob>>, Text> {
         switch (internal_search(collection, query_builder)) {
@@ -1214,36 +1223,36 @@ module StableCollection {
         sort_records_by_field_cmp;
     };
 
-    public func stats(collection : StableCollection) : T.CollectionStats {
-        let main_btree_index = {
-            stable_memory = {
-                metadata_bytes = MemoryBTree.metadataBytes(collection.main);
-                actual_data_bytes = MemoryBTree.bytes(collection.main);
-            };
-        };
+    // public func stats(collection : StableCollection) : T.CollectionStats {
+    //     let main_btree_index = {
+    //         stable_memory = {
+    //             metadata_bytes = BTree.metadataBytes(collection.main);
+    //             actual_data_bytes = BTree.bytes(collection.main);
+    //         };
+    //     };
 
-        let indexes : [T.IndexStats] = Iter.toArray(
-            Iter.map<(Text, Index), T.IndexStats>(
-                Map.entries(collection.indexes),
-                func((index_name, index) : (Text, Index)) : T.IndexStats {
-                    let columns : [Text] = Array.map<(Text, Any), Text>(
-                        index.key_details,
-                        func((key, direction) : (Text, Any)) : Text = key,
-                    );
+    //     let indexes : [T.IndexStats] = Iter.toArray(
+    //         Iter.map<(Text, Index), T.IndexStats>(
+    //             Map.entries(collection.indexes),
+    //             func((index_name, index) : (Text, Index)) : T.IndexStats {
+    //                 let columns : [Text] = Array.map<(Text, Any), Text>(
+    //                     index.key_details,
+    //                     func((key, direction) : (Text, Any)) : Text = key,
+    //                 );
 
-                    let stable_memory : T.MemoryStats = {
-                        metadata_bytes = MemoryBTree.metadataBytes(index.data);
-                        actual_data_bytes = MemoryBTree.bytes(index.data);
-                    };
+    //                 let stable_memory : T.MemoryStats = {
+    //                     metadata_bytes = BTree.metadataBytes(index.data);
+    //                     actual_data_bytes = BTree.bytes(index.data);
+    //                 };
 
-                    { columns; stable_memory };
+    //                 { columns; stable_memory };
 
-                },
-            )
-        );
+    //             },
+    //         )
+    //     );
 
-        { indexes; main_btree_index; records = size(collection) };
-    };
+    //     { indexes; main_btree_index; records = size(collection) };
+    // };
 
     public func count(collection : StableCollection, query_builder : QueryBuilder) : Result<Nat, Text> {
         let stable_query = query_builder.build();
@@ -1313,13 +1322,13 @@ module StableCollection {
 
     };
 
-    public func delete_by_id(collection : StableCollection, main_btree_utils : BTreeUtils<Nat, Blob>, id : Nat) : Result<(T.CandidBlob), Text> {
+    public func delete_by_id(collection : StableCollection, main_btree_utils : T.BTreeUtils<Nat, Blob>, id : Nat) : Result<(T.CandidBlob), Text> {
         Logger.lazyInfo(
             collection.logger,
             func() = "Deleting record with id: " # debug_show id,
         );
 
-        let ?prev_candid_blob = MemoryBTree.remove(collection.main, main_btree_utils, id) else {
+        let ?prev_candid_blob = BTree.remove(collection.main, main_btree_utils, id) else {
             return Utils.log_error_msg(collection.logger, "Record not found");
         };
 
@@ -1332,9 +1341,9 @@ module StableCollection {
 
         for (index in Map.vals(collection.indexes)) {
             let prev_index_key_values = CollectionUtils.get_index_columns(collection, index.key_details, id, prev_candid_map);
-            let index_data_utils = CollectionUtils.get_index_data_utils();
+            let index_data_utils = CollectionUtils.get_index_data_utils(collection);
 
-            let removed_id = MemoryBTree.remove(index.data, index_data_utils, prev_index_key_values);
+            let removed_id = BTree.remove(index.data, index_data_utils, prev_index_key_values);
             if (removed_id != ?id) {
                 Logger.lazyError(
                     collection.logger,

@@ -22,8 +22,6 @@ import Int8 "mo:base/Int8";
 import Nat16 "mo:base/Nat16";
 import Nat8 "mo:base/Nat8";
 
-import MemoryBTree "mo:memory-collection/MemoryBTree/Stable";
-import TypeUtils "mo:memory-collection/TypeUtils";
 import Int8Cmp "mo:memory-collection/TypeUtils/Int8Cmp";
 
 import Itertools "mo:itertools/Iter";

@@ -154,6 +154,7 @@ let db_sstore = let sstore = ZenDB.newStableStore(
             log_level = #Debug;
             is_running_locally = true;
         };
+        memory_type = ?(#stableMemory);
     }
 );
 let db = ZenDB.launchDefaultDB(db_sstore);

@@ -240,7 +240,14 @@ module {
 
         var interval = Index.scan(collection, index, scan_bounds.0, scan_bounds.1, cursor_record);
 
-        Logger.lazyDebug(collection.logger, func() = "QueryPlan.query_plan_from_and_operation(): Index scan intervals: " # debug_show interval);
+        Logger.lazyDebug(
+            collection.logger,
+            func() {
+                "QueryPlan.query_plan_from_or_operation(): Index scan intervals: " # debug_show interval # " -> " # debug_show (
+                    Index.from_interval(collection, index, interval)
+                );
+            },
+        );
 
         if (requires_additional_filtering) {
             // we need to do index interval intersection with the filter bounds
@@ -253,7 +260,7 @@ module {
             simple_operations = operations_array;
             scans = [
                 #IndexScan({
-                    index;
+                    index_name = index.name;
                     requires_additional_filtering;
                     requires_additional_sorting;
                     sorted_in_reverse;
@@ -352,10 +359,17 @@ module {
                             );
 
                             let interval = Index.scan(collection, index, scan_bounds.0, scan_bounds.1, cursor_record);
-                            Logger.lazyDebug(collection.logger, func() = "QueryPlan.query_plan_from_or_operation(): Index scan intervals: " # debug_show interval);
+                            Logger.lazyDebug(
+                                collection.logger,
+                                func() {
+                                    "QueryPlan.query_plan_from_or_operation(): Index scan intervals: " # debug_show interval # " -> " # debug_show (
+                                        Index.from_interval(collection, index, interval)
+                                    );
+                                },
+                            );
 
                             let scan_details : ScanDetails = #IndexScan({
-                                index;
+                                index_name = index.name;
                                 requires_additional_filtering;
                                 requires_additional_sorting;
                                 sorted_in_reverse;
@@ -460,7 +474,7 @@ module {
 
         Logger.lazyInfo(
             collection.logger,
-            func() = "QueryPlan.create_query_plan(): Query plan created successfully",
+            func() = "QueryPlan.create_query_plan(): Query plan created successfully -> " # debug_show query_plan,
         );
         query_plan;
     };

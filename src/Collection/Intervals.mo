@@ -18,7 +18,6 @@ import RevIter "mo:itertools/RevIter";
 import BitMap "mo:bit-map";
 import Vector "mo:vector";
 
-import MemoryBTree "mo:memory-collection/MemoryBTree/Stable";
 import TypeUtils "mo:memory-collection/TypeUtils";
 import Int8Cmp "mo:memory-collection/TypeUtils/Int8Cmp";
 
@@ -46,8 +45,6 @@ module {
     public type RevIter<A> = RevIter.RevIter<A>;
     type QueryBuilder = Query.QueryBuilder;
 
-    // public type MemoryBTree = MemoryBTree.VersionedMemoryBTree;
-    public type BTreeUtils<K, V> = MemoryBTree.BTreeUtils<K, V>;
     public type TypeUtils<A> = TypeUtils.TypeUtils<A>;
 
     public type Order = Order.Order;

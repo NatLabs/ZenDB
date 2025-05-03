@@ -35,6 +35,8 @@ import BitMap "mo:bit-map";
 import MemoryBTree "mo:memory-collection/MemoryBTree/Stable";
 import TypeUtils "mo:memory-collection/TypeUtils";
 import Int8Cmp "mo:memory-collection/TypeUtils/Int8Cmp";
+import Cmp "mo:augmented-btrees/Cmp";
+import Vector "mo:vector";
 
 import T "../Types";
 import Query "../Query";
@@ -47,6 +49,7 @@ import Schema "Schema";
 import C "../Constants";
 import Logger "../Logger";
 import SchemaMap "SchemaMap";
+import BTree "../BTree";
 
 module CollectionUtils {
 
@@ -56,7 +59,6 @@ module CollectionUtils {
     public type RevIter<A> = RevIter.RevIter<A>;
 
     // public type MemoryBTree = MemoryBTree.VersionedMemoryBTree;
-    public type BTreeUtils<K, V> = MemoryBTree.BTreeUtils<K, V>;
     public type TypeUtils<A> = TypeUtils.TypeUtils<A>;
 
     public type Order = Order.Order;
@@ -78,28 +80,56 @@ module CollectionUtils {
 
     public let { thash; bhash } = Map;
 
-    public func new_btree() : T.MemoryBTree {
-        MemoryBTree.new(?C.DEFAULT_BTREE_ORDER);
-    };
-
-    public func get_index_data_utils() : MemoryBTree.BTreeUtils<[T.CandidQuery], T.RecordId> {
-
-        let key_utils = get_index_key_utils();
-        let value_utils = TypeUtils.Nat;
-
-        MemoryBTree.createUtils(key_utils, value_utils);
-
+    public func new_btree<K, V>(collection : StableCollection) : T.BTree<K, V> {
+        switch (collection.memory_type) {
+            case (#heap) { BTree.newHeap() };
+            case (#stableMemory) {
+                switch (Vector.removeLast(collection.freed_btrees)) {
+                    case (?memory_btree) {
+                        #stableMemory(memory_btree);
+                    };
+                    case (null) {
+                        BTree.newStableMemory();
+                    };
+                };
+            };
+        };
     };
 
     public func get_index_key_utils() : TypeUtils.TypeUtils<[T.CandidQuery]> {
         Orchid.Orchid;
     };
 
-    public func get_main_btree_utils() : BTreeUtils<Nat, Blob> {
-        MemoryBTree.createUtils<Nat, Blob>(Utils.typeutils_nat_as_nat64, TypeUtils.Blob);
+    public func get_index_data_utils(collection : StableCollection) : T.BTreeUtils<[T.CandidQuery], T.RecordId> {
+        switch (collection.memory_type) {
+            case (#stableMemory(_)) {
+                #stableMemory(MemoryBTree.createUtils<[T.CandidQuery], T.RecordId>(get_index_key_utils(), TypeUtils.Nat));
+            };
+            case (#heap(_)) {
+                #heap({
+                    blobify = Orchid.Orchid.blobify;
+                    cmp = Cmp.Blob;
+                });
+            };
+        };
+
     };
 
-    public func get_index_columns(collection : StableCollection, index_key_details : [(Text, SortDirection)], id : Nat, candid_map : CandidMap.CandidMap) : [Candid] {
+    public func get_main_btree_utils(collection : StableCollection) : T.BTreeUtils<Nat, Blob> {
+        switch (collection.memory_type) {
+            case (#stableMemory(_)) {
+                #stableMemory(MemoryBTree.createUtils<Nat, Blob>(Utils.typeutils_nat_as_nat64, TypeUtils.Blob));
+            };
+            case (#heap(_)) {
+                #heap({
+                    blobify = Utils.typeutils_nat_as_nat64.blobify;
+                    cmp = Cmp.Blob;
+                });
+            };
+        };
+    };
+
+    public func get_index_columns(collection : T.StableCollection, index_key_details : [(Text, SortDirection)], id : Nat, candid_map : CandidMap.CandidMap) : [Candid] {
         let buffer = Buffer.Buffer<Candid>(8);
 
         for ((index_key, dir) in index_key_details.vals()) {
@@ -134,41 +164,14 @@ module CollectionUtils {
 
     };
 
-    public func memorybtree_scan_interval<K, V>(
-        btree : MemoryBTree.StableMemoryBTree,
-        btree_utils : MemoryBTree.BTreeUtils<K, V>,
-        start_key : ?K,
-        end_key : ?K,
-    ) : (Nat, Nat) {
-
-        let start_rank = switch (start_key) {
-            case (?key) switch (MemoryBTree.getExpectedIndex(btree, btree_utils, key)) {
-                case (#Found(rank)) rank;
-                case (#NotFound(rank)) rank;
-            };
-            case (null) 0;
-        };
-
-        let end_rank = switch (end_key) {
-            case (?key) switch (MemoryBTree.getExpectedIndex(btree, btree_utils, key)) {
-                case (#Found(rank)) rank + 1;
-                case (#NotFound(rank)) rank;
-            };
-            case (null) MemoryBTree.size(btree);
-        };
-
-        (start_rank, end_rank);
-
-    };
-
     public func lookup_record<Record>(collection : T.StableCollection, blobify : T.InternalCandify<Record>, id : Nat) : Record {
-        let ?record_details = MemoryBTree.get(collection.main, get_main_btree_utils(), id) else Debug.trap("lookup_record: record not found for id: " # debug_show id);
+        let ?record_details = BTree.get<Nat, Blob>(collection.main, get_main_btree_utils(collection), id) else Debug.trap("lookup_record: record not found for id: " # debug_show id);
         let record = blobify.from_blob(record_details);
         record;
     };
 
     public func lookup_candid_blob(collection : StableCollection, id : Nat) : Blob {
-        let ?record_details = MemoryBTree.get(collection.main, get_main_btree_utils(), id) else Debug.trap("lookup_candid_blob: record not found for id: " # debug_show id);
+        let ?record_details = BTree.get(collection.main, get_main_btree_utils(collection), id) else Debug.trap("lookup_candid_blob: record not found for id: " # debug_show id);
         record_details;
     };
 
@@ -180,14 +183,14 @@ module CollectionUtils {
     };
 
     public func lookup_candid_record(collection : StableCollection, id : Nat) : ?Candid.Candid {
-        let ?record_details = MemoryBTree.get(collection.main, get_main_btree_utils(), id) else return null;
+        let ?record_details = BTree.get(collection.main, get_main_btree_utils(collection), id) else return null;
         let candid = decode_candid_blob(collection, record_details);
 
         ?candid;
     };
 
     // public func lookup_candid_map_bytes(collection : StableCollection, id : Nat) : ?[Nat8] {
-    //     let ?record_details = MemoryBTree.get(collection.main, get_main_btree_utils(), id) else return null;
+    //     let ?record_details = MemoryBTree.get(collection.main, get_main_btree_utils(collection), id) else return null;
     //     let bytes = record_details.1;
 
     //     ?bytes;
@@ -243,13 +246,13 @@ module CollectionUtils {
         };
 
         if (index_name == C.RECORD_ID) {
-            let main_btree_utils = get_main_btree_utils();
+            let main_btree_utils = get_main_btree_utils(collection);
 
             let record_ids = Itertools.flatten(
                 Iter.map(
                     intervals.vals(),
                     func(interval : (Nat, Nat)) : Iter<(Nat)> {
-                        let record_ids = MemoryBTree.rangeKeys(collection.main, main_btree_utils, interval.0, interval.1);
+                        let record_ids = BTree.rangeKeys(collection.main, main_btree_utils, interval.0, interval.1);
 
                         if (sorted_in_reverse) {
                             return record_ids.rev();
@@ -265,13 +268,13 @@ module CollectionUtils {
 
         let ?index = Map.get(collection.indexes, thash, index_name) else Debug.trap("Unreachable: IndexMap not found for index: " # index_name);
 
-        let index_data_utils = CollectionUtils.get_index_data_utils();
+        let index_data_utils = CollectionUtils.get_index_data_utils(collection);
 
         Itertools.flatten(
             Iter.map(
                 intervals.vals(),
                 func(interval : (Nat, Nat)) : Iter<(Nat)> {
-                    let record_ids = MemoryBTree.rangeVals(index.data, index_data_utils, interval.0, interval.1);
+                    let record_ids = BTree.rangeVals(index.data, index_data_utils, interval.0, interval.1);
 
                     if (sorted_in_reverse) {
                         return record_ids.rev();

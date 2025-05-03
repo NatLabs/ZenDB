@@ -22,10 +22,6 @@ import Candid "mo:serde/Candid";
 import Itertools "mo:itertools/Iter";
 import RevIter "mo:itertools/RevIter";
 
-import MemoryBTree "mo:memory-collection/MemoryBTree/Stable";
-import TypeUtils "mo:memory-collection/TypeUtils";
-import Int8Cmp "mo:memory-collection/TypeUtils/Int8Cmp";
-
 import Collection "../Collection";
 import Utils "../Utils";
 import T "../Types";

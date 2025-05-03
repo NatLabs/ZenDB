@@ -24,7 +24,6 @@ import RevIter "mo:itertools/RevIter";
 import Vector "mo:vector";
 import Ids "mo:incremental-ids";
 
-import MemoryBTree "mo:memory-collection/MemoryBTree/Stable";
 import TypeUtils "mo:memory-collection/TypeUtils";
 import Int8Cmp "mo:memory-collection/TypeUtils/Int8Cmp";
 
@@ -88,13 +87,26 @@ module {
             log_level : Logger.LogLevel;
             is_running_locally : Bool;
         };
+        memory_type : ?T.MemoryType;
     };
 
-    public func newStableStore(settings : ?Settings) : T.StableStore {
+    public let defaultSettings : Settings = {
+        logging = ?{
+            log_level = #Error;
+            is_running_locally = false;
+        };
+        memory_type = ?(#heap);
+    };
+
+    public func newStableStore(opt_settings : ?Settings) : T.StableStore {
+        let settings = Option.get(opt_settings, defaultSettings);
+
         let zendb : T.StableStore = {
-            id_store = Ids.new();
             databases = Map.new<Text, T.StableDatabase>();
-            freed_btrees = Vector.new<MemoryBTree.StableMemoryBTree>();
+            memory_type = Option.get(settings.memory_type, #heap);
+
+            id_store = Ids.new();
+            freed_btrees = Vector.new<T.MemoryBTree>();
             logger = Logger.init(#Error, false);
         };
 
@@ -103,12 +115,13 @@ module {
             collections = Map.new<Text, T.StableCollection>();
             freed_btrees = zendb.freed_btrees;
             logger = zendb.logger;
+            memory_type = zendb.memory_type;
         };
 
         ignore Map.put(zendb.databases, T.thash, "default", default_db);
 
         ignore do ? {
-            let log_settings = settings!.logging!;
+            let log_settings = settings.logging!;
 
             Logger.setLogLevel(zendb.logger, log_settings.log_level);
             Logger.setIsRunLocally(zendb.logger, log_settings.is_running_locally);

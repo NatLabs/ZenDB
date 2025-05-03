@@ -34,16 +34,13 @@ import Itertools "mo:itertools/Iter";
 import RevIter "mo:itertools/RevIter";
 import BitMap "mo:bit-map";
 
-import MemoryBTree "mo:memory-collection/MemoryBTree/Stable";
-import TypeUtils "mo:memory-collection/TypeUtils";
-import Int8Cmp "mo:memory-collection/TypeUtils/Int8Cmp";
-
 import T "../Types";
 import Query "../Query";
 import Utils "../Utils";
 import CandidMap "../CandidMap";
 import ByteUtils "../ByteUtils";
 import C "../Constants";
+import BTree "../BTree";
 
 import Index "Index";
 import Orchid "Orchid";
@@ -66,10 +63,6 @@ module {
     public type RevIter<A> = RevIter.RevIter<A>;
     type QueryBuilder = Query.QueryBuilder;
 
-    // public type MemoryBTree = MemoryBTree.VersionedMemoryBTree;
-    public type BTreeUtils<K, V> = MemoryBTree.BTreeUtils<K, V>;
-    public type TypeUtils<A> = TypeUtils.TypeUtils<A>;
-
     public type Order = Order.Order;
     public type Hash = Hash.Hash;
 
@@ -87,7 +80,7 @@ module {
 
     public type IndexKeyFields = T.IndexKeyFields;
 
-    let DEFAULT_BTREE_ORDER = 256;
+    let STABLE_MEMORY_BTREE_ORDER = 256;
     let MAX_QUERY_INSTRUCTIONS : Nat64 = 5_000_000_000;
     let MAX_UPDATE_INSTRUCTIONS : Nat64 = 40_000_000_000;
 
@@ -118,18 +111,18 @@ module {
         public func name() : Text = collection_name;
 
         /// Returns the number of records in the collection.
-        public func size() : Nat = MemoryBTree.size(collection.main);
+        public func size() : Nat = BTree.size(collection.main);
 
-        let main_btree_utils : MemoryBTree.BTreeUtils<Nat, Blob> = CollectionUtils.get_main_btree_utils();
+        let main_btree_utils : T.BTreeUtils<Nat, Blob> = CollectionUtils.get_main_btree_utils(collection);
 
         /// Returns an iterator over all the record ids in the collection.
         public func keys() : Iter<Nat> {
-            MemoryBTree.keys(collection.main, main_btree_utils);
+            BTree.keys(collection.main, main_btree_utils);
         };
 
         /// Returns an iterator over all the records in the collection.
         public func vals() : Iter<Record> {
-            let iter = MemoryBTree.vals(collection.main, main_btree_utils);
+            let iter = BTree.vals(collection.main, main_btree_utils);
             let records = Iter.map<Blob, Record>(
                 iter,
                 func(candid_blob : Blob) {
@@ -141,7 +134,7 @@ module {
 
         /// Returns an iterator over a tuple containing the id and record for all entries in the collection.
         public func entries() : Iter<(Nat, Record)> {
-            let iter = MemoryBTree.entries(collection.main, main_btree_utils);
+            let iter = BTree.entries(collection.main, main_btree_utils);
 
             let records = Iter.map<(Nat, Blob), (Nat, Record)>(
                 iter,
@@ -154,7 +147,7 @@ module {
 
         public func filter_iter(condition : (Record) -> Bool) : Iter<Record> {
 
-            let iter = MemoryBTree.vals(collection.main, main_btree_utils);
+            let iter = BTree.vals(collection.main, main_btree_utils);
             let records = Iter.map<Blob, Record>(
                 iter,
                 func(candid_blob : Blob) {
@@ -171,10 +164,10 @@ module {
 
         /// Clear all the data in the collection.
         public func clear() {
-            MemoryBTree.clear(collection.main);
+            BTree.clear(collection.main);
 
             for (index in Map.vals(collection.indexes)) {
-                MemoryBTree.clear(index.data);
+                BTree.clear(index.data);
             };
         };
 
@@ -352,9 +345,9 @@ module {
         //     };
         // };
 
-        public func stats() : T.CollectionStats {
-            StableCollection.stats(collection);
-        };
+        // public func stats() : T.CollectionStats {
+        //     StableCollection.stats(collection);
+        // };
 
         /// Returns the total number of records that match the query.
         /// This ignores the limit and skip parameters.

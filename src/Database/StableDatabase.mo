@@ -23,9 +23,7 @@ import Itertools "mo:itertools/Iter";
 import RevIter "mo:itertools/RevIter";
 import Ids "mo:incremental-ids";
 
-import MemoryBTree "mo:memory-collection/MemoryBTree/Stable";
-import TypeUtils "mo:memory-collection/TypeUtils";
-import Int8Cmp "mo:memory-collection/TypeUtils/Int8Cmp";
+import Vector "mo:vector";
 
 import Collection "../Collection";
 import StableCollection "../Collection/StableCollection";
@@ -35,6 +33,7 @@ import C "../Constants";
 import Schema "../Collection/Schema";
 import Logger "../Logger";
 import SchemaMap "../Collection/SchemaMap";
+import BTree "../BTree";
 
 module {
 
@@ -115,7 +114,20 @@ module {
             schema_map = SchemaMap.new(processed_schema);
             schema_keys;
             schema_keys_set = Set.fromIter(schema_keys.vals(), thash);
-            main = MemoryBTree.new(?C.DEFAULT_BTREE_ORDER);
+            main = switch (db.memory_type) {
+                case (#heap) { BTree.newHeap() };
+                case (#stableMemory) {
+                    switch (Vector.removeLast(db.freed_btrees)) {
+                        case (?memory_btree) {
+                            #stableMemory(memory_btree);
+                        };
+                        case (null) {
+                            BTree.newStableMemory();
+                        };
+                    };
+                };
+            };
+
             indexes = Map.new<Text, T.Index>();
 
             field_constraints;
@@ -125,6 +137,7 @@ module {
             // db references
             freed_btrees = db.freed_btrees;
             logger = db.logger;
+            memory_type = db.memory_type;
         };
 
         let unique_constraints_buffer = Buffer.Buffer<([Text], T.Index)>(8);

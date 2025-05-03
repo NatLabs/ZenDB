@@ -17,7 +17,6 @@ import Int "mo:base/Int";
 import Map "mo:map/Map";
 import Set "mo:map/Set";
 import Serde "mo:serde";
-import Decoder "mo:serde/Candid/Blob/Decoder";
 import Candid "mo:serde/Candid";
 import Itertools "mo:itertools/Iter";
 import RevIter "mo:itertools/RevIter";
@@ -28,6 +27,8 @@ import Ids "mo:incremental-ids";
 import MemoryBTree "mo:memory-collection/MemoryBTree/Stable";
 import TypeUtils "mo:memory-collection/TypeUtils";
 import Int8Cmp "mo:memory-collection/TypeUtils/Int8Cmp";
+import BpTree "mo:augmented-btrees/BpTree";
+import BpTreeTypes "mo:augmented-btrees/BpTree/Types";
 
 module T {
     public type BitMap = BitMap.BitMap;
@@ -64,7 +65,6 @@ module T {
     public type Order = Order.Order;
 
     public type MemoryBTree = MemoryBTree.StableMemoryBTree;
-    public type BTreeUtils<K, V> = MemoryBTree.BTreeUtils<K, V>;
     public type TypeUtils<A> = TypeUtils.TypeUtils<A>;
 
     public type Hash = Hash.Hash;
@@ -99,7 +99,8 @@ module T {
     public type Index = {
         name : Text;
         key_details : [(Text, SortDirection)];
-        data : MemoryBTree.StableMemoryBTree;
+
+        data : BTree<[CandidQuery], RecordId>; // using CandidQuery here for comparison only, the actual data stored here is Candid
         used_internally : Bool; // if true, the index cannot be deleted by user if true
         is_unique : Bool; // if true, the index is unique and the record ids are not concatenated with the index key values to make duplicate values appear unique
     };
@@ -110,6 +111,21 @@ module T {
 
     };
 
+    public type BTree<K, V> = {
+        #stableMemory : T.MemoryBTree;
+        #heap : BpTree.BpTree<Blob, V>;
+    };
+
+    public type BpTreeUtils<K> = {
+        blobify : TypeUtils.Blobify<K>;
+        cmp : BpTreeTypes.CmpFn<Blob>;
+    };
+
+    public type BTreeUtils<K, V> = {
+        #stableMemory : MemoryBTree.BTreeUtils<K, V>;
+        #heap : BpTreeUtils<K>;
+    };
+
     public type StableCollection = {
         ids : Ids.Generator;
         name : Text;
@@ -118,7 +134,7 @@ module T {
         schema_keys : [Text];
         schema_keys_set : Set<Text>;
 
-        main : MemoryBTree.StableMemoryBTree;
+        main : BTree<Nat, Blob>;
         indexes : Map<Text, Index>;
 
         field_constraints : Map<Text, [SchemaFieldConstraint]>;
@@ -129,10 +145,17 @@ module T {
         // the ZenDB database record
         freed_btrees : Vector.Vector<MemoryBTree.StableMemoryBTree>;
         logger : Logger;
+        memory_type : MemoryType;
+    };
+
+    public type MemoryType = {
+        #heap;
+        #stableMemory;
     };
 
     public type StableDatabase = {
         collections : Map<Text, StableCollection>;
+        memory_type : MemoryType;
 
         // reference to the freed btrees to the same variable in
         // the ZenDB database record
@@ -144,6 +167,7 @@ module T {
     public type StableStore = {
         id_store : Ids.Ids;
         databases : Map<Text, StableDatabase>;
+        memory_type : MemoryType;
         freed_btrees : Vector.Vector<MemoryBTree.StableMemoryBTree>;
         logger : Logger;
     };
@@ -234,7 +258,7 @@ module T {
     };
 
     public type IndexScanDetails = {
-        index : Index;
+        index_name : Text;
         requires_additional_sorting : Bool;
         requires_additional_filtering : Bool;
         sorted_in_reverse : Bool;
@@ -336,5 +360,15 @@ module T {
     public type SchemaConstraint = {
         #Unique : [Text];
         #Field : (Text, [SchemaFieldConstraint]);
+    };
+
+    public type CandidHeapStorageType = {
+        // stored by both memory types
+        #candid_blob : CandidBlob;
+
+        // heap only
+        #candid_variant : Candid;
+        #candid_map : { get : () -> () }; // placeholder for map type
+
     };
 };
