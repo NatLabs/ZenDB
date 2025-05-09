@@ -97,13 +97,31 @@ module {
         collection : StableCollection,
         index : Index,
         id : Nat,
-        candid_map : CandidMap.CandidMap,
-    ) : T.Result<?T.RecordId, Text> {
-
-        let index_key_values = CollectionUtils.get_index_columns(collection, index.key_details, id, candid_map);
+        candid_map : T.CandidMap,
+    ) : T.Result<(), Text> {
 
         let index_data_utils = CollectionUtils.get_index_data_utils(collection);
-        let opt_prev_id = BTree.put(index.data, index_data_utils, index_key_values, id);
+
+        let index_key_values = switch (CollectionUtils.get_index_columns(collection, index.key_details, id, candid_map)) {
+            case (?index_key_values) index_key_values;
+            case (null) {
+                Logger.lazyDebug(
+                    collection.logger,
+                    func() = "Skipping indexing for record with id " # debug_show id # " because it does not have any values in the index",
+                );
+
+                return #ok();
+            };
+        };
+
+        switch (BTree.put(index.data, index_data_utils, index_key_values, id)) {
+            case (null) {};
+            case (?prev_id) {
+                return #err(
+                    "Failed to insert record with id " # debug_show id # " into index " # index.name # ", because a duplicate entry with id " # debug_show prev_id # " already exists"
+                );
+            };
+        };
 
         Logger.lazyDebug(
             collection.logger,
@@ -116,8 +134,71 @@ module {
             ),
         );
 
-        #ok(opt_prev_id);
+        #ok();
     };
+
+    public func remove(collection : StableCollection, index : Index, id : Nat, prev_candid_map : T.CandidMap) : T.Result<(), Text> {
+        let index_data_utils = CollectionUtils.get_index_data_utils(collection);
+
+        let index_key_values = switch (CollectionUtils.get_index_columns(collection, index.key_details, id, prev_candid_map)) {
+            case (?index_key_values) index_key_values;
+            case (null) {
+                Logger.lazyDebug(
+                    collection.logger,
+                    func() = "Skipping indexing for record with id " # debug_show id # " because it does not have any values in the index",
+                );
+
+                return #ok();
+            };
+        };
+
+        switch (BTree.remove(index.data, index_data_utils, index_key_values)) {
+            case (null) return #err(
+                "Failed to remove record with id " # debug_show id # " from index " # index.name # ", because it does not exist"
+            );
+            case (?prev_id) {
+                if (prev_id != id) {
+
+                    ignore BTree.put(index.data, index_data_utils, index_key_values, prev_id);
+
+                    return #err(
+                        "Failed to remove record with id " # debug_show id # " from index " # index.name # ", because it was not found in the index. The record with id " # debug_show prev_id # " was found instead"
+                    );
+                };
+            };
+        };
+
+        #ok();
+    };
+
+    // public func exists(
+    //     collection : StableCollection,
+    //     index : Index,
+    //     id : Nat,
+    //     candid_map : T.CandidMap,
+    // ) : Bool {
+    //     let index_data_utils = CollectionUtils.get_index_data_utils(collection);
+
+    //     let index_key_values = switch (CollectionUtils.get_index_columns(collection, index.key_details, id, candid_map)) {
+    //         case (?index_key_values) index_key_values;
+    //         case (null) {
+    //             Logger.lazyDebug(
+    //                 collection.logger,
+    //                 func() = "Skipping indexing for record with id " # debug_show id # " because it does not have any values in the index",
+    //             );
+
+    //             return false;
+    //         };
+    //     };
+
+    //     switch (BTree.get(index.data, index_data_utils, index_key_values)) {
+    //         case (null) false;
+    //         case (?prev_id) {
+    //             return true;
+
+    //         };
+    //     };
+    // };
 
     let EQUALITY_SCORE = 4;
     let SORT_SCORE = 2;
@@ -359,6 +440,15 @@ module {
         Iter.toArray<([T.CandidQuery], T.RecordId)>(
             BTree.range<[T.CandidQuery], T.RecordId>(index.data, index_data_utils, start, end)
         );
+    };
+
+    public func entries(
+        collection : T.StableCollection,
+        index : Index,
+    ) : T.RevIter<([T.CandidQuery], T.RecordId)> {
+        let index_data_utils = CollectionUtils.get_index_data_utils(collection);
+
+        BTree.entries<[T.CandidQuery], T.RecordId>(index.data, index_data_utils);
     };
 
     public func extract_scan_and_filter_bounds(lower : Map<Text, T.CandidInclusivityQuery>, upper : Map<Text, T.CandidInclusivityQuery>, opt_index_key_details : ?[(Text, T.SortDirection)], opt_fully_covered_equality_and_range_fields : ?Set.Set<Text>) : (Bounds, Bounds) {

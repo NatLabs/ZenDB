@@ -111,7 +111,7 @@ module {
         };
 
         let default_db : T.StableDatabase = {
-            id_store = zendb.id_store;
+            id_store = Ids.new();
             collections = Map.new<Text, T.StableCollection>();
             freed_btrees = zendb.freed_btrees;
             logger = zendb.logger;
@@ -137,6 +137,33 @@ module {
     public func launchDefaultDB(sstore : T.StableStore) : Database.Database {
         let ?default_db = Map.get<Text, T.StableDatabase>(sstore.databases, T.thash, "default") else Debug.trap("Default database not found");
         Database.Database(default_db);
+    };
+
+    public func createDatabase(sstore : T.StableStore, db_name : Text) : T.Result<Database.Database, Text> {
+
+        switch (Map.get<Text, T.StableDatabase>(sstore.databases, T.thash, db_name)) {
+            case (?db) return #err("Database with name '" # db_name # "' already exists");
+            case (null) {};
+        };
+
+        let db : T.StableDatabase = {
+            id_store = Ids.new();
+            collections = Map.new<Text, T.StableCollection>();
+            freed_btrees = sstore.freed_btrees;
+            logger = sstore.logger;
+            memory_type = sstore.memory_type;
+        };
+
+        ignore Map.put(sstore.databases, T.thash, db_name, db);
+
+        #ok(Database.Database(db));
+    };
+
+    public func getDatabase(sstore : T.StableStore, db_name : Text) : ?Database.Database {
+        switch (Map.get<Text, T.StableDatabase>(sstore.databases, T.thash, db_name)) {
+            case (?db) return ?Database.Database(db);
+            case (null) return null;
+        };
     };
 
     public class ZenDB(sstore : T.StableStore) {

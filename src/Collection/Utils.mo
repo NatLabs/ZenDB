@@ -129,26 +129,34 @@ module CollectionUtils {
         };
     };
 
-    public func get_index_columns(collection : T.StableCollection, index_key_details : [(Text, SortDirection)], id : Nat, candid_map : CandidMap.CandidMap) : [Candid] {
+    public func get_index_columns(collection : T.StableCollection, index_key_details : [(Text, SortDirection)], id : Nat, candid_map : T.CandidMap) : ?[Candid] {
         let buffer = Buffer.Buffer<Candid>(8);
+
+        var field_columns_excluding_record_id = 0;
+        var field_columns_with_missing_value_at_path = 0;
 
         for ((index_key, dir) in index_key_details.vals()) {
             if (index_key == C.RECORD_ID) {
                 buffer.add(#Nat(id));
             } else {
+                field_columns_excluding_record_id += 1;
 
-                let ?candid_value = candid_map.get(index_key) else Debug.trap(" get_index_columns: field '" # debug_show index_key # "' not found in record candid: " # debug_show candid_map.extract_candid());
-
-                let final_candid_value = switch (SchemaMap.get_type(collection.schema_map, index_key), candid_value) {
-                    case (?(_), #Option(_)) candid_value;
-                    case (?#Option(_), #Null) #Null;
-                    case (?#Option(_), _) #Option(candid_value);
-                    case (?(_), _) candid_value;
-                    case (null, _) Debug.trap("Error retrieving schema type for index key '" # debug_show index_key # "' in collection '" # debug_show collection.name # "'. The schema type is null.");
+                let candid_value = switch (CandidMap.get(candid_map, collection.schema_map, index_key)) {
+                    case (?val) val;
+                    case (null) {
+                        field_columns_with_missing_value_at_path += 1;
+                        #Null;
+                    };
                 };
 
-                buffer.add(final_candid_value);
+                buffer.add(candid_value);
             };
+        };
+
+        if (field_columns_excluding_record_id == field_columns_with_missing_value_at_path) {
+            // In this case, all the index key values for the fields are missing, so we will return a null value so this record is not indexed
+
+            return null;
         };
 
         let index_key_values = Buffer.toArray(buffer);
@@ -160,7 +168,7 @@ module CollectionUtils {
             },
         );
 
-        index_key_values;
+        ?index_key_values;
 
     };
 
@@ -198,14 +206,17 @@ module CollectionUtils {
 
     public func candid_map_filter_condition(collection : StableCollection, candid_record : Candid.Candid, lower : [(Text, ?T.CandidInclusivityQuery)], upper : [(Text, ?T.CandidInclusivityQuery)]) : Bool {
 
-        let candid_map = CandidMap.CandidMap(collection.schema, candid_record);
+        let candid_map = CandidMap.new(collection.schema_map, candid_record);
 
         for (((key, opt_lower_val), (upper_key, opt_upper_val)) in Itertools.zip(lower.vals(), upper.vals())) {
             assert key == upper_key;
 
             //    Debug.print("candid_map: " # debug_show candid_map.extract_candid());
 
-            let ?field_value = candid_map.get(key) else Debug.trap("candid_map_filter_condition: field '" # debug_show key # "' not found in record");
+            let field_value = switch (CandidMap.get(candid_map, collection.schema_map, key)) {
+                case (?val) val;
+                case (null) return false; // nested field is missing
+            };
 
             var res = true;
 

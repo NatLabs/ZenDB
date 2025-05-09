@@ -174,7 +174,9 @@ let input_txs = Buffer.fromArray<Tx>(
 );
 
 for ((i, tx) in Itertools.enumerate(input_txs.vals())) {
-    let #ok(_) = txs.insert_with_id(tx.tx_index, tx);
+    // the id is assigned incrementally
+    // so they should match the tx_index
+    let #ok(id) = txs.insert(tx);
 };
 
 assert txs.size() == limit;

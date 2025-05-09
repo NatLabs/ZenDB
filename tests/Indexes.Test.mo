@@ -213,7 +213,7 @@ func index_tests(zendb : ZenDB.Database) {
                 //     "Sorted results for field " # field # ": " # debug_show (results)
                 // );
 
-                return Itertools.all(
+                return sorted_ids.size() == limit and Itertools.all(
                     Itertools.zip(
                         Iter.map(
                             results.vals(),

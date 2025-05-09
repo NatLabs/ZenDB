@@ -105,7 +105,10 @@ module T {
         is_unique : Bool; // if true, the index is unique and the record ids are not concatenated with the index key values to make duplicate values appear unique
     };
 
-    public type SchemaMap = Map<Text, Schema>;
+    public type SchemaMap = {
+        map : Map.Map<Text, T.Schema>;
+        fields_with_array_type : [Text];
+    };
 
     public type ResolvedConstraints = {
 
@@ -146,6 +149,15 @@ module T {
         freed_btrees : Vector.Vector<MemoryBTree.StableMemoryBTree>;
         logger : Logger;
         memory_type : MemoryType;
+    };
+
+    public type NestedCandidMap = {
+        #Candid : (T.Schema, Candid);
+        #CandidMap : (Map.Map<Text, NestedCandidMap>);
+    };
+
+    public type CandidMap = {
+        candid_map : Map.Map<Text, NestedCandidMap>;
     };
 
     public type MemoryType = {

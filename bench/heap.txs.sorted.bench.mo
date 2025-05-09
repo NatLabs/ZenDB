@@ -33,7 +33,6 @@ module {
             "#heap no index (sorted by ts)",
             "#heap 7 single field indexes (sorted by tx.amt)",
             "#heap 6 fully covered indexes (sorted by ts)",
-
         ]);
 
         bench.rows([

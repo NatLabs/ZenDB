@@ -19,6 +19,7 @@ import Candid "mo:serde/Candid";
 
 import ZenDB "../src";
 import TestUtils "TestUtils";
+import SchemaMap "../src/Collection/SchemaMap";
 import CandidMap "../src/CandidMap";
 import { Orchid } "../src/Collection/Orchid";
 
@@ -636,9 +637,10 @@ func inclusivity_tests(zendb : ZenDB.Database) {
                         let blob = candify_edge.to_blob(doc);
                         let #ok(candid) = Candid.decode(blob, ["opt_field"], null);
                         Debug.print(debug_show { candid = candid });
+                        let schema_map = SchemaMap.new(EdgeCaseSchema);
 
-                        let candid_map = CandidMap.CandidMap(EdgeCaseSchema, candid[0]);
-                        let opt_field = candid_map.get("opt_field");
+                        let candid_map = CandidMap.new(schema_map, candid[0]);
+                        let opt_field = CandidMap.get(candid_map, schema_map, "opt_field");
                         Debug.print(debug_show { opt_field = opt_field });
 
                     };

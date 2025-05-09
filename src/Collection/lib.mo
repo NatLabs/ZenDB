@@ -110,7 +110,7 @@ module {
         /// Returns the collection name.
         public func name() : Text = collection_name;
 
-        /// Returns the number of records in the collection.
+        /// Returns the total number of records in the collection.
         public func size() : Nat = BTree.size(collection.main);
 
         let main_btree_utils : T.BTreeUtils<Nat, Blob> = CollectionUtils.get_main_btree_utils(collection);
@@ -143,6 +143,173 @@ module {
                 },
             );
             records;
+        };
+
+        public func insert(record : Record) : Result<(Nat), Text> {
+            put(record);
+        };
+
+        public func put(record : Record) : Result<(Nat), Text> {
+            let candid_blob = blobify.to_blob(record);
+            handleResult(
+                StableCollection.put(collection, main_btree_utils, candid_blob),
+                "Failed to put record",
+            );
+        };
+
+        public func get(id : Nat) : ?Record {
+            Option.map(
+                StableCollection.get(collection, main_btree_utils, id),
+                blobify.from_blob,
+            );
+        };
+
+        type RecordLimits = [(Text, ?State<T.CandidQuery>)];
+        type FieldLimit = (Text, ?State<T.CandidQuery>);
+
+        type Bounds = (RecordLimits, RecordLimits);
+
+        type IndexDetails = {
+            var sorted_in_reverse : ?Bool;
+            intervals : Buffer.Buffer<(Nat, Nat)>;
+        };
+
+        type Iter<A> = Iter.Iter<A>;
+
+        public func search_iter(query_builder : QueryBuilder) : Result<Iter<T.WrapId<Record>>, Text> {
+            switch (
+                handleResult(
+                    StableCollection.internal_search(collection, query_builder),
+                    "Failed to execute search",
+                )
+            ) {
+                case (#err(err)) return #err(err);
+                case (#ok(record_ids_iter)) {
+                    let record_iter = StableCollection.id_to_record_iter(collection, blobify, record_ids_iter);
+                    #ok(record_iter);
+                };
+            };
+        };
+
+        public func search(query_builder : QueryBuilder) : Result<[T.WrapId<Record>], Text> {
+            switch (
+                handleResult(
+                    StableCollection.internal_search(collection, query_builder),
+                    "Failed to execute search",
+                )
+            ) {
+                case (#err(err)) return #err(err);
+                case (#ok(record_ids_iter)) {
+                    let record_iter = StableCollection.id_to_record_iter(collection, blobify, record_ids_iter);
+                    let records = Iter.toArray(record_iter);
+                    #ok(records);
+                };
+            };
+        };
+
+        // public func stats() : T.CollectionStats {
+        //     StableCollection.stats(collection);
+        // };
+
+        /// Returns the total number of records that match the query.
+        /// This ignores the limit and skip parameters.
+        public func count(query_builder : QueryBuilder) : Result<Nat, Text> {
+            handleResult(
+                StableCollection.count(collection, query_builder),
+                "Failed to count records",
+            );
+        };
+
+        public func replaceRecord(id : Nat, record : Record) : Result<(), Text> {
+            handleResult(
+                StableCollection.replace_record_by_id(collection, main_btree_utils, id, blobify.to_blob(record)),
+                "Failed to replace record with id: " # debug_show (id),
+            );
+        };
+
+        public func replaceRecords(records : [(Nat, Record)]) : Result<(), Text> {
+            for ((id, record) in records.vals()) {
+                switch (replaceRecord(id, record)) {
+                    case (#ok(_)) {};
+                    case (#err(err)) return #err(err);
+                };
+            };
+
+            #ok();
+        };
+
+        public func updateById(id : Nat, update_operations : [(Text, T.FieldUpdateOperations)]) : Result<(), Text> {
+            handleResult(
+                StableCollection.update_by_id(collection, main_btree_utils, id, update_operations),
+                "Failed to update record with id: " # debug_show (id),
+            );
+        };
+
+        public func update(query_builder : QueryBuilder, update_operations : [(Text, T.FieldUpdateOperations)]) : Result<(), Text> {
+            let records_iter = switch (
+                handleResult(
+                    StableCollection.internal_search(collection, query_builder),
+                    "Failed to find records to update",
+                )
+            ) {
+                case (#err(err)) return #err(err);
+                case (#ok(records_iter)) records_iter;
+            };
+
+            for (id in records_iter) {
+                switch (StableCollection.update_by_id(collection, main_btree_utils, id, update_operations)) {
+                    case (#ok(_)) {};
+                    case (#err(err)) {
+                        Logger.lazyError(collection.logger, func() = "Failed to update record with id: " # debug_show (id) # ": " # err);
+                        return #err("Failed to update record with id: " # debug_show (id) # ": " # err);
+                    };
+                };
+            };
+
+            #ok;
+        };
+
+        public func deleteById(id : Nat) : Result<Record, Text> {
+            switch (
+                handleResult(
+                    StableCollection.delete_by_id(collection, main_btree_utils, id),
+                    "Failed to delete record with id: " # debug_show (id),
+                )
+            ) {
+                case (#err(err)) return #err(err);
+                case (#ok(record_details)) {
+                    let record = blobify.from_blob(record_details);
+                    #ok(record);
+                };
+            };
+        };
+
+        public func delete(query_builder : QueryBuilder) : Result<[(T.RecordId, Record)], Text> {
+            let internal_search_res = handleResult(
+                StableCollection.internal_search(collection, query_builder),
+                "Failed to find records to delete",
+            );
+
+            let results_iter = switch (internal_search_res) {
+                case (#err(err)) return #err(err);
+                case (#ok(records_iter)) records_iter;
+            };
+
+            // need to convert the iterator to an array before deleting
+            // to avoid invalidating the iterator as its reference in the btree
+            // might slide when elements are deleted.
+
+            let results = Iter.toArray(results_iter);
+
+            let buffer = Buffer.Buffer<(T.RecordId, Record)>(8);
+            for ((id) in results.vals()) {
+                switch (deleteById(id)) {
+                    case (#ok(record)) buffer.add(id, record);
+                    case (#err(err)) return #err(err);
+                };
+            };
+
+            #ok(Buffer.toArray(buffer));
         };
 
         public func filter_iter(condition : (Record) -> Bool) : Iter<Record> {
@@ -222,226 +389,6 @@ module {
                 StableCollection.populate_indexes(collection, main_btree_utils, names),
                 "Failed to populate indexes: " # debug_show (names),
             );
-        };
-
-        public func insert_with_id(id : Nat, record : Record) : Result<(), Text> {
-            put_with_id(id, record);
-        };
-
-        public func put_with_id(id : Nat, record : Record) : Result<(), Text> {
-            let candid_blob = blobify.to_blob(record);
-            handleResult(
-                StableCollection.put_with_id(collection, main_btree_utils, id, candid_blob),
-                "Failed to put record with id: " # debug_show (id),
-            );
-        };
-
-        public func insert(record : Record) : Result<(Nat), Text> {
-            put(record);
-        };
-
-        public func put(record : Record) : Result<(Nat), Text> {
-            let candid_blob = blobify.to_blob(record);
-            handleResult(
-                StableCollection.put(collection, main_btree_utils, candid_blob),
-                "Failed to put record",
-            );
-        };
-
-        public func get(id : Nat) : Result<Record, Text> {
-            switch (
-                handleResult(
-                    StableCollection.get(collection, main_btree_utils, id),
-                    "Failed to get record with id: " # debug_show (id),
-                )
-            ) {
-                case (#err(err)) return #err(err);
-                case (#ok(record_details)) {
-                    let record = blobify.from_blob(record_details);
-                    #ok(record);
-                };
-            };
-        };
-
-        type RecordLimits = [(Text, ?State<T.CandidQuery>)];
-        type FieldLimit = (Text, ?State<T.CandidQuery>);
-
-        type Bounds = (RecordLimits, RecordLimits);
-
-        type IndexDetails = {
-            var sorted_in_reverse : ?Bool;
-            intervals : Buffer.Buffer<(Nat, Nat)>;
-        };
-
-        type Iter<A> = Iter.Iter<A>;
-
-        public func search_iter(query_builder : QueryBuilder) : Result<Iter<T.WrapId<Record>>, Text> {
-            switch (
-                handleResult(
-                    StableCollection.internal_search(collection, query_builder),
-                    "Failed to execute search",
-                )
-            ) {
-                case (#err(err)) return #err(err);
-                case (#ok(record_ids_iter)) {
-                    let record_iter = StableCollection.id_to_record_iter(collection, blobify, record_ids_iter);
-                    #ok(record_iter);
-                };
-            };
-        };
-
-        public func search(query_builder : QueryBuilder) : Result<[T.WrapId<Record>], Text> {
-            switch (
-                handleResult(
-                    StableCollection.internal_search(collection, query_builder),
-                    "Failed to execute search",
-                )
-            ) {
-                case (#err(err)) return #err(err);
-                case (#ok(record_ids_iter)) {
-                    let record_iter = StableCollection.id_to_record_iter(collection, blobify, record_ids_iter);
-                    let records = Iter.toArray(record_iter);
-                    #ok(records);
-                };
-            };
-        };
-
-        // func async_skip_helper(iter : Iter<Nat>, skip : Nat) : async (Nat) {
-        //     let performance_start = InternetComputer.performanceCounter(0);
-
-        //     func instructions() : Nat64 {
-        //         InternetComputer.performanceCounter(0) - performance_start;
-        //     };
-
-        //     var i = 0;
-        //     while ((instructions() + 10_000_000 < MAX_UPDATE_INSTRUCTIONS) and i < skip) {
-        //         ignore iter.next();
-        //         i += 1;
-        //     };
-
-        //     i;
-        // };
-
-        // func async_skip(iter : Iter<Nat>, skip : Nat, performance_start : Nat64) : async* () {
-
-        //     var skipped = 0;
-        //     // Debug.print("starting async_skip: " # debug_show skip);
-        //     while (skipped < skip) {
-        //         skipped += await async_skip_helper(iter, skip - skipped);
-        //         // Debug.print("skipped: " # debug_show skipped);
-        //     };
-
-        // };
-
-        // public func async_find(query_builder : QueryBuilder, buffer : Buffer<T.WrapId<Record>>) : async* Result<(), Text> {
-        //     switch (search_iter(query_builder)) {
-        //         case (#err(err)) #err(err);
-        //         case (#ok(records)) {
-        //             for (record in records) {
-        //                 buffer.add(record);
-        //             };
-        //             #ok(());
-        //         };
-        //     };
-        // };
-
-        // public func stats() : T.CollectionStats {
-        //     StableCollection.stats(collection);
-        // };
-
-        /// Returns the total number of records that match the query.
-        /// This ignores the limit and skip parameters.
-        public func count(query_builder : QueryBuilder) : Result<Nat, Text> {
-            handleResult(
-                StableCollection.count(collection, query_builder),
-                "Failed to count records",
-            );
-        };
-
-        public func replaceRecord(id : Nat, record : Record) : Result<(), Text> {
-            handleResult(
-                StableCollection.replace_record_by_id(collection, main_btree_utils, id, blobify.to_blob(record)),
-                "Failed to replace record with id: " # debug_show (id),
-            );
-        };
-
-        public func replaceRecords(records : [(Nat, Record)]) : Result<(), Text> {
-            for ((id, record) in records.vals()) {
-                switch (replaceRecord(id, record)) {
-                    case (#ok(_)) {};
-                    case (#err(err)) return #err(err);
-                };
-            };
-
-            #ok();
-        };
-
-        public func updateById(id : Nat, update_operations : [(Text, T.FieldUpdateOperations)]) : Result<(), Text> {
-            handleResult(
-                StableCollection.update_by_id(collection, main_btree_utils, id, update_operations),
-                "Failed to update record with id: " # debug_show (id),
-            );
-        };
-
-        public func update(query_builder : QueryBuilder, update_operations : [(Text, T.FieldUpdateOperations)]) : Result<(), Text> {
-            let records_iter = switch (
-                handleResult(
-                    StableCollection.internal_search(collection, query_builder),
-                    "Failed to find records to update",
-                )
-            ) {
-                case (#err(err)) return #err(err);
-                case (#ok(records_iter)) records_iter;
-            };
-
-            for (id in records_iter) {
-                switch (StableCollection.update_by_id(collection, main_btree_utils, id, update_operations)) {
-                    case (#ok(_)) {};
-                    case (#err(err)) {
-                        Logger.lazyError(collection.logger, func() = "Failed to update record with id: " # debug_show (id) # ": " # err);
-                        return #err("Failed to update record with id: " # debug_show (id) # ": " # err);
-                    };
-                };
-            };
-
-            #ok;
-        };
-
-        public func deleteById(id : Nat) : Result<Record, Text> {
-            switch (
-                handleResult(
-                    StableCollection.delete_by_id(collection, main_btree_utils, id),
-                    "Failed to delete record with id: " # debug_show (id),
-                )
-            ) {
-                case (#err(err)) return #err(err);
-                case (#ok(record_details)) {
-                    let record = blobify.from_blob(record_details);
-                    #ok(record);
-                };
-            };
-        };
-
-        public func delete(query_builder : QueryBuilder) : Result<[Record], Text> {
-            let internal_search_res = handleResult(
-                StableCollection.internal_search(collection, query_builder),
-                "Failed to find records to delete",
-            );
-
-            let results_iter = switch (internal_search_res) {
-                case (#err(err)) return #err(err);
-                case (#ok(records_iter)) records_iter;
-            };
-
-            let buffer = Buffer.Buffer<Record>(8);
-            for ((id) in results_iter) {
-                switch (deleteById(id)) {
-                    case (#ok(record)) buffer.add(record);
-                    case (#err(err)) return #err(err);
-                };
-            };
-
-            #ok(Buffer.toArray(buffer));
         };
 
     };

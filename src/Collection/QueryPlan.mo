@@ -45,7 +45,7 @@ module {
         query_statements : [T.ZenQueryLang],
         sort_column : ?(Text, T.SortDirection),
         cursor_record : ?(Nat, Candid.Candid),
-        cursor_map : CandidMap.CandidMap,
+        cursor_map : T.CandidMap,
     ) : QueryPlan {
         Logger.lazyDebug(
             collection.logger,
@@ -243,9 +243,7 @@ module {
         Logger.lazyDebug(
             collection.logger,
             func() {
-                "QueryPlan.query_plan_from_or_operation(): Index scan intervals: " # debug_show interval # " -> " # debug_show (
-                    Index.from_interval(collection, index, interval)
-                );
+                "QueryPlan.query_plan_from_or_operation(): Index scan intervals: " # debug_show interval ;
             },
         );
 
@@ -282,7 +280,7 @@ module {
         query_statements : [T.ZenQueryLang],
         sort_column : ?(Text, T.SortDirection),
         cursor_record : ?(Nat, Candid.Candid),
-        cursor_map : CandidMap.CandidMap,
+        cursor_map : T.CandidMap,
         parent_simple_and_operations : [(Text, T.ZqlOperators)],
     ) : QueryPlan {
         Logger.lazyDebug(
@@ -362,9 +360,7 @@ module {
                             Logger.lazyDebug(
                                 collection.logger,
                                 func() {
-                                    "QueryPlan.query_plan_from_or_operation(): Index scan intervals: " # debug_show interval # " -> " # debug_show (
-                                        Index.from_interval(collection, index, interval)
-                                    );
+                                    "QueryPlan.query_plan_from_or_operation(): Index scan intervals: " # debug_show interval ;
                                 },
                             );
 
@@ -424,7 +420,7 @@ module {
         db_query : ZenQueryLang,
         sort_column : ?(Text, T.SortDirection),
         cursor_record : ?(Nat, Candid.Candid),
-        cursor_map : CandidMap.CandidMap,
+        cursor_map : T.CandidMap,
     ) : QueryPlan {
         Logger.lazyInfo(
             collection.logger,

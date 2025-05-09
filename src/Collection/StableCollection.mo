@@ -39,6 +39,7 @@ import Query "../Query";
 import Utils "../Utils";
 import CandidMap "../CandidMap";
 import ByteUtils "../ByteUtils";
+import SchemaMap "SchemaMap";
 
 import Index "Index";
 import Orchid "Orchid";
@@ -150,32 +151,6 @@ module StableCollection {
     //     #ok;
     // };
 
-    func insert_into_index(
-        collection : StableCollection,
-        index : Index,
-        id : Nat,
-        candid_map : CandidMap.CandidMap,
-    ) : Result<(), Text> {
-
-        let index_key_values = CollectionUtils.get_index_columns(collection, index.key_details, id, candid_map);
-
-        let index_data_utils = CollectionUtils.get_index_data_utils(collection);
-        ignore BTree.put(index.data, index_data_utils, index_key_values, id);
-
-        Logger.lazyDebug(
-            collection.logger,
-            func() = "Storing record with id " # debug_show id # " in index " # index.name # ", originally "
-            # debug_show (index_key_values) # ", now encoded as " # debug_show (
-                switch (index_data_utils) {
-                    case (#stableMemory(utils)) debug_show utils.key.blobify.to_blob(index_key_values);
-                    case (#heap(utils)) debug_show index_key_values;
-                }
-            ),
-        );
-
-        #ok();
-    };
-
     public func internal_create_index(
         collection : StableCollection,
         index_name : Text,
@@ -274,10 +249,10 @@ module StableCollection {
         var count = 0;
         for ((id, candid_blob) in entries) {
             let candid = CollectionUtils.decode_candid_blob(collection, candid_blob);
-            let candid_map = CandidMap.CandidMap(collection.schema, candid);
+            let candid_map = CandidMap.new(collection.schema_map, candid);
 
             for (index in indexes.vals()) {
-                switch (insert_into_index(collection, index, id, candid_map)) {
+                switch (Index.insert(collection, index, id, candid_map)) {
                     case (#err(err)) {
                         Logger.lazyError(
                             collection.logger,
@@ -359,61 +334,6 @@ module StableCollection {
 
     };
 
-    // public func async_populate_indexes(
-    //     collection : StableCollection,
-    //     _main_btree_utils : T.BTreeUtils<Nat, Blob>,
-    //     indexes_key_details : [[Text]],
-    //     opt_batch_size : ?Nat,
-    // ) : async* Result<(), Text> {
-
-    //     let recommended_batch_size = recommended_entries_to_populate_based_on_benchmarks(indexes_key_details.size());
-
-    //     let BATCH_SIZE = Option.get(opt_batch_size, recommended_batch_size);
-
-    //     let indexes = Buffer.Buffer<Index>(indexes_key_details.size());
-
-    //     for (index_key_details in indexes_key_details.vals()) {
-    //         let index_name = Text.join(
-    //             "_",
-    //             Iter.map<Text, Text>(
-    //                 index_key_details.vals(),
-    //                 func(key : Text) : Text {
-    //                     key;
-    //                 },
-    //             ),
-    //         );
-
-    //         let ?index = Map.get(collection.indexes, thash, index_name) else return Utils.log_error_msg(collection.logger, "Index with key_details '" # debug_show index_key_details # "' does not exist");
-
-    //         indexes.add(index);
-    //     };
-
-    //     var size = 0;
-
-    //     while (size < BTree.size(collection.main)) {
-
-    //         let start = size;
-    //         let end = Nat.min(size + BATCH_SIZE, BTree.size(collection.main));
-
-    //         let res = await internal_populate_indexes(
-    //             collection,
-    //             indexes,
-    //             BTree.range(collection.main, _main_btree_utils, start, end),
-    //         );
-
-    //         switch (res) {
-    //             case (#err(err)) return Utils.log_error_msg(collection.logger, err);
-    //             case (#ok(_)) {};
-    //         };
-
-    //         size += BATCH_SIZE;
-
-    //     };
-
-    //     #ok()
-
-    // };
-
     public func delete_index(
         collection : StableCollection,
         _main_btree_utils : T.BTreeUtils<Nat, Blob>,
@@ -421,60 +341,6 @@ module StableCollection {
     ) : Result<(), Text> {
         Logger.info(collection.logger, "Deleting index: " # index_name);
 
-        // public func async_populate_indexes(
-        //     collection : StableCollection,
-        //     _main_btree_utils : T.BTreeUtils<Nat, Blob>,
-        //     indexes_key_details : [[Text]],
-        //     opt_batch_size : ?Nat,
-        // ) : async* Result<(), Text> {
-
-        //     let recommended_batch_size = recommended_entries_to_populate_based_on_benchmarks(indexes_key_details.size());
-
-        //     let BATCH_SIZE = Option.get(opt_batch_size, recommended_batch_size);
-
-        //     let indexes = Buffer.Buffer<Index>(indexes_key_details.size());
-
-        //     for (index_key_details in indexes_key_details.vals()) {
-        //         let index_name = Text.join(
-        //             "_",
-        //             Iter.map<Text, Text>(
-        //                 index_key_details.vals(),
-        //                 func(key : Text) : Text {
-        //                     key;
-        //                 },
-        //             ),
-        //         );
-
-        //         let ?index = Map.get(collection.indexes, thash, index_name) else return Utils.log_error_msg(collection.logger, "Index with key_details '" # debug_show index_key_details # "' does not exist");
-
-        //         indexes.add(index);
-        //     };
-
-        //     var size = 0;
-
-        //     while (size < BTree.size(collection.main)) {
-
-        //         let start = size;
-        //         let end = Nat.min(size + BATCH_SIZE, BTree.size(collection.main));
-
-        //         let res = await internal_populate_indexes(
-        //             collection,
-        //             indexes,
-        //             BTree.range(collection.main, _main_btree_utils, start, end),
-        //         );
-
-        //         switch (res) {
-        //             case (#err(err)) return Utils.log_error_msg(collection.logger, err);
-        //             case (#ok(_)) {};
-        //         };
-
-        //         size += BATCH_SIZE;
-
-        //     };
-
-        //     #ok()
-
-        // };
         let opt_index = Map.remove(collection.indexes, thash, index_name);
 
         switch (opt_index) {
@@ -557,7 +423,7 @@ module StableCollection {
     public func validate_schema_constraints_on_updated_fields(
         collection : StableCollection,
         record_id : Nat,
-        candid_map : CandidMap.CandidMap,
+        candid_map : T.CandidMap,
         opt_updated_fields : ?[Text],
     ) : Result<(), Text> {
 
@@ -582,7 +448,7 @@ module StableCollection {
         };
 
         for ((field_name, field_constraints) in field_constraints_iter) {
-            let ?field_value = candid_map.get(field_name) else return Utils.log_error_msg(collection.logger, "Field '" # field_name # "' not found in record");
+            let ?field_value = CandidMap.get(candid_map, collection.schema_map, field_name) else return Utils.log_error_msg(collection.logger, "Field '" # field_name # "' not found in record");
 
             for (field_constraint in field_constraints.vals()) {
                 switch (field_constraint) {
@@ -685,9 +551,9 @@ module StableCollection {
             case (null) collection.unique_constraints.vals();
         };
 
-        for ((composite_field_keys, index) in unique_constraints_iter) {
+        label validating_unique_constraints for ((composite_field_keys, index) in unique_constraints_iter) {
 
-            let compsite_field_values = CollectionUtils.get_index_columns(collection, index.key_details, record_id, candid_map);
+            let ?compsite_field_values = CollectionUtils.get_index_columns(collection, index.key_details, record_id, candid_map) else continue validating_unique_constraints;
             let index_data_utils = CollectionUtils.get_index_data_utils(collection);
 
             let opt_prev_id = BTree.get(index.data, index_data_utils, compsite_field_values);
@@ -756,7 +622,7 @@ module StableCollection {
             };
         };
 
-        let candid_map = CandidMap.CandidMap(collection.schema, candid);
+        let candid_map = CandidMap.new(collection.schema_map, candid);
 
         switch (validate_schema_constraints_on_updated_fields(collection, id, candid_map, null)) {
             case (#ok(_)) {};
@@ -800,10 +666,10 @@ module StableCollection {
 
         let ?prev_candid_blob = BTree.get(collection.main, main_btree_utils, id) else return Utils.log_error_msg(collection.logger, "Record for id '" # debug_show (id) # "' not found");
         let prev_candid = CollectionUtils.decode_candid_blob(collection, prev_candid_blob);
-        let prev_candid_map = CandidMap.CandidMap(collection.schema, prev_candid);
+        let prev_candid_map = CandidMap.new(collection.schema_map, prev_candid);
 
         let new_candid_value = CollectionUtils.decode_candid_blob(collection, new_candid_blob);
-        let new_candid_map = CandidMap.CandidMap(collection.schema, new_candid_value);
+        let new_candid_map = CandidMap.new(collection.schema_map, new_candid_value);
 
         switch (Schema.validate_record(collection.schema, new_candid_value)) {
             case (#err(msg)) {
@@ -835,12 +701,12 @@ module StableCollection {
         #ok();
     };
 
-    func partially_update_doc(collection : StableCollection, candid_map : CandidMap.CandidMap, update_operations : [(Text, T.FieldUpdateOperations)]) : Result<Candid, Text> {
+    func partially_update_doc(collection : StableCollection, candid_map : T.CandidMap, update_operations : [(Text, T.FieldUpdateOperations)]) : Result<Candid, Text> {
         Logger.lazyInfo(collection.logger, func() = "Partially updating record with operations: " # debug_show update_operations);
 
         for ((field_name, op) in update_operations.vals()) {
-            let ?field_type = candid_map.get_type(field_name) else return Utils.log_error_msg(collection.logger, "Field type '" # field_name # "' not found in record");
-            let ?prev_candid = candid_map.get(field_name) else return Utils.log_error_msg(collection.logger, "Field '" # field_name # "' not found in record");
+            let ?field_type = SchemaMap.get(collection.schema_map, field_name) else return Utils.log_error_msg(collection.logger, "Field type '" # field_name # "' not found in record");
+            let ?prev_candid = CandidMap.get(candid_map, collection.schema_map, field_name) else return Utils.log_error_msg(collection.logger, "Field '" # field_name # "' not found in record");
 
             let new_value = switch (UpdateOps.handle_field_update_operation(collection, candid_map, field_type, prev_candid, op)) {
                 case (#ok(new_value)) new_value;
@@ -852,7 +718,7 @@ module StableCollection {
                 };
             };
 
-            switch (candid_map.set(field_name, new_value)) {
+            switch (CandidMap.set(candid_map, collection.schema_map, field_name, new_value)) {
                 case (#err(err)) return Utils.log_error_msg(collection.logger, "Failed to update field '" # field_name # "' with new value (" # debug_show new_value # "): " # err);
                 case (#ok(_)) {};
             };
@@ -863,25 +729,31 @@ module StableCollection {
             func() = "Updated candid map, about to extract candid",
         );
 
-        let candid = candid_map.extract_candid();
+        let candid = CandidMap.extract_candid(candid_map);
 
         #ok(candid);
     };
 
-    func update_indexed_record_fields(collection : StableCollection, index : Index, id : Nat, new_record_candid_map : CandidMap.CandidMap, opt_prev_record_candid_map : ?CandidMap.CandidMap) : Result<(), Text> {
+    func update_indexed_record_fields(collection : StableCollection, index : Index, id : Nat, new_record_candid_map : T.CandidMap, opt_prev_record_candid_map : ?T.CandidMap) : Result<(), Text> {
 
         let index_data_utils = CollectionUtils.get_index_data_utils(collection);
 
         ignore do ? {
             let prev_record_candid_map = opt_prev_record_candid_map!;
-            let prev_index_key_values = CollectionUtils.get_index_columns(collection, index.key_details, id, prev_record_candid_map);
-            let ?prev_id = BTree.remove(index.data, index_data_utils, prev_index_key_values) else {
-                return #err("Record with id " # debug_show id # " that is about to be updates does not exist in the index " # index.name);
+
+            switch (Index.remove(collection, index, id, prev_record_candid_map)) {
+                case (#err(err)) {
+                    Logger.lazyError(
+                        collection.logger,
+                        func() = "Failed to remove from index '" # index.name # "': " # err,
+                    );
+                    return Utils.log_error_msg(collection.logger, err);
+                };
+                case (#ok(_)) {};
             };
 
         };
 
-        let new_index_key_values = CollectionUtils.get_index_columns(collection, index.key_details, id, new_record_candid_map);
         Logger.lazyDebug(
             collection.logger,
             func() = "Updating index for id: " # debug_show id,
@@ -890,36 +762,22 @@ module StableCollection {
             collection.logger,
             func() = "Index key details: " # debug_show index.key_details,
         );
-        Logger.lazyDebug(
-            collection.logger,
-            func() = "New index key values: " # debug_show new_index_key_values,
-        );
 
-        let opt_existing_id = BTree.put(index.data, index_data_utils, new_index_key_values, id);
-        switch (opt_existing_id) {
-            case (null) {};
-            case (?existing_id) {
-                // if (existing_id != id) {
-                return #err("New record with id " # debug_show id # " conflicts with existing id " # debug_show existing_id # " which already exists in the index " # index.name # " with the same index key values " # debug_show new_index_key_values);
-                // };
+        switch (Index.insert(collection, index, id, new_record_candid_map)) {
+            case (#err(err)) {
+                Logger.lazyError(
+                    collection.logger,
+                    func() = "Failed to insert into index '" # index.name # "': " # err,
+                );
+                return Utils.log_error_msg(collection.logger, err);
             };
+            case (#ok(_)) {};
         };
-
-        Logger.lazyDebug(
-            collection.logger,
-            func() = "Storing record with id " # debug_show id # " in index " # index.name # ", originally "
-            # debug_show (new_index_key_values) # ", now encoded as " # debug_show (
-                switch (index_data_utils) {
-                    case (#stableMemory(utils)) debug_show utils.key.blobify.to_blob(new_index_key_values);
-                    case (#heap(utils)) debug_show new_index_key_values;
-                }
-            ),
-        );
 
         #ok;
     };
 
-    func update_indexed_data_on_updated_fields(collection : StableCollection, id : Nat, prev_record_candid_map : CandidMap.CandidMap, new_record_candid_map : CandidMap.CandidMap, updated_fields : [Text]) : Result<(), Text> {
+    func update_indexed_data_on_updated_fields(collection : StableCollection, id : Nat, prev_record_candid_map : T.CandidMap, new_record_candid_map : T.CandidMap, updated_fields : [Text]) : Result<(), Text> {
 
         let updated_fields_set = Set.fromIter(updated_fields.vals(), thash);
 
@@ -945,7 +803,7 @@ module StableCollection {
         let ?prev_candid_blob = BTree.get(collection.main, main_btree_utils, id) else return Utils.log_error_msg(collection.logger, "Record for id '" # debug_show (id) # "' not found");
 
         let prev_candid = CollectionUtils.decode_candid_blob(collection, prev_candid_blob);
-        let prev_candid_map = CandidMap.CandidMap(collection.schema, prev_candid);
+        let prev_candid_map = CandidMap.new(collection.schema_map, prev_candid);
 
         let fields_with_updates = Array.map<(Text, T.FieldUpdateOperations), Text>(field_updates, func(k, _) = k);
 
@@ -954,7 +812,7 @@ module StableCollection {
             func() = "Performing partial update on fields: " # debug_show (fields_with_updates),
         );
 
-        let new_candid_map = prev_candid_map.clone();
+        let new_candid_map = CandidMap.clone(prev_candid_map, collection.schema_map);
 
         let new_candid_record = switch (partially_update_doc(collection, new_candid_map, field_updates)) {
             case (#ok(new_candid_record)) new_candid_record;
@@ -1027,9 +885,8 @@ module StableCollection {
         collection : StableCollection,
         main_btree_utils : T.BTreeUtils<Nat, Blob>,
         id : Nat,
-    ) : Result<T.CandidBlob, Text> {
-        let ?record_details = BTree.get(collection.main, main_btree_utils, id) else return Utils.log_error_msg(collection.logger, "Record not found");
-        #ok(record_details);
+    ) : ?T.CandidBlob {
+        BTree.get(collection.main, main_btree_utils, id);
     };
 
     public type SearchResult = {
@@ -1077,11 +934,11 @@ module StableCollection {
         let (opt_cursor, cursor_map) = switch (pagination.cursor) {
             case (?(id, pagination_direction)) switch (CollectionUtils.lookup_candid_record(collection, id)) {
                 case (?record) {
-                    (?(id, record), CandidMap.CandidMap(collection.schema, record));
+                    (?(id, record), CandidMap.new(collection.schema_map, record));
                 };
-                case (null) (null, CandidMap.CandidMap(collection.schema, #Record([])));
+                case (null) (null, CandidMap.new(collection.schema_map, #Record([])));
             };
-            case (null) (null, CandidMap.CandidMap(collection.schema, #Record([])));
+            case (null) (null, CandidMap.new(collection.schema_map, #Record([])));
         };
 
         switch (Query.validate_query(collection, stable_query.query_operations)) {
@@ -1177,38 +1034,38 @@ module StableCollection {
             };
         };
 
-        let opt_candid_map_a : ?CandidMap.CandidMap = null;
-        let opt_candid_map_b : ?CandidMap.CandidMap = null;
+        let opt_candid_map_a : ?T.CandidMap = null;
+        let opt_candid_map_b : ?T.CandidMap = null;
 
         func sort_records_by_field_cmp(a : Nat, b : Nat) : Order {
 
             let record_a = get_candid_map_bytes(a);
             let record_b = get_candid_map_bytes(b);
 
-            let candid_map_a : CandidMap.CandidMap = switch (opt_candid_map_a) {
+            let candid_map_a : T.CandidMap = switch (opt_candid_map_a) {
                 case (?candid_map) {
-                    candid_map.reload(record_a);
+                    CandidMap.reload(candid_map, collection.schema_map, record_a);
                     candid_map;
                 };
                 case (null) {
-                    let candid_map = CandidMap.CandidMap(collection.schema, record_a);
+                    let candid_map = CandidMap.new(collection.schema_map, record_a);
                     candid_map;
                 };
             };
 
-            let candid_map_b : CandidMap.CandidMap = switch (opt_candid_map_b) {
+            let candid_map_b : T.CandidMap = switch (opt_candid_map_b) {
                 case (?candid_map) {
-                    candid_map.reload(record_b);
+                    CandidMap.reload(candid_map, collection.schema_map, record_b);
                     candid_map;
                 };
                 case (null) {
-                    let candid_map = CandidMap.CandidMap(collection.schema, record_b);
+                    let candid_map = CandidMap.new(collection.schema_map, record_b);
                     candid_map;
                 };
             };
 
-            let ?value_a = candid_map_a.get(sort_field.0) else Debug.trap("Couldn't get value from CandidMap for key: " # sort_field.0);
-            let ?value_b = candid_map_b.get(sort_field.0) else Debug.trap("Couldn't get value from CandidMap for key: " # sort_field.0);
+            let ?value_a = CandidMap.get(candid_map_a, collection.schema_map, sort_field.0) else Debug.trap("Couldn't get value from CandidMap for key: " # sort_field.0);
+            let ?value_b = CandidMap.get(candid_map_b, collection.schema_map, sort_field.0) else Debug.trap("Couldn't get value from CandidMap for key: " # sort_field.0);
 
             let order_num = Schema.cmp_candid(#Empty, value_a, value_b);
 
@@ -1262,7 +1119,7 @@ module StableCollection {
             stable_query.query_operations,
             null,
             null,
-            CandidMap.CandidMap(collection.schema, #Record([])),
+            CandidMap.new(collection.schema_map, #Record([])),
         );
 
         let count = switch (QueryExecution.get_unique_record_ids_from_query_plan(collection, Map.new(), query_plan)) {
@@ -1294,7 +1151,7 @@ module StableCollection {
             stable_query.query_operations,
             null,
             null,
-            CandidMap.CandidMap(collection.schema, #Record([])),
+            CandidMap.new(collection.schema_map, #Record([])),
         );
 
         let sort_records_by_field_cmp = func(_ : Nat, _ : Nat) : Order = #equal;
@@ -1333,22 +1190,19 @@ module StableCollection {
         };
 
         let prev_candid = CollectionUtils.decode_candid_blob(collection, prev_candid_blob);
-        let prev_candid_map = CandidMap.CandidMap(collection.schema, prev_candid);
+        let prev_candid_map = CandidMap.new(collection.schema_map, prev_candid);
 
         let #Record(prev_records) = prev_candid else {
             return Utils.log_error_msg(collection.logger, "Couldn't get records");
         };
 
         for (index in Map.vals(collection.indexes)) {
-            let prev_index_key_values = CollectionUtils.get_index_columns(collection, index.key_details, id, prev_candid_map);
-            let index_data_utils = CollectionUtils.get_index_data_utils(collection);
 
-            let removed_id = BTree.remove(index.data, index_data_utils, prev_index_key_values);
-            if (removed_id != ?id) {
-                Logger.lazyError(
-                    collection.logger,
-                    func() = "Failed to remove id " # debug_show id # " from index " # index.name,
-                );
+            switch (Index.remove(collection, index, id, prev_candid_map)) {
+                case (#err(err)) {
+                    return Utils.log_error_msg(collection.logger, "Failed to remove from index '" # index.name # "': " # err);
+                };
+                case (#ok(_)) {};
             };
         };
 

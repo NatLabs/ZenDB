@@ -14,14 +14,14 @@ module {
 
     func handle_multi_field_update_operations(
         collection : T.StableCollection,
-        candid_map : CandidMap.CandidMap,
+        candid_map : T.CandidMap,
         field_type : T.CandidType,
         field_value : T.Candid,
         op : T.FieldUpdateOperations,
     ) : T.Result<T.Candid, Text> {
 
         func handle_nested_operations(
-            candid_map : CandidMap.CandidMap,
+            candid_map : T.CandidMap,
             nested_operations : [T.FieldUpdateOperations],
             operation_handler : (T.Iter<T.Candid>) -> T.Result<T.Candid, Text>,
         ) : T.Result<T.Candid, Text> {
@@ -62,7 +62,7 @@ module {
 
     func handle_single_field_update_operation(
         collection : T.StableCollection,
-        candid_map : CandidMap.CandidMap,
+        candid_map : T.CandidMap,
         field_type : T.CandidType,
         field_value : T.Candid,
         op : T.FieldUpdateOperations,
@@ -101,7 +101,7 @@ module {
         let res : T.Result<T.Candid, Text> = switch (op) {
             case (#currValue) { return #ok(field_value) };
             case (#get(requested_field_name)) {
-                let ?value = candid_map.get(requested_field_name) else return #err("Field '" # requested_field_name # "' not found in record");
+                let ?value = CandidMap.get(candid_map, collection.schema_map, requested_field_name) else return #err("Field '" # requested_field_name # "' not found in record");
                 return #ok(value);
             };
 
@@ -245,7 +245,7 @@ module {
 
     func handle_field_update_operation_helper(
         collection : T.StableCollection,
-        candid_map : CandidMap.CandidMap,
+        candid_map : T.CandidMap,
         field_type : T.CandidType,
         field_value : T.Candid,
         op : T.FieldUpdateOperations,
@@ -271,7 +271,7 @@ module {
 
     public func handle_field_update_operation(
         collection : T.StableCollection,
-        candid_map : CandidMap.CandidMap,
+        candid_map : T.CandidMap,
         field_type : T.CandidType,
         field_value : T.Candid,
         op : T.FieldUpdateOperations,

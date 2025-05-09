@@ -1,6 +1,9 @@
+import Array "mo:base/Array";
+import Debug "mo:base/Debug";
 import Nat "mo:base/Nat";
 import Buffer "mo:base/Buffer";
 import Text "mo:base/Text";
+import Iter "mo:base/Iter";
 
 import Map "mo:map/Map";
 import T "../Types";
@@ -9,10 +12,12 @@ import Itertools "mo:itertools/Iter";
 
 module {
 
-    public type SchemaMap = Map.Map<Text, T.Schema>;
+    public type SchemaMap = T.SchemaMap;
 
     public func new(schema : T.Schema) : T.SchemaMap {
         let schema_map = Map.new<Text, T.Schema>();
+
+        let list_of_fields_with_array_type = Buffer.Buffer<Text>(8);
 
         func join_field_names(
             field_name : Text,
@@ -26,10 +31,9 @@ module {
         };
 
         func store_field_type(
-            schema_map : SchemaMap,
+            schema_map : Map.Map<Text, T.Schema>,
             field_name : Text,
             field_type : T.CandidType,
-            has_option_type_in_path : Bool,
         ) {
 
             switch (field_type) {
@@ -39,7 +43,6 @@ module {
                             schema_map,
                             join_field_names(field_name, nested_field_name),
                             nested_field_type,
-                            has_option_type_in_path,
                         );
                     };
                 };
@@ -49,7 +52,6 @@ module {
                             schema_map,
                             join_field_names(field_name, Nat.toText(tuple_index)),
                             tuple_type,
-                            has_option_type_in_path,
                         );
                     };
                 };
@@ -58,44 +60,97 @@ module {
                         store_field_type(
                             schema_map,
                             join_field_names(field_name, nested_field_name),
-                            #Option(nested_field_type),
-                            true,
+                            nested_field_type,
                         );
                     };
 
                 };
+                case (#Array(inner)) {
+                    list_of_fields_with_array_type.add(field_name);
+                    store_field_type(schema_map, field_name, inner);
+                };
                 case (#Option(inner)) {
-                    store_field_type(schema_map, field_name, inner, true);
+                    store_field_type(schema_map, field_name, inner);
                 };
                 case (_) {};
 
             };
 
-            if (has_option_type_in_path) {
-                switch (field_type) {
-                    case (#Option(inner_type)) {
-                        ignore Map.put(schema_map, T.thash, field_name, #Option(inner_type));
-                    };
-                    case (_) {
-                        ignore Map.put(schema_map, T.thash, field_name, #Option(field_type));
-                    };
-                };
-            } else {
-                ignore Map.put(schema_map, T.thash, field_name, field_type);
-            };
+            ignore Map.put(schema_map, T.thash, field_name, field_type);
 
         };
 
-        store_field_type(schema_map, "", schema, false);
+        store_field_type(schema_map, "", schema);
 
-        schema_map
+        list_of_fields_with_array_type.sort(Text.compare);
+
+        {
+            map = schema_map;
+            fields_with_array_type = Buffer.toArray(list_of_fields_with_array_type);
+        } : SchemaMap
 
     };
 
-    public func get_type(schema_map : SchemaMap, field_name : Text) : ?T.CandidType {
-        switch (Map.get<Text, T.CandidType>(schema_map, T.thash, field_name)) {
+    public func get(schema_map : SchemaMap, field_name : Text) : ?T.CandidType {
+        switch (Map.get<Text, T.CandidType>(schema_map.map, T.thash, field_name)) {
             case (?candid_type) ?candid_type;
-            case (null) null;
+            case (null) {
+                // Debug.print("Field '" # field_name # "' not found in schema map");
+                // Debug.print("fields with array type: " # debug_show (schema_map.fields_with_array_type));
+                let ?index : ?Nat = Itertools.findIndex<Text>(
+                    schema_map.fields_with_array_type.vals(),
+                    func(field_with_array_type : Text) : Bool {
+                        Text.startsWith(field_name, #text(field_with_array_type));
+                    },
+                ) else {
+                    return null;
+                };
+
+                // Debug.print("index: " # debug_show (index));
+
+                var i = index;
+                var field_path = field_name;
+
+                label exclude_array_indexes while (i < schema_map.fields_with_array_type.size()) {
+                    let field_with_array_type = schema_map.fields_with_array_type[i];
+
+                    // Debug.print("field_with_array_type: " # debug_show (field_with_array_type));
+
+                    switch (Text.stripStart(field_name, #text(field_with_array_type))) {
+                        case (null) break exclude_array_indexes;
+                        case (?field_suffix_path) {
+                            // Debug.print("field_suffix_path: " # debug_show (field_suffix_path));
+
+                            let paths_within_suffix = Text.tokens(field_suffix_path, #text("."));
+
+                            ignore paths_within_suffix.next(); // todo: check if the skipped path is a number; also could have future conflicts between array index and tuple index
+
+                            // if (Text.isNumeric(next_suffix_path))
+
+                            field_path := Text.join(".", Itertools.prepend(field_with_array_type, paths_within_suffix));
+                            // Debug.print("new field_path: " # debug_show (field_path));
+
+                            switch (Map.get<Text, T.CandidType>(schema_map.map, T.thash, field_path)) {
+                                case (?candid_type) return ?candid_type;
+                                case (null) {};
+                            };
+
+                        };
+                    };
+                    i += 1;
+
+                };
+
+                null;
+
+            };
+        };
+    };
+
+    public func is_valid_path(schema_map : SchemaMap, field_name : Text) : Bool {
+        switch (Map.get<Text, T.CandidType>(schema_map.map, T.thash, field_name)) {
+            case (?_) true;
+            case (null) false;
         };
     };
 
@@ -114,7 +169,7 @@ module {
         for (constraint in constraints.vals()) {
             switch (constraint) {
                 case (#Field(field_name, field_constraints)) {
-                    let ?field_type = get_type(schema_map, field_name) else {
+                    let ?field_type = get(schema_map, field_name) else {
                         return #err("Field '" # field_name # "' not found in schema");
                     };
 
@@ -216,7 +271,7 @@ module {
                 };
                 case (#Unique(unique_field_names)) {
                     for (unique_field_name in unique_field_names.vals()) {
-                        let ?unique_field_type = get_type(schema_map, unique_field_name) else {
+                        let ?unique_field_type = get(schema_map, unique_field_name) else {
                             return #err("Field '" # unique_field_name # "' not found in schema");
                         };
 
