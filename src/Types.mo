@@ -210,7 +210,7 @@ module T {
         #lt : Candid;
         #gt : Candid;
 
-        #In : [Candid];
+        #anyOf : [Candid];
         #Not : ZqlOperators;
 
         #between : (Candid, Candid);

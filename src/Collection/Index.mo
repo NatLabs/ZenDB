@@ -269,7 +269,7 @@ module {
                 // Debug.trap("startsWith not implemented");
             };
 
-            case (#In(_) or #Not(_) or #exists) {
+            case (#anyOf(_) or #Not(_) or #exists) {
                 Debug.trap(debug_show op # " not allowed in this context. Should have been expanded by the query builder");
             };
         };

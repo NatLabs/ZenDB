@@ -63,7 +63,7 @@ module {
 
             // #Or only, 3 queries on the same field (btype == '1xfer' or '2xfer' or '1mint')",
             "query(): #Or (btype == '1xfer' OR '2xfer' OR '1mint')",
-            // "query(): #In (btype either of ['1xfer', '2xfer', '1mint'])",
+            // "query(): #anyOf (btype either of ['1xfer', '2xfer', '1mint'])",
 
             // #Or only, 1 query each on 2 different fields (btype, amt)
             "query(): #Or (btype == '1xfer' OR tx.amt >= 500)",

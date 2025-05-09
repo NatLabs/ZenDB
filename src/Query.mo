@@ -122,8 +122,8 @@ module {
                     ignore Or(key, #gt(prefix_upper_bound));
 
                 };
-                case (#In(values)) {
-                    // #Not(#In([x, y, z]))
+                case (#anyOf(values)) {
+                    // #Not(#anyOf([x, y, z]))
                     // -> #And([#Not(x), #Not(y), #Not(z)])
                     // -> #And([#Or([#lt(x), #gt(x)]), #Or([#lt(y), #gt(y)]), #Or([#lt(z), #gt(z)])])
 
@@ -157,7 +157,7 @@ module {
                 case (#exists) {
                     handle_op(key, #Not(#eq(#Null)));
                 };
-                case (#In(values)) {
+                case (#anyOf(values)) {
                     update_query(false);
                     for (value in values.vals()) {
                         buffer.add(#Operation(key, #eq(value : T.Candid)));
@@ -358,7 +358,7 @@ module {
                     case (#between(min, max)) #between(handle_value(min), handle_value(max));
                     case (#exists) #exists;
                     case (#startsWith(prefix)) #startsWith(handle_value(prefix));
-                    case (#In(values)) #In(Array.map(values, handle_value));
+                    case (#anyOf(values)) #anyOf(Array.map(values, handle_value));
                     case (#Not(op)) #Not(handle_operator(op));
                 };
 

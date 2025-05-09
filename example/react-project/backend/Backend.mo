@@ -169,7 +169,7 @@ actor class Backend() {
                 let btypes = options.filter.btype!;
                 let values = Array.map<Text, ZenDB.Types.Candid>(btypes, func(btype : Text) : ZenDB.Types.Candid = #Text(btype));
 
-                ignore Query.Where("btype", #In(values));
+                ignore Query.Where("btype", #anyOf(values));
             };
 
             if (options.filter.to != null) {

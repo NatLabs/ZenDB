@@ -53,7 +53,7 @@ module TxsBenchUtils {
 
         // #Or only, 3 queries on the same field (btype == '1xfer' or '2xfer' or '1mint')",
         "query(): #Or (btype == '1xfer' OR '2xfer' OR '1mint')",
-        // "query(): #In (btype either of ['1xfer', '2xfer', '1mint'])",
+        // "query(): #anyOf (btype either of ['1xfer', '2xfer', '1mint'])",
 
         // #Or only, 1 query each on 2 different fields (btype, amt)
         "query(): #Or (btype == '1xfer' OR tx.amt >= 500)",
@@ -385,7 +385,7 @@ module TxsBenchUtils {
                     case ("query(): #Or (btype == '1xfer' OR '2xfer' OR '1mint')") {
                         let db_query = new_query().Where(
                             "btype",
-                            #In([#Text("1xfer"), #Text("2xfer"), #Text("1mint")]),
+                            #anyOf([#Text("1xfer"), #Text("2xfer"), #Text("1mint")]),
                         );
 
                         let #ok(matching_txs) = collection.search(db_query);
@@ -439,7 +439,7 @@ module TxsBenchUtils {
                     case ("query(): #Or (btype in ['1xfer', '1burn'] OR (tx.amt < 200 OR tx.amt >= 800))") {
                         let db_query = new_query().Where(
                             "btype",
-                            #In([#Text("1xfer"), #Text("1burn")]),
+                            #anyOf([#Text("1xfer"), #Text("1burn")]),
                         ).Or(
                             "tx.amt",
                             #lt(#Nat(200)),
@@ -463,7 +463,7 @@ module TxsBenchUtils {
                     case ("query() -> principals[0..10] == tx.to.owner (is recipient)") {
                         let db_query = new_query().Where(
                             "tx.to.owner",
-                            #In(candid_principals_0_10),
+                            #anyOf(candid_principals_0_10),
                         );
 
                         let #ok(matching_txs) = collection.search(db_query);
@@ -488,13 +488,13 @@ module TxsBenchUtils {
 
                         let db_query = new_query().Where(
                             "tx.to.owner",
-                            #In(candid_principals_0_10),
+                            #anyOf(candid_principals_0_10),
                         ).Or(
                             "tx.from.owner",
-                            #In(candid_principals_0_10),
+                            #anyOf(candid_principals_0_10),
                         ).Or(
                             "tx.spender.owner",
-                            #In(candid_principals_0_10),
+                            #anyOf(candid_principals_0_10),
                         );
 
                         let #ok(matching_txs) = collection.search(db_query);
@@ -848,7 +848,7 @@ module TxsBenchUtils {
             case ("query(): #Or (btype == '1xfer' OR '2xfer)'") {
                 let db_query = ZenDB.QueryBuilder().Where(
                     "btype",
-                    #In([#Text("1xfer"), #Text("2xfer")]),
+                    #anyOf([#Text("1xfer"), #Text("2xfer")]),
                 );
 
                 skip_limit_paginated_query(db_query);
@@ -870,7 +870,7 @@ module TxsBenchUtils {
 
                 let db_query = ZenDB.QueryBuilder().Where(
                     "tx.to.owner",
-                    #In(candid_principals),
+                    #anyOf(candid_principals),
                 );
 
                 skip_limit_paginated_query(db_query);
@@ -899,13 +899,13 @@ module TxsBenchUtils {
 
                 let db_query = ZenDB.QueryBuilder().Where(
                     "tx.to.owner",
-                    #In(candid_principals),
+                    #anyOf(candid_principals),
                 ).Or(
                     "tx.from.owner",
-                    #In(candid_principals),
+                    #anyOf(candid_principals),
                 ).Or(
                     "tx.spender.owner",
-                    #In(candid_principals),
+                    #anyOf(candid_principals),
                 );
 
                 skip_limit_paginated_query(db_query);

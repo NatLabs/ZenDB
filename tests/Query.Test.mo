@@ -173,11 +173,11 @@ func query_tests(zendb : ZenDB.Database) {
         );
 
         test(
-            "#In",
+            "#anyOf",
             func() {
 
                 let res = texts.search(
-                    QueryBuilder().Where("value", #In([#Text("a"), #Text("b"), #Text("c")]))
+                    QueryBuilder().Where("value", #anyOf([#Text("a"), #Text("b"), #Text("c")]))
                 );
 
                 assert res == #ok([
@@ -188,7 +188,7 @@ func query_tests(zendb : ZenDB.Database) {
 
                 //! Executes very slowly
                 // assert texts.search(
-                //     QueryBuilder().Where("value", #Not(#In([#Text("a"), #Text("b"), #Text("c")])))
+                //     QueryBuilder().Where("value", #Not(#anyOf([#Text("a"), #Text("b"), #Text("c")])))
                 // ) == #ok([
                 //     (1, { value = "alphabet" }),
                 //     (2, { value = "alphabetical" }),
