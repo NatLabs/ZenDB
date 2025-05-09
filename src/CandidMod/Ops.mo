@@ -19,10 +19,13 @@ import Int64 "mo:base/Int64";
 import Int8 "mo:base/Int8";
 import Nat16 "mo:base/Nat16";
 import Nat8 "mo:base/Nat8";
+import Func "mo:base/Func";
+import Char "mo:base/Char";
 
 import Itertools "mo:itertools/Iter";
 
 import T "../Types";
+import Utils "../Utils";
 
 /// Handles numeric update operations to candid values
 ///
@@ -369,6 +372,29 @@ module CandidOps {
             };
             case (other) {
                 return #err("Cannot complete #concat operation on " # debug_show (self, other) # ". Only text is supported");
+            };
+        };
+
+    };
+
+    public func concat_bytes(self : Candid, bytes : Blob) : Result<Candid, Text> {
+        switch (self) {
+            case (#Blob(blob)) {
+                let concatenated = Utils.concat_blob(blob, bytes);
+                #ok(#Blob(concatenated));
+            };
+            case (#Text(text)) {
+                let other_text = Text.fromIter(
+                    Iter.map<Nat8, Char>(
+                        bytes.vals(),
+                        Func.compose(Char.fromNat32, Func.compose(Nat32.fromNat, Nat8.toNat)),
+                    )
+                );
+                let concatenated = text # other_text;
+                #ok(#Text(concatenated));
+            };
+            case (other) {
+                return #err("Cannot complete #concat operation on " # debug_show (self, other) # ". Only blob is supported");
             };
         };
 

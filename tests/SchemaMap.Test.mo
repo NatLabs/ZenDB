@@ -114,6 +114,37 @@ suite(
         );
 
         test(
+            "get() - get array type with field path including element index",
+            func() {
+                // Check that we can get the type of an array element
+                assert SchemaMap.get(schema_map, "comments") == ?#Array(#Record([("content", #Text), ("created_at", #Nat)]));
+                assert SchemaMap.get(schema_map, "comments.0") == ?#Array(#Record([("content", #Text), ("created_at", #Nat)]));
+                assert SchemaMap.get(schema_map, "comments.0.content") == ?#Text;
+                assert SchemaMap.get(schema_map, "comments.0.created_at") == ?#Nat;
+
+                // Check that we can get the type of a nested array element
+                assert SchemaMap.get(schema_map, "tags") == ?#Array(#Text);
+                assert SchemaMap.get(schema_map, "tags.0") == ?#Array(#Text);
+
+                // check nested array element
+                var schema_map2 = SchemaMap.new(#Record([("nested", #Array(#Array(#Text)))]));
+                assert SchemaMap.get(schema_map2, "nested") == ?#Array(#Array(#Text));
+                assert SchemaMap.get(schema_map2, "nested.0") == ?#Array(#Array(#Text));
+                // assert SchemaMap.get(schema_map2, "nested.0.0") == ?#Array(#Text);
+                assert SchemaMap.get(schema_map2, "nested.0.0.0") == null;
+
+                // check nested array between tuples
+                var schema_map3 = SchemaMap.new(#Record([("nested", #Array(#Tuple([#Array(#Text), #Nat])))]));
+                assert SchemaMap.get(schema_map3, "nested") == ?#Array(#Tuple([#Array(#Text), #Nat]));
+                assert SchemaMap.get(schema_map3, "nested.0") == ?#Array(#Tuple([#Array(#Text), #Nat]));
+                assert SchemaMap.get(schema_map3, "nested.0.0") == ?#Array(#Text);
+                assert SchemaMap.get(schema_map3, "nested.0.1") == ?#Nat;
+                assert SchemaMap.get(schema_map3, "nested.0.0.0") == null;
+
+            },
+        );
+
+        test(
             "validate_schema_constraints() - validates field constraints correctly",
             func() {
                 // Define schema constraints for testing

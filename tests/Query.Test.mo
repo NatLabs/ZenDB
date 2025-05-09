@@ -255,6 +255,93 @@ func query_tests(zendb : ZenDB.Database) {
         );
 
         test(
+            "#startsWith()",
+            func() {
+                let res = texts.search(
+                    QueryBuilder().Where("value", #startsWith(#Text("a")))
+                );
+
+                Debug.print(debug_show { res });
+
+                assert res == #ok([
+                    (0, { value = "a" }),
+                    (1, { value = "alphabet" }),
+                    (2, { value = "alphabetical" }),
+                    (3, { value = "and" }),
+                    (4, { value = "anderson" }),
+                ]);
+
+                assert texts.search(
+                    QueryBuilder().Where("value", #Not(#startsWith(#Text("a"))))
+                ) == #ok([
+                    (5, { value = "b" }),
+                    (6, { value = "berry" }),
+                    (7, { value = "c" }),
+                ]);
+
+                let res2 = texts.search(
+                    QueryBuilder().Where("value", #startsWith(#Text("al")))
+                );
+
+                assert res2 == #ok([
+                    (1, { value = "alphabet" }),
+                    (2, { value = "alphabetical" }),
+                ]);
+
+                assert texts.search(
+                    QueryBuilder().Where("value", #Not(#startsWith(#Text("al"))))
+                ) == #ok([
+                    (0, { value = "a" }),
+                    (3, { value = "and" }),
+                    (4, { value = "anderson" }),
+                    (5, { value = "b" }),
+                    (6, { value = "berry" }),
+                    (7, { value = "c" }),
+                ]);
+
+                let res3 = texts.search(
+                    QueryBuilder().Where("value", #startsWith(#Text("and")))
+                );
+
+                assert res3 == #ok([
+                    (3, { value = "and" }),
+                    (4, { value = "anderson" }),
+                ]);
+
+                assert texts.search(
+                    QueryBuilder().Where("value", #Not(#startsWith(#Text("and"))))
+                ) == #ok([
+                    (0, { value = "a" }),
+                    (1, { value = "alphabet" }),
+                    (2, { value = "alphabetical" }),
+                    (5, { value = "b" }),
+                    (6, { value = "berry" }),
+                    (7, { value = "c" }),
+                ]);
+
+                let res4 = texts.search(
+                    QueryBuilder().Where("value", #startsWith(#Text("ben")))
+                );
+
+                assert res4 == #ok([]);
+
+                assert texts.search(
+                    QueryBuilder().Where("value", #Not(#startsWith(#Text("ben"))))
+                ) == #ok([
+                    (0, { value = "a" }),
+                    (1, { value = "alphabet" }),
+                    (2, { value = "alphabetical" }),
+                    (3, { value = "and" }),
+                    (4, { value = "anderson" }),
+                    (5, { value = "b" }),
+                    (6, { value = "berry" }),
+                    (7, { value = "c" }),
+                ]);
+
+            },
+        );
+
+        test(
             "#exists()",
             func() {
 

@@ -95,7 +95,7 @@ module {
             log_level = #Error;
             is_running_locally = false;
         };
-        memory_type = ?(#heap);
+        memory_type = ?(#stableMemory);
     };
 
     public func newStableStore(opt_settings : ?Settings) : T.StableStore {
@@ -128,10 +128,6 @@ module {
         zendb;
     };
 
-    // public func new() : ZenDB {
-    //     newStableStore();
-    // };
-
     public func launchDefaultDB(sstore : T.StableStore) : Database.Database {
         let ?default_db = Map.get<Text, T.StableDatabase>(sstore.databases, T.thash, "default") else Debug.trap("Default database not found");
         Database.Database(default_db);
@@ -163,15 +159,8 @@ module {
         };
     };
 
-    public class ZenDB(sstore : T.StableStore) {
-
-        public func setLogLevel(log_level : Logger.LogLevel) {
-            Logger.setLogLevel(sstore.logger, log_level);
-        };
-
-        public func setIsRunLocally(is_running_locally : Bool) {
-            Logger.setIsRunLocally(sstore.logger, is_running_locally);
-        };
+    public func setIsRunLocally(sstore : T.StableStore, is_running_locally : Bool) {
+        Logger.setIsRunLocally(sstore.logger, is_running_locally);
     };
 
     public func setLogLevel(sstore : T.StableStore, log_level : Logger.LogLevel) {

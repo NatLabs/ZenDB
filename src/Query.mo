@@ -14,6 +14,7 @@ import T "Types";
 import Logger "Logger";
 import Schema "Collection/Schema";
 import SchemaMap "Collection/SchemaMap";
+import CandidMod "CandidMod";
 
 module {
 
@@ -109,11 +110,21 @@ module {
                     buffer.add(#Operation(key, #eq(#Null)));
                 };
                 case (#startsWith(prefix)) {
-                    // #Not(#startsWith(prefix)) -> #Or([#lt(prefix), #gt(prefix)])
-                    Debug.trap("#Not(#startsWith(prefix)) is not implemented");
+                    let prefix_lower_bound = prefix;
+                    let #ok(prefix_upper_bound) = CandidMod.Ops.concat_bytes(prefix, "\FF") else {
+                        Debug.trap("QueryBuilder: Failed to create upper bound for #startsWith");
+                    };
+
+                    // #Not(#startsWith(prefix))
+                    // -> #Not(#between(prefix_lower_bound, prefix_upper_bound))
+                    // -> #Or([#lt(prefix_lower_bound), #gt(prefix_upper_bound)])
+                    ignore Or(key, #lt(prefix_lower_bound));
+                    ignore Or(key, #gt(prefix_upper_bound));
+
                 };
                 case (#In(values)) {
-                    // #Not(#In([x, y, z])) -> #And([#Not(x), #Not(y), #Not(z)])
+                    // #Not(#In([x, y, z]))
+                    // -> #And([#Not(x), #Not(y), #Not(z)])
                     // -> #And([#Or([#lt(x), #gt(x)]), #Or([#lt(y), #gt(y)]), #Or([#lt(z), #gt(z)])])
 
                     update_query(true);
@@ -158,6 +169,15 @@ module {
                 case (#between(min, max)) {
                     ignore And(key, #gte(min));
                     ignore And(key, #lte(max));
+                };
+                case (#startsWith(prefix)) {
+                    let prefix_lower_bound = prefix;
+                    let #ok(prefix_upper_bound) = CandidMod.Ops.concat_bytes(prefix, "\FF") else {
+                        Debug.trap("QueryBuilder: Failed to create upper bound for #startsWith");
+                    };
+
+                    handle_op(key, #between(prefix_lower_bound, prefix_upper_bound));
+
                 };
                 case (_) {
                     buffer.add(#Operation(key, op));
