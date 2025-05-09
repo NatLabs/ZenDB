@@ -87,13 +87,13 @@ func query_tests(zendb : ZenDB.Database) {
                 Debug.print(
                     debug_show (
                         texts.search(
-                            QueryBuilder().Where("value", #Not(#gt(#Text("and"))))
+                            QueryBuilder().Where("value", #not_(#gt(#Text("and"))))
                         )
                     )
                 );
 
                 assert texts.search(
-                    QueryBuilder().Where("value", #Not(#gt(#Text("and"))))
+                    QueryBuilder().Where("value", #not_(#gt(#Text("and"))))
                 ) == #ok([
                     (0, { value = "a" }),
                     (1, { value = "alphabet" }),
@@ -117,7 +117,7 @@ func query_tests(zendb : ZenDB.Database) {
                 ]);
 
                 assert texts.search(
-                    QueryBuilder().Where("value", #Not(#gte(#Text("and"))))
+                    QueryBuilder().Where("value", #not_(#gte(#Text("and"))))
                 ) == #ok([
                     (0, { value = "a" }),
                     (1, { value = "alphabet" }),
@@ -138,7 +138,7 @@ func query_tests(zendb : ZenDB.Database) {
                 ]);
 
                 assert texts.search(
-                    QueryBuilder().Where("value", #Not(#lt(#Text("and"))))
+                    QueryBuilder().Where("value", #not_(#lt(#Text("and"))))
                 ) == #ok([
                     (3, { value = "and" }),
                     (4, { value = "anderson" }),
@@ -162,7 +162,7 @@ func query_tests(zendb : ZenDB.Database) {
                 ]);
 
                 assert texts.search(
-                    QueryBuilder().Where("value", #Not(#lte(#Text("and"))))
+                    QueryBuilder().Where("value", #not_(#lte(#Text("and"))))
                 ) == #ok([
                     (4, { value = "anderson" }),
                     (5, { value = "b" }),
@@ -188,7 +188,7 @@ func query_tests(zendb : ZenDB.Database) {
 
                 //! Executes very slowly
                 // assert texts.search(
-                //     QueryBuilder().Where("value", #Not(#anyOf([#Text("a"), #Text("b"), #Text("c")])))
+                //     QueryBuilder().Where("value", #not_(#anyOf([#Text("a"), #Text("b"), #Text("c")])))
                 // ) == #ok([
                 //     (1, { value = "alphabet" }),
                 //     (2, { value = "alphabetical" }),
@@ -244,7 +244,7 @@ func query_tests(zendb : ZenDB.Database) {
                 assert res2 == expected_negative_response;
 
                 let res3 = texts.search(
-                    QueryBuilder().Where("value", #Not(#between(#Text("a"), #Text("anderson"))))
+                    QueryBuilder().Where("value", #not_(#between(#Text("a"), #Text("anderson"))))
                 );
 
                 Debug.print(debug_show { res3 });
@@ -272,7 +272,7 @@ func query_tests(zendb : ZenDB.Database) {
                 ]);
 
                 assert texts.search(
-                    QueryBuilder().Where("value", #Not(#startsWith(#Text("a"))))
+                    QueryBuilder().Where("value", #not_(#startsWith(#Text("a"))))
                 ) == #ok([
                     (5, { value = "b" }),
                     (6, { value = "berry" }),
@@ -289,7 +289,7 @@ func query_tests(zendb : ZenDB.Database) {
                 ]);
 
                 assert texts.search(
-                    QueryBuilder().Where("value", #Not(#startsWith(#Text("al"))))
+                    QueryBuilder().Where("value", #not_(#startsWith(#Text("al"))))
                 ) == #ok([
                     (0, { value = "a" }),
                     (3, { value = "and" }),
@@ -309,7 +309,7 @@ func query_tests(zendb : ZenDB.Database) {
                 ]);
 
                 assert texts.search(
-                    QueryBuilder().Where("value", #Not(#startsWith(#Text("and"))))
+                    QueryBuilder().Where("value", #not_(#startsWith(#Text("and"))))
                 ) == #ok([
                     (0, { value = "a" }),
                     (1, { value = "alphabet" }),
@@ -326,7 +326,7 @@ func query_tests(zendb : ZenDB.Database) {
                 assert res4 == #ok([]);
 
                 assert texts.search(
-                    QueryBuilder().Where("value", #Not(#startsWith(#Text("ben"))))
+                    QueryBuilder().Where("value", #not_(#startsWith(#Text("ben"))))
                 ) == #ok([
                     (0, { value = "a" }),
                     (1, { value = "alphabet" }),
@@ -361,7 +361,7 @@ func query_tests(zendb : ZenDB.Database) {
                 ]);
 
                 assert texts.search(
-                    QueryBuilder().Where("value", #Not(#exists))
+                    QueryBuilder().Where("value", #not_(#exists))
                 ) == #ok([]);
 
             },

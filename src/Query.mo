@@ -77,36 +77,36 @@ module {
         func handle_not(key : Text, not_op : ZqlOperators) {
             switch (not_op) {
                 case (#eq(value)) {
-                    // #Not(#eq(x)) -> #Or([#lt(x), #gt(x)])
+                    // #not_(#eq(x)) -> #Or([#lt(x), #gt(x)])
                     ignore Or(key, #lt(value));
                     ignore Or(key, #gt(value));
 
                 };
                 case (#lt(value)) {
-                    // #Not(#lt(x)) -> #gte(x)
+                    // #not_(#lt(x)) -> #gte(x)
                     buffer.add(#Operation(key, #gte(value)));
                 };
                 case (#gt(value)) {
-                    // #Not(#gt(x) )-> #lte(x)
+                    // #not_(#gt(x) )-> #lte(x)
                     buffer.add(#Operation(key, #lte(value)));
                 };
                 case (#lte(value)) {
-                    // #Not(#lte(x)) -> #gt(x)
+                    // #not_(#lte(x)) -> #gt(x)
                     buffer.add(#Operation(key, #gt(value)));
                 };
                 case (#gte(value)) {
-                    // #Not(#gte(x)) -> #lt(x)
+                    // #not_(#gte(x)) -> #lt(x)
                     buffer.add(#Operation(key, #lt(value)));
                 };
                 case (#between(min, max)) {
-                    // #Not(#between(min, max))
-                    // -> #Not(#And([#gte(min), #lte(max)]))
+                    // #not_(#between(min, max))
+                    // -> #not_(#And([#gte(min), #lte(max)]))
                     // -> #Or([#lt(min), #gt(max)])
                     ignore Or(key, #lt(min));
                     ignore Or(key, #gt(max));
                 };
                 case (#exists) {
-                    // #Not(#exists) -> #Not(#Not(#eq(null))) -> #eq(null)
+                    // #not_(#exists) -> #not_(#not_(#eq(null))) -> #eq(null)
                     buffer.add(#Operation(key, #eq(#Null)));
                 };
                 case (#startsWith(prefix)) {
@@ -115,16 +115,16 @@ module {
                         Debug.trap("QueryBuilder: Failed to create upper bound for #startsWith");
                     };
 
-                    // #Not(#startsWith(prefix))
-                    // -> #Not(#between(prefix_lower_bound, prefix_upper_bound))
+                    // #not_(#startsWith(prefix))
+                    // -> #not_(#between(prefix_lower_bound, prefix_upper_bound))
                     // -> #Or([#lt(prefix_lower_bound), #gt(prefix_upper_bound)])
                     ignore Or(key, #lt(prefix_lower_bound));
                     ignore Or(key, #gt(prefix_upper_bound));
 
                 };
                 case (#anyOf(values)) {
-                    // #Not(#anyOf([x, y, z]))
-                    // -> #And([#Not(x), #Not(y), #Not(z)])
+                    // #not_(#anyOf([x, y, z]))
+                    // -> #And([#not_(x), #not_(y), #not_(z)])
                     // -> #And([#Or([#lt(x), #gt(x)]), #Or([#lt(y), #gt(y)]), #Or([#lt(z), #gt(z)])])
 
                     update_query(true);
@@ -133,8 +133,8 @@ module {
                     };
 
                 };
-                case (#Not(nested_op)) {
-                    // #Not(#Not(x)) -> x
+                case (#not_(nested_op)) {
+                    // #not_(#not_(x)) -> x
                     buffer.add(#Operation(key, nested_op));
                 };
             };
@@ -155,7 +155,7 @@ module {
             switch (op) {
                 // aliases
                 case (#exists) {
-                    handle_op(key, #Not(#eq(#Null)));
+                    handle_op(key, #not_(#eq(#Null)));
                 };
                 case (#anyOf(values)) {
                     update_query(false);
@@ -163,7 +163,7 @@ module {
                         buffer.add(#Operation(key, #eq(value : T.Candid)));
                     };
                 };
-                case (#Not(not_op)) {
+                case (#not_(not_op)) {
                     handle_not(key, not_op);
                 };
                 case (#between(min, max)) {
@@ -359,7 +359,7 @@ module {
                     case (#exists) #exists;
                     case (#startsWith(prefix)) #startsWith(handle_value(prefix));
                     case (#anyOf(values)) #anyOf(Array.map(values, handle_value));
-                    case (#Not(op)) #Not(handle_operator(op));
+                    case (#not_(op)) #not_(handle_operator(op));
                 };
 
             };

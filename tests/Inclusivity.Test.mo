@@ -351,7 +351,7 @@ func inclusivity_tests(zendb : ZenDB.Database) {
                 func() {
                     // Test not-equal on indexed fields
                     let result1 = numeric_collection.search(
-                        QueryBuilder().Where("id", #Not(#eq(#Nat(5))))
+                        QueryBuilder().Where("id", #not_(#eq(#Nat(5))))
                     );
                     assert Result.isOk(result1);
                     let #ok(data1) = result1;

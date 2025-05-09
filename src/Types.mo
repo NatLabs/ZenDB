@@ -211,7 +211,7 @@ module T {
         #gt : Candid;
 
         #anyOf : [Candid];
-        #Not : ZqlOperators;
+        #not_ : ZqlOperators;
 
         #between : (Candid, Candid);
         #exists;
