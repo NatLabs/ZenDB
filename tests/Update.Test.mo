@@ -69,6 +69,7 @@ let data_type_to_candid : ZenDB.Types.Candify<Doc> = {
 
 newZenDBSuite(
     "Update Tests",
+    ?ZenDBSuite.withAndWithoutIndex,
     func collection_setup(zendb : ZenDB.Database) {
         let #ok(data) = zendb.create_collection<Doc>("data", DocSchema, data_type_to_candid, []);
     },

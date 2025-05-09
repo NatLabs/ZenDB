@@ -254,11 +254,7 @@ module StableCollection {
             for (index in indexes.vals()) {
                 switch (Index.insert(collection, index, id, candid_map)) {
                     case (#err(err)) {
-                        Logger.lazyError(
-                            collection.logger,
-                            func() = "Failed to insert into index '" # index.name # "': " # err,
-                        );
-                        return Utils.log_error_msg(collection.logger, err);
+                        return #err("Failed to insert into index '" # index.name # "': " # err);
                     };
                     case (#ok(_)) {};
                 };
@@ -581,20 +577,16 @@ module StableCollection {
 
     };
 
-    public func insert_with_id(collection : StableCollection, main_btree_utils : T.BTreeUtils<Nat, Blob>, id : Nat, candid_blob : T.CandidBlob) : Result<(), Text> {
-        put_with_id(collection, main_btree_utils, id, candid_blob);
-    };
-
-    public func put_with_id(
+    public func put(
         collection : StableCollection,
         main_btree_utils : T.BTreeUtils<Nat, Blob>,
-        id : Nat,
         candid_blob : T.CandidBlob,
-    ) : Result<(), Text> {
+    ) : Result<Nat, Text> {
 
+        let id = Ids.next(collection.ids);
         Logger.lazyInfo(
             collection.logger,
-            func() = "ZenDB Collection.put_with_id(): Inserting record with id " # debug_show id,
+            func() = "ZenDB Collection.put(): Inserting record with id " # debug_show id,
         );
 
         let candid = CollectionUtils.decode_candid_blob(collection, candid_blob);
@@ -606,12 +598,13 @@ module StableCollection {
 
         Logger.lazyDebug(
             collection.logger,
-            func() = "ZenDB Collection.put_with_id(): Inserting record with id " # debug_show id # " and candid " # debug_show candid,
+            func() = "ZenDB Collection.put(): Inserting record with id " # debug_show id # " and candid " # debug_show candid,
         );
 
         switch (Schema.validate_record(collection.schema, candid)) {
             case (#ok(_)) {};
             case (#err(msg)) {
+                Ids.undoNext(collection.ids);
                 let err_msg = "Schema validation failed: " # msg;
 
                 Logger.lazyError(
@@ -627,6 +620,7 @@ module StableCollection {
         switch (validate_schema_constraints_on_updated_fields(collection, id, candid_map, null)) {
             case (#ok(_)) {};
             case (#err(msg)) {
+                Ids.undoNext(collection.ids);
                 let err_msg = "Schema Constraint validation failed: " # msg;
                 return Utils.log_error_msg(collection.logger, err_msg);
             };
@@ -637,23 +631,34 @@ module StableCollection {
         switch (opt_prev) {
             case (null) {};
             case (?prev) {
-                ignore BTree.put(collection.main, main_btree_utils, id, prev);
-                let error_msg = "Record with id " # debug_show id # " already exists";
-                Logger.error(
-                    collection.logger,
-                    error_msg,
-                );
-                return Utils.log_error_msg(collection.logger, error_msg);
+                Debug.trap("put(): Record with id " # debug_show id # " already exists. Internal error found, report this to the developers");
             };
         };
 
-        if (Map.size(collection.indexes) == 0) return #ok();
+        if (Map.size(collection.indexes) == 0) return #ok(id);
 
-        for (index in Map.vals(collection.indexes)) {
-            let #ok(_) = update_indexed_record_fields(collection, index, id, candid_map, null);
+        let updated_indexes = Buffer.Buffer<Index>(Map.size(collection.indexes));
+
+        label updating_indexes for (index in Map.vals(collection.indexes)) {
+            let res = update_indexed_record_fields(collection, index, id, candid_map, null);
+
+            switch (res) {
+                case (#err(err)) {
+                    for (index in updated_indexes.vals()) {
+                        ignore Index.remove(collection, index, id, candid_map);
+                    };
+
+                    ignore BTree.remove(collection.main, main_btree_utils, id);
+
+                    return #err(err);
+                };
+                case (#ok(_)) {};
+            };
+
+            updated_indexes.add(index);
         };
 
-        #ok();
+        #ok(id);
     };
 
     public func replace_record_by_id<Record>(
@@ -765,11 +770,7 @@ module StableCollection {
 
         switch (Index.insert(collection, index, id, new_record_candid_map)) {
             case (#err(err)) {
-                Logger.lazyError(
-                    collection.logger,
-                    func() = "Failed to insert into index '" # index.name # "': " # err,
-                );
-                return Utils.log_error_msg(collection.logger, err);
+                return #err("Failed to insert into index '" # index.name # "': " # err);
             };
             case (#ok(_)) {};
         };
@@ -868,17 +869,6 @@ module StableCollection {
 
     public func insert(collection : StableCollection, main_btree_utils : T.BTreeUtils<Nat, Blob>, candid_blob : T.CandidBlob) : Result<Nat, Text> {
         put(collection, main_btree_utils, candid_blob);
-    };
-
-    public func put(collection : StableCollection, main_btree_utils : T.BTreeUtils<Nat, Blob>, candid_blob : T.CandidBlob) : Result<Nat, Text> {
-        let id = Ids.next(collection.ids);
-
-        switch (put_with_id(collection, main_btree_utils, id, candid_blob)) {
-            case (#err(msg)) return Utils.log_error_msg(collection.logger, msg);
-            case (#ok(_)) {};
-        };
-
-        #ok(id);
     };
 
     public func get(

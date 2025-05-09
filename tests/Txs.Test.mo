@@ -163,6 +163,7 @@ let input_txs = Buffer.fromArray<Tx>(
 
 newZenDBSuite(
     "Txs tests",
+    ?ZenDBSuite.withAndWithoutIndex,
     func collection_setup(zendb : ZenDB.Database) {
         let #ok(txs) = zendb.create_collection<Tx>("transactions", TxSchema, candify_tx, []);
     },

@@ -52,6 +52,7 @@ let data_type_to_candid : ZenDB.Types.Candify<Data> = {
 
 newZenDBSuite(
     "Variant Tests",
+    ?ZenDBSuite.withAndWithoutIndex,
     func collection_setup(zendb : ZenDB.Database) {
         let #ok(data) = zendb.create_collection<Data>("data", DataSchema, data_type_to_candid, []);
     },

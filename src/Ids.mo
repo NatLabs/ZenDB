@@ -6,4 +6,8 @@ module {
         ids[0] += 1;
         id;
     };
+
+    public func undoNext(ids : [var Nat]) {
+        ids[0] -= 1;
+    };
 };

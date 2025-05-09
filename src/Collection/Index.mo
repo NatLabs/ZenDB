@@ -30,6 +30,7 @@ import { Orchid } "Orchid";
 import CollectionUtils "Utils";
 import Schema "Schema";
 import BTree "../BTree";
+import SchemaMap "SchemaMap";
 module {
 
     type BestIndexResult = T.BestIndexResult;
@@ -68,12 +69,31 @@ module {
         collection : StableCollection,
         name : Text,
         index_key_details : [(Text, SortDirection)],
-        used_internally : Bool, // cannot be deleted by user if true
         is_unique : Bool, // if true, the index is unique and the record ids are not concatenated with the index key values to make duplicate values appear unique
+        used_internally : Bool, // cannot be deleted by user if true
     ) : T.Index {
 
         let key_details : [(Text, SortDirection)] = if (is_unique) {
-            index_key_details;
+            let contains_option_type = Itertools.any(
+                index_key_details.vals(),
+                func(index_key_detail : (Text, SortDirection)) : Bool {
+                    switch (SchemaMap.get(collection.schema_map, index_key_detail.0)) {
+                        case (?#Option(_)) true;
+                        case (null) Debug.trap("Index key details must be a valid field in the schema map");
+                        case (_) false;
+                    };
+                },
+            );
+
+            if (contains_option_type) {
+                Array.append(
+                    index_key_details,
+                    [(C.UNIQUE_INDEX_NULL_EXEMPT_FROM_UNIQUENESS_ID, #Ascending)],
+                );
+            } else {
+                index_key_details;
+            }
+
         } else {
             Array.append(
                 index_key_details,
@@ -117,6 +137,8 @@ module {
         switch (BTree.put(index.data, index_data_utils, index_key_values, id)) {
             case (null) {};
             case (?prev_id) {
+                ignore BTree.put(index.data, index_data_utils, index_key_values, prev_id);
+
                 return #err(
                     "Failed to insert record with id " # debug_show id # " into index " # index.name # ", because a duplicate entry with id " # debug_show prev_id # " already exists"
                 );

@@ -105,6 +105,11 @@ module {
         public func _get_schema() : T.Schema { collection.schema };
         public func _get_schema_map() : T.SchemaMap { collection.schema_map };
         public func _get_indexes() : Map<Text, Index> { collection.indexes };
+        public func _get_index(name : Text) : Index = switch (Map.get(collection.indexes, T.thash, name)) {
+            case (?(index)) return index;
+            case (null) Debug.trap("Internal function error '_get_index()': You shouldn't be using this function anyway");
+        };
+
         public func _get_stable_state() : StableCollection { collection };
 
         /// Returns the collection name.

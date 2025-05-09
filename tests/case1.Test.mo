@@ -51,6 +51,7 @@ let candify_user2 = {
 
 newZenDBSuite(
     "Simple Record Tests",
+    ?ZenDBSuite.withAndWithoutIndex,
     func collection_setup(zendb : ZenDB.Database) {
         let #ok(users) = zendb.create_collection<User>("users", users_schema, candify_user, []);
     },

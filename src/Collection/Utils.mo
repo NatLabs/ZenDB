@@ -135,14 +135,41 @@ module CollectionUtils {
         var field_columns_excluding_record_id = 0;
         var field_columns_with_missing_value_at_path = 0;
 
+        var option_field_type_count = 0;
+        var null_option_field_value_count = 0;
+
         for ((index_key, dir) in index_key_details.vals()) {
-            if (index_key == C.RECORD_ID) {
+            if (index_key == C.UNIQUE_INDEX_NULL_EXEMPT_FROM_UNIQUENESS_ID) {
+                let val = if (null_option_field_value_count == option_field_type_count) {
+                    #Nat(id); // use the record id to ensure the key is unique in the index
+                } else {
+                    // if at least one optional field has a value, we don't need to exempt the key from the btree's uniqueness restriction
+                    // so we can set the value to a dummy value
+                    #Nat(0);
+                };
+
+                buffer.add(val)
+
+            } else if (index_key == C.RECORD_ID) {
                 buffer.add(#Nat(id));
             } else {
                 field_columns_excluding_record_id += 1;
 
                 let candid_value = switch (CandidMap.get(candid_map, collection.schema_map, index_key)) {
-                    case (?val) val;
+                    case (?val) {
+                        switch (val) {
+                            case (#Option(_)) {
+                                option_field_type_count += 1;
+                            };
+                            case (#Null) {
+                                option_field_type_count += 1;
+                                null_option_field_value_count += 1;
+                            };
+                            case (_) {};
+                        };
+
+                        val;
+                    };
                     case (null) {
                         field_columns_with_missing_value_at_path += 1;
                         #Null;
