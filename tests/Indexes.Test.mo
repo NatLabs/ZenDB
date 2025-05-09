@@ -556,6 +556,39 @@ func index_tests(zendb : ZenDB.Database) {
         },
     );
 
+    suite(
+        "Unique Indexes",
+        func() {
+
+            type TestRecord = {
+                opt_nat : ?Nat;
+            };
+
+            let OptNatSchema : ZenDB.Types.Schema = #Record([
+                ("opt_nat", #Option(#Nat)),
+            ]);
+
+            let candify_test : ZenDB.Types.Candify<TestRecord> = {
+                to_blob = func(data : TestRecord) : Blob {
+                    to_candid (data);
+                };
+                from_blob = func(blob : Blob) : ?TestRecord {
+                    from_candid (blob);
+                };
+            };
+
+            let #ok(test) = zendb.create_collection("unique_index_test", OptNatSchema, candify_test, []);
+
+            let #ok(_) = test.create_index("opt_nat_idx", [("opt_nat", #Ascending)], true);
+
+            let #ok(_) = test.insert({ opt_nat = ?1 });
+            let #ok(_) = test.insert({ opt_nat = ?2 });
+            let #ok(_) = test.insert({ opt_nat = null });
+            let #ok(_) = test.insert({ opt_nat = null });
+
+        },
+    );
+
     // suite(
     //     "exclusive range queries",
     //     func() {

@@ -32,7 +32,7 @@ import Itertools "mo:itertools/Iter";
 import RevIter "mo:itertools/RevIter";
 import BitMap "mo:bit-map";
 import Vector "mo:vector";
-import Ids "mo:incremental-ids";
+import Ids "../Ids";
 
 import T "../Types";
 import Query "../Query";
@@ -92,7 +92,7 @@ module StableCollection {
     //     let schema_keys = Utils.extract_schema_keys(processed_schema);
 
     //     let stable_collection = {
-    //         ids = Ids.create(db.id_store, name);
+    //         ids = Ids.new();
     //         var schema = processed_schema;
     //         schema_keys;
     //         schema_keys_set = Set.fromIter(schema_keys.vals(), thash);
@@ -871,7 +871,7 @@ module StableCollection {
     };
 
     public func put(collection : StableCollection, main_btree_utils : T.BTreeUtils<Nat, Blob>, candid_blob : T.CandidBlob) : Result<Nat, Text> {
-        let id = Ids.Gen.next(collection.ids);
+        let id = Ids.next(collection.ids);
 
         switch (put_with_id(collection, main_btree_utils, id, candid_blob)) {
             case (#err(msg)) return Utils.log_error_msg(collection.logger, msg);
@@ -892,7 +892,6 @@ module StableCollection {
     public type SearchResult = {
         results : [(Nat, T.CandidBlob)];
         next : () -> SearchResult;
-
     };
 
     public func search(
@@ -1207,7 +1206,6 @@ module StableCollection {
         };
 
         let candid_blob = prev_candid_blob;
-        Ids.Gen.release(collection.ids, id);
 
         Logger.lazyInfo(
             collection.logger,

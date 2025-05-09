@@ -21,7 +21,7 @@ import Decoder "mo:serde/Candid/Blob/Decoder";
 import Candid "mo:serde/Candid";
 import Itertools "mo:itertools/Iter";
 import RevIter "mo:itertools/RevIter";
-import Ids "mo:incremental-ids";
+import Ids "../Ids";
 
 import Vector "mo:vector";
 
@@ -108,7 +108,7 @@ module {
         let schema_keys = Utils.extract_schema_keys(processed_schema);
 
         var stable_collection : T.StableCollection = {
-            ids = Ids.create(db.id_store, name);
+            ids = Ids.new();
             name;
             schema = processed_schema;
             schema_map = SchemaMap.new(processed_schema);

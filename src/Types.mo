@@ -22,7 +22,6 @@ import Itertools "mo:itertools/Iter";
 import RevIter "mo:itertools/RevIter";
 import BitMap "mo:bit-map";
 import Vector "mo:vector";
-import Ids "mo:incremental-ids";
 
 import MemoryBTree "mo:memory-collection/MemoryBTree/Stable";
 import TypeUtils "mo:memory-collection/TypeUtils";
@@ -129,8 +128,10 @@ module T {
         #heap : BpTreeUtils<K>;
     };
 
+    public type Ids = [var Nat];
+
     public type StableCollection = {
-        ids : Ids.Generator;
+        ids : Ids;
         name : Text;
         schema : Schema;
         schema_map : SchemaMap;
@@ -173,11 +174,9 @@ module T {
         // the ZenDB database record
         freed_btrees : Vector.Vector<MemoryBTree.StableMemoryBTree>;
         logger : Logger;
-        id_store : Ids.Ids;
     };
 
     public type StableStore = {
-        id_store : Ids.Ids;
         databases : Map<Text, StableDatabase>;
         memory_type : MemoryType;
         freed_btrees : Vector.Vector<MemoryBTree.StableMemoryBTree>;

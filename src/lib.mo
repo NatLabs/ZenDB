@@ -22,7 +22,7 @@ import Candid "mo:serde/Candid";
 import Itertools "mo:itertools/Iter";
 import RevIter "mo:itertools/RevIter";
 import Vector "mo:vector";
-import Ids "mo:incremental-ids";
+import Ids "Ids";
 
 import TypeUtils "mo:memory-collection/TypeUtils";
 import Int8Cmp "mo:memory-collection/TypeUtils/Int8Cmp";
@@ -105,13 +105,11 @@ module {
             databases = Map.new<Text, T.StableDatabase>();
             memory_type = Option.get(settings.memory_type, #heap);
 
-            id_store = Ids.new();
             freed_btrees = Vector.new<T.MemoryBTree>();
             logger = Logger.init(#Error, false);
         };
 
         let default_db : T.StableDatabase = {
-            id_store = Ids.new();
             collections = Map.new<Text, T.StableCollection>();
             freed_btrees = zendb.freed_btrees;
             logger = zendb.logger;
@@ -147,7 +145,6 @@ module {
         };
 
         let db : T.StableDatabase = {
-            id_store = Ids.new();
             collections = Map.new<Text, T.StableCollection>();
             freed_btrees = sstore.freed_btrees;
             logger = sstore.logger;
