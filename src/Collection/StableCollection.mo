@@ -87,8 +87,6 @@ module StableCollection {
 
     // public func new(db: ZenDB.StableDatabase) : StableCollection {
 
-    //     let #Record(_) = processed_schema else return log_error_msg(db.logger, "Schema error: schema type is not a record");
-
     //     let schema_keys = Utils.extract_schema_keys(processed_schema);
 
     //     let stable_collection = {
@@ -443,12 +441,36 @@ module StableCollection {
             case (null) Map.entries(collection.field_constraints);
         };
 
-        for ((field_name, field_constraints) in field_constraints_iter) {
-            let ?field_value = CandidMap.get(candid_map, collection.schema_map, field_name) else return Utils.log_error_msg(collection.logger, "Field '" # field_name # "' not found in record");
+        label validating_field_constraints for ((field_name, field_constraints) in field_constraints_iter) {
+            let field_value = switch (CandidMap.get(candid_map, collection.schema_map, field_name)) {
+                case (?field_value) field_value;
+                case (null) {
+                    if (
+                        SchemaMap.is_nested_variant_field(collection.schema_map, field_name) or
+                        SchemaMap.is_nested_option_field(collection.schema_map, field_name)
+                    ) {
+                        continue validating_field_constraints;
+                    };
+
+                    return Utils.log_error_msg(collection.logger, "Schema Constraint Field '" # field_name # "' not found in record");
+
+                };
+
+            };
 
             for (field_constraint in field_constraints.vals()) {
-                switch (field_constraint) {
-                    case (#Max(max_value)) {
+
+                // move to CandidOps
+                func unwrap_option(val : Candid) : Candid {
+                    switch (val) {
+                        case (#Option(inenr)) unwrap_option(inenr);
+                        case (val) val;
+                    };
+                };
+
+                switch (unwrap_option(field_value), field_constraint) {
+                    case (#Null, _) {}; // ignore validation for null values
+                    case (_, #Max(max_value)) {
                         switch (CandidMod.Ops.compare(field_value, #Float(max_value))) {
                             case (#greater) {
                                 let error_msg = "Field '" # field_name # "' exceeds maximum value of " # debug_show max_value;
@@ -459,7 +481,7 @@ module StableCollection {
 
                     };
 
-                    case (#Min(min_value)) {
+                    case (_, #Min(min_value)) {
                         switch (CandidMod.Ops.compare(field_value, #Float(min_value))) {
                             case (#less) {
                                 let error_msg = "Field '" # field_name # "' is less than minimum value of " # debug_show min_value;
@@ -470,7 +492,7 @@ module StableCollection {
 
                     };
 
-                    case (#MinSize(min_size)) {
+                    case (_, #MinSize(min_size)) {
                         let field_value_size = CandidMod.Ops.size(field_value);
 
                         switch (CandidMod.Ops.compare(#Nat(field_value_size), #Nat(min_size))) {
@@ -483,7 +505,7 @@ module StableCollection {
 
                     };
 
-                    case (#MaxSize(max_size)) {
+                    case (_, #MaxSize(max_size)) {
                         let field_value_size = CandidMod.Ops.size(field_value);
 
                         switch (CandidMod.Ops.compare(#Nat(field_value_size), #Nat(max_size))) {
@@ -496,7 +518,7 @@ module StableCollection {
 
                     };
 
-                    case (#Size(min_size, max_size)) {
+                    case (_, #Size(min_size, max_size)) {
                         let field_value_size = CandidMod.Ops.size(field_value);
 
                         switch (CandidMod.Ops.compare(#Nat(field_value_size), #Nat(min_size))) {
@@ -591,17 +613,12 @@ module StableCollection {
 
         let candid = CollectionUtils.decode_candid_blob(collection, candid_blob);
 
-        switch (candid) {
-            case (#Record(_)) {};
-            case (_) return Utils.log_error_msg(collection.logger, "Values inserted into the collection must be #Records");
-        };
-
         Logger.lazyDebug(
             collection.logger,
             func() = "ZenDB Collection.put(): Inserting record with id " # debug_show id # " and candid " # debug_show candid,
         );
 
-        switch (Schema.validate_record(collection.schema, candid)) {
+        switch (Schema.validate(collection.schema, candid)) {
             case (#ok(_)) {};
             case (#err(msg)) {
                 Ids.undoNext(collection.ids);
@@ -676,7 +693,7 @@ module StableCollection {
         let new_candid_value = CollectionUtils.decode_candid_blob(collection, new_candid_blob);
         let new_candid_map = CandidMap.new(collection.schema_map, new_candid_value);
 
-        switch (Schema.validate_record(collection.schema, new_candid_value)) {
+        switch (Schema.validate(collection.schema, new_candid_value)) {
             case (#err(msg)) {
                 return Utils.log_error_msg(collection.logger, "Schema validation failed: " # msg);
             };
@@ -827,7 +844,7 @@ module StableCollection {
             func() = "Updated candid map: " # debug_show new_candid_record,
         );
 
-        switch (Schema.validate_record(collection.schema, new_candid_record)) {
+        switch (Schema.validate(collection.schema, new_candid_record)) {
             case (#err(msg)) {
                 return Utils.log_error_msg(collection.logger, "Schema validation failed: " # msg);
             };
@@ -925,9 +942,16 @@ module StableCollection {
                 case (?record) {
                     (?(id, record), CandidMap.new(collection.schema_map, record));
                 };
-                case (null) (null, CandidMap.new(collection.schema_map, #Record([])));
+                case (null) {
+                    let #ok(default_value) = Schema.generate_default_value(collection.schema) else Debug.trap("Couldn't generate default value for schema: " # debug_show collection.schema);
+                    (null, CandidMap.new(collection.schema_map, default_value));
+                };
+
             };
-            case (null) (null, CandidMap.new(collection.schema_map, #Record([])));
+            case (null) {
+                let #ok(default_value) = Schema.generate_default_value(collection.schema) else Debug.trap("Couldn't generate default value for schema: " # debug_show collection.schema);
+                (null, CandidMap.new(collection.schema_map, default_value));
+            };
         };
 
         switch (Query.validate_query(collection, stable_query.query_operations)) {
@@ -1180,10 +1204,6 @@ module StableCollection {
 
         let prev_candid = CollectionUtils.decode_candid_blob(collection, prev_candid_blob);
         let prev_candid_map = CandidMap.new(collection.schema_map, prev_candid);
-
-        let #Record(prev_records) = prev_candid else {
-            return Utils.log_error_msg(collection.logger, "Couldn't get records");
-        };
 
         for (index in Map.vals(collection.indexes)) {
 

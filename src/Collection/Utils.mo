@@ -355,28 +355,4 @@ module CollectionUtils {
         );
     };
 
-    public func get_nested_candid_field(_candid_record : Candid, key : Text) : ?Candid {
-        let nested_field_keys = Text.split(key, #text("."));
-
-        var candid_record = _candid_record;
-
-        for (key in nested_field_keys) {
-            let #Record(record_fields) or #Option(#Record(record_fields)) = candid_record else return null;
-
-            let ?found_field = Array.find<(Text, Candid)>(
-                record_fields,
-                func((variant_name, _) : (Text, Candid)) : Bool {
-                    variant_name == key;
-                },
-            ) else return null;
-
-            candid_record := found_field.1;
-
-            // return #Null if the nested field was terminated early
-            if (candid_record == #Null) return ?#Null;
-        };
-
-        return ?candid_record;
-    };
-
 };

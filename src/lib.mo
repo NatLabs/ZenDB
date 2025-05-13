@@ -66,12 +66,18 @@ module {
         _0_ = a;
         _1_ = b;
     };
+    public func fromTuple<A, B>(t : T.Tuple<A, B>) : (A, B) {
+        (t._0_, t._1_);
+    };
 
     public type Triple<A, B, C> = T.Triple<A, B, C>;
     public func Triple<A, B, C>(a : A, b : B, c : C) : T.Triple<A, B, C> = {
         _0_ = a;
         _1_ = b;
         _2_ = c;
+    };
+    public func fromTriple<A, B, C>(t : T.Triple<A, B, C>) : (A, B, C) {
+        (t._0_, t._1_, t._2_);
     };
 
     public type Quadruple<A, B, C, D> = T.Quadruple<A, B, C, D>;
@@ -80,6 +86,9 @@ module {
         _1_ = b;
         _2_ = c;
         _3_ = d;
+    };
+    public func fromQuadruple<A, B, C, D>(t : T.Quadruple<A, B, C, D>) : (A, B, C, D) {
+        (t._0_, t._1_, t._2_, t._3_);
     };
 
     public type Settings = {
@@ -92,7 +101,7 @@ module {
 
     public let defaultSettings : Settings = {
         logging = ?{
-            log_level = #Error;
+            log_level = #Warn;
             is_running_locally = false;
         };
         memory_type = ?(#stableMemory);
@@ -133,7 +142,7 @@ module {
         Database.Database(default_db);
     };
 
-    public func createDatabase(sstore : T.StableStore, db_name : Text) : T.Result<Database.Database, Text> {
+    public func createDB(sstore : T.StableStore, db_name : Text) : T.Result<Database.Database, Text> {
 
         switch (Map.get<Text, T.StableDatabase>(sstore.databases, T.thash, db_name)) {
             case (?db) return #err("Database with name '" # db_name # "' already exists");
@@ -152,7 +161,7 @@ module {
         #ok(Database.Database(db));
     };
 
-    public func getDatabase(sstore : T.StableStore, db_name : Text) : ?Database.Database {
+    public func getDB(sstore : T.StableStore, db_name : Text) : ?Database.Database {
         switch (Map.get<Text, T.StableDatabase>(sstore.databases, T.thash, db_name)) {
             case (?db) return ?Database.Database(db);
             case (null) return null;

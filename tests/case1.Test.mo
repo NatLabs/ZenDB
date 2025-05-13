@@ -12,7 +12,7 @@ import Itertools "mo:itertools/Iter";
 import Map "mo:map/Map";
 
 import ZenDB "../src";
-import { newZenDBSuite } "TestFramework";
+import ZenDBSuite "TestFramework";
 
 let fuzz = Fuzz.fromSeed(0x7eadbeef);
 
@@ -49,7 +49,7 @@ let candify_user2 = {
     to_blob = func(c : User2) : Blob { to_candid (c) };
 };
 
-newZenDBSuite(
+ZenDBSuite.newZenDBSuite(
     "Simple Record Tests",
     ?ZenDBSuite.withAndWithoutIndex,
     func collection_setup(zendb : ZenDB.Database) {

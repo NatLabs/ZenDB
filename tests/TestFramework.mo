@@ -34,6 +34,12 @@ module TestFramework {
         compare_with_no_index = true;
     };
 
+    public let onlyWithIndex : Settings = {
+        log_level = #Error;
+        compare_with_index = true;
+        compare_with_no_index = false;
+    };
+
     public func newZenDBSuite(
         test_name : Text,
         options : ?Settings,
@@ -45,11 +51,11 @@ module TestFramework {
 
         func run_suite_on_index_granularity(zendb_sstore : ZenDB.Types.StableStore) {
             if (settings.compare_with_index or settings.compare_with_no_index) {
-                if (settings.compare_with_index) {
+                if (settings.compare_with_no_index) {
                     suite(
                         "with no index",
                         func() {
-                            let #ok(zendb) = ZenDB.createDatabase(zendb_sstore, "no_index");
+                            let #ok(zendb) = ZenDB.createDB(zendb_sstore, "no_index");
 
                             zendb_collection_setup(zendb);
                             zendb_suite(zendb);
@@ -58,11 +64,11 @@ module TestFramework {
 
                 };
 
-                if (settings.compare_with_no_index) {
+                if (settings.compare_with_index) {
                     suite(
                         "with indexes",
                         func() {
-                            let #ok(zendb) = ZenDB.createDatabase(zendb_sstore, "with_index");
+                            let #ok(zendb) = ZenDB.createDB(zendb_sstore, "with_index");
 
                             zendb_collection_setup(zendb);
                             zendb_index_setup(zendb);
@@ -73,7 +79,7 @@ module TestFramework {
 
             } else {
 
-                let #ok(zendb) = ZenDB.createDatabase(zendb_sstore, "no_index");
+                let #ok(zendb) = ZenDB.createDB(zendb_sstore, "no_index");
 
                 zendb_collection_setup(zendb);
                 zendb_suite(zendb);
@@ -134,7 +140,7 @@ module TestFramework {
             suite(
                 "with no index",
                 func() {
-                    let #ok(zendb) = ZenDB.createDatabase(zendb_sstore, "no_index");
+                    let #ok(zendb) = ZenDB.createDB(zendb_sstore, "no_index");
 
                     zendb_collection_setup(zendb);
                     zendb_suite(zendb);
@@ -195,7 +201,7 @@ module TestFramework {
             suite(
                 "with indexes",
                 func() {
-                    let #ok(zendb) = ZenDB.createDatabase(zendb_sstore, "with_index");
+                    let #ok(zendb) = ZenDB.createDB(zendb_sstore, "with_index");
 
                     zendb_collection_setup(zendb);
                     zendb_index_setup(zendb);

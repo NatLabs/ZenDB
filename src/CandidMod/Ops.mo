@@ -412,6 +412,8 @@ module CandidOps {
             case (#Text(text)) text.size();
             case (#Blob(blob)) blob.size();
             case (#Array(array)) array.size();
+            case (#Option(inner)) size(inner);
+            case (#Null) 0;
             case (other) Debug.trap("Cannot get size of " # debug_show (self));
         };
     };

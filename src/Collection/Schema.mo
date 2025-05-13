@@ -133,6 +133,15 @@ module {
         };
     };
 
+    public func validate_schema(schema : Schema) : Result<(), Text> {
+        switch (schema) {
+            case (#Array(_)) #err("Top level #Array is not supported");
+            case (#Empty) #err("A schema with a single #Empty type is not valid, translated to () in motoko");
+            case (#Null) #err("A schema with a single #Null type is not valid");
+            case (others) #ok;
+        };
+    };
+
     public func validate(schema : Schema, record : Candid) : Result<(), Text> {
 
         switch (schema, record) {
@@ -164,6 +173,17 @@ module {
                 if (inner == #Null) return #ok;
 
                 validate(schema, inner);
+            };
+            case (#Tuple(tuple_types), #Tuple(tuple_values)) {
+                if (tuple_types.size() != tuple_values.size()) return #err("Tuple size mismatch: expected " # debug_show (tuple_types.size()) # ", got " # debug_show (tuple_values.size()));
+
+                for ((i, value) in Itertools.enumerate(tuple_values.vals())) {
+                    let res = validate(tuple_types[i], value);
+                    let #ok(_) = res else return send_error(res);
+                };
+
+                #ok;
+
             };
             case (#Tuple(tuples), #Record(records)) {
                 if (records.size() != tuples.size()) return #err("Tuple size mismatch: expected " # debug_show (tuples.size()) # ", got " # debug_show (records.size()));
@@ -242,15 +262,7 @@ module {
                 };
             };
 
-            case (a, b) return #err("validate_record(): schema and record mismatch: " # debug_show (a, b) # " in " # debug_show (schema, record));
-        };
-    };
-
-    public func validate_record(main_schema : Schema, main_record : Candid) : Result<(), Text> {
-
-        switch (main_schema) {
-            case (#Record(fields)) validate(main_schema, main_record);
-            case (_) #err("validate_schema(): schema is not a record");
+            case (a, b) return #err("validate(): schema and record mismatch: " # debug_show (a, b) # " in " # debug_show (schema, record));
         };
     };
 
@@ -435,40 +447,6 @@ module {
         };
     };
 
-    public func get_nested_candid_type(_schema : Schema, key : Text) : ?Schema {
-        let nested_field_keys = Text.split(key, #text("."));
-
-        var schema = _schema;
-        var has_option_in_path = false;
-
-        for (key in nested_field_keys) {
-            let #Record(record_fields) or #Option(#Record(record_fields)) or #Variant(record_fields) or #Option(#Variant(record_fields)) = schema else return null;
-
-            switch (schema) {
-                case (#Option(_)) has_option_in_path := true;
-                case (_) {};
-            };
-
-            let ?found_field = Array.find<(Text, Schema)>(
-                record_fields,
-                func((variant_name, _) : (Text, Schema)) : Bool {
-                    variant_name == key;
-                },
-            ) else return null;
-
-            schema := found_field.1;
-        };
-
-        if (has_option_in_path) {
-            return switch (schema) {
-                case (#Option(_)) ?schema;
-                case (_) ?#Option(schema);
-            };
-        };
-
-        return ?schema;
-    };
-
     public func generate_default_value(schema : Schema) : Result<Candid, Text> {
         let candid : Candid = switch (schema) {
             case (#Empty) #Empty;
@@ -492,7 +470,10 @@ module {
                 case (#ok(value)) #Option(value);
                 case (#err(err)) return #err(err);
             };
-            case (#Array(inner)) #Array([]);
+            case (#Array(inner)) switch (generate_default_value(inner)) {
+                case (#ok(val)) #Array([val]);
+                case (#err(err)) return #err(err);
+            };
             case (#Tuple(tuples)) {
 
                 let buffer = Buffer.Buffer<Candid>(tuples.size());

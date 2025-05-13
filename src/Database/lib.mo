@@ -44,6 +44,7 @@ module {
     public type StableCollection = T.StableCollection;
     public type Collection<Record> = Collection.Collection<Record>;
 
+    /// The database class provides an interface for creating and managing collections.
     public class Database(stable_db : T.StableDatabase) = self {
 
         func convert_to_internal_candify<A>(collection_name : Text, external_candify : T.Candify<A>) : T.InternalCandify<A> {
@@ -90,9 +91,48 @@ module {
 
         };
 
+        /// Retrieves the total number of collections in the database.
         public func size() : Nat {
             StableDatabase.size(stable_db);
         };
+
+        /// Creates a new collection in the database with the given name and schema.
+        /// The name must be unique and not already exist in the database, unless the function will return an #err.
+        /// The schema must be the exact representation of the motoko type you want to store in the collection.
+        ///
+        /// Example:
+        /// ```motoko
+        /// type User = {
+        ///   id: Nat;
+        ///   name: Text;
+        ///   email: Text;
+        ///   profile: {
+        ///     age: ?Nat;
+        ///     location: Text;
+        ///     interests: [Text];
+        ///   };
+        ///   created_at: Int;
+        /// };
+        ///
+        /// let UsersSchema : ZenDB.Types.Schema = #Record([
+        ///   ("id", #Nat),
+        ///   ("name", #Text),
+        ///   ("email", #Text),
+        ///   ("profile", #Record([
+        ///     ("age", #Option(#Nat)),
+        ///     ("location", #Text),
+        ///     ("interests", #Array(#Text)),
+        ///   ])),
+        ///   ("created_at", #Int),
+        /// ]);
+        ///
+        /// let candify_users : ZenDB.Types.Candify<User> = {
+        ///   to_blob = func(user: User) : Blob { to_candid(user) };
+        ///   from_blob = func(blob: Blob) : ?User { from_candid(blob) };
+        /// };
+        ///
+        /// let #ok(users_collection) = db.create_collection<User>("users", UsersSchema, candify_users, []);
+        /// ```
 
         public func create_collection<Record>(name : Text, schema : T.Schema, external_candify : T.Candify<Record>, schema_constraints : [T.SchemaConstraint]) : Result<Collection<Record>, Text> {
             let validate_candify_result = Utils.handleResult(
@@ -103,7 +143,7 @@ module {
 
             let internal_candify : T.InternalCandify<Record> = switch (validate_candify_result) {
                 case (#ok(internal_candify)) internal_candify;
-                case (#err(msg)) return #err(msg);
+                case (#err(msg)) return Utils.log_error_msg(stable_db.logger, msg);
             };
 
             switch (StableDatabase.create_collection(stable_db, name, schema, schema_constraints)) {
@@ -116,7 +156,7 @@ module {
                         )
                     );
                 };
-                case (#err(msg)) #err(msg);
+                case (#err(msg)) Utils.log_error_msg(stable_db.logger, msg);
             };
         };
 

@@ -128,9 +128,9 @@ module {
                             // if (Text.isNumeric(next_suffix_path))
 
                             field_path := Text.join(".", Itertools.prepend(field_with_array_type, paths_within_suffix));
-                            // Debug.print("new field_path: " # debug_show (field_path));
 
                             switch (Map.get<Text, T.CandidType>(schema_map.map, T.thash, field_path)) {
+                                case (?#Array(inner_type)) return ?inner_type;
                                 case (?candid_type) return ?candid_type;
                                 case (null) {};
                             };
@@ -147,6 +147,24 @@ module {
         };
     };
 
+    public func get_parent_field_path(field_name : Text) : ?(Text, Text) {
+        let fields = Iter.toArray(Text.split(field_name, #text(".")));
+
+        if (fields.size() == 0) {
+            return null;
+        };
+
+        if (fields.size() == 1) {
+            return ?("", fields[0]);
+        };
+
+        let parent_field_name = Text.join(".", Itertools.take(fields.vals(), fields.size() - 1));
+        let last_field_name = fields[fields.size() - 1];
+
+        ?(parent_field_name, last_field_name);
+
+    };
+
     public func is_valid_path(schema_map : SchemaMap, field_name : Text) : Bool {
         switch (Map.get<Text, T.CandidType>(schema_map.map, T.thash, field_name)) {
             case (?_) true;
@@ -159,6 +177,66 @@ module {
         unique_constraints : [[Text]];
     };
 
+    public func is_nested_variant_field(schema_map : SchemaMap, field_name : Text) : Bool {
+        if (field_name == "") return false;
+
+        let ?(parent_field_name, last_field_name) = get_parent_field_path(field_name) else {
+            return false;
+        };
+
+        let ?parent_field_type = get(schema_map, parent_field_name) else {
+            return false;
+        };
+
+        switch (parent_field_type) {
+            case (#Variant(variants)) {
+                Itertools.any(
+                    variants.vals(),
+                    func((variant_name, variant_type) : (Text, T.Schema)) : Bool {
+                        variant_name == last_field_name;
+                    },
+                );
+            };
+            case (_) is_nested_variant_field(schema_map, parent_field_name);
+        };
+
+    };
+
+    public func is_nested_option_field(schema_map : SchemaMap, field_name : Text) : Bool {
+        if (field_name == "") return false;
+
+        let ?(parent_field_name, last_field_name) = get_parent_field_path(field_name) else {
+            return false;
+        };
+
+        let ?parent_field_type = get(schema_map, parent_field_name) else {
+            return false;
+        };
+
+        switch (parent_field_type) {
+            case (#Option(_)) true;
+            case (_) is_nested_option_field(schema_map, parent_field_name);
+        };
+    };
+
+    public func unwrap_option_type(option_type : T.CandidType) : T.CandidType {
+        switch (option_type) {
+            case (#Option(inner)) {
+                unwrap_option_type(inner);
+            };
+            case (unwrapped) { unwrapped };
+        };
+    };
+
+    public func unwrap_array_type(array_type : T.CandidType) : T.CandidType {
+        switch (array_type) {
+            case (#Array(inner)) {
+                unwrap_array_type(inner);
+            };
+            case (unwrapped) { unwrapped };
+        };
+    };
+
     public func validate_schema_constraints(
         schema_map : SchemaMap,
         constraints : [T.SchemaConstraint],
@@ -166,23 +244,30 @@ module {
         let field_constraints_map = Map.new<Text, [T.SchemaFieldConstraint]>();
         let unique_constraints_buffer = Buffer.Buffer<[Text]>(8);
 
-        for (constraint in constraints.vals()) {
+        func missing_field_error<A>(field_name : Text) : T.Result<A, Text> {
+            return #err("Field '" # field_name # "' not found in schema");
+        };
+
+        label validating_field_constraint for (constraint in constraints.vals()) {
             switch (constraint) {
                 case (#Field(field_name, field_constraints)) {
-                    let ?field_type = get(schema_map, field_name) else {
-                        return #err("Field '" # field_name # "' not found in schema");
-                    };
+                    let field_type = switch (get(schema_map, field_name)) {
+                        case (?field_type) field_type;
+                        case (null) {
 
-                    func unwrap_option_type(option_type : T.CandidType) : T.CandidType {
-                        switch (option_type) {
-                            case (#Option(inner)) {
-                                unwrap_option_type(inner);
-                            };
-                            case (unwrapped) { unwrapped };
+                            // // we can skip validation on a variant field
+                            // if (not is_variant_field(field_name)) {
+                            //     return missing_field_error(field_name);
+                            // } else {
+                            //     continue validating_field_constraint;
+                            // };
+
+                            return missing_field_error(field_name);
+
                         };
                     };
 
-                    let unwrapped_option_type = unwrap_option_type(field_type);
+                    let unwrapped_type = unwrap_option_type(field_type);
 
                     let buffer = Buffer.Buffer<T.SchemaFieldConstraint>(8);
 
@@ -190,7 +275,7 @@ module {
                         switch (field_constraint) {
                             case (#Max(value)) {
 
-                                switch (unwrapped_option_type) {
+                                switch (unwrapped_type) {
                                     case (#Int(_) or #Int8(_) or #Int16(_) or #Int32(_) or #Int64(_) or #Float(_)) {};
                                     case (#Nat(_) or #Nat8(_) or #Nat16(_) or #Nat32(_) or #Nat64(_)) {
                                         if (value < 0) {
@@ -208,7 +293,7 @@ module {
                             };
                             case (#Min(value)) {
 
-                                switch (unwrapped_option_type) {
+                                switch (unwrapped_type) {
                                     case (#Int(_) or #Int8(_) or #Int16(_) or #Int32(_) or #Int64(_) or #Float(_)) {};
                                     case (#Nat(_) or #Nat8(_) or #Nat16(_) or #Nat32(_) or #Nat64(_)) {
                                         if (value < 0) {
@@ -225,7 +310,7 @@ module {
                             };
                             case (#MaxSize(_)) {
 
-                                switch (unwrapped_option_type) {
+                                switch (unwrapped_type) {
                                     case (#Array(_) or #Blob(_) or #Text(_)) {};
                                     case (_) {
                                         return #err(
@@ -236,7 +321,7 @@ module {
 
                             };
                             case (#MinSize(_)) {
-                                switch (unwrapped_option_type) {
+                                switch (unwrapped_type) {
                                     case (#Array(_) or #Blob(_) or #Text(_)) {};
                                     case (_) {
                                         return #err(
@@ -246,7 +331,7 @@ module {
                                 };
                             };
                             case (#Size(min, max)) {
-                                switch (unwrapped_option_type) {
+                                switch (unwrapped_type) {
                                     case (#Array(_) or #Blob(_) or #Text(_)) {};
                                     case (_) {
                                         return #err(
@@ -275,8 +360,8 @@ module {
                             return #err("Field '" # unique_field_name # "' not found in schema");
                         };
 
-                        switch (unique_field_type) {
-                            case (#Record(_) or #Map(_) or #Array(_) or #Variant(_) or #Tuple(_) or #Float(_)) {
+                        switch (unwrap_option_type(unique_field_type)) {
+                            case (#Record(_) or #Map(_) or #Array(_) or #Variant(_) or #Tuple(_) or #Float(_) or #Null or #Empty or #Recursive(_)) {
                                 return #err(
                                     "Error creating unique constraint on field " # unique_field_name # "' as unique constraint is not supported with type " # debug_show (unique_field_type) # "."
                                 );

@@ -106,8 +106,9 @@ module {
                     ignore Or(key, #gt(max));
                 };
                 case (#exists) {
-                    // #not_(#exists) -> #not_(#not_(#eq(null))) -> #eq(null)
-                    buffer.add(#Operation(key, #eq(#Null)));
+                    // #not_(#exists)
+                    // buffer.add(#Operation(key, #eq(#Null)));
+                    Debug.trap("QueryBuilder: #not_(#exists) is not supported");
                 };
                 case (#startsWith(prefix)) {
                     let prefix_lower_bound = prefix;
@@ -140,23 +141,9 @@ module {
             };
         };
 
-        func handle_op_aliases(op : ZqlOperators) {
-            switch (op) {
-                case (#exists) {
-
-                };
-                case (_) {
-                    Debug.trap("Operator '" # debug_show op # "' is not an alias");
-                };
-            };
-        };
-
         func handle_op(key : Text, op : ZqlOperators) {
             switch (op) {
                 // aliases
-                case (#exists) {
-                    handle_op(key, #not_(#eq(#Null)));
-                };
                 case (#anyOf(values)) {
                     update_query(false);
                     for (value in values.vals()) {
@@ -179,6 +166,7 @@ module {
                     handle_op(key, #between(prefix_lower_bound, prefix_upper_bound));
 
                 };
+                // core operations
                 case (_) {
                     buffer.add(#Operation(key, op));
                 };
@@ -292,16 +280,16 @@ module {
             case (#Operation(field, op)) {
                 // Debug.print(debug_show (Set.toArray(collection.schema_keys_set)));
 
-                if (not Set.has(collection.schema_keys_set, thash, field)) {
+                if (field != "" and Option.isNull(Nat.fromText(field)) and not Set.has(collection.schema_keys_set, thash, field)) {
 
                     if (Text.contains(field, #text("."))) {
                         for (key in Text.split(field, #text("."))) {
-                            if (not Set.has(collection.schema_keys_set, thash, key)) {
-                                return #err("Field '" # key # "' not found in schema");
+                            if (Option.isNull(Nat.fromText(key)) and not Set.has(collection.schema_keys_set, thash, key)) {
+                                return #err("Field '" # key # "' not found in schema when validating query");
                             };
                         };
                     } else {
-                        return #err("Field '" # field # "' not found in schema");
+                        return #err("Field '" # field # "' not found in schema when validating query");
                     };
                 };
             };

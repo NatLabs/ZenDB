@@ -118,26 +118,35 @@ suite(
             func() {
                 // Check that we can get the type of an array element
                 assert SchemaMap.get(schema_map, "comments") == ?#Array(#Record([("content", #Text), ("created_at", #Nat)]));
-                assert SchemaMap.get(schema_map, "comments.0") == ?#Array(#Record([("content", #Text), ("created_at", #Nat)]));
+                assert SchemaMap.get(schema_map, "comments.0") == ?(#Record([("content", #Text), ("created_at", #Nat)]));
                 assert SchemaMap.get(schema_map, "comments.0.content") == ?#Text;
                 assert SchemaMap.get(schema_map, "comments.0.created_at") == ?#Nat;
 
                 // Check that we can get the type of a nested array element
                 assert SchemaMap.get(schema_map, "tags") == ?#Array(#Text);
-                assert SchemaMap.get(schema_map, "tags.0") == ?#Array(#Text);
+                assert SchemaMap.get(schema_map, "tags.0") == ?(#Text);
 
                 // check nested array element
                 var schema_map2 = SchemaMap.new(#Record([("nested", #Array(#Array(#Text)))]));
                 assert SchemaMap.get(schema_map2, "nested") == ?#Array(#Array(#Text));
-                assert SchemaMap.get(schema_map2, "nested.0") == ?#Array(#Array(#Text));
+                assert SchemaMap.get(schema_map2, "nested.0") == ?(#Array(#Text));
                 // assert SchemaMap.get(schema_map2, "nested.0.0") == ?#Array(#Text);
                 assert SchemaMap.get(schema_map2, "nested.0.0.0") == null;
 
                 // check nested array between tuples
                 var schema_map3 = SchemaMap.new(#Record([("nested", #Array(#Tuple([#Array(#Text), #Nat])))]));
                 assert SchemaMap.get(schema_map3, "nested") == ?#Array(#Tuple([#Array(#Text), #Nat]));
-                assert SchemaMap.get(schema_map3, "nested.0") == ?#Array(#Tuple([#Array(#Text), #Nat]));
-                assert SchemaMap.get(schema_map3, "nested.0.0") == ?#Array(#Text);
+
+                // for the schema map, we should not be able to get the inner type of a tuple from the element index
+                // these cases succeeds however, because the schema map removes the element index from the path after an initial failed lookup
+                // and scans the schema map for the parent array type to return. so 'nested.0' becomes 'nested'
+                //
+                // In this case, we have a conflict as the schema has a tuple type that would conflict with an attempt to get the array element by the index 'nested.0'
+                // The tuple type wins out, and we get the value of the element in the tuple type and not the array type
+                assert SchemaMap.get(schema_map3, "nested.0") == ?#Array(#Text);
+
+                // This tries to get the type of the first element of the tuple, nested in the first element of the array
+                assert SchemaMap.get(schema_map3, "nested.0.0") == ?(#Text);
                 assert SchemaMap.get(schema_map3, "nested.0.1") == ?#Nat;
                 assert SchemaMap.get(schema_map3, "nested.0.0.0") == null;
 

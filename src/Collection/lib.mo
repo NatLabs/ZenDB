@@ -80,10 +80,6 @@ module {
 
     public type IndexKeyFields = T.IndexKeyFields;
 
-    let STABLE_MEMORY_BTREE_ORDER = 256;
-    let MAX_QUERY_INSTRUCTIONS : Nat64 = 5_000_000_000;
-    let MAX_UPDATE_INSTRUCTIONS : Nat64 = 40_000_000_000;
-
     public class Collection<Record>(
         collection_name : Text,
         collection : StableCollection,
@@ -150,6 +146,15 @@ module {
             records;
         };
 
+        /// Insert a record that matches the collection's schema.
+        /// If the record passes the schema validation and schema constraints, it will be inserted into the collection and a unique id will be assigned to it and returned.
+        ///
+        /// Example:
+        /// ```motoko
+        /// let #ok(id) = collection.insert(record);
+        /// ```
+        ///
+        /// If the record does not pass the schema validation or schema constraints, an error will be returned.
         public func insert(record : Record) : Result<(Nat), Text> {
             put(record);
         };
@@ -162,6 +167,7 @@ module {
             );
         };
 
+        /// Retrieves a record by its id.
         public func get(id : Nat) : ?Record {
             Option.map(
                 StableCollection.get(collection, main_btree_utils, id),
@@ -195,6 +201,60 @@ module {
                 };
             };
         };
+
+        /// This function is used to search for records in the collection by using a query builder.
+        /// The query builder takes a set of queries or filters on the fields in the records and uses this as instructions to search for the specified records.
+        ///
+        /// Example:
+        /// - Search for all records with a field "name" equal to "John":
+        /// ```motoko
+        ///
+        /// let #ok(records_named_john) = collection.search(
+        ///     ZenDB.QueryBuilder().Where("name", #eq("John"))
+        /// );
+        /// ```
+        ///
+        /// - Search for all records with a field "age" greater than 18, sorted by "age" in descending order:
+        /// ```motoko
+        /// let #ok(records_older_than_18) = collection.search(
+        ///     ZenDB.QueryBuilder().Where("age", #gt(18)).Sort("age", #Descending)
+        /// );
+        /// ```
+        ///
+        /// - Search for all records with name "John" or "Jane", and age greater than 18:
+        /// ```motoko
+        /// let #ok(records_named_john_or_jane) = collection.search(
+        ///     ZenDB.QueryBuilder()
+        ///         .Where("name", #anyOf([#Text("John"), #Text("Jane")]))
+        ///         .And("age", #gt(18))
+        /// );
+        /// ```
+        ///
+        /// Could also be written as:
+        /// ```motoko
+        /// let #ok(records_named_john_or_jane) = collection.search(
+        ///     ZenDB.QueryBuilder()
+        ///         .Where("name", #eq(#Text("John")))
+        ///            .Or("name", #eq(#Text("Jane")))
+        ///         .And("age", #gt(18))
+        /// );
+        /// ```
+        ///
+        /// Or as nested queries:
+        /// ```motoko
+        /// let #ok(records_named_john_or_jane) = collection.search(
+        ///     ZenDB.QueryBuilder()
+        ///          .Where("age", #gt(18))
+        ///          .AndQuery(
+        ///              ZenDB.QueryBuilder()
+        ///                  .Where("name", #eq(#Text("John")))
+        ///                  .Or("name", #eq(#Text("Jane")))
+        ///          )
+        /// );
+        /// ```
+        ///
+        /// @returns A Result containing an array of tuples containing the id and the record for all matching records.
+        /// If the search fails, an error message will be returned.
 
         public func search(query_builder : QueryBuilder) : Result<[T.WrapId<Record>], Text> {
             switch (
@@ -243,6 +303,7 @@ module {
             #ok();
         };
 
+        /// Updates a record by its id with the given update operations.
         public func updateById(id : Nat, update_operations : [(Text, T.FieldUpdateOperations)]) : Result<(), Text> {
             handleResult(
                 StableCollection.update_by_id(collection, main_btree_utils, id, update_operations),

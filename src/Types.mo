@@ -152,13 +152,13 @@ module T {
         memory_type : MemoryType;
     };
 
-    public type NestedCandidMap = {
+    type NestedCandid = {
         #Candid : (T.Schema, Candid);
-        #CandidMap : (Map.Map<Text, NestedCandidMap>);
+        #CandidMap : (Map.Map<Text, NestedCandid>);
     };
 
     public type CandidMap = {
-        candid_map : Map.Map<Text, NestedCandidMap>;
+        candid_map : Map.Map<Text, NestedCandid>;
     };
 
     public type MemoryType = {

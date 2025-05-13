@@ -102,20 +102,20 @@ func inclusivity_tests(zendb : ZenDB.Database) {
     };
 
     // Create collections
-    let #ok(numeric_collection) = zendb.create_collection<NumericDoc>("numeric_test", NumericSchema, candify_numeric, []);
-    let #ok(text_collection) = zendb.create_collection<TextDoc>("text_test", TextSchema, candify_text, []);
-    let #ok(edge_collection) = zendb.create_collection<EdgeDoc>("edge_test", EdgeCaseSchema, candify_edge, []);
+    let #ok(numeric_collection) = zendb.create_collection<NumericDoc>("numeric_test", NumericSchema, candify_numeric, []) else return assert false;
+    let #ok(text_collection) = zendb.create_collection<TextDoc>("text_test", TextSchema, candify_text, []) else return assert false;
+    let #ok(edge_collection) = zendb.create_collection<EdgeDoc>("edge_test", EdgeCaseSchema, candify_edge, []) else return assert false;
 
     // Create indexes
-    let #ok(_) = numeric_collection.create_index("id_index", [("id", #Ascending)], false);
-    let #ok(_) = numeric_collection.create_index("int_val_index", [("int_val", #Ascending)], false);
+    let #ok(_) = numeric_collection.create_index("id_index", [("id", #Ascending)], false) else return assert false;
+    let #ok(_) = numeric_collection.create_index("int_val_index", [("int_val", #Ascending)], false) else return assert false;
     // let #ok(_) = numeric_collection.create_index("float_val_index", [("float_val", #Ascending)], false);
 
-    let #ok(_) = text_collection.create_index("text_val_index", [("text_val", #Ascending)], false);
-    let #ok(_) = text_collection.create_index("case_sensitive_index", [("case_sensitive", #Ascending)], false);
+    let #ok(_) = text_collection.create_index("text_val_index", [("text_val", #Ascending)], false) else return assert false;
+    let #ok(_) = text_collection.create_index("case_sensitive_index", [("case_sensitive", #Ascending)], false) else return assert false;
 
-    let #ok(_) = edge_collection.create_index("opt_field_index", [("opt_field", #Ascending)], false);
-    let #ok(_) = edge_collection.create_index("text_field_index", [("text_field", #Ascending)], false);
+    let #ok(_) = edge_collection.create_index("opt_field_index", [("opt_field", #Ascending)], false) else return assert false;
+    let #ok(_) = edge_collection.create_index("text_field_index", [("text_field", #Ascending)], false) else return assert false;
 
     // Insert test data for numeric tests
     let #ok(numeric_id_0) = numeric_collection.insert({
@@ -125,7 +125,7 @@ func inclusivity_tests(zendb : ZenDB.Database) {
         unindexed_nat = 0;
         unindexed_int = 0;
         unindexed_float = 0;
-    });
+    }) else return assert false;
 
     let #ok(numeric_id_1) = numeric_collection.insert({
         id = 1;
@@ -134,7 +134,7 @@ func inclusivity_tests(zendb : ZenDB.Database) {
         unindexed_nat = 1;
         unindexed_int = -1;
         unindexed_float = -1.5;
-    });
+    }) else return assert false;
 
     let #ok(numeric_id_2) = numeric_collection.insert({
         id = 5;
@@ -143,7 +143,7 @@ func inclusivity_tests(zendb : ZenDB.Database) {
         unindexed_nat = 5;
         unindexed_int = 5;
         unindexed_float = 5.5;
-    });
+    }) else return assert false;
 
     let #ok(numeric_id_3) = numeric_collection.insert({
         id = 10;
@@ -152,7 +152,7 @@ func inclusivity_tests(zendb : ZenDB.Database) {
         unindexed_nat = 10;
         unindexed_int = -10;
         unindexed_float = -10.5;
-    });
+    }) else return assert false;
 
     let #ok(numeric_id_4) = numeric_collection.insert({
         id = 100;
@@ -161,7 +161,7 @@ func inclusivity_tests(zendb : ZenDB.Database) {
         unindexed_nat = 100;
         unindexed_int = 100;
         unindexed_float = 100.5;
-    });
+    }) else return assert false;
 
     // Insert test data for text tests
     let #ok(text_id_0) = text_collection.insert({
@@ -169,35 +169,35 @@ func inclusivity_tests(zendb : ZenDB.Database) {
         text_val = "";
         unindexed_text = "";
         case_sensitive = "";
-    });
+    }) else return assert false;
 
     let #ok(text_id_1) = text_collection.insert({
         id = 2;
         text_val = "a";
         unindexed_text = "a";
         case_sensitive = "a";
-    });
+    }) else return assert false;
 
     let #ok(text_id_2) = text_collection.insert({
         id = 3;
         text_val = "b";
         unindexed_text = "b";
         case_sensitive = "B";
-    });
+    }) else return assert false;
 
     let #ok(text_id_3) = text_collection.insert({
         id = 4;
         text_val = "A";
         unindexed_text = "A";
         case_sensitive = "A";
-    });
+    }) else return assert false;
 
     let #ok(text_id_4) = text_collection.insert({
         id = 5;
         text_val = "!@#$%^";
         unindexed_text = "!@#$%^";
         case_sensitive = "!@#$%^";
-    });
+    }) else return assert false;
 
     // Insert test data for edge cases
     let #ok(edge_id_0) = edge_collection.insert({
@@ -207,7 +207,7 @@ func inclusivity_tests(zendb : ZenDB.Database) {
         zero_val = 0;
         min_int = -2147483648;
         max_int = 2147483647;
-    });
+    }) else return assert false;
 
     let #ok(edge_id_1) = edge_collection.insert({
         id = 2;
@@ -216,7 +216,7 @@ func inclusivity_tests(zendb : ZenDB.Database) {
         zero_val = 1;
         min_int = -1000;
         max_int = 1000;
-    });
+    }) else return assert false;
 
     let #ok(edge_id_2) = edge_collection.insert({
         id = 3;
@@ -225,7 +225,7 @@ func inclusivity_tests(zendb : ZenDB.Database) {
         zero_val = 0;
         min_int = -100;
         max_int = 100;
-    });
+    }) else return assert false;
 
     // Create a new collection for testing composite keys
     let CompositeSchema : ZenDB.Types.Schema = #Record([
@@ -249,11 +249,11 @@ func inclusivity_tests(zendb : ZenDB.Database) {
     };
 
     // Create collection
-    let #ok(composite_collection) = zendb.create_collection<CompositeDoc>("composite_test", CompositeSchema, candify_composite, []);
+    let #ok(composite_collection) = zendb.create_collection<CompositeDoc>("composite_test", CompositeSchema, candify_composite, []) else return assert false;
 
     // Create composite index
-    let #ok(_) = composite_collection.create_index("composite_index", [("category", #Ascending), ("number", #Ascending)], false);
-    let #ok(_) = composite_collection.create_index("blob_index", [("category", #Ascending), ("data", #Ascending)], false);
+    let #ok(_) = composite_collection.create_index("composite_index", [("category", #Ascending), ("number", #Ascending)], false) else return assert false;
+    let #ok(_) = composite_collection.create_index("blob_index", [("category", #Ascending), ("data", #Ascending)], false) else return assert false;
 
     // Insert test documents
     let #ok(comp_id_1) = composite_collection.insert({
@@ -261,35 +261,35 @@ func inclusivity_tests(zendb : ZenDB.Database) {
         category = "A";
         number = 5;
         data = Text.encodeUtf8("test1");
-    });
+    }) else return assert false;
 
     let #ok(comp_id_2) = composite_collection.insert({
         id = 2;
         category = "A";
         number = 10;
         data = Text.encodeUtf8("test2");
-    });
+    }) else return assert false;
 
     let #ok(comp_id_3) = composite_collection.insert({
         id = 3;
         category = "B";
         number = 5;
         data = Text.encodeUtf8("test3");
-    });
+    }) else return assert false;
 
     let #ok(comp_id_4) = composite_collection.insert({
         id = 4;
         category = "A";
         number = 7;
         data = Text.encodeUtf8("test4");
-    });
+    }) else return assert false;
 
     let #ok(comp_id_5) = composite_collection.insert({
         id = 5;
         category = "A";
         number = 15;
         data = Text.encodeUtf8("test5");
-    });
+    }) else return assert false;
 
     // For blob testing
     let #ok(blob_id_1) = composite_collection.insert({
@@ -297,28 +297,28 @@ func inclusivity_tests(zendb : ZenDB.Database) {
         category = "X";
         number = 1;
         data = Blob.fromArray([12, 32, 45]);
-    });
+    }) else return assert false;
 
     let #ok(blob_id_2) = composite_collection.insert({
         id = 11;
         category = "X";
         number = 2;
         data = Blob.fromArray([12, 32, 45, 1]);
-    });
+    }) else return assert false;
 
     let #ok(blob_id_3) = composite_collection.insert({
         id = 12;
         category = "X";
         number = 3;
         data = Blob.fromArray([12, 32, 45, 0]);
-    });
+    }) else return assert false;
 
     let #ok(blob_id_4) = composite_collection.insert({
         id = 13;
         category = "X";
         number = 4;
         data = Blob.fromArray([12, 32, 44]);
-    });
+    }) else return assert false;
 
     suite(
         "Numeric inclusivity operations",
@@ -331,7 +331,7 @@ func inclusivity_tests(zendb : ZenDB.Database) {
                         QueryBuilder().Where("id", #eq(#Nat(5)))
                     );
                     assert Result.isOk(result1);
-                    let #ok(data1) = result1;
+                    let #ok(data1) = result1 else return assert false;
                     assert data1.size() == 1;
                     assert data1[0].0 == numeric_id_2;
 
@@ -340,7 +340,7 @@ func inclusivity_tests(zendb : ZenDB.Database) {
                         QueryBuilder().Where("unindexed_nat", #eq(#Nat(5)))
                     );
                     assert Result.isOk(result2);
-                    let #ok(data2) = result2;
+                    let #ok(data2) = result2 else return assert false;
                     assert data2.size() == 1;
                     assert data2[0].0 == numeric_id_2;
                 },
@@ -354,7 +354,7 @@ func inclusivity_tests(zendb : ZenDB.Database) {
                         QueryBuilder().Where("id", #not_(#eq(#Nat(5))))
                     );
                     assert Result.isOk(result1);
-                    let #ok(data1) = result1;
+                    let #ok(data1) = result1 else return assert false;
                     assert data1.size() == 4;
                     assert Array.find<Nat>(
                         Array.map<(Nat, NumericDoc), Nat>(
@@ -374,7 +374,7 @@ func inclusivity_tests(zendb : ZenDB.Database) {
                         QueryBuilder().Where("id", #lt(#Nat(5)))
                     );
                     assert Result.isOk(result);
-                    let #ok(data) = result;
+                    let #ok(data) = result else return assert false;
                     assert data.size() == 2;
 
                     let ids = Array.map<(Nat, NumericDoc), Nat>(
@@ -395,7 +395,7 @@ func inclusivity_tests(zendb : ZenDB.Database) {
                         QueryBuilder().Where("id", #lte(#Nat(5)))
                     );
                     assert Result.isOk(result);
-                    let #ok(data) = result;
+                    let #ok(data) = result else return assert false;
                     assert data.size() == 3;
 
                     let ids = Array.map<(Nat, NumericDoc), Nat>(
@@ -417,7 +417,7 @@ func inclusivity_tests(zendb : ZenDB.Database) {
                         QueryBuilder().Where("id", #gt(#Nat(5)))
                     );
                     assert Result.isOk(result);
-                    let #ok(data) = result;
+                    let #ok(data) = result else return assert false;
                     assert data.size() == 2;
 
                     let ids = Array.map<(Nat, NumericDoc), Nat>(
@@ -438,7 +438,7 @@ func inclusivity_tests(zendb : ZenDB.Database) {
                         QueryBuilder().Where("id", #gte(#Nat(5)))
                     );
                     assert Result.isOk(result);
-                    let #ok(data) = result;
+                    let #ok(data) = result else return assert false;
                     assert data.size() == 3;
 
                     let ids = Array.map<(Nat, NumericDoc), Nat>(
@@ -461,7 +461,7 @@ func inclusivity_tests(zendb : ZenDB.Database) {
                     );
 
                     assert Result.isOk(result);
-                    let #ok(data) = result;
+                    let #ok(data) = result else return assert false;
                     Debug.print(debug_show ({ data = data }));
                     assert data.size() == 3;
 
@@ -487,7 +487,7 @@ func inclusivity_tests(zendb : ZenDB.Database) {
                     );
 
                     assert Result.isOk(result);
-                    let #ok(data) = result;
+                    let #ok(data) = result else return assert false;
                     assert data.size() == 3; // ids 1, 2, and 3
 
                     let ids = Array.map<(Nat, NumericDoc), Nat>(
@@ -514,7 +514,7 @@ func inclusivity_tests(zendb : ZenDB.Database) {
                         QueryBuilder().Where("text_val", #eq(#Text("")))
                     );
                     assert Result.isOk(result1);
-                    let #ok(data1) = result1;
+                    let #ok(data1) = result1 else return assert false;
                     assert data1.size() == 1;
                     assert data1[0].0 == text_id_0;
 
@@ -523,7 +523,7 @@ func inclusivity_tests(zendb : ZenDB.Database) {
                         QueryBuilder().Where("case_sensitive", #eq(#Text("A")))
                     );
                     assert Result.isOk(result2);
-                    let #ok(data2) = result2;
+                    let #ok(data2) = result2 else return assert false;
                     assert data2.size() == 1;
                     assert data2[0].0 == text_id_3;
 
@@ -531,7 +531,7 @@ func inclusivity_tests(zendb : ZenDB.Database) {
                         QueryBuilder().Where("case_sensitive", #eq(#Text("a")))
                     );
                     assert Result.isOk(result3);
-                    let #ok(data3) = result3;
+                    let #ok(data3) = result3 else return assert false;
                     assert data3.size() == 1;
                     assert data3[0].0 == text_id_1;
                 },
@@ -546,7 +546,7 @@ func inclusivity_tests(zendb : ZenDB.Database) {
                     );
 
                     assert Result.isOk(result1);
-                    let #ok(data1) = result1;
+                    let #ok(data1) = result1 else return assert false;
 
                     Debug.print(debug_show { data1 = data1 });
                     assert data1.size() == 4; // "", "a", "A", "!@#$%^"
@@ -566,7 +566,7 @@ func inclusivity_tests(zendb : ZenDB.Database) {
                         QueryBuilder().Where("text_val", #gt(#Text("a")))
                     );
                     assert Result.isOk(result2);
-                    let #ok(data2) = result2;
+                    let #ok(data2) = result2 else return assert false;
 
                     // Should include "b"
                     assert data2.size() > 0;
@@ -589,7 +589,7 @@ func inclusivity_tests(zendb : ZenDB.Database) {
                     );
 
                     assert Result.isOk(result);
-                    let #ok(data) = result;
+                    let #ok(data) = result else return assert false;
                     assert data.size() == 2; // "a" and "b"
 
                     let ids = Array.map<(Nat, TextDoc), Nat>(
@@ -610,7 +610,7 @@ func inclusivity_tests(zendb : ZenDB.Database) {
                         QueryBuilder().Where("text_val", #eq(#Text("!@#$%^")))
                     );
                     assert Result.isOk(result);
-                    let #ok(data) = result;
+                    let #ok(data) = result else return assert false;
                     assert data.size() == 1;
                     assert data[0].0 == text_id_4;
                 },
@@ -630,12 +630,12 @@ func inclusivity_tests(zendb : ZenDB.Database) {
                     );
 
                     assert Result.isOk(result);
-                    let #ok(data) = result;
+                    let #ok(data) = result else return assert false;
                     Debug.print(debug_show { data = data });
 
                     for (doc in edge_collection.vals()) {
                         let blob = candify_edge.to_blob(doc);
-                        let #ok(candid) = Candid.decode(blob, ["opt_field"], null);
+                        let #ok(candid) = Candid.decode(blob, ["opt_field"], null) else return assert false;
                         Debug.print(debug_show { candid = candid });
                         let schema_map = SchemaMap.new(EdgeCaseSchema);
 
@@ -658,7 +658,7 @@ func inclusivity_tests(zendb : ZenDB.Database) {
                         QueryBuilder().Where("text_field", #eq(#Text(" ")))
                     );
                     assert Result.isOk(result);
-                    let #ok(data) = result;
+                    let #ok(data) = result else return assert false;
                     Debug.print(debug_show ({ data = data }));
 
                     assert data.size() == 1;
@@ -675,7 +675,7 @@ func inclusivity_tests(zendb : ZenDB.Database) {
                         QueryBuilder().Where("zero_val", #eq(#Nat(0)))
                     );
                     assert Result.isOk(result);
-                    let #ok(data) = result;
+                    let #ok(data) = result else return assert false;
                     assert data.size() == 2;
 
                     let ids = Array.map<(Nat, EdgeDoc), Nat>(
@@ -696,7 +696,7 @@ func inclusivity_tests(zendb : ZenDB.Database) {
                         QueryBuilder().Where("min_int", #lt(#Int(-1000)))
                     );
                     assert Result.isOk(result1);
-                    let #ok(data1) = result1;
+                    let #ok(data1) = result1 else return assert false;
                     assert data1.size() == 1;
                     assert data1[0].0 == edge_id_0;
 
@@ -705,7 +705,7 @@ func inclusivity_tests(zendb : ZenDB.Database) {
                         QueryBuilder().Where("max_int", #gt(#Int(1000)))
                     );
                     assert Result.isOk(result2);
-                    let #ok(data2) = result2;
+                    let #ok(data2) = result2 else return assert false;
                     assert data2.size() == 1;
                     assert data2[0].0 == edge_id_0;
                 },
@@ -719,7 +719,7 @@ func inclusivity_tests(zendb : ZenDB.Database) {
                         QueryBuilder().Where("text_field", #lt(#Text("abc"))).Sort("text_field", #Descending)
                     );
                     assert Result.isOk(result);
-                    let #ok(data) = result;
+                    let #ok(data) = result else return assert false;
 
                     assert data.size() == 2;
 
@@ -744,7 +744,7 @@ func inclusivity_tests(zendb : ZenDB.Database) {
                     );
 
                     assert Result.isOk(result);
-                    let #ok(data) = result;
+                    let #ok(data) = result else return assert false;
                     assert data.size() == 2; // ids 2 and 4
 
                     let ids = Array.map<(Nat, NumericDoc), Nat>(
@@ -766,7 +766,7 @@ func inclusivity_tests(zendb : ZenDB.Database) {
                     );
 
                     assert Result.isOk(result);
-                    let #ok(data) = result;
+                    let #ok(data) = result else return assert false;
                     assert data.size() == 2; // ids 0 and 4
 
                     let ids = Array.map<(Nat, NumericDoc), Nat>(
@@ -788,7 +788,7 @@ func inclusivity_tests(zendb : ZenDB.Database) {
                     );
 
                     assert Result.isOk(result);
-                    let #ok(data) = result;
+                    let #ok(data) = result else return assert false;
                     assert data.size() == 3;
 
                     let ids = Array.map<(Nat, NumericDoc), Nat>(
@@ -817,7 +817,7 @@ func inclusivity_tests(zendb : ZenDB.Database) {
                     );
 
                     assert Result.isOk(result);
-                    let #ok(data) = result;
+                    let #ok(data) = result else return assert false;
                     Debug.print(debug_show ({ gt_nat_data = data }));
 
                     // Should include A-10 and A-15, but not A-5 or A-7
@@ -843,7 +843,7 @@ func inclusivity_tests(zendb : ZenDB.Database) {
                     );
 
                     assert Result.isOk(result);
-                    let #ok(data) = result;
+                    let #ok(data) = result else return assert false;
                     Debug.print(debug_show ({ lt_nat_data = data }));
 
                     // Should include A-5 and A-7, but not A-10 or A-15
@@ -903,7 +903,7 @@ func inclusivity_tests(zendb : ZenDB.Database) {
                     );
 
                     assert Result.isOk(result);
-                    let #ok(data) = result;
+                    let #ok(data) = result else return assert false;
                     Debug.print(debug_show ({ lt_blob_data = data }));
 
                     // Should include [12, 32, 44] but not [12, 32, 45, x]
@@ -954,7 +954,7 @@ func inclusivity_tests(zendb : ZenDB.Database) {
                     );
 
                     assert Result.isOk(result);
-                    let #ok(data) = result;
+                    let #ok(data) = result else return assert false;
                     Debug.print(debug_show ({ range_query_data = data }));
 
                     // Should include only A-7 and A-10

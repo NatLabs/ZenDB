@@ -10,7 +10,7 @@ import ZenDB "../src";
 import { test; suite } "mo:test";
 import Itertools "mo:itertools/Iter";
 import Map "mo:map/Map";
-import { newZenDBSuite } "TestFramework";
+import ZenDBSuite "TestFramework";
 
 type SizeVariant = {
     #known : Nat;
@@ -67,7 +67,7 @@ let data_type_to_candid : ZenDB.Types.Candify<Doc> = {
     to_blob = func(c : Doc) : Blob { to_candid (c) };
 };
 
-newZenDBSuite(
+ZenDBSuite.newZenDBSuite(
     "Update Tests",
     ?ZenDBSuite.withAndWithoutIndex,
     func collection_setup(zendb : ZenDB.Database) {

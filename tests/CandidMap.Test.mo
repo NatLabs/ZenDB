@@ -5,6 +5,8 @@ import Char "mo:base/Char";
 
 import { test; suite } "mo:test";
 import Candid "mo:serde/Candid";
+import Map "mo:map/Map";
+
 import SchemaMap "../src/Collection/SchemaMap";
 import CandidMap "../src/CandidMap";
 import ZenDB "../src";
@@ -61,6 +63,9 @@ suite(
         test(
             "get()",
             func() {
+                Debug.print("candid_map: " # debug_show Map.toArray(candid_map.candid_map));
+                Debug.print("name: " # debug_show CandidMap.get(candid_map, schema_map, "name"));
+                Debug.print("candid_map: " # debug_show Map.toArray(candid_map.candid_map));
 
                 assert CandidMap.get(candid_map, schema_map, "name") == ?#Text("Alice");
                 assert CandidMap.get(candid_map, schema_map, "age") == ?#Nat(25);
@@ -99,6 +104,7 @@ suite(
                 assert CandidMap.get(candid_map, schema_map, "tags.0") == ?#Text("new");
                 assert CandidMap.get(candid_map, schema_map, "tags.1") == ?#Text("popular");
 
+                Debug.print("comments.0.content: " # debug_show CandidMap.get(candid_map, schema_map, "comments.0.content"));
                 assert CandidMap.get(candid_map, schema_map, "comments.0.content") == ?#Text("comment1");
                 assert CandidMap.get(candid_map, schema_map, "comments.0.created_at") == ?#Nat(1234567890);
                 assert CandidMap.get(candid_map, schema_map, "comments.1") == null;
@@ -267,6 +273,17 @@ suite(
                         ]),
                     ),
                 ]);
+            },
+        );
+
+        test(
+            "CandidMap: store primitive types",
+            func() {
+                let schema_map = SchemaMap.new(#Nat);
+                let candid_map = CandidMap.new(schema_map, #Nat(42));
+                assert CandidMap.get(candid_map, schema_map, "") == ?#Nat(42);
+                assert CandidMap.get(candid_map, schema_map, "0") == null;
+
             },
         );
     },

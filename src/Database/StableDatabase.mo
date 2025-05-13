@@ -57,11 +57,26 @@ module {
         size;
     };
 
+    // public type CollectionOptions = T.CollectionOptions;
+
     public func create_collection(db : T.StableDatabase, name : Text, schema : T.Schema, schema_constraints : [T.SchemaConstraint]) : Result<StableCollection, Text> {
         Logger.lazyInfo(
             db.logger,
             func() = "StableDatabase.create_collection(): Creating collection '" # name # "'",
         );
+
+        switch (Schema.validate_schema(schema)) {
+            case (#ok(_)) {
+                Logger.lazyInfo(
+                    db.logger,
+                    func() = "StableDatabase.create_collection(): Schema validation passed for collection '" # name # "'",
+                );
+            };
+            case (#err(msg)) {
+                let error_msg = "StableDatabase.create_collection(): Schema validation failed: " # msg;
+                return log_error_msg(db.logger, error_msg);
+            };
+        };
 
         let processed_schema = Schema.process_schema(schema);
 
@@ -93,7 +108,6 @@ module {
             };
         };
 
-        let #Record(_) = processed_schema else return log_error_msg(db.logger, "Schema error: schema type is not a record");
         let schema_map = SchemaMap.new(processed_schema);
 
         // Validate schema constraints

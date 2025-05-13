@@ -10,7 +10,7 @@ import ZenDB "../src";
 import { test; suite } "mo:test";
 import Itertools "mo:itertools/Iter";
 import Map "mo:map/Map";
-import { newZenDBSuite } "TestFramework";
+import ZenDBSuite "TestFramework";
 
 type SizeVariant = {
     #known : Nat;
@@ -50,7 +50,7 @@ let data_type_to_candid : ZenDB.Types.Candify<Data> = {
     to_blob = func(c : Data) : Blob { to_candid (c) };
 };
 
-newZenDBSuite(
+ZenDBSuite.newZenDBSuite(
     "Variant Tests",
     ?ZenDBSuite.withAndWithoutIndex,
     func collection_setup(zendb : ZenDB.Database) {
@@ -86,6 +86,14 @@ newZenDBSuite(
                         assert data.search(
                             ZenDB.QueryBuilder().Where("version.v1.a", #eq(#Nat(42)))
                         ) == #ok([(0, { version = #v1({ a = 42; b = "hello" }) })]);
+
+                        Debug.print(
+                            "searching for version.v3.size.known == 32: " # debug_show (
+                                data.search(
+                                    ZenDB.QueryBuilder().Where("version.v3.size.known", #eq(#Nat(32)))
+                                )
+                            )
+                        );
 
                         assert data.search(
                             ZenDB.QueryBuilder().Where("version.v3.size.known", #eq(#Nat(32)))

@@ -37,16 +37,16 @@ func query_tests(zendb : ZenDB.Database) {
         };
     };
 
-    let #ok(texts) = zendb.create_collection("texts", DataSchema, candify_data, []);
+    let #ok(texts) = zendb.create_collection("texts", DataSchema, candify_data, []) else return assert false;
 
-    let #ok(_) = texts.insert({ value = "a" });
-    let #ok(_) = texts.insert({ value = "alphabet" });
-    let #ok(_) = texts.insert({ value = "alphabetical" });
-    let #ok(_) = texts.insert({ value = "and" });
-    let #ok(_) = texts.insert({ value = "anderson" });
-    let #ok(_) = texts.insert({ value = "b" });
-    let #ok(_) = texts.insert({ value = "berry" });
-    let #ok(_) = texts.insert({ value = "c" });
+    let #ok(_) = texts.insert({ value = "a" }) else return assert false;
+    let #ok(_) = texts.insert({ value = "alphabet" }) else return assert false;
+    let #ok(_) = texts.insert({ value = "alphabetical" }) else return assert false;
+    let #ok(_) = texts.insert({ value = "and" }) else return assert false;
+    let #ok(_) = texts.insert({ value = "anderson" }) else return assert false;
+    let #ok(_) = texts.insert({ value = "b" }) else return assert false;
+    let #ok(_) = texts.insert({ value = "berry" }) else return assert false;
+    let #ok(_) = texts.insert({ value = "c" }) else return assert false;
 
     func run_query_tests(texts : ZenDB.Collection<Data>) {
         test(
@@ -360,10 +360,6 @@ func query_tests(zendb : ZenDB.Database) {
                     (7, { value = "c" }),
                 ]);
 
-                assert texts.search(
-                    QueryBuilder().Where("value", #not_(#exists))
-                ) == #ok([]);
-
             },
         );
 
@@ -403,7 +399,7 @@ func query_tests(zendb : ZenDB.Database) {
         "testing on indexed field",
         func() {
             Debug.print("trying to index field");
-            let #ok(_) = texts.create_and_populate_index("value_index", [("value", #Ascending)]);
+            let #ok(_) = texts.create_and_populate_index("value_index", [("value", #Ascending)]) else return assert false;
             Debug.print("field indexed");
 
             run_query_tests(texts);

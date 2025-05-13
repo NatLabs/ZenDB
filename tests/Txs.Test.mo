@@ -17,7 +17,7 @@ import BitMap "mo:bit-map";
 
 import ZenDB "../src";
 import TestUtils "TestUtils";
-import { newZenDBSuite } "TestFramework";
+import ZenDBSuite "TestFramework";
 
 let fuzz = Fuzz.fromSeed(0x7eadbeef);
 let { QueryBuilder } = ZenDB;
@@ -161,29 +161,29 @@ let input_txs = Buffer.fromArray<Tx>(
     )
 );
 
-newZenDBSuite(
+ZenDBSuite.newZenDBSuite(
     "Txs tests",
-    ?ZenDBSuite.withAndWithoutIndex,
+    ?ZenDBSuite.onlyWithIndex,
     func collection_setup(zendb : ZenDB.Database) {
         let #ok(txs) = zendb.create_collection<Tx>("transactions", TxSchema, candify_tx, []);
     },
     func index_setup(zendb : ZenDB.Database) {
         let #ok(txs) = zendb.get_collection<Tx>("transactions", candify_tx);
 
-        let #ok(_) = txs.create_and_populate_index("index:[[btype],[tx.amt]]", [("btype", #Ascending), ("tx.amt", #Ascending)]);
-        let #ok(_) = txs.create_and_populate_index("index:[[btype],[ts]]", [("btype", #Ascending), ("ts", #Ascending)]);
-        let #ok(_) = txs.create_and_populate_index("index:[[tx.amt]]", [("tx.amt", #Ascending)]);
-        let #ok(_) = txs.create_and_populate_index("index:[[ts]]", [("ts", #Ascending)]);
-        let #ok(_) = txs.create_and_populate_index("index:[[tx.from.owner],[tx.from.sub_account]]", [("tx.from.owner", #Ascending), ("tx.from.sub_account", #Ascending)]);
-        let #ok(_) = txs.create_and_populate_index("index:[[tx.to.owner],[tx.to.sub_account]]", [("tx.to.owner", #Ascending), ("tx.to.sub_account", #Ascending)]);
-        let #ok(_) = txs.create_and_populate_index("index:[[tx.spender.owner],[tx.spender.sub_account]]", [("tx.spender.owner", #Ascending), ("tx.spender.sub_account", #Ascending)]);
+        let #ok(_) = txs.create_and_populate_index("index:[btype],[tx.amt]", [("btype", #Ascending), ("tx.amt", #Ascending)]);
+        let #ok(_) = txs.create_and_populate_index("index:[btype],[ts]", [("btype", #Ascending), ("ts", #Ascending)]);
+        let #ok(_) = txs.create_and_populate_index("index:[tx.amt]", [("tx.amt", #Ascending)]);
+        let #ok(_) = txs.create_and_populate_index("index:[ts]", [("ts", #Ascending)]);
+        let #ok(_) = txs.create_and_populate_index("index:[tx.from.owner],[tx.from.sub_account]", [("tx.from.owner", #Ascending), ("tx.from.sub_account", #Ascending)]);
+        let #ok(_) = txs.create_and_populate_index("index:[tx.to.owner],[tx.to.sub_account]", [("tx.to.owner", #Ascending), ("tx.to.sub_account", #Ascending)]);
+        let #ok(_) = txs.create_and_populate_index("index:[tx.spender.owner],[tx.spender.sub_account]", [("tx.spender.owner", #Ascending), ("tx.spender.sub_account", #Ascending)]);
     },
     func txs_tests(zendb : ZenDB.Database) {
 
         let #ok(txs) = zendb.get_collection<Tx>("transactions", candify_tx);
 
         for ((i, tx) in Itertools.enumerate(input_txs.vals())) {
-            let #ok(_) = txs.insert_with_id(tx.tx_index, tx);
+            let #ok(id) = txs.insert(tx); // id is generated incrementally, so it should match tx.tx_index
         };
 
         assert txs.size() == limit;
@@ -325,7 +325,7 @@ newZenDBSuite(
             var batch_size = records.size();
 
             label skip_limit_pagination while (batch_size > 0) {
-                Debug.print("total size: " # debug_show records.size());
+                // Debug.print("total size: " # debug_show records.size());
                 // Debug.print("records: " # debug_show (Array.map<(Nat, Tx), Nat>(Buffer.toArray(records), func((id, tx) : (Nat, Tx)) : Nat = id)));
 
                 ignore db_query.Skip(records.size()).Limit(pagination_limit);
@@ -504,33 +504,33 @@ newZenDBSuite(
                     tx1.tx.amt <= tx2.tx.amt;
                 };
             },
-            // {
-            //     query_name = "get_txs() with btype = '1burn' or '1xfer'";
-            //     db_query = QueryBuilder().Where(
-            //         "btype",
-            //         #anyOf([#Text("1burn"), #Text("1xfer")]),
-            //     );
-            //     expected_query_resolution = #Or([
-            //         #Operation(
-            //             "btype",
-            //             #eq(#Text("1burn")),
-            //         ),
-            //         #Operation(
-            //             "btype",
-            //             #eq(#Text("1xfer")),
-            //         ),
-            //     ]);
-            //     check_if_result_matches_query = func(id : Nat, tx : Tx) : Bool {
-            //         tx.btype == "1burn" or tx.btype == "1xfer";
-            //     };
-            //     display_record = func(tx : Tx) : Text = debug_show tx;
-            //     sort = [
-            //         ("ts", #Descending),
-            //     ];
-            //     check_if_results_are_sorted = func(tx1 : Tx, tx2 : Tx) : Bool {
-            //         tx1.ts >= tx2.ts;
-            //     };
-            // },
+            {
+                query_name = "get_txs() with btype = '1burn' or '1xfer'";
+                db_query = QueryBuilder().Where(
+                    "btype",
+                    #anyOf([#Text("1burn"), #Text("1xfer")]),
+                );
+                expected_query_resolution = #Or([
+                    #Operation(
+                        "btype",
+                        #eq(#Text("1burn")),
+                    ),
+                    #Operation(
+                        "btype",
+                        #eq(#Text("1xfer")),
+                    ),
+                ]);
+                check_if_result_matches_query = func(id : Nat, tx : Tx) : Bool {
+                    tx.btype == "1burn" or tx.btype == "1xfer";
+                };
+                display_record = func(tx : Tx) : Text = debug_show tx;
+                sort = [
+                    ("ts", #Descending),
+                ];
+                check_if_results_are_sorted = func(tx1 : Tx, tx2 : Tx) : Bool {
+                    tx1.ts >= tx2.ts;
+                };
+            },
             {
                 query_name = "get_txs() with the first principal as the recipient";
                 db_query = QueryBuilder().Where(

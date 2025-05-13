@@ -282,16 +282,14 @@ module {
                     case (null) ignore Map.put(lower, thash, field, #Exclusive(candid));
                 };
             };
-            case (#between(candid1, candid2)) {
-                operation_eval(field, #gte(candid1), lower, upper);
-                operation_eval(field, #lte(candid2), lower, upper);
-            };
-            case (#startsWith(candid)) {
-                // Debug.print("startsWith: " # debug_show candid);
-                // Debug.trap("startsWith not implemented");
+
+            case (#exists) {
+                ignore Map.put(lower, thash, field, #Inclusive(#Minimum));
+                ignore Map.put(upper, thash, field, #Inclusive(#Maximum));
             };
 
-            case (#anyOf(_) or #not_(_) or #exists) {
+            // aliases should be handled by the query builder
+            case (#anyOf(_) or #between(_, _) or #startsWith(_) or #not_(_)) {
                 Debug.trap(debug_show op # " not allowed in this context. Should have been expanded by the query builder");
             };
         };
@@ -382,6 +380,8 @@ module {
             let index_of_first_null = Option.get(opt_index_of_first_null, 0);
 
             let new_value_at_index = switch (query_entries[index_of_first_null - 1]) {
+                case ((_field, ?#Inclusive(#Minimum) or ?#Exclusive(#Minimum))) #Minimum;
+                case ((_field, ?#Inclusive(#Maximum) or ?#Exclusive(#Maximum))) #Maximum;
                 case ((_field, ?#Inclusive(value))) value;
                 case ((_field, ?#Exclusive(value))) if (is_lower_bound) {
                     CandidMod.get_next_value(value);
