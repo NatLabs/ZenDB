@@ -639,7 +639,7 @@ func inclusivity_tests(zendb : ZenDB.Database) {
                         Debug.print(debug_show { candid = candid });
                         let schema_map = SchemaMap.new(EdgeCaseSchema);
 
-                        let candid_map = CandidMap.new(schema_map, candid[0]);
+                        let candid_map = CandidMap.new(schema_map, 0, candid[0]);
                         let opt_field = CandidMap.get(candid_map, schema_map, "opt_field");
                         Debug.print(debug_show { opt_field = opt_field });
 

@@ -11,6 +11,7 @@ import Map "mo:map/Map";
 import Set "mo:map/Set";
 
 import T "Types";
+import C "Constants";
 import Logger "Logger";
 import Schema "Collection/Schema";
 import SchemaMap "Collection/SchemaMap";
@@ -280,7 +281,12 @@ module {
             case (#Operation(field, op)) {
                 // Debug.print(debug_show (Set.toArray(collection.schema_keys_set)));
 
-                if (field != "" and Option.isNull(Nat.fromText(field)) and not Set.has(collection.schema_keys_set, thash, field)) {
+                if (
+                    field != "" and
+                    Option.isNull(Nat.fromText(field)) and
+                    not Set.has(collection.schema_keys_set, thash, field) and
+                    field != C.RECORD_ID
+                ) {
 
                     if (Text.contains(field, #text("."))) {
                         for (key in Text.split(field, #text("."))) {

@@ -31,15 +31,15 @@ module {
 
     //     var size = 0;
 
-    //     while (size < MemoryBTree.size(collection.main)) {
+    //     while (size < MemoryBTree.size(collection.documents)) {
 
     //         let start = size;
-    //         let end = Nat.min(size + BATCH_SIZE, MemoryBTree.size(collection.main));
+    //         let end = Nat.min(size + BATCH_SIZE, MemoryBTree.size(collection.documents));
 
     //         let res = await internal_populate_indexes(
     //             collection,
     //             indexes,
-    //             MemoryBTree.range(collection.main, _main_btree_utils, start, end),
+    //             MemoryBTree.range(collection.documents, _main_btree_utils, start, end),
     //         );
 
     //         switch (res) {

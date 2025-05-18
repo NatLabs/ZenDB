@@ -88,7 +88,7 @@ module {
             if (contains_option_type) {
                 Array.append(
                     index_key_details,
-                    [(C.UNIQUE_INDEX_NULL_EXEMPT_FROM_UNIQUENESS_ID, #Ascending)],
+                    [(C.UNIQUE_INDEX_NULL_EXEMPT_ID, #Ascending)],
                 );
             } else {
                 index_key_details;
@@ -151,7 +151,7 @@ module {
             # debug_show (index_key_values) # ", now encoded as " # (
                 switch (index_data_utils) {
                     case (#stableMemory(utils)) debug_show utils.key.blobify.to_blob(index_key_values);
-                    case (#heap(utils)) debug_show index_key_values;
+                    case (#heap(utils)) debug_show utils.blobify.to_blob(index_key_values);
                 }
             ),
         );
@@ -366,29 +366,29 @@ module {
                 },
             );
 
-            let is_null_or_equal_to_zero = Option.isNull(opt_index_of_first_null) or opt_index_of_first_null == ?0;
+            switch (opt_index_of_first_null) {
+                case (?0) {
+                    // the first null value was found at index 0
+                    return [if (is_lower_bound) #Minimum else #Maximum];
+                };
+                case (_) {};
 
-            if (is_null_or_equal_to_zero) {
-                return [
-                    switch (query_entries[0].1) {
-                        case (?#Exclusive(value) or ?#Inclusive(value)) value;
-                        case (null) if (is_lower_bound) #Minimum else #Maximum;
-                    }
-                ];
             };
 
             let index_of_first_null = Option.get(opt_index_of_first_null, 0);
 
-            let new_value_at_index = switch (query_entries[index_of_first_null - 1]) {
-                case ((_field, ?#Inclusive(#Minimum) or ?#Exclusive(#Minimum))) #Minimum;
-                case ((_field, ?#Inclusive(#Maximum) or ?#Exclusive(#Maximum))) #Maximum;
-                case ((_field, ?#Inclusive(value))) value;
-                case ((_field, ?#Exclusive(value))) if (is_lower_bound) {
-                    CandidMod.get_next_value(value);
-                } else {
-                    CandidMod.get_prev_value(value);
+            func get_new_value_at_index(i : Nat) : T.CandidQuery {
+                switch (query_entries[index_of_first_null - 1]) {
+                    case ((_field, ?#Inclusive(#Minimum) or ?#Exclusive(#Minimum))) #Minimum;
+                    case ((_field, ?#Inclusive(#Maximum) or ?#Exclusive(#Maximum))) #Maximum;
+                    case ((_field, ?#Inclusive(value))) value;
+                    case ((_field, ?#Exclusive(value))) if (is_lower_bound) {
+                        CandidMod.get_next_value(value);
+                    } else {
+                        CandidMod.get_prev_value(value);
+                    };
+                    case (_) Debug.trap("filter_null_entries_in_query: received null value, should not happen");
                 };
-                case (_) Debug.trap("filter_null_entries_in_query: received null value, should not happen");
             };
 
             Array.tabulate<T.CandidQuery>(
@@ -396,7 +396,7 @@ module {
                 func(i : Nat) : T.CandidQuery {
                     let (_field, inclusivity_query) = query_entries[i];
 
-                    if (i + 1 == index_of_first_null) return new_value_at_index;
+                    if (i + 1 == index_of_first_null) return get_new_value_at_index(i);
 
                     switch (inclusivity_query) {
                         case (?#Exclusive(value) or ?#Inclusive(value)) value;
@@ -444,7 +444,7 @@ module {
 
         Logger.lazyDebug(
             collection.logger,
-            func() = "scan interval results: " # debug_show scans,
+            func() = "scan interval results: " # debug_show scans # "\nindex size: " # debug_show BTree.size(index.data),
         );
 
         scans;
@@ -699,7 +699,7 @@ module {
             label scoring_indexes for ((index_key, direction) in index.key_details.vals()) {
                 index_key_details_position += 1;
 
-                if (index_key == C.RECORD_ID) break scoring_indexes;
+                // if (index_key == C.RECORD_ID) break scoring_indexes;
 
                 var matches_at_least_one_column = false;
 

@@ -12,6 +12,7 @@ import Candid "mo:serde/Candid";
 import Itertools "mo:itertools/Iter";
 
 import T "Types";
+import C "Constants";
 import Schema "Collection/Schema";
 import SchemaMap "Collection/SchemaMap";
 
@@ -81,7 +82,7 @@ module CandidMap {
         candid_map : Map.Map<Text, NestedCandid>;
     };
 
-    public func new(schema_map : T.SchemaMap, candid : T.Candid) : CandidMap {
+    public func new(schema_map : T.SchemaMap, id : Nat, candid : T.Candid) : CandidMap {
 
         let ?types = SchemaMap.get(schema_map, "") else Debug.trap("CandidMap only accepts #Record types");
         let map = Map.new<Text, NestedCandid>();
@@ -89,6 +90,7 @@ module CandidMap {
         // Debug.print("CandidMap.new(): " # debug_show (types, candid));
 
         ignore Map.put(map, T.thash, "", #Candid(types, candid));
+        ignore Map.put(map, T.thash, C.RECORD_ID, #Candid(#Nat, #Nat(id)));
 
         let candid_map = { candid_map = map };
 
@@ -281,6 +283,11 @@ module CandidMap {
 
     public func get(candid_map_state : CandidMap, schema_map : T.SchemaMap, key : Text) : ?Candid {
         let { candid_map } = candid_map_state;
+
+        if (key == C.RECORD_ID) {
+            let ?#Candid(#Nat, #Nat(id)) = Map.get(candid_map, thash, C.RECORD_ID) else Debug.trap("CandidMap: Could not find candid id");
+            return ?#Nat(id);
+        };
 
         let fields = Iter.toArray(Text.split(key, #text(".")));
         let ?types = SchemaMap.get(schema_map, key) else return null;
@@ -523,11 +530,12 @@ module CandidMap {
     };
 
     /// Assumes the new candid has the same schema as the original candid
-    public func reload({ candid_map } : CandidMap, schema_map : T.SchemaMap, new_candid : Candid) {
+    public func reload({ candid_map } : CandidMap, schema_map : T.SchemaMap, new_id : Nat, new_candid : Candid) {
         let ?(types) = SchemaMap.get(schema_map, "") else Debug.trap("CandidMap only accepts #Record types");
 
         Map.clear(candid_map);
         ignore Map.put(candid_map, thash, "", #Candid(types, new_candid));
+        ignore Map.put(candid_map, thash, C.RECORD_ID, #Candid(#Nat, #Nat(new_id)));
 
         // // unlike the `load()` method, we already have a map that might have cached nested records
         // // these cached records are indicative of the fields that have been accessed and would most likely be accessed again
@@ -578,7 +586,8 @@ module CandidMap {
 
     public func clone(candid_map : CandidMap, schema_map : T.SchemaMap) : CandidMap {
         let extracted_candid = extract_candid(candid_map);
-        let cloned = CandidMap.new(schema_map, extracted_candid);
+        let ?(#Candid(#Nat, #Nat(id))) = Map.get(candid_map.candid_map, thash, C.RECORD_ID) else Debug.trap("CandidMap.clone(): Could not find candid id");
+        let cloned = CandidMap.new(schema_map, id, extracted_candid);
 
         cloned;
     };

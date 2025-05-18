@@ -21,7 +21,6 @@ import Int64 "mo:base/Int64";
 import Int8 "mo:base/Int8";
 import Nat16 "mo:base/Nat16";
 import Nat8 "mo:base/Nat8";
-import InternetComputer "mo:base/ExperimentalInternetComputer";
 
 import Map "mo:map/Map";
 import Set "mo:map/Set";
@@ -53,6 +52,7 @@ import CandidMod "../CandidMod";
 import Logger "../Logger";
 import UpdateOps "UpdateOps";
 import BTree "../BTree";
+import DocumentStore "DocumentStore";
 
 module StableCollection {
 
@@ -85,53 +85,87 @@ module StableCollection {
     public type IndexKeyFields = T.IndexKeyFields;
     type EvalResult = T.EvalResult;
 
-    // public func new(db: ZenDB.StableDatabase) : StableCollection {
+    // public func new(
+    //     db : ZenDB.StableDatabase,
+    //     name : Text,
+    //     memory_type : ZenDB.MemoryType,
+    //     processed_schema : T.Schema,
+    // ) : StableCollection {
 
     //     let schema_keys = Utils.extract_schema_keys(processed_schema);
 
-    //     let stable_collection = {
+    //     var stable_collection : T.StableCollection = {
     //         ids = Ids.new();
-    //         var schema = processed_schema;
+    //         name;
+    //         schema = processed_schema;
+    //         schema_map = SchemaMap.new(processed_schema);
     //         schema_keys;
     //         schema_keys_set = Set.fromIter(schema_keys.vals(), thash);
-    //         main = BTree.new(?C.STABLE_MEMORY_BTREE_ORDER);
+    //         documents = switch (db.memory_type) {
+    //             case (#heap) { BTree.newHeap() };
+    //             case (#stableMemory) {
+    //                 switch (Vector.removeLast(db.freed_btrees)) {
+    //                     case (?memory_btree) {
+    //                         #stableMemory(memory_btree);
+    //                     };
+    //                     case (null) {
+    //                         BTree.newStableMemory();
+    //                     };
+    //                 };
+    //             };
+    //         };
+
     //         indexes = Map.new<Text, T.Index>();
+
+    //         field_constraints;
+    //         unique_constraints = [];
+    //         fields_with_unique_constraints = Map.new();
 
     //         // db references
     //         freed_btrees = db.freed_btrees;
     //         logger = db.logger;
+    //         memory_type = db.memory_type;
     //     };
 
     // };
 
     public func size(collection : StableCollection) : Nat {
-        BTree.size(collection.main);
+        DocumentStore.size(collection.documents);
+    };
+
+    /// Clear all the data in the collection.
+    public func clear(collection : StableCollection) : () {
+        DocumentStore.clear(collection.documents);
+
+        for (index in Map.vals(collection.indexes)) {
+            BTree.clear(index.data);
+        };
     };
 
     // BTree methods
 
-    public func entries(collection : StableCollection, main_btree_utils : T.BTreeUtils<Nat, Blob>) : Iter<(Nat, Blob)> {
-        BTree.entries(collection.main, main_btree_utils);
+    public func entries(collection : StableCollection, main_btree_utils : T.BTreeUtils<Nat, T.Document>) : Iter<(Nat, Blob)> {
+        DocumentStore.entries(collection.documents, main_btree_utils);
     };
 
-    public func keys(collection : StableCollection, main_btree_utils : T.BTreeUtils<Nat, Blob>) : Iter<Nat> {
-        BTree.keys(collection.main, main_btree_utils);
+    public func keys(collection : StableCollection, main_btree_utils : T.BTreeUtils<Nat, T.Document>) : Iter<Nat> {
+        DocumentStore.keys(collection.documents, main_btree_utils);
     };
 
-    public func vals(collection : StableCollection, main_btree_utils : T.BTreeUtils<Nat, Blob>) : Iter<Blob> {
-        BTree.vals(collection.main, main_btree_utils);
+    public func vals(collection : StableCollection, main_btree_utils : T.BTreeUtils<Nat, T.Document>) : Iter<Blob> {
+        DocumentStore.vals(collection.documents, main_btree_utils);
     };
 
-    public func range(collection : StableCollection, main_btree_utils : T.BTreeUtils<Nat, Blob>, start : Nat, end : Nat) : Iter<(Nat, Blob)> {
-        BTree.range(collection.main, main_btree_utils, start, end);
+    public func range(collection : StableCollection, main_btree_utils : T.BTreeUtils<Nat, T.Document>, start : Nat, end : Nat) : Iter<(Nat, Blob)> {
+        DocumentStore.range(collection.documents, main_btree_utils, start, end);
     };
 
-    public func rangeKeys(collection : StableCollection, main_btree_utils : T.BTreeUtils<Nat, Blob>, start : Nat, end : Nat) : Iter<Nat> {
-        BTree.rangeKeys(collection.main, main_btree_utils, start, end);
+    public func rangeKeys(collection : StableCollection, main_btree_utils : T.BTreeUtils<Nat, T.Document>, start : Nat, end : Nat) : Iter<Nat> {
+        DocumentStore.rangeKeys(collection.documents, main_btree_utils, start, end);
     };
 
-    public func rangeVals(collection : StableCollection, main_btree_utils : T.BTreeUtils<Nat, Blob>, start : Nat, end : Nat) : Iter<Blob> {
-        BTree.rangeVals(collection.main, main_btree_utils, start, end);
+    public func rangeVals(collection : StableCollection, main_btree_utils : T.BTreeUtils<Nat, T.Document>, start : Nat, end : Nat) : Iter<Blob> {
+        DocumentStore.rangeVals(collection.documents, main_btree_utils, start, end);
     };
 
     // public func update_schema(collection : StableCollection, schema : T.Schema) : Result<(), Text> {
@@ -188,7 +222,7 @@ module StableCollection {
 
     public func create_index(
         collection : StableCollection,
-        main_btree_utils : T.BTreeUtils<Nat, Blob>,
+        main_btree_utils : T.BTreeUtils<Nat, T.Document>,
         index_name : Text,
         _index_key_details : [(Text, SortDirection)],
         is_unique : Bool,
@@ -199,7 +233,7 @@ module StableCollection {
 
     public func create_and_populate_index(
         collection : StableCollection,
-        _main_btree_utils : T.BTreeUtils<Nat, Blob>,
+        _main_btree_utils : T.BTreeUtils<Nat, T.Document>,
         index_name : Text,
         index_key_details : [(Text, SortDirection)],
     ) : Result<(), Text> {
@@ -221,7 +255,7 @@ module StableCollection {
 
     public func clear_index(
         collection : StableCollection,
-        _main_btree_utils : T.BTreeUtils<Nat, Blob>,
+        _main_btree_utils : T.BTreeUtils<Nat, T.Document>,
         index_name : Text,
     ) : Result<(), Text> {
 
@@ -247,7 +281,7 @@ module StableCollection {
         var count = 0;
         for ((id, candid_blob) in entries) {
             let candid = CollectionUtils.decode_candid_blob(collection, candid_blob);
-            let candid_map = CandidMap.new(collection.schema_map, candid);
+            let candid_map = CandidMap.new(collection.schema_map, id, candid);
 
             for (index in indexes.vals()) {
                 switch (Index.insert(collection, index, id, candid_map)) {
@@ -285,7 +319,7 @@ module StableCollection {
 
     public func populate_index(
         collection : StableCollection,
-        _main_btree_utils : T.BTreeUtils<Nat, Blob>,
+        _main_btree_utils : T.BTreeUtils<Nat, T.Document>,
         index_name : Text,
     ) : Result<(), Text> {
         populate_indexes(collection, _main_btree_utils, [index_name]);
@@ -293,7 +327,7 @@ module StableCollection {
 
     public func populate_indexes(
         collection : StableCollection,
-        _main_btree_utils : T.BTreeUtils<Nat, Blob>,
+        _main_btree_utils : T.BTreeUtils<Nat, T.Document>,
         index_names : [Text],
     ) : Result<(), Text> {
 
@@ -323,14 +357,14 @@ module StableCollection {
         internal_populate_indexes(
             collection,
             indexes,
-            BTree.entries(collection.main, _main_btree_utils),
+            DocumentStore.entries(collection.documents, _main_btree_utils),
         );
 
     };
 
     public func delete_index(
         collection : StableCollection,
-        _main_btree_utils : T.BTreeUtils<Nat, Blob>,
+        _main_btree_utils : T.BTreeUtils<Nat, T.Document>,
         index_name : Text,
     ) : Result<(), Text> {
         Logger.info(collection.logger, "Deleting index: " # index_name);
@@ -601,7 +635,7 @@ module StableCollection {
 
     public func put(
         collection : StableCollection,
-        main_btree_utils : T.BTreeUtils<Nat, Blob>,
+        main_btree_utils : T.BTreeUtils<Nat, T.Document>,
         candid_blob : T.CandidBlob,
     ) : Result<Nat, Text> {
 
@@ -632,7 +666,7 @@ module StableCollection {
             };
         };
 
-        let candid_map = CandidMap.new(collection.schema_map, candid);
+        let candid_map = CandidMap.new(collection.schema_map, id, candid);
 
         switch (validate_schema_constraints_on_updated_fields(collection, id, candid_map, null)) {
             case (#ok(_)) {};
@@ -643,7 +677,7 @@ module StableCollection {
             };
         };
 
-        let opt_prev = BTree.put(collection.main, main_btree_utils, id, candid_blob);
+        let opt_prev = DocumentStore.put(collection.documents, main_btree_utils, id, candid_blob);
 
         switch (opt_prev) {
             case (null) {};
@@ -665,7 +699,7 @@ module StableCollection {
                         ignore Index.remove(collection, index, id, candid_map);
                     };
 
-                    ignore BTree.remove(collection.main, main_btree_utils, id);
+                    ignore DocumentStore.remove(collection.documents, main_btree_utils, id);
 
                     return #err(err);
                 };
@@ -680,18 +714,18 @@ module StableCollection {
 
     public func replace_record_by_id<Record>(
         collection : StableCollection,
-        main_btree_utils : T.BTreeUtils<Nat, Blob>,
+        main_btree_utils : T.BTreeUtils<Nat, T.Document>,
         id : Nat,
         new_candid_blob : T.CandidBlob,
     ) : Result<(), Text> {
         Logger.info(collection.logger, "Replacing record with id: " # debug_show id);
 
-        let ?prev_candid_blob = BTree.get(collection.main, main_btree_utils, id) else return Utils.log_error_msg(collection.logger, "Record for id '" # debug_show (id) # "' not found");
+        let ?prev_candid_blob = DocumentStore.get(collection.documents, main_btree_utils, id) else return Utils.log_error_msg(collection.logger, "Record for id '" # debug_show (id) # "' not found");
         let prev_candid = CollectionUtils.decode_candid_blob(collection, prev_candid_blob);
-        let prev_candid_map = CandidMap.new(collection.schema_map, prev_candid);
+        let prev_candid_map = CandidMap.new(collection.schema_map, id, prev_candid);
 
         let new_candid_value = CollectionUtils.decode_candid_blob(collection, new_candid_blob);
-        let new_candid_map = CandidMap.new(collection.schema_map, new_candid_value);
+        let new_candid_map = CandidMap.new(collection.schema_map, id, new_candid_value);
 
         switch (Schema.validate(collection.schema, new_candid_value)) {
             case (#err(msg)) {
@@ -708,7 +742,7 @@ module StableCollection {
             };
         };
 
-        assert ?prev_candid_blob == BTree.put(collection.main, main_btree_utils, id, new_candid_blob);
+        assert ?prev_candid_blob == DocumentStore.put(collection.documents, main_btree_utils, id, new_candid_blob);
 
         for (index in Map.vals(collection.indexes)) {
             let #ok(_) = update_indexed_record_fields(collection, index, id, new_candid_map, ?prev_candid_map) else {
@@ -812,16 +846,16 @@ module StableCollection {
         #ok;
     };
 
-    public func update_by_id<Record>(collection : StableCollection, main_btree_utils : T.BTreeUtils<Nat, Blob>, id : Nat, field_updates : [(Text, T.FieldUpdateOperations)]) : Result<(), Text> {
+    public func update_by_id<Record>(collection : StableCollection, main_btree_utils : T.BTreeUtils<Nat, T.Document>, id : Nat, field_updates : [(Text, T.FieldUpdateOperations)]) : Result<(), Text> {
         Logger.lazyInfo(
             collection.logger,
             func() = "Updating record with id: " # debug_show id,
         );
 
-        let ?prev_candid_blob = BTree.get(collection.main, main_btree_utils, id) else return Utils.log_error_msg(collection.logger, "Record for id '" # debug_show (id) # "' not found");
+        let ?prev_candid_blob = DocumentStore.get(collection.documents, main_btree_utils, id) else return Utils.log_error_msg(collection.logger, "Record for id '" # debug_show (id) # "' not found");
 
         let prev_candid = CollectionUtils.decode_candid_blob(collection, prev_candid_blob);
-        let prev_candid_map = CandidMap.new(collection.schema_map, prev_candid);
+        let prev_candid_map = CandidMap.new(collection.schema_map, id, prev_candid);
 
         let fields_with_updates = Array.map<(Text, T.FieldUpdateOperations), Text>(field_updates, func(k, _) = k);
 
@@ -866,7 +900,7 @@ module StableCollection {
             };
         };
 
-        assert ?prev_candid_blob == BTree.put(collection.main, main_btree_utils, id, new_candid_blob);
+        assert ?prev_candid_blob == DocumentStore.put(collection.documents, main_btree_utils, id, new_candid_blob);
 
         let updated_keys = Array.map<(Text, Any), Text>(
             field_updates,
@@ -884,16 +918,16 @@ module StableCollection {
         #ok();
     };
 
-    public func insert(collection : StableCollection, main_btree_utils : T.BTreeUtils<Nat, Blob>, candid_blob : T.CandidBlob) : Result<Nat, Text> {
+    public func insert(collection : StableCollection, main_btree_utils : T.BTreeUtils<Nat, T.Document>, candid_blob : T.CandidBlob) : Result<Nat, Text> {
         put(collection, main_btree_utils, candid_blob);
     };
 
     public func get(
         collection : StableCollection,
-        main_btree_utils : T.BTreeUtils<Nat, Blob>,
+        main_btree_utils : T.BTreeUtils<Nat, T.Document>,
         id : Nat,
     ) : ?T.CandidBlob {
-        BTree.get(collection.main, main_btree_utils, id);
+        DocumentStore.get(collection.documents, main_btree_utils, id);
     };
 
     public type SearchResult = {
@@ -903,7 +937,7 @@ module StableCollection {
 
     public func search(
         collection : StableCollection,
-        main_btree_utils : T.BTreeUtils<Nat, Blob>,
+        main_btree_utils : T.BTreeUtils<Nat, T.Document>,
         query_builder : QueryBuilder,
     ) : Result<[(T.WrapId<T.CandidBlob>)], Text> {
         Logger.lazyDebug(
@@ -940,17 +974,17 @@ module StableCollection {
         let (opt_cursor, cursor_map) = switch (pagination.cursor) {
             case (?(id, pagination_direction)) switch (CollectionUtils.lookup_candid_record(collection, id)) {
                 case (?record) {
-                    (?(id, record), CandidMap.new(collection.schema_map, record));
+                    (?(id, record), CandidMap.new(collection.schema_map, id, record));
                 };
                 case (null) {
                     let #ok(default_value) = Schema.generate_default_value(collection.schema) else Debug.trap("Couldn't generate default value for schema: " # debug_show collection.schema);
-                    (null, CandidMap.new(collection.schema_map, default_value));
+                    (null, CandidMap.new(collection.schema_map, 0, default_value));
                 };
 
             };
             case (null) {
                 let #ok(default_value) = Schema.generate_default_value(collection.schema) else Debug.trap("Couldn't generate default value for schema: " # debug_show collection.schema);
-                (null, CandidMap.new(collection.schema_map, default_value));
+                (null, CandidMap.new(collection.schema_map, 0, default_value));
             };
         };
 
@@ -961,8 +995,11 @@ module StableCollection {
             case (#ok(_)) ();
         };
 
-        let #ok(formatted_query_operations) = Query.process_query(collection, query_operations) else {
-            return Utils.log_error_msg(collection.logger, "Failed to process query operations");
+        let formatted_query_operations = switch (Query.process_query(collection, query_operations)) {
+            case (#ok(formatted_query_operations)) formatted_query_operations;
+            case (#err(err)) {
+                return Utils.log_error_msg(collection.logger, "Failed to process query operations: " # err);
+            };
         };
 
         let query_plan : T.QueryPlan = QueryPlan.create_query_plan(
@@ -1018,7 +1055,7 @@ module StableCollection {
 
     public func search_iter(
         collection : StableCollection,
-        main_btree_utils : T.BTreeUtils<Nat, Blob>,
+        main_btree_utils : T.BTreeUtils<Nat, T.Document>,
         query_builder : QueryBuilder,
     ) : Result<Iter<T.WrapId<T.CandidBlob>>, Text> {
         switch (internal_search(collection, query_builder)) {
@@ -1057,22 +1094,22 @@ module StableCollection {
 
             let candid_map_a : T.CandidMap = switch (opt_candid_map_a) {
                 case (?candid_map) {
-                    CandidMap.reload(candid_map, collection.schema_map, record_a);
+                    CandidMap.reload(candid_map, collection.schema_map, a, record_a);
                     candid_map;
                 };
                 case (null) {
-                    let candid_map = CandidMap.new(collection.schema_map, record_a);
+                    let candid_map = CandidMap.new(collection.schema_map, a, record_a);
                     candid_map;
                 };
             };
 
             let candid_map_b : T.CandidMap = switch (opt_candid_map_b) {
                 case (?candid_map) {
-                    CandidMap.reload(candid_map, collection.schema_map, record_b);
+                    CandidMap.reload(candid_map, collection.schema_map, b, record_b);
                     candid_map;
                 };
                 case (null) {
-                    let candid_map = CandidMap.new(collection.schema_map, record_b);
+                    let candid_map = CandidMap.new(collection.schema_map, b, record_b);
                     candid_map;
                 };
             };
@@ -1096,8 +1133,8 @@ module StableCollection {
     // public func stats(collection : StableCollection) : T.CollectionStats {
     //     let main_btree_index = {
     //         stable_memory = {
-    //             metadata_bytes = BTree.metadataBytes(collection.main);
-    //             actual_data_bytes = BTree.bytes(collection.main);
+    //             metadata_bytes = DocumentStore.metadataBytes(collection.documents);
+    //             actual_data_bytes = DocumentStore.bytes(collection.documents);
     //         };
     //     };
 
@@ -1132,7 +1169,7 @@ module StableCollection {
             stable_query.query_operations,
             null,
             null,
-            CandidMap.new(collection.schema_map, #Record([])),
+            CandidMap.new(collection.schema_map, 0, #Record([])),
         );
 
         let count = switch (QueryExecution.get_unique_record_ids_from_query_plan(collection, Map.new(), query_plan)) {
@@ -1164,7 +1201,7 @@ module StableCollection {
             stable_query.query_operations,
             null,
             null,
-            CandidMap.new(collection.schema_map, #Record([])),
+            CandidMap.new(collection.schema_map, 0, #Record([])),
         );
 
         let sort_records_by_field_cmp = func(_ : Nat, _ : Nat) : Order = #equal;
@@ -1192,18 +1229,18 @@ module StableCollection {
 
     };
 
-    public func delete_by_id(collection : StableCollection, main_btree_utils : T.BTreeUtils<Nat, Blob>, id : Nat) : Result<(T.CandidBlob), Text> {
+    public func delete_by_id(collection : StableCollection, main_btree_utils : T.BTreeUtils<Nat, T.Document>, id : Nat) : Result<(T.CandidBlob), Text> {
         Logger.lazyInfo(
             collection.logger,
             func() = "Deleting record with id: " # debug_show id,
         );
 
-        let ?prev_candid_blob = BTree.remove(collection.main, main_btree_utils, id) else {
+        let ?prev_candid_blob = DocumentStore.remove(collection.documents, main_btree_utils, id) else {
             return Utils.log_error_msg(collection.logger, "Record not found");
         };
 
         let prev_candid = CollectionUtils.decode_candid_blob(collection, prev_candid_blob);
-        let prev_candid_map = CandidMap.new(collection.schema_map, prev_candid);
+        let prev_candid_map = CandidMap.new(collection.schema_map, id, prev_candid);
 
         for (index in Map.vals(collection.indexes)) {
 

@@ -7,6 +7,7 @@ import Iter "mo:base/Iter";
 
 import Map "mo:map/Map";
 import T "../Types";
+import C "../Constants";
 
 import Itertools "mo:itertools/Iter";
 
@@ -16,6 +17,7 @@ module {
 
     public func new(schema : T.Schema) : T.SchemaMap {
         let schema_map = Map.new<Text, T.Schema>();
+        ignore Map.put(schema_map, T.thash, C.RECORD_ID, #Nat);
 
         let list_of_fields_with_array_type = Buffer.Buffer<Text>(8);
 
@@ -361,7 +363,7 @@ module {
                         };
 
                         switch (unwrap_option_type(unique_field_type)) {
-                            case (#Record(_) or #Map(_) or #Array(_) or #Variant(_) or #Tuple(_) or #Float(_) or #Null or #Empty or #Recursive(_)) {
+                            case (#Record(_) or #Map(_) or #Array(_) or #Variant(_) or #Tuple(_) or #Null or #Empty or #Recursive(_)) {
                                 return #err(
                                     "Error creating unique constraint on field " # unique_field_name # "' as unique constraint is not supported with type " # debug_show (unique_field_type) # "."
                                 );

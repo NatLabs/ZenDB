@@ -65,6 +65,10 @@ module T {
 
     public type MemoryBTree = MemoryBTree.StableMemoryBTree;
     public type TypeUtils<A> = TypeUtils.TypeUtils<A>;
+    public type Blobify<A> = TypeUtils.Blobify<A>;
+    public type MemoryBTreeUtils<K, V> = MemoryBTree.BTreeUtils<K, V>;
+
+    public type ExpectedIndex = BpTreeTypes.ExpectedIndex;
 
     public type Hash = Hash.Hash;
 
@@ -95,15 +99,6 @@ module T {
         #Descending;
     };
 
-    public type Index = {
-        name : Text;
-        key_details : [(Text, SortDirection)];
-
-        data : BTree<[CandidQuery], RecordId>; // using CandidQuery here for comparison only, the actual data stored here is Candid
-        used_internally : Bool; // if true, the index cannot be deleted by user if true
-        is_unique : Bool; // if true, the index is unique and the record ids are not concatenated with the index key values to make duplicate values appear unique
-    };
-
     public type SchemaMap = {
         map : Map.Map<Text, T.Schema>;
         fields_with_array_type : [Text];
@@ -130,6 +125,21 @@ module T {
 
     public type Ids = [var Nat];
 
+    public type Document = {
+        #v0 : CandidBlob;
+    };
+
+    public type Index = {
+        name : Text;
+        key_details : [(Text, SortDirection)];
+
+        data : BTree<[CandidQuery], RecordId>; // using CandidQuery here for comparison only, the actual data stored here is Candid
+        used_internally : Bool; // if true, the index cannot be deleted by user if true
+        is_unique : Bool; // if true, the index is unique and the record ids are not concatenated with the index key values to make duplicate values appear unique
+    };
+
+    public type DocumentStore = BTree<Nat, Document>;
+
     public type StableCollection = {
         ids : Ids;
         name : Text;
@@ -138,7 +148,7 @@ module T {
         schema_keys : [Text];
         schema_keys_set : Set<Text>;
 
-        main : BTree<Nat, Blob>;
+        documents : DocumentStore;
         indexes : Map<Text, Index>;
 
         field_constraints : Map<Text, [SchemaFieldConstraint]>;
@@ -373,13 +383,13 @@ module T {
         #Field : (Text, [SchemaFieldConstraint]);
     };
 
-    public type CandidHeapStorageType = {
-        // stored by both memory types
-        #candid_blob : CandidBlob;
+    // public type CandidHeapStorageType = {
+    //     // stored by both memory types
+    //     #candid_blob : CandidBlob;
 
-        // heap only
-        #candid_variant : Candid;
-        #candid_map : { get : () -> () }; // placeholder for map type
+    //     // heap only
+    //     #candid_variant : Candid;
+    //     #candid_map : { get : () -> () }; // placeholder for map type
 
-    };
+    // };
 };

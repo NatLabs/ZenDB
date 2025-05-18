@@ -128,7 +128,7 @@ module {
             schema_map = SchemaMap.new(processed_schema);
             schema_keys;
             schema_keys_set = Set.fromIter(schema_keys.vals(), thash);
-            main = switch (db.memory_type) {
+            documents = switch (db.memory_type) {
                 case (#heap) { BTree.newHeap() };
                 case (#stableMemory) {
                     switch (Vector.removeLast(db.freed_btrees)) {

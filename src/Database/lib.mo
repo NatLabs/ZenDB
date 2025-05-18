@@ -28,6 +28,8 @@ import T "../Types";
 import Schema "../Collection/Schema";
 
 import StableDatabase "StableDatabase";
+import StableCollection "../Collection/StableCollection";
+import CollectionUtils "../Collection/Utils";
 
 module {
 
@@ -194,6 +196,32 @@ module {
                         case (#err(_)) #err(msg);
                     };
                 };
+            };
+
+        };
+
+        public func create_index_on_collection(
+            collection_name : Text,
+            index_name : Text,
+            index_fields : [(Text, T.SortDirection)],
+            is_unique : Bool,
+        ) : T.Result<(), Text> {
+            let stable_collection = switch (StableDatabase.get_collection(stable_db, collection_name)) {
+                case (#ok(stable_collection)) stable_collection;
+                case (#err(msg)) return #err(msg);
+            };
+
+            switch (
+                StableCollection.create_index(
+                    stable_collection,
+                    CollectionUtils.get_main_btree_utils(stable_collection),
+                    index_name,
+                    index_fields,
+                    is_unique,
+                )
+            ) {
+                case (#ok(_)) #ok();
+                case (#err(msg)) return #err(msg);
             };
 
         };

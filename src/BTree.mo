@@ -270,9 +270,14 @@ module BTree {
         };
 
         let end_rank = switch (end_key) {
-            case (?key) switch (MemoryBTree.getExpectedIndex(btree, btree_utils, key)) {
-                case (#Found(rank)) rank + 1;
-                case (#NotFound(rank)) rank;
+            case (?key) {
+                let res = MemoryBTree.getExpectedIndex(btree, btree_utils, key);
+                // Debug.print("end_key expected index: " # debug_show (res));
+
+                switch (res) {
+                    case (#Found(rank)) rank + 1;
+                    case (#NotFound(rank)) rank;
+                };
             };
             case (null) MemoryBTree.size(btree);
         };
@@ -290,8 +295,10 @@ module BTree {
 
         let start_rank = switch (start_key) {
             case (?key) {
+                let res = BpTree.getExpectedIndex<Blob, V>(btree, heap_btree_utils.cmp, heap_btree_utils.blobify.to_blob(key));
+                // Debug.print("start_key expected index: " # debug_show (res));
 
-                switch (BpTree.getExpectedIndex<Blob, V>(btree, heap_btree_utils.cmp, heap_btree_utils.blobify.to_blob(key))) {
+                switch (res) {
                     case (#Found(rank)) rank;
                     case (#NotFound(rank)) rank;
                 };
@@ -301,8 +308,9 @@ module BTree {
 
         let end_rank = switch (end_key) {
             case (?key) {
-
-                switch (BpTree.getExpectedIndex<Blob, V>(btree, heap_btree_utils.cmp, heap_btree_utils.blobify.to_blob(key))) {
+                let res = BpTree.getExpectedIndex<Blob, V>(btree, heap_btree_utils.cmp, heap_btree_utils.blobify.to_blob(key));
+                // Debug.print("end_key expected index: " # debug_show (res));
+                switch (res) {
                     case (#Found(rank)) rank + 1;
                     case (#NotFound(rank)) rank;
                 };

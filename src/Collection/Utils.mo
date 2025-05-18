@@ -50,7 +50,7 @@ import C "../Constants";
 import Logger "../Logger";
 import SchemaMap "SchemaMap";
 import BTree "../BTree";
-
+import DocumentStore "DocumentStore";
 module CollectionUtils {
 
     public type Result<A, B> = Result.Result<A, B>;
@@ -103,7 +103,7 @@ module CollectionUtils {
     public func get_index_data_utils(collection : StableCollection) : T.BTreeUtils<[T.CandidQuery], T.RecordId> {
         switch (collection.memory_type) {
             case (#stableMemory(_)) {
-                #stableMemory(MemoryBTree.createUtils<[T.CandidQuery], T.RecordId>(get_index_key_utils(), TypeUtils.Nat));
+                #stableMemory(MemoryBTree.createUtils<[T.CandidQuery], T.RecordId>(Orchid.Orchid, TypeUtils.Nat));
             };
             case (#heap(_)) {
                 #heap({
@@ -115,18 +115,8 @@ module CollectionUtils {
 
     };
 
-    public func get_main_btree_utils(collection : StableCollection) : T.BTreeUtils<Nat, Blob> {
-        switch (collection.memory_type) {
-            case (#stableMemory(_)) {
-                #stableMemory(MemoryBTree.createUtils<Nat, Blob>(Utils.typeutils_nat_as_nat64, TypeUtils.Blob));
-            };
-            case (#heap(_)) {
-                #heap({
-                    blobify = Utils.typeutils_nat_as_nat64.blobify;
-                    cmp = Cmp.Blob;
-                });
-            };
-        };
+    public func get_main_btree_utils(collection : StableCollection) : T.BTreeUtils<Nat, T.Document> {
+        DocumentStore.get_btree_utils(collection.documents);
     };
 
     public func get_index_columns(collection : T.StableCollection, index_key_details : [(Text, SortDirection)], id : Nat, candid_map : T.CandidMap) : ?[Candid] {
@@ -139,7 +129,7 @@ module CollectionUtils {
         var null_option_field_value_count = 0;
 
         for ((index_key, dir) in index_key_details.vals()) {
-            if (index_key == C.UNIQUE_INDEX_NULL_EXEMPT_FROM_UNIQUENESS_ID) {
+            if (index_key == C.UNIQUE_INDEX_NULL_EXEMPT_ID) {
                 let val = if (null_option_field_value_count == option_field_type_count) {
                     #Nat(id); // use the record id to ensure the key is unique in the index
                 } else {
@@ -200,13 +190,13 @@ module CollectionUtils {
     };
 
     public func lookup_record<Record>(collection : T.StableCollection, blobify : T.InternalCandify<Record>, id : Nat) : Record {
-        let ?record_details = BTree.get<Nat, Blob>(collection.main, get_main_btree_utils(collection), id) else Debug.trap("lookup_record: record not found for id: " # debug_show id);
+        let ?record_details = DocumentStore.get(collection.documents, DocumentStore.get_btree_utils(collection.documents), id) else Debug.trap("lookup_record: record not found for id: " # debug_show id);
         let record = blobify.from_blob(record_details);
         record;
     };
 
     public func lookup_candid_blob(collection : StableCollection, id : Nat) : Blob {
-        let ?record_details = BTree.get(collection.main, get_main_btree_utils(collection), id) else Debug.trap("lookup_candid_blob: record not found for id: " # debug_show id);
+        let ?record_details : ?Blob = DocumentStore.get(collection.documents, DocumentStore.get_btree_utils(collection.documents), id) else Debug.trap("lookup_candid_blob: record not found for id: " # debug_show id);
         record_details;
     };
 
@@ -218,22 +208,22 @@ module CollectionUtils {
     };
 
     public func lookup_candid_record(collection : StableCollection, id : Nat) : ?Candid.Candid {
-        let ?record_details = BTree.get(collection.main, get_main_btree_utils(collection), id) else return null;
+        let ?record_details = DocumentStore.get(collection.documents, DocumentStore.get_btree_utils(collection.documents), id) else return null;
         let candid = decode_candid_blob(collection, record_details);
 
         ?candid;
     };
 
     // public func lookup_candid_map_bytes(collection : StableCollection, id : Nat) : ?[Nat8] {
-    //     let ?record_details = MemoryBTree.get(collection.main, get_main_btree_utils(collection), id) else return null;
+    //     let ?record_details = MemoryBTree.get(collection.documents, get_main_btree_utils(collection), id) else return null;
     //     let bytes = record_details.1;
 
     //     ?bytes;
     // };
 
-    public func candid_map_filter_condition(collection : StableCollection, candid_record : Candid.Candid, lower : [(Text, ?T.CandidInclusivityQuery)], upper : [(Text, ?T.CandidInclusivityQuery)]) : Bool {
+    public func candid_map_filter_condition(collection : StableCollection, id : Nat, candid_record : Candid.Candid, lower : [(Text, ?T.CandidInclusivityQuery)], upper : [(Text, ?T.CandidInclusivityQuery)]) : Bool {
 
-        let candid_map = CandidMap.new(collection.schema_map, candid_record);
+        let candid_map = CandidMap.new(collection.schema_map, id, candid_record);
 
         for (((key, opt_lower_val), (upper_key, opt_upper_val)) in Itertools.zip(lower.vals(), upper.vals())) {
             assert key == upper_key;
@@ -284,13 +274,13 @@ module CollectionUtils {
         };
 
         if (index_name == C.RECORD_ID) {
-            let main_btree_utils = get_main_btree_utils(collection);
+            let main_btree_utils = DocumentStore.get_btree_utils(collection.documents);
 
             let record_ids = Itertools.flatten(
                 Iter.map(
                     intervals.vals(),
                     func(interval : (Nat, Nat)) : Iter<(Nat)> {
-                        let record_ids = BTree.rangeKeys(collection.main, main_btree_utils, interval.0, interval.1);
+                        let record_ids = DocumentStore.rangeKeys(collection.documents, main_btree_utils, interval.0, interval.1);
 
                         if (sorted_in_reverse) {
                             return record_ids.rev();
@@ -339,7 +329,7 @@ module CollectionUtils {
                     (lower, upper) : (([(Text, ?T.CandidInclusivityQuery)], [(Text, ?T.CandidInclusivityQuery)]))
                 ) : Bool {
 
-                    let res = candid_map_filter_condition(collection, candid, lower, upper);
+                    let res = candid_map_filter_condition(collection, id, candid, lower, upper);
 
                     res;
                 };

@@ -78,7 +78,7 @@ This architecture allows ZenDB to handle complex queries efficiently, even with 
 mops add zendb
 ```
 
-> Requires `moc` version `0.10.0` or higher to run
+> Requires `moc` version `0.14.9"` or higher to run
 
 ### 2. Initialize Your Database
 

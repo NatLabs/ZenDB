@@ -1,3 +1,4 @@
+import Option "mo:base/Option";
 import Array "mo:base/Array";
 
 import Itertools "mo:itertools/Iter";
@@ -5,7 +6,7 @@ import Itertools "mo:itertools/Iter";
 import ZenDB "../../src";
 
 shared ({ caller = owner }) actor class Notes() {
-    let zendb = ZenDB.newStableStore(null);
+    stable let zendb = ZenDB.newStableStore(null);
     let db = ZenDB.launchDefaultDB(zendb);
 
     type Note = {
@@ -25,20 +26,20 @@ shared ({ caller = owner }) actor class Notes() {
         to_blob = func(c : Note) : Blob { to_candid (c) };
     };
 
-    let schema_constraints = [
+    let schema_constraints : [ZenDB.Types.SchemaConstraint] = [
         #Unique(["user_id", "title"]), // a user cannot have two notes with the same title
-        #Field("title", #MaxSize(100)), // title must be <= 100 characters
-        #Field("content", #MaxSize(100_000)), // content must be <= 100_000 characters
+        #Field("title", [#MaxSize(100)]), // title must be <= 100 characters
+        #Field("content", [#MaxSize(100_000)]), // content must be <= 100_000 characters
     ];
 
-    let #ok(notes_collection) = zendb.get_or_create_collection<Note>("notes", NoteSchema, candify_notes, schema_constraints);
+    let #ok(notes_collection) = db.create_collection<Note>("notes", NoteSchema, candify_notes, schema_constraints);
 
-    public shared ({ caller = user_id }) func createNote(title : Text, content : Text) : ZenDB.Types.Result<Nat, Text> {
+    public shared ({ caller = user_id }) func createNote(title : Text, content : Text) : async ZenDB.Types.Result<Nat, Text> {
         let note : Note = { user_id; title; content };
         notes_collection.insert(note);
     };
 
-    public shared ({ caller = user_id }) func getNote(title : Text) : ZenDB.Types.Result<Note, Text> {
+    public shared ({ caller = user_id }) func getNote(title : Text) : async ZenDB.Types.Result<Note, Text> {
         let response = notes_collection.search(
             ZenDB.QueryBuilder().Where(
                 "user_id",
@@ -64,7 +65,7 @@ shared ({ caller = owner }) actor class Notes() {
 
     };
 
-    public shared ({ caller = user_id }) func updateNote(title : Text, content : Text) : ZenDB.Types.Result<(), Text> {
+    public shared ({ caller = user_id }) func updateNote(title : Text, content : Text) : async ZenDB.Types.Result<(), Text> {
 
         let notes_to_update_query = ZenDB.QueryBuilder().Where(
             "user_id",
@@ -74,16 +75,23 @@ shared ({ caller = owner }) actor class Notes() {
             #eq(#Text(title)),
         );
 
-        notes_collection.update(
+        let response = notes_collection.update(
             notes_to_update_query,
             [
                 ("content", #Text(content)),
             ],
         );
 
+        switch (response) {
+            case (#ok(documents_updated)) assert documents_updated == 1;
+            case (#err(msg)) return #err(msg);
+        };
+
+        #ok();
+
     };
 
-    public shared ({ caller = user_id }) func deleteNote(title : Text) : ZenDB.Types.Result<(), Text> {
+    public shared ({ caller = user_id }) func deleteNote(title : Text) : async ZenDB.Types.Result<(), Text> {
         let response = notes_collection.delete(
             ZenDB.QueryBuilder().Where(
                 "user_id",
@@ -95,7 +103,7 @@ shared ({ caller = owner }) actor class Notes() {
         );
 
         let deleted_notes = switch (response) {
-            case (#ok(notes)) deleted_notes;
+            case (#ok(deleted_notes)) deleted_notes;
             case (#err(msg)) return #err(msg);
         };
 
@@ -106,18 +114,21 @@ shared ({ caller = owner }) actor class Notes() {
             },
         );
 
+        #ok();
+
     };
 
-    public shared ({ caller = user_id }) func getAllNotes(page_size : Nat, curr_page : Nat) : ZenDB.Types.Result<[Note], Text> {
+    public shared ({ caller = user_id }) func getAllNotes(curr_page : Nat, opt_page_size : ?Nat) : async ZenDB.Types.Result<[Note], Text> {
+        let page_size = Option.get(opt_page_size, 10);
 
         let response = notes_collection.search(
             ZenDB.QueryBuilder().Where(
                 "user_id",
-                user_id,
+                #eq(#Principal(user_id)),
             ).Limit(
                 page_size
-            ).Offset(
-                page_size * (curr_page - 1)
+            ).Skip(
+                page_size * curr_page
             )
         );
 
@@ -136,7 +147,7 @@ shared ({ caller = owner }) actor class Notes() {
         );
     };
 
-    public shared ({ caller = user_id }) func getNoteCount() : ZenDB.Types.Result<Nat, Text> {
+    public shared ({ caller = user_id }) func getNoteCount() : async ZenDB.Types.Result<Nat, Text> {
         let response = notes_collection.count(
             ZenDB.QueryBuilder().Where(
                 "user_id",
@@ -152,13 +163,13 @@ shared ({ caller = owner }) actor class Notes() {
         #ok(count);
     };
 
-    public shared ({ caller }) func getAllNotesCount() : ZenDB.Types.Result<Nat, Text> {
+    public shared ({ caller }) func getAllNotesCount() : async ZenDB.Types.Result<Nat, Text> {
         if (caller != owner) {
             return #err("Only the owner can call this function");
         };
 
         notes_collection.count(
-            ZenDB.QueryBuilder().Where()
+            ZenDB.QueryBuilder()
         );
 
     };

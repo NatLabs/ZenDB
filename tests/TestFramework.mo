@@ -252,4 +252,148 @@ module TestFramework {
         );
     };
 
+    public type CreateIndexOnCollection = (
+        collection_name : Text,
+        index_name : Text,
+        index_key_details : [(Text, ZenDB.Types.SortDirection)],
+        is_unique : Bool,
+    ) -> ZenDB.Types.Result<(), Text>;
+
+    public type SuiteUtils = {
+        create_index : CreateIndexOnCollection;
+    };
+
+    public func newSuite(
+        test_name : Text,
+        options : ?Settings,
+        zendb_suite : (zendb : ZenDB.Database, suite_utils : SuiteUtils) -> (),
+    ) {
+        let settings = Option.get(options, defaultSettings);
+
+        func run_suite_on_index_granularity(zendb_sstore : ZenDB.Types.StableStore) {
+
+            if (settings.compare_with_index or settings.compare_with_no_index) {
+                if (settings.compare_with_no_index) {
+                    suite(
+                        "with no index",
+                        func() {
+                            let #ok(zendb) = ZenDB.createDB(zendb_sstore, "no_index");
+                            let suite_utils : SuiteUtils = {
+                                create_index : CreateIndexOnCollection = func(
+                                    collection_name : Text,
+                                    index_name : Text,
+                                    index_key_details : [(Text, ZenDB.Types.SortDirection)],
+                                    is_unique : Bool,
+                                ) {
+                                    // no-op
+                                    return #ok(());
+                                };
+                            };
+
+                            zendb_suite(
+                                zendb,
+                                suite_utils,
+                            );
+                        },
+                    );
+
+                };
+
+                if (settings.compare_with_index) {
+                    suite(
+                        "with indexes",
+                        func() {
+                            let #ok(zendb) = ZenDB.createDB(zendb_sstore, "with_index");
+
+                            let suite_utils : SuiteUtils = {
+                                create_index : CreateIndexOnCollection = func(
+                                    collection_name : Text,
+                                    index_name : Text,
+                                    index_key_details : [(Text, ZenDB.Types.SortDirection)],
+                                    is_unique : Bool,
+                                ) {
+
+                                    zendb.create_index_on_collection(
+                                        collection_name,
+                                        index_name,
+                                        index_key_details,
+                                        is_unique,
+                                    );
+
+                                };
+                            };
+                            zendb_suite(
+                                zendb,
+                                suite_utils,
+                            );
+                        },
+                    );
+                };
+
+            } else {
+
+                let #ok(zendb) = ZenDB.createDB(zendb_sstore, "no_index");
+
+                zendb_suite(
+                    zendb,
+                    {
+                        create_index : CreateIndexOnCollection = func(
+                            collection_name : Text,
+                            index_name : Text,
+                            index_key_details : [(Text, ZenDB.Types.SortDirection)],
+                            is_unique : Bool,
+                        ) {
+                            // no-op
+                            return #ok(());
+                        };
+                    },
+                );
+
+            };
+
+        };
+
+        suite(
+            test_name,
+            func() {
+                suite(
+                    "Stable Memory",
+                    func() {
+
+                        let zendb_sstore = let sstore = ZenDB.newStableStore(
+                            ?{
+                                logging = ?{
+                                    log_level = settings.log_level;
+                                    is_running_locally = true;
+                                };
+                                memory_type = ?(#stableMemory);
+                            }
+                        );
+
+                        run_suite_on_index_granularity(zendb_sstore);
+
+                    },
+                );
+
+                suite(
+                    "Heap Memory",
+                    func() {
+                        let zendb_sstore = let sstore = ZenDB.newStableStore(
+                            ?{
+                                logging = ?{
+                                    log_level = settings.log_level;
+                                    is_running_locally = true;
+                                };
+                                memory_type = ?(#heap);
+                            }
+                        );
+                        run_suite_on_index_granularity(zendb_sstore);
+
+                    },
+                );
+            },
+        );
+
+    };
+
 };

@@ -243,7 +243,7 @@ module {
         Logger.lazyDebug(
             collection.logger,
             func() {
-                "QueryPlan.query_plan_from_or_operation(): Index scan intervals: " # debug_show interval ;
+                "QueryPlan.query_plan_from_or_operation(): Index scan intervals: " # debug_show interval;
             },
         );
 
@@ -360,7 +360,7 @@ module {
                             Logger.lazyDebug(
                                 collection.logger,
                                 func() {
-                                    "QueryPlan.query_plan_from_or_operation(): Index scan intervals: " # debug_show interval ;
+                                    "QueryPlan.query_plan_from_or_operation(): Index scan intervals: " # debug_show interval;
                                 },
                             );
 

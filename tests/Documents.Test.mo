@@ -128,6 +128,28 @@ ZenDBSuite.newNoIndexSetup(
                 );
 
                 test(
+                    "Float",
+                    func() {
+                        let #ok(floats) = zendb.create_collection<Float>(
+                            "floats",
+                            #Float,
+                            {
+                                from_blob = func(blob : Blob) : ?Float = from_candid (blob);
+                                to_blob = func(c : Float) : Blob = to_candid (c);
+                            },
+                            [#Field("", [#Min(1)]), #Unique([""])],
+                        ) else return assert false;
+
+                        let #ok(id) = floats.insert(42.0) else return assert false;
+                        assert floats.size() == 1;
+                        assert floats.search(ZenDB.QueryBuilder().Where("", #eq(#Float(42.0)))) == #ok([(0, 42.0)]);
+                        assert floats.get(id) == ?(42.0);
+
+                    }
+
+                );
+
+                test(
                     "Text",
                     func() {
                         let #ok(texts) = zendb.create_collection<Text>(
@@ -266,7 +288,91 @@ ZenDBSuite.newNoIndexSetup(
                         let #ok(id) = records.insert({ a = 42; b = "hello" }) else return assert false;
                         assert records.size() == 1;
                         assert records.search(ZenDB.QueryBuilder().Where("a", #eq(#Nat(42)))) == #ok([(0, { a = 42; b = "hello" })]);
+                        assert records.search(ZenDB.QueryBuilder().Where("b", #eq(#Text("hello"))).And("a", #eq(#Nat(42)))) == #ok([(0, { a = 42; b = "hello" })]);
                         assert records.get(id) == ?({ a = 42; b = "hello" });
+
+                    },
+                );
+
+                test(
+                    "Record: note {user_id: Principal; title: Text; content: Text}",
+                    func() {
+                        type Note = {
+                            user_id : Principal;
+                            title : Text;
+                            content : Text;
+                        };
+
+                        let NoteSchema : ZenDB.Types.Schema = #Record([
+                            ("user_id", #Principal),
+                            ("title", #Text),
+                            ("content", #Text),
+                        ]);
+
+                        let candify : ZenDB.Types.Candify<Note> = {
+                            from_blob = func(blob : Blob) : ?Note = from_candid (blob);
+                            to_blob = func(c : Note) : Blob = to_candid (c);
+                        };
+
+                        let schema_constraints : [ZenDB.Types.SchemaConstraint] = [
+                            #Unique(["user_id", "title"]), // a user cannot have two notes with the same title
+                            #Field("title", [#MaxSize(100)]), // title must be <= 100 characters
+                            #Field("content", [#MaxSize(100_000)]), // content must be <= 100_000 characters
+                        ];
+
+                        let #ok(notes) = zendb.create_collection<Note>(
+                            "notes",
+                            NoteSchema,
+                            candify,
+                            schema_constraints,
+                        ) else return assert false;
+
+                        let #ok(id) = notes.insert({
+                            user_id = Principal.fromText("2vxsx-fae");
+                            title = "hello.mo";
+                            content = "This is a test note";
+                        }) else return assert false;
+
+                        let #err(_) = notes.insert({
+                            user_id = Principal.fromText("2vxsx-fae");
+                            title = "hello.mo";
+                            content = "Replaced content";
+                        }) else return assert false;
+
+                        assert notes.size() == 1;
+
+                        assert notes.search(
+                            ZenDB.QueryBuilder().Where(
+                                "user_id",
+                                #eq(#Principal(Principal.fromText("2vxsx-fae"))),
+                            ).And(
+                                "title",
+                                #eq(#Text("hello.mo")),
+                            )
+                        ) == #ok([(0, { user_id = Principal.fromText("2vxsx-fae"); title = "hello.mo"; content = "This is a test note" })]);
+
+                        let #ok(total_updated) = notes.update(
+                            ZenDB.QueryBuilder().Where(
+                                "user_id",
+                                #eq(#Principal(Principal.fromText("2vxsx-fae"))),
+                            ).And(
+                                "title",
+                                #eq(#Text("hello.mo")),
+                            ),
+                            [("content", #Text("This is version 2 of the note"))],
+                        );
+
+                        assert total_updated == 1;
+
+                        assert notes.search(
+                            ZenDB.QueryBuilder().Where(
+                                "user_id",
+                                #eq(#Principal(Principal.fromText("2vxsx-fae"))),
+                            ).And(
+                                "title",
+                                #eq(#Text("hello.mo")),
+                            )
+                        ) == #ok([(0, { user_id = Principal.fromText("2vxsx-fae"); title = "hello.mo"; content = "This is version 2 of the note" })]);
 
                     },
                 );
@@ -506,52 +612,52 @@ ZenDBSuite.newNoIndexSetup(
                     },
                 );
 
-                // test(
-                //     "Nested Variants: { #name: Text; #id: { #active: Nat; #inactive } }",
-                //     func() {
-                //         type NestedVariant = {
-                //             #name : Text;
-                //             #id : { #active : Nat; #inactive };
-                //         };
+                test(
+                    "Nested Variants: { #name: Text; #id: { #active: Nat; #inactive } }",
+                    func() {
+                        type NestedVariant = {
+                            #name : Text;
+                            #id : { #active : Nat; #inactive };
+                        };
 
-                //         let NestedVariantSchema = #Variant([("name", #Text), ("id", #Variant([("active", #Nat), ("inactive", #Null)]))]);
+                        let NestedVariantSchema = #Variant([("name", #Text), ("id", #Variant([("active", #Nat), ("inactive", #Null)]))]);
 
-                //         let #ok(nested_variants) = zendb.create_collection<NestedVariant>(
-                //             "nested_variants",
-                //             NestedVariantSchema,
-                //             {
-                //                 from_blob = func(blob : Blob) : ?NestedVariant = from_candid (blob);
-                //                 to_blob = func(c : NestedVariant) : Blob = to_candid (c);
-                //             },
-                //             [#Field("name", [#MinSize(1)]), #Field("id.active", [#Min(1)]), #Field("id.inactive", [#MinSize(1)]), #Unique(["name"]), #Unique(["id.active"]), #Unique(["id.inactive"])],
-                //         );
+                        let #ok(nested_variants) = zendb.create_collection<NestedVariant>(
+                            "nested_variants",
+                            NestedVariantSchema,
+                            {
+                                from_blob = func(blob : Blob) : ?NestedVariant = from_candid (blob);
+                                to_blob = func(c : NestedVariant) : Blob = to_candid (c);
+                            },
+                            [#Field("name", [#MinSize(1)]), #Field("id.active", [#Min(1)]), #Field("id.inactive", [#MinSize(1)]), #Unique(["name"]), #Unique(["id.active"]), #Unique(["id.inactive"])],
+                        );
 
-                //         let #ok(id) = nested_variants.insert(#name("hello")) else return assert false;
-                //         let #ok(id2) = nested_variants.insert(#id(#active(42))) else return assert false;
-                //         let #ok(id3) = nested_variants.insert(#id(#inactive)) else return assert false;
+                        let #ok(id) = nested_variants.insert(#name("hello")) else return assert false;
+                        let #ok(id2) = nested_variants.insert(#id(#active(42))) else return assert false;
+                        let #ok(id3) = nested_variants.insert(#id(#inactive)) else return assert false;
 
-                //         assert nested_variants.size() == 3;
-                //         assert nested_variants.search(ZenDB.QueryBuilder().Where("name", #eq(#Text("hello")))) == #ok([(0, #name("hello"))]);
-                //         assert nested_variants.search(ZenDB.QueryBuilder().Where("id.active", #eq(#Nat(42)))) == #ok([(1, #id(#active(42)))]);
-                //         assert nested_variants.search(ZenDB.QueryBuilder().Where("id.inactive", #eq(#Null))) == #ok([(2, #id(#inactive))]);
+                        assert nested_variants.size() == 3;
+                        assert nested_variants.search(ZenDB.QueryBuilder().Where("name", #eq(#Text("hello")))) == #ok([(0, #name("hello"))]);
+                        assert nested_variants.search(ZenDB.QueryBuilder().Where("id.active", #eq(#Nat(42)))) == #ok([(1, #id(#active(42)))]);
+                        assert nested_variants.search(ZenDB.QueryBuilder().Where("id.inactive", #eq(#Null))) == #ok([(2, #id(#inactive))]);
 
-                //         assert nested_variants.search(ZenDB.QueryBuilder().Where("", #eq(#Text("name")))) == #ok([(0, #name("hello"))]);
-                //         assert nested_variants.search(ZenDB.QueryBuilder().Where("", #eq(#Text("id")))) == #ok([(1, #id(#active(42))), (2, #id(#inactive))]);
-                //         assert nested_variants.search(ZenDB.QueryBuilder().Where("id", #eq(#Text("active")))) == #ok([(1, #id(#active(42)))]);
-                //         assert nested_variants.search(ZenDB.QueryBuilder().Where("id", #eq(#Text("inactive")))) == #ok([(2, #id(#inactive))]);
-                //         assert nested_variants.search(ZenDB.QueryBuilder().Where("id", #eq(#Text("unknown")))) == #ok([]);
+                        assert nested_variants.search(ZenDB.QueryBuilder().Where("", #eq(#Text("name")))) == #ok([(0, #name("hello"))]);
+                        assert nested_variants.search(ZenDB.QueryBuilder().Where("", #eq(#Text("id")))) == #ok([(1, #id(#active(42))), (2, #id(#inactive))]);
+                        assert nested_variants.search(ZenDB.QueryBuilder().Where("id", #eq(#Text("active")))) == #ok([(1, #id(#active(42)))]);
+                        assert nested_variants.search(ZenDB.QueryBuilder().Where("id", #eq(#Text("inactive")))) == #ok([(2, #id(#inactive))]);
+                        assert nested_variants.search(ZenDB.QueryBuilder().Where("id", #eq(#Text("unknown")))) == #ok([]);
 
-                //         assert nested_variants.search(ZenDB.QueryBuilder().Where("name", #exists)) == #ok([(0, #name("hello"))]);
-                //         assert nested_variants.search(ZenDB.QueryBuilder().Where("id", #exists)) == #ok([(1, #id(#active(42))), (2, #id(#inactive))]);
-                //         assert nested_variants.search(ZenDB.QueryBuilder().Where("id.active", #exists)) == #ok([(1, #id(#active(42)))]);
-                //         assert nested_variants.search(ZenDB.QueryBuilder().Where("id.inactive", #exists)) == #ok([(2, #id(#inactive))]);
+                        assert nested_variants.search(ZenDB.QueryBuilder().Where("name", #exists)) == #ok([(0, #name("hello"))]);
+                        assert nested_variants.search(ZenDB.QueryBuilder().Where("id", #exists)) == #ok([(1, #id(#active(42))), (2, #id(#inactive))]);
+                        assert nested_variants.search(ZenDB.QueryBuilder().Where("id.active", #exists)) == #ok([(1, #id(#active(42)))]);
+                        assert nested_variants.search(ZenDB.QueryBuilder().Where("id.inactive", #exists)) == #ok([(2, #id(#inactive))]);
 
-                //         assert nested_variants.get(id) == ?(#name("hello"));
-                //         assert nested_variants.get(id2) == ?(#id(#active(42)));
-                //         assert nested_variants.get(id3) == ?(#id(#inactive));
+                        assert nested_variants.get(id) == ?(#name("hello"));
+                        assert nested_variants.get(id2) == ?(#id(#active(42)));
+                        assert nested_variants.get(id3) == ?(#id(#inactive));
 
-                //     },
-                // );
+                    },
+                );
 
                 test(
                     "Nested Tuples: (Nat, (Text, Nat))",

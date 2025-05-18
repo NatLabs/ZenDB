@@ -35,6 +35,7 @@ import Schema "Schema";
 import CollectionUtils "Utils";
 import QueryPlan "QueryPlan";
 import Intervals "Intervals";
+import DocumentStore "DocumentStore";
 
 module {
     public type Map<K, V> = Map.Map<K, V>;
@@ -111,7 +112,7 @@ module {
                 case (#FullScan({ filter_bounds; requires_additional_filtering; requires_additional_sorting })) {
                     if (not requires_additional_filtering and not requires_additional_sorting) {
                         Logger.lazyDebug(collection.logger, func() = "QueryExecution.get_unique_record_ids(): Full scan with no filtering or sorting");
-                        return #Interval(C.RECORD_ID, [(0, BTree.size(collection.main))], false);
+                        return #Interval(C.RECORD_ID, [(0, DocumentStore.size(collection.documents))], false);
                     };
                 };
             };
@@ -125,7 +126,7 @@ module {
                 case (#FullScan({ filter_bounds; requires_additional_filtering })) {
                     Logger.lazyDebug(collection.logger, func() = "QueryExecution.get_unique_record_ids(): Processing full scan");
                     let main_btree_utils = CollectionUtils.get_main_btree_utils(collection);
-                    let full_scan_iter = BTree.keys(collection.main, main_btree_utils);
+                    let full_scan_iter = DocumentStore.keys(collection.documents, main_btree_utils);
 
                     if (requires_additional_filtering) {
                         Logger.lazyDebug(collection.logger, func() = "QueryExecution.get_unique_record_ids(): Applying filters to full scan");
@@ -849,7 +850,7 @@ module {
                 };
                 case (#FullScan({ requires_additional_sorting; requires_additional_filtering })) {
                     if (not requires_additional_sorting and not requires_additional_filtering) {
-                        return #Interval(C.RECORD_ID, [(0, BTree.size(collection.main))], false);
+                        return #Interval(C.RECORD_ID, [(0, DocumentStore.size(collection.documents))], false);
                     };
 
                 };
@@ -1033,7 +1034,7 @@ module {
                 let main_btree_utils = CollectionUtils.get_main_btree_utils(collection);
                 let filtered_ids = CollectionUtils.multi_filter(
                     collection,
-                    BTree.keys(collection.main, main_btree_utils),
+                    DocumentStore.keys(collection.documents, main_btree_utils),
                     full_scan_filter_bounds,
                     query_plan.is_and_operation,
                 );
@@ -1290,7 +1291,7 @@ module {
             };
 
             let main_btree_utils = CollectionUtils.get_main_btree_utils(collection);
-            let record_ids = BTree.keys(collection.main, main_btree_utils);
+            let record_ids = DocumentStore.keys(collection.documents, main_btree_utils);
             let filtered_ids = CollectionUtils.multi_filter(collection, record_ids, full_scan_filter_bounds, query_plan.is_and_operation);
 
             if (requires_sorting) {

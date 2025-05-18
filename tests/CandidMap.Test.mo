@@ -10,6 +10,7 @@ import Map "mo:map/Map";
 import SchemaMap "../src/Collection/SchemaMap";
 import CandidMap "../src/CandidMap";
 import ZenDB "../src";
+import Constants "../src/Constants";
 
 let schema : ZenDB.Types.Schema = #Record([
     ("name", #Text),
@@ -55,7 +56,8 @@ let candid : Candid.Candid = #Record([
     ("comments", #Array([#Record([("content", #Text("comment1")), ("created_at", #Nat(1234567890))])])),
 ]);
 
-let candid_map = CandidMap.new(schema_map, candid);
+let candid_map = CandidMap.new(schema_map, 0, candid);
+assert CandidMap.get(candid_map, schema_map, Constants.RECORD_ID) == ?#Nat(0);
 
 suite(
     "CandidMap",
@@ -280,7 +282,7 @@ suite(
             "CandidMap: store primitive types",
             func() {
                 let schema_map = SchemaMap.new(#Nat);
-                let candid_map = CandidMap.new(schema_map, #Nat(42));
+                let candid_map = CandidMap.new(schema_map, 0, #Nat(42));
                 assert CandidMap.get(candid_map, schema_map, "") == ?#Nat(42);
                 assert CandidMap.get(candid_map, schema_map, "0") == null;
 

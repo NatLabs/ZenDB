@@ -26,7 +26,7 @@ import Itertools "mo:itertools/Iter";
 import RevIter "mo:itertools/RevIter";
 import Logger "Logger";
 
-import TypeUtils "mo:memory-collection/TypeUtils";
+import _TypeUtils "mo:memory-collection/TypeUtils";
 import Int8Cmp "mo:memory-collection/TypeUtils/Int8Cmp";
 
 import T "Types";
@@ -34,6 +34,8 @@ import ByteUtils "ByteUtils";
 
 module {
     type Order = Order.Order;
+
+    public let TypeUtils = _TypeUtils;
 
     public func ignore_this() : None {
         Debug.trap("trap caused by ignore_this()");
@@ -54,6 +56,19 @@ module {
             )
         );
         res;
+    };
+
+    public func slice_blob(blob : Blob, start : Nat, end : Nat) : Blob {
+        let size = end - start;
+
+        Blob.fromArray(
+            Array.tabulate(
+                size,
+                func(i : Nat) : Nat8 {
+                    blob.get(start + i);
+                },
+            )
+        );
     };
 
     /// Generic helper function to handle Result types with consistent error logging

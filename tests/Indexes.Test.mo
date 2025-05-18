@@ -218,10 +218,6 @@ ZenDBSuite.newZenDBSuite(
                         ZenDB.QueryBuilder().Sort(field, #Ascending)
                     );
 
-                    // Debug.print(
-                    //     "Sorted results for field " # field # ": " # debug_show (results)
-                    // );
-
                     return sorted_ids.size() == limit and Itertools.all(
                         Itertools.zip(
                             Iter.map(
@@ -237,13 +233,39 @@ ZenDBSuite.newZenDBSuite(
 
                 };
 
+                func verify_entries<A>(
+                    field : Text,
+                    sorted_ids : Buffer.Buffer<Nat>,
+                    getter : (record : SupportedIndexTypes, field : Text) -> ZenDB.Types.Candid,
+                ) : Bool {
+
+                    for ((id, r) in Map.entries(inputs)) {
+                        let #ok(results) = sorted_index_types.search(
+                            QueryBuilder().Where(field, #eq(getter(r, field)))
+                        );
+
+                        Debug.print("Looking for id " # debug_show id # " with record " # debug_show r);
+                        Debug.print("Results: " # debug_show (results));
+
+                        assert Itertools.any(
+                            results.vals(),
+                            func((search_id, record) : (Nat, SupportedIndexTypes)) : Bool {
+                                return search_id == id;
+                            },
+                        );
+                    };
+
+                    return true;
+
+                };
+
                 test("Sorts correctly for field text", func() { assert verify_sorted_data("text", sorted_texts) });
                 test("Sorts correctly for field nat", func() { assert verify_sorted_data("nat", sorted_nats) });
                 test("Sorts correctly for field nat8", func() { assert verify_sorted_data("nat8", sorted_nat8s) });
                 test("Sorts correctly for field nat16", func() { assert verify_sorted_data("nat16", sorted_nat16s) });
                 test("Sorts correctly for field nat32", func() { assert verify_sorted_data("nat32", sorted_nat32s) });
                 test("Sorts correctly for field nat64", func() { assert verify_sorted_data("nat64", sorted_nat64s) });
-                // test("Sorts correctly for field int", func() { assert verify_sorted_data("int", sorted_ints) });
+                test("Sorts correctly for field int", func() { assert verify_sorted_data("int", sorted_ints) });
                 test("Sorts correctly for field int8", func() { assert verify_sorted_data("int8", sorted_int8s) });
                 test("Sorts correctly for field int16", func() { assert verify_sorted_data("int16", sorted_int16s) });
                 test("Sorts correctly for field int32", func() { assert verify_sorted_data("int32", sorted_int32s) });
@@ -253,8 +275,263 @@ ZenDBSuite.newZenDBSuite(
                 test("Sorts correctly for field blob", func() { assert verify_sorted_data("blob", sorted_blobs) });
                 test("Sorts correctly for field bool", func() { assert verify_sorted_data("bool", sorted_bools) });
 
+                func get_candid_text(record : SupportedIndexTypes, field : Text) : ZenDB.Types.Candid {
+                    return #Text(record.text);
+                };
+
+                func get_candid_nat(record : SupportedIndexTypes, field : Text) : ZenDB.Types.Candid {
+                    return #Nat(record.nat);
+                };
+
+                func get_candid_bool(record : SupportedIndexTypes, field : Text) : ZenDB.Types.Candid {
+                    return #Bool(record.bool);
+                };
+
+                func get_candid_blob(record : SupportedIndexTypes, field : Text) : ZenDB.Types.Candid {
+                    return #Blob(record.blob);
+                };
+                func get_candid_principal(record : SupportedIndexTypes, field : Text) : ZenDB.Types.Candid {
+                    return #Principal(record.principal);
+                };
+                func get_candid_float(record : SupportedIndexTypes, field : Text) : ZenDB.Types.Candid {
+                    return #Float(record.float);
+                };
+                func get_candid_int(record : SupportedIndexTypes, field : Text) : ZenDB.Types.Candid {
+                    return #Int(record.int);
+                };
+                func get_candid_int8(record : SupportedIndexTypes, field : Text) : ZenDB.Types.Candid {
+                    return #Int8(record.int8);
+                };
+                func get_candid_int16(record : SupportedIndexTypes, field : Text) : ZenDB.Types.Candid {
+                    return #Int16(record.int16);
+                };
+                func get_candid_int32(record : SupportedIndexTypes, field : Text) : ZenDB.Types.Candid {
+                    return #Int32(record.int32);
+                };
+                func get_candid_int64(record : SupportedIndexTypes, field : Text) : ZenDB.Types.Candid {
+                    return #Int64(record.int64);
+                };
+                func get_candid_nat8(record : SupportedIndexTypes, field : Text) : ZenDB.Types.Candid {
+                    return #Nat8(record.nat8);
+                };
+                func get_candid_nat16(record : SupportedIndexTypes, field : Text) : ZenDB.Types.Candid {
+                    return #Nat16(record.nat16);
+                };
+                func get_candid_nat32(record : SupportedIndexTypes, field : Text) : ZenDB.Types.Candid {
+                    return #Nat32(record.nat32);
+                };
+                func get_candid_nat64(record : SupportedIndexTypes, field : Text) : ZenDB.Types.Candid {
+                    return #Nat64(record.nat64);
+                };
+
+                test("Correctly retrieves entries for field nat", func() { assert verify_entries("nat", sorted_nats, get_candid_nat) });
+                test("Correctly retrieves entries for field bool", func() { assert verify_entries("bool", sorted_bools, get_candid_bool) });
+                test("Correctly retrieves entries for field blob", func() { assert verify_entries("blob", sorted_blobs, get_candid_blob) });
+                test("Correctly retrieves entries for field principal", func() { assert verify_entries("principal", sorted_principals, get_candid_principal) });
+                test("Correctly retrieves entries for field int", func() { assert verify_entries("int", sorted_ints, get_candid_int) });
+                test("Correctly retrieves entries for field int8", func() { assert verify_entries("int8", sorted_int8s, get_candid_int8) });
+                test("Correctly retrieves entries for field int16", func() { assert verify_entries("int16", sorted_int16s, get_candid_int16) });
+                test("Correctly retrieves entries for field int32", func() { assert verify_entries("int32", sorted_int32s, get_candid_int32) });
+                test("Correctly retrieves entries for field int64", func() { assert verify_entries("int64", sorted_int64s, get_candid_int64) });
+                test("Correctly retrieves entries for field nat64", func() { assert verify_entries("nat64", sorted_nat64s, get_candid_nat64) });
+                test("Correctly retrieves entries for field float", func() { assert verify_entries("float", sorted_floats, get_candid_float) });
+                test("Correctly retrieves entries for field nat8", func() { assert verify_entries("nat8", sorted_nat8s, get_candid_nat8) });
+                test("Correctly retrieves entries for field nat16", func() { assert verify_entries("nat16", sorted_nat16s, get_candid_nat16) });
+                test("Correctly retrieves entries for field nat32", func() { assert verify_entries("nat32", sorted_nat32s, get_candid_nat32) });
+                test("Correctly retrieves entries for field nat64", func() { assert verify_entries("nat64", sorted_nat64s, get_candid_nat64) });
+                test("Correctly retrieves entries for field text", func() { assert verify_entries("text", sorted_texts, get_candid_text) });
+
+                let types = ["text", "nat", "nat8", "nat16", "nat32", "nat64", "int", "int8", "int16", "int32", "int64", "principal", "blob", "bool"];
+                let compound_types = Buffer.Buffer<(Text, Text)>(types.size() ** 2);
+
+                for (type_a in types.vals()) {
+                    for (type_b in types.vals()) {
+                        compound_types.add((type_a, type_b));
+                        let #ok(_) = sorted_index_types.create_and_populate_index(
+                            type_a # "_" # type_b,
+                            [(type_a, #Ascending), (type_b, #Ascending)],
+
+                        );
+                    };
+                };
+
+                func verify_compound_entries(
+                    field : Text,
+                    getter_a : (record : SupportedIndexTypes, field : Text) -> ZenDB.Types.Candid,
+                    field_b : Text,
+                    getter_b : (record : SupportedIndexTypes, field : Text) -> ZenDB.Types.Candid,
+                ) : Bool {
+
+                    for (id in Itertools.range(0, limit)) {
+                        let ?r = Map.get(inputs, Map.nhash, id);
+                        let #ok(results) = sorted_index_types.search(
+                            QueryBuilder().Where(
+                                field,
+                                #eq(getter_a(r, field)),
+                            ).And(
+                                field_b,
+                                #eq(getter_b(r, field_b)),
+                            )
+                        );
+
+                        assert Itertools.any(
+                            results.vals(),
+                            func((search_id, record) : (Nat, SupportedIndexTypes)) : Bool {
+                                return search_id == id;
+                            },
+                        );
+                    };
+
+                    return true;
+
+                };
+
+                for ((type_a, type_b) in compound_types.vals()) {
+                    let getter_a = switch (type_a) {
+                        case ("text") get_candid_text;
+                        case ("nat") get_candid_nat;
+                        case ("nat8") get_candid_nat8;
+                        case ("nat16") get_candid_nat16;
+                        case ("nat32") get_candid_nat32;
+                        case ("nat64") get_candid_nat64;
+                        case ("int") get_candid_int;
+                        case ("int8") get_candid_int8;
+                        case ("int16") get_candid_int16;
+                        case ("int32") get_candid_int32;
+                        case ("int64") get_candid_int64;
+                        case ("float") get_candid_float;
+                        case ("principal") get_candid_principal;
+                        case ("blob") get_candid_blob;
+                        case ("bool") get_candid_bool;
+                        case (_) Debug.trap("Unsupported type");
+                    };
+
+                    let getter_b = switch (type_b) {
+                        case ("text") get_candid_text;
+                        case ("nat") get_candid_nat;
+                        case ("nat8") get_candid_nat8;
+                        case ("nat16") get_candid_nat16;
+                        case ("nat32") get_candid_nat32;
+                        case ("nat64") get_candid_nat64;
+                        case ("int") get_candid_int;
+                        case ("int8") get_candid_int8;
+                        case ("int16") get_candid_int16;
+                        case ("int32") get_candid_int32;
+                        case ("int64") get_candid_int64;
+                        case ("float") get_candid_float;
+                        case ("principal") get_candid_principal;
+                        case ("blob") get_candid_blob;
+                        case ("bool") get_candid_bool;
+                        case (_) Debug.trap("Unsupported type");
+                    };
+
+                    test(
+                        "Correctly retrieves entries for field " # type_a # " and field " # type_b,
+                        func() {
+                            assert verify_compound_entries(type_a, getter_a, type_b, getter_b);
+                        },
+                    );
+                };
+
             },
         );
+
+        // suite(
+        //     "Compound indexes",
+        //     func() {
+        //         let types = ["text", "nat", "nat8", "nat16", "nat32", "nat64", "int", "int8", "int16", "int32", "int64", "principal", "blob", "bool"];
+
+        //         func get_candid_text(record : SupportedIndexTypes, field : Text) : ZenDB.Types.Candid {
+        //             return #Text(record.text);
+        //         };
+
+        //         func get_candid_nat(record : SupportedIndexTypes, field : Text) : ZenDB.Types.Candid {
+        //             return #Nat(record.nat);
+        //         };
+
+        //         func get_candid_bool(record : SupportedIndexTypes, field : Text) : ZenDB.Types.Candid {
+        //             return #Bool(record.bool);
+        //         };
+
+        //         func get_candid_blob(record : SupportedIndexTypes, field : Text) : ZenDB.Types.Candid {
+        //             return #Blob(record.blob);
+        //         };
+        //         func get_candid_principal(record : SupportedIndexTypes, field : Text) : ZenDB.Types.Candid {
+        //             return #Principal(record.principal);
+        //         };
+        //         func get_candid_float(record : SupportedIndexTypes, field : Text) : ZenDB.Types.Candid {
+        //             return #Float(record.float);
+        //         };
+        //         func get_candid_int(record : SupportedIndexTypes, field : Text) : ZenDB.Types.Candid {
+        //             return #Int(record.int);
+        //         };
+        //         func get_candid_int8(record : SupportedIndexTypes, field : Text) : ZenDB.Types.Candid {
+        //             return #Int8(record.int8);
+        //         };
+        //         func get_candid_int16(record : SupportedIndexTypes, field : Text) : ZenDB.Types.Candid {
+        //             return #Int16(record.int16);
+        //         };
+        //         func get_candid_int32(record : SupportedIndexTypes, field : Text) : ZenDB.Types.Candid {
+        //             return #Int32(record.int32);
+        //         };
+        //         func get_candid_int64(record : SupportedIndexTypes, field : Text) : ZenDB.Types.Candid {
+        //             return #Int64(record.int64);
+        //         };
+        //         func get_candid_nat8(record : SupportedIndexTypes, field : Text) : ZenDB.Types.Candid {
+        //             return #Nat8(record.nat8);
+        //         };
+        //         func get_candid_nat16(record : SupportedIndexTypes, field : Text) : ZenDB.Types.Candid {
+        //             return #Nat16(record.nat16);
+        //         };
+        //         func get_candid_nat32(record : SupportedIndexTypes, field : Text) : ZenDB.Types.Candid {
+        //             return #Nat32(record.nat32);
+        //         };
+        //         func get_candid_nat64(record : SupportedIndexTypes, field : Text) : ZenDB.Types.Candid {
+        //             return #Nat64(record.nat64);
+        //         };
+
+        //         suite(
+        //             "Compound indexes with 2 fields",
+        //             func() {
+
+        //                 for (type_a in types.vals()) {
+        //                     for (type_b in types.vals()) {
+        //                         let #ok(_) = sorted_index_types.create_index(
+        //                             type_a # "_" # type_b,
+        //                             [(type_a, #Ascending), (type_b, #Ascending)],
+        //                             false,
+        //                         );
+        //                     };
+        //                 };
+
+        //             },
+        //         );
+        //     },
+        // );
+
+        // suite(
+        //     "Sorted compound indexes",
+        //     func() {
+
+        //         let types = ["text", "nat", "nat8", "nat16", "nat32", "nat64", "int", "int8", "int16", "int32", "int64", "principal", "blob", "bool"];
+        //         let compound_types = Buffer.Buffer<(Text, Text)>(types.size() ** 2);
+
+        //         for (type_a in types.vals()) {
+        //             for (type_b in types.vals()) {
+        //                 compound_types.add((type_a, type_b));
+
+        //                 let #ok(_) = sorted_index_types.create_index(
+        //                     type_a # "_" # type_b,
+        //                     [(type_a, #Ascending), (type_b, #Ascending)],
+        //                     false,
+        //                 );
+
+        //             };
+
+        //         };
+
+        //     },
+        // );
 
         suite(
             "edge cases",

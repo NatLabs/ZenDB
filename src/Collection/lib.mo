@@ -50,6 +50,7 @@ import QueryPlan "QueryPlan";
 import QueryExecution "QueryExecution";
 import StableCollection "StableCollection";
 import Logger "../Logger";
+import DocumentStore "DocumentStore";
 
 module {
 
@@ -112,18 +113,18 @@ module {
         public func name() : Text = collection_name;
 
         /// Returns the total number of records in the collection.
-        public func size() : Nat = BTree.size(collection.main);
+        public func size() : Nat = StableCollection.size(collection);
 
-        let main_btree_utils : T.BTreeUtils<Nat, Blob> = CollectionUtils.get_main_btree_utils(collection);
+        let main_btree_utils : T.BTreeUtils<Nat, T.Document> = DocumentStore.get_btree_utils(collection.documents);
 
         /// Returns an iterator over all the record ids in the collection.
         public func keys() : Iter<Nat> {
-            BTree.keys(collection.main, main_btree_utils);
+            StableCollection.keys(collection, main_btree_utils);
         };
 
         /// Returns an iterator over all the records in the collection.
         public func vals() : Iter<Record> {
-            let iter = BTree.vals(collection.main, main_btree_utils);
+            let iter = StableCollection.vals(collection, main_btree_utils);
             let records = Iter.map<Blob, Record>(
                 iter,
                 func(candid_blob : Blob) {
@@ -135,7 +136,7 @@ module {
 
         /// Returns an iterator over a tuple containing the id and record for all entries in the collection.
         public func entries() : Iter<(Nat, Record)> {
-            let iter = BTree.entries(collection.main, main_btree_utils);
+            let iter = StableCollection.entries(collection, main_btree_utils);
 
             let records = Iter.map<(Nat, Blob), (Nat, Record)>(
                 iter,
@@ -311,7 +312,7 @@ module {
             );
         };
 
-        public func update(query_builder : QueryBuilder, update_operations : [(Text, T.FieldUpdateOperations)]) : Result<(), Text> {
+        public func update(query_builder : QueryBuilder, update_operations : [(Text, T.FieldUpdateOperations)]) : Result<Nat, Text> {
             let records_iter = switch (
                 handleResult(
                     StableCollection.internal_search(collection, query_builder),
@@ -322,9 +323,11 @@ module {
                 case (#ok(records_iter)) records_iter;
             };
 
+            var total_updated = 0;
+
             for (id in records_iter) {
                 switch (StableCollection.update_by_id(collection, main_btree_utils, id, update_operations)) {
-                    case (#ok(_)) {};
+                    case (#ok(_)) total_updated += 1;
                     case (#err(err)) {
                         Logger.lazyError(collection.logger, func() = "Failed to update record with id: " # debug_show (id) # ": " # err);
                         return #err("Failed to update record with id: " # debug_show (id) # ": " # err);
@@ -332,7 +335,7 @@ module {
                 };
             };
 
-            #ok;
+            #ok(total_updated);
         };
 
         public func deleteById(id : Nat) : Result<Record, Text> {
@@ -380,7 +383,7 @@ module {
 
         public func filter_iter(condition : (Record) -> Bool) : Iter<Record> {
 
-            let iter = BTree.vals(collection.main, main_btree_utils);
+            let iter = StableCollection.vals(collection, main_btree_utils);
             let records = Iter.map<Blob, Record>(
                 iter,
                 func(candid_blob : Blob) {
@@ -397,11 +400,7 @@ module {
 
         /// Clear all the data in the collection.
         public func clear() {
-            BTree.clear(collection.main);
-
-            for (index in Map.vals(collection.indexes)) {
-                BTree.clear(index.data);
-            };
+            StableCollection.clear(collection);
         };
 
         // public func update_schema(schema : Schema) : Result<(), Text> {
