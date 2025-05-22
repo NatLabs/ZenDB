@@ -1060,7 +1060,7 @@ module StableCollection {
         );
     };
 
-    public func search_iter(
+    public func searchIter(
         collection : StableCollection,
         main_btree_utils : T.BTreeUtils<Nat, T.Document>,
         query_builder : QueryBuilder,

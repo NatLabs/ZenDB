@@ -165,22 +165,22 @@ ZenDBSuite.newZenDBSuite(
     "Txs tests",
     ?ZenDBSuite.onlyWithIndex,
     func collection_setup(zendb : ZenDB.Database) {
-        let #ok(txs) = zendb.create_collection<Tx>("transactions", TxSchema, candify_tx, []);
+        let #ok(txs) = zendb.createCollection<Tx>("transactions", TxSchema, candify_tx, []);
     },
     func index_setup(zendb : ZenDB.Database) {
-        let #ok(txs) = zendb.get_collection<Tx>("transactions", candify_tx);
+        let #ok(txs) = zendb.getCollection<Tx>("transactions", candify_tx);
 
-        let #ok(_) = txs.create_and_populate_index("index:[btype],[tx.amt]", [("btype", #Ascending), ("tx.amt", #Ascending)]);
-        let #ok(_) = txs.create_and_populate_index("index:[btype],[ts]", [("btype", #Ascending), ("ts", #Ascending)]);
-        let #ok(_) = txs.create_and_populate_index("index:[tx.amt]", [("tx.amt", #Ascending)]);
-        let #ok(_) = txs.create_and_populate_index("index:[ts]", [("ts", #Ascending)]);
-        let #ok(_) = txs.create_and_populate_index("index:[tx.from.owner],[tx.from.sub_account]", [("tx.from.owner", #Ascending), ("tx.from.sub_account", #Ascending)]);
-        let #ok(_) = txs.create_and_populate_index("index:[tx.to.owner],[tx.to.sub_account]", [("tx.to.owner", #Ascending), ("tx.to.sub_account", #Ascending)]);
-        let #ok(_) = txs.create_and_populate_index("index:[tx.spender.owner],[tx.spender.sub_account]", [("tx.spender.owner", #Ascending), ("tx.spender.sub_account", #Ascending)]);
+        let #ok(_) = txs.createAndPopulateIndex("index:[btype],[tx.amt]", [("btype", #Ascending), ("tx.amt", #Ascending)]);
+        let #ok(_) = txs.createAndPopulateIndex("index:[btype],[ts]", [("btype", #Ascending), ("ts", #Ascending)]);
+        let #ok(_) = txs.createAndPopulateIndex("index:[tx.amt]", [("tx.amt", #Ascending)]);
+        let #ok(_) = txs.createAndPopulateIndex("index:[ts]", [("ts", #Ascending)]);
+        let #ok(_) = txs.createAndPopulateIndex("index:[tx.from.owner],[tx.from.sub_account]", [("tx.from.owner", #Ascending), ("tx.from.sub_account", #Ascending)]);
+        let #ok(_) = txs.createAndPopulateIndex("index:[tx.to.owner],[tx.to.sub_account]", [("tx.to.owner", #Ascending), ("tx.to.sub_account", #Ascending)]);
+        let #ok(_) = txs.createAndPopulateIndex("index:[tx.spender.owner],[tx.spender.sub_account]", [("tx.spender.owner", #Ascending), ("tx.spender.sub_account", #Ascending)]);
     },
     func txs_tests(zendb : ZenDB.Database) {
 
-        let #ok(txs) = zendb.get_collection<Tx>("transactions", candify_tx);
+        let #ok(txs) = zendb.getCollection<Tx>("transactions", candify_tx);
 
         for ((i, tx) in Itertools.enumerate(input_txs.vals())) {
             let #ok(id) = txs.insert(tx); // id is generated incrementally, so it should match tx.tx_index

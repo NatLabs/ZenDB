@@ -23,7 +23,7 @@ module {
         bench.rows([
             "put() no index",
             "updateById() 1",
-            "create_index()",
+            "createIndex()",
             "clear collection data",
             "put() with 1 index",
             "updateById() 2",
@@ -164,7 +164,7 @@ module {
         };
 
         let buffer = Buffer.Buffer<StoreItem>(limit);
-        let #ok(collection) = ZenDB.create_collection(hydra_db, "store_items", item_schema);
+        let #ok(collection) = ZenDB.createCollection(hydra_db, "store_items", item_schema, null);
 
         Debug.print(debug_show collection.schema_keys);
         for (i in Itertools.range(0, limit)) {
@@ -181,8 +181,8 @@ module {
                         let #ok(_) = ZenDB.put<StoreItem>(hydra_db, "store_items", candify_store_item, item);
                     };
                 };
-                case ("ZenDB", "create_index()") {
-                    let #ok(_) = ZenDB.create_index(hydra_db, "store_items", ["store", "in_stock", "price"], false);
+                case ("ZenDB", "createIndex()") {
+                    let #ok(_) = ZenDB.createIndex(hydra_db, "store_items", ["store", "in_stock", "price"], false);
                 };
                 case ("ZenDB", "clear collection data") {
                     ZenDB.clear_collection(hydra_db, "store_items");
@@ -194,7 +194,7 @@ module {
                     };
                 };
                 case ("ZenDB", "create 2nd index") {
-                    let #ok(_) = ZenDB.create_index(hydra_db, "store_items", ["name", "price"], false);
+                    let #ok(_) = ZenDB.createIndex(hydra_db, "store_items", ["name", "price"], false);
                 };
                 case ("ZenDB", "put() with 2 indexes") {
                     for (i in Itertools.range(0, limit)) {
@@ -203,7 +203,7 @@ module {
                     };
                 };
                 case ("ZenDB", "create 3rd index") {
-                    let #ok(_) = ZenDB.create_index(hydra_db, "store_items", ["name", "in_stock", "price"], false);
+                    let #ok(_) = ZenDB.createIndex(hydra_db, "store_items", ["name", "in_stock", "price"], false);
                 };
                 case ("ZenDB", "put() with 3 indexes") {
                     for (i in Itertools.range(0, limit)) {

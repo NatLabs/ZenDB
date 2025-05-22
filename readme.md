@@ -137,14 +137,18 @@ let candify_users : ZenDB.Types.Candify<User> = {
 
 ```motoko
 // Create collection
-let #ok(users) = db.create_collection("users", UsersSchema, candify_users);
+let #ok(users) = db.createCollection("users", UsersSchema, candify_users, null);
 
 // Create optimal indexes for your query patterns
-let #ok(_) = users.create_index("name_idx", [("name", #Ascending)]);
-let #ok(_) = users.create_index("location_created_idx", [
-  ("profile.location", #Ascending), 
-  ("created_at", #Descending)
-]);
+let #ok(_) = users.createIndex("name_idx", [("name", #Ascending)], null);
+let #ok(_) = users.createIndex(
+  "location_created_idx", 
+  [
+    ("profile.location", #Ascending), 
+    ("created_at", #Descending)
+  ],
+  null
+);
 ```
 
 ### 5. Insert & Query Data
@@ -256,7 +260,7 @@ ZenDB uses a sophisticated query planner to determine the most efficient indexes
 
 ```motoko
 // Great for queries filtering on status and sorting by date
-let #ok(_) = users.create_index("status_date_idx", [
+let #ok(_) = users.createIndex("status_date_idx", [
   ("status", #Ascending), 
   ("created_at", #Descending)
 ]);

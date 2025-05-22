@@ -5,7 +5,7 @@ Instructions
 |                                                                        |          ZenDB |
 | :--------------------------------------------------------------------- | -------------: |
 | put() no index                                                         |  4_346_787_546 |
-| create_index()                                                         |  5_455_578_597 |
+| createIndex()                                                         |  5_455_578_597 |
 | clear collection data                                                  |        103_376 |
 | put() with 1 index                                                     |  7_687_600_646 |
 | create 2nd index                                                       |  5_842_120_856 |
@@ -24,7 +24,7 @@ Heap
 |                                                                        |       ZenDB |
 | :--------------------------------------------------------------------- | ----------: |
 | put() no index                                                         |  22_022_328 |
-| create_index()                                                         |  -5_565_608 |
+| createIndex()                                                         |  -5_565_608 |
 | clear collection data                                                  |      16_084 |
 | put() with 1 index                                                     |  12_096_844 |
 | create 2nd index                                                       | -12_444_772 |

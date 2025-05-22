@@ -53,17 +53,17 @@ ZenDBSuite.newZenDBSuite(
     "Simple Record Tests",
     ?ZenDBSuite.withAndWithoutIndex,
     func collection_setup(zendb : ZenDB.Database) {
-        let #ok(users) = zendb.create_collection<User>("users", users_schema, candify_user, []);
+        let #ok(users) = zendb.createCollection<User>("users", users_schema, candify_user, []);
     },
     func index_setup(zendb : ZenDB.Database) {
-        let #ok(users) = zendb.get_collection<User>("users", candify_user);
-        let #ok(_) = users.create_index("name_idx", [("name", #Ascending)], false);
-        let #ok(_) = users.create_index("age_idx", [("age", #Ascending)], false);
-        let #ok(_) = users.create_index("email_idx", [("email", #Ascending)], false);
+        let #ok(users) = zendb.getCollection<User>("users", candify_user);
+        let #ok(_) = users.createIndex("name_idx", [("name", #Ascending)], null);
+        let #ok(_) = users.createIndex("age_idx", [("age", #Ascending)], null);
+        let #ok(_) = users.createIndex("email_idx", [("email", #Ascending)], null);
     },
     func suite_setup(zendb : ZenDB.Database) {
 
-        let #ok(users) = zendb.get_collection<User>("users", candify_user);
+        let #ok(users) = zendb.getCollection<User>("users", candify_user);
 
         let inputs = Buffer.Buffer<User>(20);
         for (i in Iter.range(1, 20)) {

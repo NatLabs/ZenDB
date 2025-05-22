@@ -27,7 +27,7 @@ ZenDBSuite.newNoIndexSetup(
                 test(
                     "Top level Null types",
                     func() {
-                        let #err(_) = zendb.create_collection<Null>(
+                        let #err(_) = zendb.createCollection<Null>(
                             "strictly_null",
                             #Null,
                             {
@@ -50,7 +50,7 @@ ZenDBSuite.newNoIndexSetup(
                             to_blob = func(c : ArrayType) : Blob = to_candid (c);
                         };
 
-                        let #err(_) = zendb.create_collection<ArrayType>("arrays_0", ArraySchema, candify, []) else return assert false;
+                        let #err(_) = zendb.createCollection<ArrayType>("arrays_0", ArraySchema, candify, []) else return assert false;
                     },
                 );
 
@@ -64,7 +64,7 @@ ZenDBSuite.newNoIndexSetup(
                 test(
                     "Bool Type",
                     func() {
-                        let #ok(bools) = zendb.create_collection<Bool>(
+                        let #ok(bools) = zendb.createCollection<Bool>(
                             "bools",
                             #Bool,
                             {
@@ -89,7 +89,7 @@ ZenDBSuite.newNoIndexSetup(
 
                         let testPrincipal = Principal.fromText("2vxsx-fae");
 
-                        let #ok(principals) = zendb.create_collection<Principal>(
+                        let #ok(principals) = zendb.createCollection<Principal>(
                             "principals",
                             #Principal,
                             {
@@ -109,7 +109,7 @@ ZenDBSuite.newNoIndexSetup(
                 test(
                     "Nat",
                     func() {
-                        let #ok(nats) = zendb.create_collection<Nat>(
+                        let #ok(nats) = zendb.createCollection<Nat>(
                             "nats",
                             #Nat,
                             {
@@ -130,7 +130,7 @@ ZenDBSuite.newNoIndexSetup(
                 test(
                     "Float",
                     func() {
-                        let #ok(floats) = zendb.create_collection<Float>(
+                        let #ok(floats) = zendb.createCollection<Float>(
                             "floats",
                             #Float,
                             {
@@ -152,7 +152,7 @@ ZenDBSuite.newNoIndexSetup(
                 test(
                     "Text",
                     func() {
-                        let #ok(texts) = zendb.create_collection<Text>(
+                        let #ok(texts) = zendb.createCollection<Text>(
                             "texts",
                             #Text,
                             {
@@ -173,7 +173,7 @@ ZenDBSuite.newNoIndexSetup(
                 test(
                     "Blob",
                     func() {
-                        let #ok(blobs) = zendb.create_collection<Blob>(
+                        let #ok(blobs) = zendb.createCollection<Blob>(
                             "blobs",
                             #Blob,
                             {
@@ -194,7 +194,7 @@ ZenDBSuite.newNoIndexSetup(
                 test(
                     "Option: ?Text",
                     func() {
-                        let #ok(options) = zendb.create_collection<?Text>(
+                        let #ok(options) = zendb.createCollection<?Text>(
                             "options",
                             #Option(#Text),
                             {
@@ -218,7 +218,7 @@ ZenDBSuite.newNoIndexSetup(
                         type NestedOption = ???Nat;
                         let NestedOptionSchema = #Option(#Option(#Option(#Nat)));
 
-                        let #ok(nested_options) = zendb.create_collection<NestedOption>(
+                        let #ok(nested_options) = zendb.createCollection<NestedOption>(
                             "nested_options",
                             NestedOptionSchema,
                             {
@@ -275,7 +275,7 @@ ZenDBSuite.newNoIndexSetup(
 
                         let RecordSchema = #Record([("a", #Nat), ("b", #Text)]);
 
-                        let #ok(records) = zendb.create_collection<Record>(
+                        let #ok(records) = zendb.createCollection<Record>(
                             "records",
                             RecordSchema,
                             {
@@ -320,7 +320,7 @@ ZenDBSuite.newNoIndexSetup(
                             #Field("content", [#MaxSize(100_000)]), // content must be <= 100_000 characters
                         ];
 
-                        let #ok(notes) = zendb.create_collection<Note>(
+                        let #ok(notes) = zendb.createCollection<Note>(
                             "notes",
                             NoteSchema,
                             candify,
@@ -393,12 +393,12 @@ ZenDBSuite.newNoIndexSetup(
                         };
 
                         // Should fail on indexes created on variant fields with #Null type
-                        let #err(_) = zendb.create_collection<Variant>("variants_0", VariantSchema, candify, [#Unique(["active"])]) else return assert false;
-                        let #err(_) = zendb.create_collection<Variant>("variants_0", VariantSchema, candify, [#Unique(["inactive"])]) else return assert false;
-                        let #err(_) = zendb.create_collection<Variant>("variants_0", VariantSchema, candify, [#Field("active", [#Min(1)])]) else return assert false;
-                        let #err(_) = zendb.create_collection<Variant>("variants_0", VariantSchema, candify, [#Field("inactive", [#Min(1)])]) else return assert false;
+                        let #err(_) = zendb.createCollection<Variant>("variants_0", VariantSchema, candify, [#Unique(["active"])]) else return assert false;
+                        let #err(_) = zendb.createCollection<Variant>("variants_0", VariantSchema, candify, [#Unique(["inactive"])]) else return assert false;
+                        let #err(_) = zendb.createCollection<Variant>("variants_0", VariantSchema, candify, [#Field("active", [#Min(1)])]) else return assert false;
+                        let #err(_) = zendb.createCollection<Variant>("variants_0", VariantSchema, candify, [#Field("inactive", [#Min(1)])]) else return assert false;
 
-                        let #ok(variants) = zendb.create_collection<Variant>(
+                        let #ok(variants) = zendb.createCollection<Variant>(
                             "variants_0",
                             VariantSchema,
                             candify,
@@ -435,7 +435,7 @@ ZenDBSuite.newNoIndexSetup(
 
                         let VariantSchema = #Variant([("name", #Text), ("id", #Nat)]);
 
-                        let #ok(variants) = zendb.create_collection<Variant>(
+                        let #ok(variants) = zendb.createCollection<Variant>(
                             "variants_1",
                             VariantSchema,
                             {
@@ -481,7 +481,7 @@ ZenDBSuite.newNoIndexSetup(
                             to_blob = func(c : Tuple) : Blob = to_candid (c);
                         };
 
-                        let #ok(tuples) = zendb.create_collection<Tuple>(
+                        let #ok(tuples) = zendb.createCollection<Tuple>(
                             "tuples",
                             TupleSchema,
                             candify,
@@ -508,7 +508,7 @@ ZenDBSuite.newNoIndexSetup(
 
                         let TripleSchema = ZenDB.Schema.Triple(#Nat, #Text, #Nat);
 
-                        let #ok(triples) = zendb.create_collection<Triple>(
+                        let #ok(triples) = zendb.createCollection<Triple>(
                             "triples",
                             TripleSchema,
                             {
@@ -548,7 +548,7 @@ ZenDBSuite.newNoIndexSetup(
 
                         let QuadrupleSchema = #Tuple([#Nat, #Text, #Nat, #Blob]);
 
-                        let #ok(quadruples) = zendb.create_collection<Quadruple>(
+                        let #ok(quadruples) = zendb.createCollection<Quadruple>(
                             "quadruples",
                             QuadrupleSchema,
                             {
@@ -588,7 +588,7 @@ ZenDBSuite.newNoIndexSetup(
 
                         let NestedRecordSchema = #Record([("a", #Record([("b", #Nat), ("c", #Text)])), ("d", #Nat)]);
 
-                        let #ok(nested_records) = zendb.create_collection<NestedRecord>(
+                        let #ok(nested_records) = zendb.createCollection<NestedRecord>(
                             "nested_records",
                             NestedRecordSchema,
                             {
@@ -622,7 +622,7 @@ ZenDBSuite.newNoIndexSetup(
 
                         let NestedVariantSchema = #Variant([("name", #Text), ("id", #Variant([("active", #Nat), ("inactive", #Null)]))]);
 
-                        let #ok(nested_variants) = zendb.create_collection<NestedVariant>(
+                        let #ok(nested_variants) = zendb.createCollection<NestedVariant>(
                             "nested_variants",
                             NestedVariantSchema,
                             {
@@ -666,7 +666,7 @@ ZenDBSuite.newNoIndexSetup(
 
                         let NestedTupleSchema = ZenDB.Schema.Tuple(#Nat, ZenDB.Schema.Tuple(#Text, #Nat));
 
-                        let #ok(nested_tuples) = zendb.create_collection<NestedTuple>(
+                        let #ok(nested_tuples) = zendb.createCollection<NestedTuple>(
                             "nested_tuples",
                             NestedTupleSchema,
                             {
@@ -691,7 +691,7 @@ ZenDBSuite.newNoIndexSetup(
 
                         let OptionalRecordSchema = #Option(#Record([("a", #Nat), ("b", #Text)]));
 
-                        let #ok(optional_records) = zendb.create_collection<OptionalRecord>(
+                        let #ok(optional_records) = zendb.createCollection<OptionalRecord>(
                             "optional_records",
                             OptionalRecordSchema,
                             {
@@ -729,9 +729,9 @@ ZenDBSuite.newNoIndexSetup(
                             to_blob = func(c : OptionalVariant) : Blob = to_candid (c);
                         };
 
-                        let #err(_) = zendb.create_collection<OptionalVariant>("optional_variants", OptionalVariantSchema, candify, [#Unique([""])]) else return assert false;
+                        let #err(_) = zendb.createCollection<OptionalVariant>("optional_variants", OptionalVariantSchema, candify, [#Unique([""])]) else return assert false;
 
-                        let #ok(optional_variants) = zendb.create_collection<OptionalVariant>(
+                        let #ok(optional_variants) = zendb.createCollection<OptionalVariant>(
                             "optional_variants",
                             OptionalVariantSchema,
                             candify,
@@ -768,7 +768,7 @@ ZenDBSuite.newNoIndexSetup(
 
                         let OptionalTupleSchema = #Option(#Tuple([#Nat, #Text]));
 
-                        let #ok(optional_tuples) = zendb.create_collection<OptionalTuple>(
+                        let #ok(optional_tuples) = zendb.createCollection<OptionalTuple>(
                             "optional_tuples",
                             OptionalTupleSchema,
                             {
@@ -808,7 +808,7 @@ ZenDBSuite.newNoIndexSetup(
 
                         let DeepOptionalSchema = #Option(#Record([("name", #Text), ("details", #Option(#Record([("id", #Nat), ("metadata", #Option(#Record([("active", #Bool), ("tags", #Option(#Array(#Text)))])))])))]));
 
-                        let #ok(deep_optionals) = zendb.create_collection<DeepOptional>(
+                        let #ok(deep_optionals) = zendb.createCollection<DeepOptional>(
                             "deep_optionals",
                             DeepOptionalSchema,
                             {
@@ -909,7 +909,7 @@ ZenDBSuite.newNoIndexSetup(
                             ("nat64_val", #Nat64),
                         ]);
 
-                        let #ok(numeric_records) = zendb.create_collection<NumericRecord>(
+                        let #ok(numeric_records) = zendb.createCollection<NumericRecord>(
                             "numeric_records",
                             NumericRecordSchema,
                             {
@@ -1077,7 +1077,7 @@ ZenDBSuite.newNoIndexSetup(
                             ("data", #Option(#Array(DataItemSchema))),
                         ]);
 
-                        let #ok(extreme_nesting) = zendb.create_collection<ExtremeNesting>(
+                        let #ok(extreme_nesting) = zendb.createCollection<ExtremeNesting>(
                             "extreme_nesting",
                             ExtremeNestingSchema,
                             {

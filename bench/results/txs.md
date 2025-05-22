@@ -100,7 +100,7 @@ Instructions
 | update() -> #div amt /= 2                                  |                 5_204 |                 31_481_887_293 |
 | update() -> #mul amt *= 2                                  |                 5_709 |                 31_484_706_184 |
 | update() -> #set amt = 100                                 |                 6_266 |                 31_619_299_489 |
-| replaceRecord() -> replace half the tx with new tx         |                 5_659 |                 40_459_568_397 |
+| replace() -> replace half the tx with new tx         |                 5_659 |                 40_459_568_397 |
 
 
 Heap
@@ -123,7 +123,7 @@ Heap
 | update() -> #div amt /= 2                                  |              9.88 KiB |                    -244.25 KiB |
 | update() -> #mul amt *= 2                                  |              9.88 KiB |                      -2.26 MiB |
 | update() -> #set amt = 100                                 |              9.88 KiB |                      -6.08 MiB |
-| replaceRecord() -> replace half the tx with new tx         |             17.89 KiB |                       4.02 MiB |
+| replace() -> replace half the tx with new tx         |             17.89 KiB |                       4.02 MiB |
 
 
 Garbage Collection
@@ -146,7 +146,7 @@ Garbage Collection
 | update() -> #div amt /= 2                                  |                   0 B |                       1.34 GiB |
 | update() -> #mul amt *= 2                                  |                   0 B |                       1.34 GiB |
 | update() -> #set amt = 100                                 |                   0 B |                       1.34 GiB |
-| replaceRecord() -> replace half the tx with new tx         |                   0 B |                       1.87 GiB |
+| replace() -> replace half the tx with new tx         |                   0 B |                       1.87 GiB |
 
 
 Stable Memory
@@ -169,4 +169,4 @@ Stable Memory
 | update() -> #div amt /= 2                                  |                   0 B |                            0 B |
 | update() -> #mul amt *= 2                                  |                   0 B |                            0 B |
 | update() -> #set amt = 100                                 |                   0 B |                            0 B |
-| replaceRecord() -> replace half the tx with new tx         |                   0 B |                            0 B |
+| replace() -> replace half the tx with new tx         |                   0 B |                            0 B |

@@ -102,20 +102,20 @@ func inclusivity_tests(zendb : ZenDB.Database) {
     };
 
     // Create collections
-    let #ok(numeric_collection) = zendb.create_collection<NumericDoc>("numeric_test", NumericSchema, candify_numeric, []) else return assert false;
-    let #ok(text_collection) = zendb.create_collection<TextDoc>("text_test", TextSchema, candify_text, []) else return assert false;
-    let #ok(edge_collection) = zendb.create_collection<EdgeDoc>("edge_test", EdgeCaseSchema, candify_edge, []) else return assert false;
+    let #ok(numeric_collection) = zendb.create_collection<NumericDoc>("numeric_test", NumericSchema, candify_numeric, null) else return assert false;
+    let #ok(text_collection) = zendb.create_collection<TextDoc>("text_test", TextSchema, candify_text, null) else return assert false;
+    let #ok(edge_collection) = zendb.create_collection<EdgeDoc>("edge_test", EdgeCaseSchema, candify_edge, null) else return assert false;
 
     // Create indexes
-    let #ok(_) = numeric_collection.create_index("id_index", [("id", #Ascending)], false) else return assert false;
-    let #ok(_) = numeric_collection.create_index("int_val_index", [("int_val", #Ascending)], false) else return assert false;
-    // let #ok(_) = numeric_collection.create_index("float_val_index", [("float_val", #Ascending)], false);
+    let #ok(_) = numeric_collection.create_index("id_index", [("id", #Ascending)], null) else return assert false;
+    let #ok(_) = numeric_collection.create_index("int_val_index", [("int_val", #Ascending)], null) else return assert false;
+    // let #ok(_) = numeric_collection.create_index("float_val_index", [("float_val", #Ascending)], null);
 
-    let #ok(_) = text_collection.create_index("text_val_index", [("text_val", #Ascending)], false) else return assert false;
-    let #ok(_) = text_collection.create_index("case_sensitive_index", [("case_sensitive", #Ascending)], false) else return assert false;
+    let #ok(_) = text_collection.create_index("text_val_index", [("text_val", #Ascending)], null) else return assert false;
+    let #ok(_) = text_collection.create_index("case_sensitive_index", [("case_sensitive", #Ascending)], null) else return assert false;
 
-    let #ok(_) = edge_collection.create_index("opt_field_index", [("opt_field", #Ascending)], false) else return assert false;
-    let #ok(_) = edge_collection.create_index("text_field_index", [("text_field", #Ascending)], false) else return assert false;
+    let #ok(_) = edge_collection.create_index("opt_field_index", [("opt_field", #Ascending)], null) else return assert false;
+    let #ok(_) = edge_collection.create_index("text_field_index", [("text_field", #Ascending)], null) else return assert false;
 
     // Insert test data for numeric tests
     let #ok(numeric_id_0) = numeric_collection.insert({

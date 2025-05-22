@@ -32,7 +32,7 @@ shared ({ caller = owner }) actor class Notes() {
         #Field("content", [#MaxSize(100_000)]), // content must be <= 100_000 characters
     ];
 
-    let #ok(notes_collection) = db.create_collection<Note>("notes", NoteSchema, candify_notes, schema_constraints);
+    let #ok(notes_collection) = db.createCollection<Note>("notes", NoteSchema, candify_notes, schema_constraints);
 
     public shared ({ caller = user_id }) func createNote(title : Text, content : Text) : async ZenDB.Types.Result<Nat, Text> {
         let note : Note = { user_id; title; content };

@@ -256,11 +256,11 @@ module TestFramework {
         collection_name : Text,
         index_name : Text,
         index_key_details : [(Text, ZenDB.Types.SortDirection)],
-        is_unique : Bool,
+        options : ?ZenDB.Types.CreateIndexOptions,
     ) -> ZenDB.Types.Result<(), Text>;
 
     public type SuiteUtils = {
-        create_index : CreateIndexOnCollection;
+        createIndex : CreateIndexOnCollection;
     };
 
     public func newSuite(
@@ -279,11 +279,11 @@ module TestFramework {
                         func() {
                             let #ok(zendb) = ZenDB.createDB(zendb_sstore, "no_index");
                             let suite_utils : SuiteUtils = {
-                                create_index : CreateIndexOnCollection = func(
+                                createIndex : CreateIndexOnCollection = func(
                                     collection_name : Text,
                                     index_name : Text,
                                     index_key_details : [(Text, ZenDB.Types.SortDirection)],
-                                    is_unique : Bool,
+                                    options : ?ZenDB.Types.CreateIndexOptions,
                                 ) {
                                     // no-op
                                     return #ok(());
@@ -306,18 +306,21 @@ module TestFramework {
                             let #ok(zendb) = ZenDB.createDB(zendb_sstore, "with_index");
 
                             let suite_utils : SuiteUtils = {
-                                create_index : CreateIndexOnCollection = func(
+                                createIndex : CreateIndexOnCollection = func(
                                     collection_name : Text,
                                     index_name : Text,
                                     index_key_details : [(Text, ZenDB.Types.SortDirection)],
-                                    is_unique : Bool,
+                                    options : ?ZenDB.Types.CreateIndexOptions,
                                 ) {
 
                                     zendb.create_index_on_collection(
                                         collection_name,
                                         index_name,
                                         index_key_details,
-                                        is_unique,
+                                        switch (options) {
+                                            case (?{ isUnique }) isUnique;
+                                            case (_) false;
+                                        },
                                     );
 
                                 };
@@ -337,11 +340,11 @@ module TestFramework {
                 zendb_suite(
                     zendb,
                     {
-                        create_index : CreateIndexOnCollection = func(
+                        createIndex : CreateIndexOnCollection = func(
                             collection_name : Text,
                             index_name : Text,
                             index_key_details : [(Text, ZenDB.Types.SortDirection)],
-                            is_unique : Bool,
+                            options : ?ZenDB.Types.CreateIndexOptions,
                         ) {
                             // no-op
                             return #ok(());

@@ -299,6 +299,14 @@ module T {
         scans : [ScanDetails]; // scan results from simple #Operation
     };
 
+    public type CreateIndexOptions = {
+        isUnique : Bool;
+    };
+
+    public type CreateCollectionOptions = {
+        schemaConstraints : [T.SchemaConstraint];
+    };
+
     public type MemoryBTreeStats = MemoryBTree.MemoryBTreeStats;
 
     public type IndexStats = {

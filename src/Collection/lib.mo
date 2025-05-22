@@ -99,6 +99,7 @@ module {
         };
 
         /// for debugging
+        public func _get_stable_state() : StableCollection { collection };
         public func _get_schema() : T.Schema { collection.schema };
         public func _get_schema_map() : T.SchemaMap { collection.schema_map };
         public func _get_indexes() : Map<Text, Index> { collection.indexes };
@@ -106,8 +107,6 @@ module {
             case (?(index)) return index;
             case (null) Debug.trap("Internal function error '_get_index()': You shouldn't be using this function anyway");
         };
-
-        public func _get_stable_state() : StableCollection { collection };
 
         /// Returns the collection name.
         public func name() : Text = collection_name;
@@ -188,7 +187,7 @@ module {
 
         type Iter<A> = Iter.Iter<A>;
 
-        public func search_iter(query_builder : QueryBuilder) : Result<Iter<T.WrapId<Record>>, Text> {
+        public func searchIter(query_builder : QueryBuilder) : Result<Iter<T.WrapId<Record>>, Text> {
             switch (
                 handleResult(
                     StableCollection.internal_search(collection, query_builder),
@@ -286,16 +285,16 @@ module {
             );
         };
 
-        public func replaceRecord(id : Nat, record : Record) : Result<(), Text> {
+        public func replace(id : Nat, record : Record) : Result<(), Text> {
             handleResult(
                 StableCollection.replace_record_by_id(collection, main_btree_utils, id, blobify.to_blob(record)),
                 "Failed to replace record with id: " # debug_show (id),
             );
         };
 
-        public func replaceRecords(records : [(Nat, Record)]) : Result<(), Text> {
+        public func replaceDocs(records : [(Nat, Record)]) : Result<(), Text> {
             for ((id, record) in records.vals()) {
-                switch (replaceRecord(id, record)) {
+                switch (replace(id, record)) {
                     case (#ok(_)) {};
                     case (#err(err)) return #err(err);
                 };
@@ -381,7 +380,7 @@ module {
             #ok(Buffer.toArray(buffer));
         };
 
-        public func filter_iter(condition : (Record) -> Bool) : Iter<Record> {
+        public func filterIter(condition : (Record) -> Bool) : Iter<Record> {
 
             let iter = StableCollection.vals(collection, main_btree_utils);
             let records = Iter.map<Blob, Record>(
@@ -395,7 +394,7 @@ module {
         };
 
         public func filter(condition : (Record) -> Bool) : [Record] {
-            Iter.toArray(filter_iter(condition));
+            Iter.toArray(filterIter(condition));
         };
 
         /// Clear all the data in the collection.
@@ -407,10 +406,20 @@ module {
         //     handleResult(StableCollection.update_schema(collection, schema), "Failed to update schema");
         // };
 
+        type CreateIndexOptions = {
+            isUnique : Bool;
+        };
+
         /// Creates a new index with the given index keys.
-        /// If `is_unique_on_index_keys` is true, the index will be unique on the index keys and records with duplicate index keys will be rejected.
-        public func create_index(name : Text, index_key_details : [(Text, SortDirection)], is_unique_on_index_keys : Bool) : Result<(), Text> {
-            switch (StableCollection.create_index(collection, main_btree_utils, name, index_key_details, is_unique_on_index_keys)) {
+        /// If `isUnique` is true, the index will be unique on the index keys and records with duplicate index keys will be rejected.
+        public func createIndex(name : Text, index_key_details : [(Text, SortDirection)], options : ?CreateIndexOptions) : Result<(), Text> {
+
+            let isUnique = switch (options) {
+                case (?options) options.isUnique;
+                case (null) false;
+            };
+
+            switch (StableCollection.create_index(collection, main_btree_utils, name, index_key_details, isUnique)) {
                 case (#ok(success)) #ok();
                 case (#err(errorMsg)) {
                     return Utils.log_error_msg(collection.logger, "Failed to create index (" # name # "): " # errorMsg);
@@ -420,7 +429,7 @@ module {
         };
 
         /// Deletes an index from the collection that is not used internally.
-        public func delete_index(name : Text) : Result<(), Text> {
+        public func deleteIndex(name : Text) : Result<(), Text> {
             handleResult(
                 StableCollection.delete_index(collection, main_btree_utils, name),
                 "Failed to delete index: " # name,
@@ -428,28 +437,28 @@ module {
         };
 
         /// Clears an index from the collection that is not used internally.
-        public func clear_index(name : Text) : Result<(), Text> {
+        public func clearIndex(name : Text) : Result<(), Text> {
             handleResult(
                 StableCollection.clear_index(collection, main_btree_utils, name),
                 "Failed to clear index: " # name,
             );
         };
 
-        public func create_and_populate_index(name : Text, index_key_details : [(Text, SortDirection)]) : Result<(), Text> {
+        public func createAndPopulateIndex(name : Text, index_key_details : [(Text, SortDirection)]) : Result<(), Text> {
             handleResult(
                 StableCollection.create_and_populate_index(collection, main_btree_utils, name, index_key_details),
                 "Failed to create and populate index: " # name,
             );
         };
 
-        public func populate_index(name : Text) : Result<(), Text> {
+        public func populateIndex(name : Text) : Result<(), Text> {
             handleResult(
                 StableCollection.populate_index(collection, main_btree_utils, name),
                 "Failed to populate index: " # name,
             );
         };
 
-        public func populate_indexes(names : [Text]) : Result<(), Text> {
+        public func populateIndexes(names : [Text]) : Result<(), Text> {
             handleResult(
                 StableCollection.populate_indexes(collection, main_btree_utils, names),
                 "Failed to populate indexes: " # debug_show (names),

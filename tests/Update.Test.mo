@@ -71,16 +71,16 @@ ZenDBSuite.newZenDBSuite(
     "Update Tests",
     ?ZenDBSuite.withAndWithoutIndex,
     func collection_setup(zendb : ZenDB.Database) {
-        let #ok(data) = zendb.create_collection<Doc>("data", DocSchema, data_type_to_candid, []);
+        let #ok(data) = zendb.createCollection<Doc>("data", DocSchema, data_type_to_candid, []);
     },
     func index_setup(zendb : ZenDB.Database) {
-        let #ok(data) = zendb.get_collection<Doc>("data", data_type_to_candid);
-        let #ok(_) = data.create_index("index_1", [("version", #Ascending)], false);
-        let #ok(_) = data.create_index("index_2", [("version.v1.a", #Ascending)], false);
-        let #ok(_) = data.create_index("index_3", [("version.v3.size.known", #Ascending)], false);
+        let #ok(data) = zendb.getCollection<Doc>("data", data_type_to_candid);
+        let #ok(_) = data.createIndex("index_1", [("version", #Ascending)], null);
+        let #ok(_) = data.createIndex("index_2", [("version.v1.a", #Ascending)], null);
+        let #ok(_) = data.createIndex("index_3", [("version.v3.size.known", #Ascending)], null);
     },
     func update_tests(zendb : ZenDB.Database) {
-        let #ok(data) = zendb.get_collection<Doc>("data", data_type_to_candid);
+        let #ok(data) = zendb.getCollection<Doc>("data", data_type_to_candid);
 
         var item1 : Doc = { version = #v1({ a = 42; b = "hello" }) };
         var item2 : Doc = { version = #v2({ c = "world"; d = true }) };
@@ -103,7 +103,7 @@ ZenDBSuite.newZenDBSuite(
             "Update Tests",
             func() {
                 test(
-                    "replaceRecord",
+                    "replace",
                     func() {
                         data.search(
                             ZenDB.QueryBuilder().Where("version.v1.a", #eq(#Int(42)))
@@ -116,7 +116,7 @@ ZenDBSuite.newZenDBSuite(
                         let new_doc : Doc = {
                             version = #v1({ a = 33; b = "text" });
                         };
-                        let #ok(_) = data.replaceRecord(item1_id, (new_doc));
+                        let #ok(_) = data.replace(item1_id, (new_doc));
 
                         assert #ok([]) == data.search(
                             ZenDB.QueryBuilder().Where("version.v1.a", #eq(#Int(42)))
@@ -574,7 +574,7 @@ ZenDBSuite.newZenDBSuite(
                         };
 
                         // Reset
-                        let #ok(_) = data.replaceRecord(item1_id, item1);
+                        let #ok(_) = data.replace(item1_id, item1);
                     },
                 );
 
@@ -588,7 +588,7 @@ ZenDBSuite.newZenDBSuite(
                                 let new_doc : Doc = {
                                     version = #v1({ a = 0; b = "text" });
                                 };
-                                let #ok(_) = data.replaceRecord(item1_id, new_doc);
+                                let #ok(_) = data.replace(item1_id, new_doc);
 
                                 // Apply negative operation
                                 let #ok(_) = data.updateById(
@@ -678,7 +678,7 @@ ZenDBSuite.newZenDBSuite(
                                 };
 
                                 // Reset
-                                let #ok(_) = data.replaceRecord(item1_id, item1);
+                                let #ok(_) = data.replace(item1_id, item1);
                             },
                         );
 
@@ -695,7 +695,7 @@ ZenDBSuite.newZenDBSuite(
                                 };
 
                                 // Reset
-                                let #ok(_) = data.replaceRecord(item1_id, item1);
+                                let #ok(_) = data.replace(item1_id, item1);
                             },
                         );
 
@@ -723,7 +723,7 @@ ZenDBSuite.newZenDBSuite(
                                 };
 
                                 // Reset
-                                let #ok(_) = data.replaceRecord(item1_id, item1);
+                                let #ok(_) = data.replace(item1_id, item1);
                             },
                         );
 
@@ -740,7 +740,7 @@ ZenDBSuite.newZenDBSuite(
                                 };
 
                                 // Reset
-                                let #ok(_) = data.replaceRecord(item1_id, item1);
+                                let #ok(_) = data.replace(item1_id, item1);
                             },
                         );
                     },
@@ -788,7 +788,7 @@ ZenDBSuite.newZenDBSuite(
                                 };
 
                                 // Reset
-                                let #ok(_) = data.replaceRecord(item1_id, item1);
+                                let #ok(_) = data.replace(item1_id, item1);
                             },
                         );
 
@@ -822,7 +822,7 @@ ZenDBSuite.newZenDBSuite(
                                 };
 
                                 // Reset
-                                let #ok(_) = data.replaceRecord(item1_id, item1);
+                                let #ok(_) = data.replace(item1_id, item1);
                             },
                         );
 
@@ -849,7 +849,7 @@ ZenDBSuite.newZenDBSuite(
                                 };
 
                                 // Reset
-                                let #ok(_) = data.replaceRecord(item1_id, item1);
+                                let #ok(_) = data.replace(item1_id, item1);
                             },
                         );
 
@@ -873,7 +873,7 @@ ZenDBSuite.newZenDBSuite(
                                 };
 
                                 // Reset
-                                let #ok(_) = data.replaceRecord(item1_id, item1);
+                                let #ok(_) = data.replace(item1_id, item1);
                             },
                         );
 
@@ -897,7 +897,7 @@ ZenDBSuite.newZenDBSuite(
                                 };
 
                                 // Reset
-                                let #ok(_) = data.replaceRecord(item1_id, item1);
+                                let #ok(_) = data.replace(item1_id, item1);
                             },
                         );
                     },

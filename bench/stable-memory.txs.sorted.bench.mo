@@ -86,7 +86,7 @@ module {
             "update(): multiple independent operations -> #add, #sub, #mul, #div on tx.amt",
             "update(): multiple nested operations -> #add, #sub, #mul, #div on tx.amt",
             "update(): multiple operations on multiple fields -> #add, #sub, #mul, #div on (tx.amt, ts, fee)",
-            "replaceRecord() -> replace half the tx with new tx",
+            "replace() -> replace half the tx with new tx",
             "delete()",
 
         ]);

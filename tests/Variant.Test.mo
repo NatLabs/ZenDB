@@ -54,19 +54,19 @@ ZenDBSuite.newZenDBSuite(
     "Variant Tests",
     ?ZenDBSuite.withAndWithoutIndex,
     func collection_setup(zendb : ZenDB.Database) {
-        let #ok(data) = zendb.create_collection<Data>("data", DataSchema, data_type_to_candid, []);
+        let #ok(data) = zendb.createCollection<Data>("data", DataSchema, data_type_to_candid, []);
     },
     func index_setup(zendb : ZenDB.Database) {
-        let #ok(data) = zendb.get_collection<Data>("data", data_type_to_candid);
+        let #ok(data) = zendb.getCollection<Data>("data", data_type_to_candid);
 
-        let #ok(_) = data.create_index("index_1", [("version", #Ascending)], false);
-        let #ok(_) = data.create_index("index_2", [("version.v1.a", #Ascending)], false);
-        let #ok(_) = data.create_index("index_3", [("version.v3.size.known", #Ascending)], false);
+        let #ok(_) = data.createIndex("index_1", [("version", #Ascending)], null);
+        let #ok(_) = data.createIndex("index_2", [("version.v1.a", #Ascending)], null);
+        let #ok(_) = data.createIndex("index_3", [("version.v3.size.known", #Ascending)], null);
 
     },
     func suite_setup(zendb : ZenDB.Database) {
 
-        let #ok(data) = zendb.get_collection<Data>("data", data_type_to_candid);
+        let #ok(data) = zendb.getCollection<Data>("data", data_type_to_candid);
 
         let #ok(_) = data.insert({ version = #v1({ a = 42; b = "hello" }) });
         let #ok(_) = data.insert({ version = #v2({ c = "world"; d = true }) });

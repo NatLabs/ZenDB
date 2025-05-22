@@ -41,9 +41,9 @@ ZenDBSuite.newSuite(
             };
         };
 
-        let #ok(texts) = zendb.create_collection("texts", DataSchema, candify_data, []) else return assert false;
+        let #ok(texts) = zendb.createCollection("texts", DataSchema, candify_data, null) else return assert false;
 
-        let #ok(_) = suite_utils.create_index(texts.name(), "value", [("value", #Ascending)], false) else return assert false;
+        let #ok(_) = suite_utils.createIndex(texts.name(), "value", [("value", #Ascending)], null) else return assert false;
 
         let #ok(_) = texts.insert({ value = "a" }) else return assert false;
         let #ok(_) = texts.insert({ value = "alphabet" }) else return assert false;
@@ -405,7 +405,7 @@ ZenDBSuite.newSuite(
             "testing on indexed field",
             func() {
                 Debug.print("trying to index field");
-                let #ok(_) = texts.create_and_populate_index("value_index", [("value", #Ascending)]) else return assert false;
+                let #ok(_) = texts.createAndPopulateIndex("value_index", [("value", #Ascending)]) else return assert false;
                 Debug.print("field indexed");
 
                 run_query_tests(texts);

@@ -90,7 +90,7 @@ ZenDBSuite.newZenDBSuite(
             };
         };
 
-        let #ok(sorted_index_types) = zendb.create_collection("sorted_index_types", SupportedIndexTypes, candify_data, []);
+        let #ok(sorted_index_types) = zendb.createCollection("sorted_index_types", SupportedIndexTypes, candify_data, null);
         let inputs = Map.new<Nat, SupportedIndexTypes>();
 
         func get_field_and_sort_record_ids<A>(getter : (record : SupportedIndexTypes) -> A, cmp : (A, A) -> Order.Order) : ((Nat, Nat) -> Order.Order) {
@@ -144,21 +144,21 @@ ZenDBSuite.newZenDBSuite(
             "Serialized values are orderd correctly",
             func() {
 
-                let #ok(_) = sorted_index_types.create_index("text", [("text", #Ascending)], false);
-                let #ok(_) = sorted_index_types.create_index("nat", [("nat", #Ascending)], false);
-                let #ok(_) = sorted_index_types.create_index("nat8", [("nat8", #Ascending)], false);
-                let #ok(_) = sorted_index_types.create_index("nat16", [("nat16", #Ascending)], false);
-                let #ok(_) = sorted_index_types.create_index("nat32", [("nat32", #Ascending)], false);
-                let #ok(_) = sorted_index_types.create_index("nat64", [("nat64", #Ascending)], false);
-                let #ok(_) = sorted_index_types.create_index("int", [("int", #Ascending)], false);
-                let #ok(_) = sorted_index_types.create_index("int8", [("int8", #Ascending)], false);
-                let #ok(_) = sorted_index_types.create_index("int16", [("int16", #Ascending)], false);
-                let #ok(_) = sorted_index_types.create_index("int32", [("int32", #Ascending)], false);
-                let #ok(_) = sorted_index_types.create_index("int64", [("int64", #Ascending)], false);
-                let #ok(_) = sorted_index_types.create_index("float", [("float", #Ascending)], false);
-                let #ok(_) = sorted_index_types.create_index("principal", [("principal", #Ascending)], false);
-                let #ok(_) = sorted_index_types.create_index("blob", [("blob", #Ascending)], false);
-                let #ok(_) = sorted_index_types.create_index("bool", [("bool", #Ascending)], false);
+                let #ok(_) = sorted_index_types.createIndex("text", [("text", #Ascending)], null);
+                let #ok(_) = sorted_index_types.createIndex("nat", [("nat", #Ascending)], null);
+                let #ok(_) = sorted_index_types.createIndex("nat8", [("nat8", #Ascending)], null);
+                let #ok(_) = sorted_index_types.createIndex("nat16", [("nat16", #Ascending)], null);
+                let #ok(_) = sorted_index_types.createIndex("nat32", [("nat32", #Ascending)], null);
+                let #ok(_) = sorted_index_types.createIndex("nat64", [("nat64", #Ascending)], null);
+                let #ok(_) = sorted_index_types.createIndex("int", [("int", #Ascending)], null);
+                let #ok(_) = sorted_index_types.createIndex("int8", [("int8", #Ascending)], null);
+                let #ok(_) = sorted_index_types.createIndex("int16", [("int16", #Ascending)], null);
+                let #ok(_) = sorted_index_types.createIndex("int32", [("int32", #Ascending)], null);
+                let #ok(_) = sorted_index_types.createIndex("int64", [("int64", #Ascending)], null);
+                let #ok(_) = sorted_index_types.createIndex("float", [("float", #Ascending)], null);
+                let #ok(_) = sorted_index_types.createIndex("principal", [("principal", #Ascending)], null);
+                let #ok(_) = sorted_index_types.createIndex("blob", [("blob", #Ascending)], null);
+                let #ok(_) = sorted_index_types.createIndex("bool", [("bool", #Ascending)], null);
 
                 let sorted_texts = Buffer.Buffer<Nat>(inputs.size());
                 let sorted_nats = Buffer.Buffer<Nat>(inputs.size());
@@ -347,7 +347,7 @@ ZenDBSuite.newZenDBSuite(
                 for (type_a in types.vals()) {
                     for (type_b in types.vals()) {
                         compound_types.add((type_a, type_b));
-                        let #ok(_) = sorted_index_types.create_and_populate_index(
+                        let #ok(_) = sorted_index_types.createAndPopulateIndex(
                             type_a # "_" # type_b,
                             [(type_a, #Ascending), (type_b, #Ascending)],
 
@@ -496,7 +496,7 @@ ZenDBSuite.newZenDBSuite(
 
         //                 for (type_a in types.vals()) {
         //                     for (type_b in types.vals()) {
-        //                         let #ok(_) = sorted_index_types.create_index(
+        //                         let #ok(_) = sorted_index_types.createIndex(
         //                             type_a # "_" # type_b,
         //                             [(type_a, #Ascending), (type_b, #Ascending)],
         //                             false,
@@ -520,7 +520,7 @@ ZenDBSuite.newZenDBSuite(
         //             for (type_b in types.vals()) {
         //                 compound_types.add((type_a, type_b));
 
-        //                 let #ok(_) = sorted_index_types.create_index(
+        //                 let #ok(_) = sorted_index_types.createIndex(
         //                     type_a # "_" # type_b,
         //                     [(type_a, #Ascending), (type_b, #Ascending)],
         //                     false,
@@ -556,8 +556,8 @@ ZenDBSuite.newZenDBSuite(
                     };
                 };
 
-                let #ok(users) = zendb.create_collection("users", UserSchema, candify_user, []);
-                let #ok(_) = users.create_index("name_id", [("name", #Ascending), ("id", #Ascending)], false);
+                let #ok(users) = zendb.createCollection("users", UserSchema, candify_user, null);
+                let #ok(_) = users.createIndex("name_id", [("name", #Ascending), ("id", #Ascending)], null);
                 let user_0 = { name = "a"; id = 0 };
 
                 let text_1 = Text.fromIter(
@@ -633,13 +633,13 @@ ZenDBSuite.newZenDBSuite(
                             };
                         };
 
-                        let schema_constraints : [ZenDB.Types.SchemaConstraint] = [
+                        let schemaConstraints : [ZenDB.Types.SchemaConstraint] = [
                             #Field("nat", [#Min(1_000), #Max(32_000)]),
                             #Field("int", [#Min(-10), #Max(10)]),
                             #Field("float", [#Min(-1.0), #Max(1.0)]),
                         ];
 
-                        let #ok(test_collection) = zendb.create_collection("schema_constraints_test", TestSchema, candify_test, schema_constraints);
+                        let #ok(test_collection) = zendb.createCollection("schema_constraints_test", TestSchema, candify_test, ?{ schemaConstraints });
 
                         let valid_values : TestRecord = {
                             nat = 10_000;
@@ -722,12 +722,12 @@ ZenDBSuite.newZenDBSuite(
                             };
                         };
 
-                        let schema_constraints : [ZenDB.Types.SchemaConstraint] = [
+                        let schemaConstraints : [ZenDB.Types.SchemaConstraint] = [
                             #Field("text", [#MinSize(5), #MaxSize(10)]),
                             #Field("blob", [#Size(3, 5)]),
                         ];
 
-                        let #ok(test_collection) = zendb.create_collection("schema_constraints_test_2", TestSchema, candify_test, schema_constraints);
+                        let #ok(test_collection) = zendb.createCollection("schema_constraints_test_2", TestSchema, candify_test, ?{ schemaConstraints });
 
                         let valid_values : TestRecord = {
                             text = "hello";
@@ -796,13 +796,13 @@ ZenDBSuite.newZenDBSuite(
                             };
                         };
 
-                        let schema_constraints : [ZenDB.Types.SchemaConstraint] = [
+                        let schemaConstraints : [ZenDB.Types.SchemaConstraint] = [
                             #Unique(["text"]),
                             #Unique(["nat"]),
                             #Unique(["compound.0", "compound.1"]),
                         ];
 
-                        let #ok(test_collection) = zendb.create_collection("schema_constraints_test_3", TestSchema, candify_test, schema_constraints);
+                        let #ok(test_collection) = zendb.createCollection("schema_constraints_test_3", TestSchema, candify_test, ?{ schemaConstraints });
 
                         test(
                             "Succeeds with unique values",
@@ -853,9 +853,9 @@ ZenDBSuite.newZenDBSuite(
                     };
                 };
 
-                let #ok(test) = zendb.create_collection("unique_index_test", OptNatSchema, candify_test, []);
+                let #ok(test) = zendb.createCollection("unique_index_test", OptNatSchema, candify_test, null);
 
-                let #ok(_) = test.create_index("opt_nat_idx", [("opt_nat", #Ascending)], true);
+                let #ok(_) = test.createIndex("opt_nat_idx", [("opt_nat", #Ascending)], ?{ isUnique = true });
 
                 let #ok(_) = test.insert({ opt_nat = ?1 });
                 let #ok(_) = test.insert({ opt_nat = ?2 });
@@ -905,11 +905,11 @@ ZenDBSuite.newZenDBSuite(
         //             };
         //         };
 
-        //         let #ok(test_collection) = zendb.create_collection("range_test", TestSchema, candify_test);
-        //         let #ok(_) = test_collection.create_index("text_val", [("text_val", #Ascending)]);
-        //         let #ok(_) = test_collection.create_index("nat_val", [("nat_val", #Ascending)]);
-        //         let #ok(_) = test_collection.create_index("int_val", [("int_val", #Ascending)]);
-        //         let #ok(_) = test_collection.create_index("blob_val", [("blob_val", #Ascending)]);
+        //         let #ok(test_collection) = zendb.createCollection("range_test", TestSchema, candify_test);
+        //         let #ok(_) = test_collection.createIndex("text_val", [("text_val", #Ascending)]);
+        //         let #ok(_) = test_collection.createIndex("nat_val", [("nat_val", #Ascending)]);
+        //         let #ok(_) = test_collection.createIndex("int_val", [("int_val", #Ascending)]);
+        //         let #ok(_) = test_collection.createIndex("blob_val", [("blob_val", #Ascending)]);
 
         //         // Insert test records with carefully selected values
         //         let records = [
@@ -1094,8 +1094,8 @@ ZenDBSuite.newZenDBSuite(
         //             };
         //         };
 
-        //         let #ok(composite_collection) = zendb.create_collection("composite_test", CompositeSchema, candify_composite);
-        //         let #ok(_) = composite_collection.create_index(
+        //         let #ok(composite_collection) = zendb.createCollection("composite_test", CompositeSchema, candify_composite);
+        //         let #ok(_) = composite_collection.createIndex(
         //             "composite",
         //             [
         //                 ("first", #Ascending),
@@ -1192,10 +1192,10 @@ ZenDBSuite.newZenDBSuite(
         //             };
         //         };
 
-        //         let #ok(boundary_collection) = zendb.create_collection("boundary_test", BoundarySchema, candify_boundary);
-        //         let #ok(_) = boundary_collection.create_index("nat_val", [("nat_val", #Ascending)]);
-        //         let #ok(_) = boundary_collection.create_index("text_val", [("text_val", #Ascending)]);
-        //         let #ok(_) = boundary_collection.create_index("blob_val", [("blob_val", #Ascending)]);
+        //         let #ok(boundary_collection) = zendb.createCollection("boundary_test", BoundarySchema, candify_boundary);
+        //         let #ok(_) = boundary_collection.createIndex("nat_val", [("nat_val", #Ascending)]);
+        //         let #ok(_) = boundary_collection.createIndex("text_val", [("text_val", #Ascending)]);
+        //         let #ok(_) = boundary_collection.createIndex("blob_val", [("blob_val", #Ascending)]);
 
         //         // Insert consecutive values to test boundary behavior
         //         let #ok(id1) = boundary_collection.insert({

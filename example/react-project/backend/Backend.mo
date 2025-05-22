@@ -72,7 +72,7 @@ actor class Backend() {
         };
     };
 
-    let #ok(txs) = db.get_or_create_collection<Block>("txs", BlockSchema, CandifyBlock);
+    let #ok(txs) = db.createCollection<Block>("txs", BlockSchema, CandifyBlock);
 
     // because of the way indexes are selected, the order of the fields in the index matters
     // but also if there are more than one index selected as the best index,
@@ -81,17 +81,17 @@ actor class Backend() {
     // the first two are defined first so if all the indexes are equal for the query,
     // the first two indexes which starting with fields we use for sorting can be used
     // to avoid sorting internally in the db which is really slow and inefficient
-    let #ok(_) = txs.create_index(["ts"]);
-    let #ok(_) = txs.create_index(["tx.amt"]);
+    let #ok(_) = txs.createIndex(["ts"]);
+    let #ok(_) = txs.createIndex(["tx.amt"]);
 
-    let #ok(_) = txs.create_index(["btype", "tx.amt"]);
-    let #ok(_) = txs.create_index(["btype", "ts"]);
+    let #ok(_) = txs.createIndex(["btype", "tx.amt"]);
+    let #ok(_) = txs.createIndex(["btype", "ts"]);
 
-    let #ok(_) = txs.create_index(["tx.from", "btype", "ts"]);
-    let #ok(_) = txs.create_index(["tx.from", "btype", "tx.amt"]);
+    let #ok(_) = txs.createIndex(["tx.from", "btype", "ts"]);
+    let #ok(_) = txs.createIndex(["tx.from", "btype", "tx.amt"]);
 
-    let #ok(_) = txs.create_index(["tx.to", "btype", "ts"]);
-    let #ok(_) = txs.create_index(["tx.to", "btype", "tx.amt"]);
+    let #ok(_) = txs.createIndex(["tx.to", "btype", "ts"]);
+    let #ok(_) = txs.createIndex(["tx.to", "btype", "tx.amt"]);
 
     public func upload_blocks(blocks : [Block]) : async () {
         for (block in blocks.vals()) {

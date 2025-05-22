@@ -76,7 +76,7 @@ module TxsBenchUtils {
         "update(): multiple independent operations -> #add, #sub, #mul, #div on tx.amt",
         "update(): multiple nested operations -> #add, #sub, #mul, #div on tx.amt",
         "update(): multiple operations on multiple fields -> #add, #sub, #mul, #div on (tx.amt, ts, fee)",
-        "replaceRecord() -> replace half the tx with new tx",
+        "replace() -> replace half the tx with new tx",
         "delete()",
 
     ];
@@ -236,21 +236,21 @@ module TxsBenchUtils {
 
         let heap_db_sstore = ZenDB.newStableStore(?{ ZenDB.defaultSettings with memory_type = ?(#heap) });
         let heap_db = ZenDB.launchDefaultDB(heap_db_sstore);
-        let #ok(heap_no_index) = heap_db.create_collection<Tx>("heap_no_index", TxSchema, candify_tx, []);
-        let #ok(heap_single_field_indexes) = heap_db.create_collection<Tx>("heap_single_field_indexes", TxSchema, candify_tx, []);
-        let #ok(heap_fully_covered_indexes) = heap_db.create_collection<Tx>("heap_fully_covered_indexes", TxSchema, candify_tx, []);
-        let #ok(heap_sorted_no_index) = heap_db.create_collection<Tx>("heap_sorted_no_index", TxSchema, candify_tx, []);
-        let #ok(heap_sorted_single_field_indexes) = heap_db.create_collection<Tx>("heap_sorted_single_field_indexes", TxSchema, candify_tx, []);
-        let #ok(heap_sorted_fully_covered_indexes) = heap_db.create_collection<Tx>("heap_sorted_fully_covered_indexes", TxSchema, candify_tx, []);
+        let #ok(heap_no_index) = heap_db.createCollection<Tx>("heap_no_index", TxSchema, candify_tx, []);
+        let #ok(heap_single_field_indexes) = heap_db.createCollection<Tx>("heap_single_field_indexes", TxSchema, candify_tx, []);
+        let #ok(heap_fully_covered_indexes) = heap_db.createCollection<Tx>("heap_fully_covered_indexes", TxSchema, candify_tx, []);
+        let #ok(heap_sorted_no_index) = heap_db.createCollection<Tx>("heap_sorted_no_index", TxSchema, candify_tx, []);
+        let #ok(heap_sorted_single_field_indexes) = heap_db.createCollection<Tx>("heap_sorted_single_field_indexes", TxSchema, candify_tx, []);
+        let #ok(heap_sorted_fully_covered_indexes) = heap_db.createCollection<Tx>("heap_sorted_fully_covered_indexes", TxSchema, candify_tx, []);
 
         let stable_memory_db_sstore = ZenDB.newStableStore(?{ ZenDB.defaultSettings with memory_type = ?(#stableMemory) });
         let stable_memory_db = ZenDB.launchDefaultDB(stable_memory_db_sstore);
-        let #ok(stable_memory_no_index) = stable_memory_db.create_collection<Tx>("stable_memory_no_index", TxSchema, candify_tx, []);
-        let #ok(stable_memory_single_field_indexes) = stable_memory_db.create_collection<Tx>("stable_memory_single_field_indexes", TxSchema, candify_tx, []);
-        let #ok(stable_memory_fully_covered_indexes) = stable_memory_db.create_collection<Tx>("stable_memory_fully_covered_indexes", TxSchema, candify_tx, []);
-        let #ok(stable_memory_sorted_no_index) = stable_memory_db.create_collection<Tx>("stable_memory_sorted_no_index", TxSchema, candify_tx, []);
-        let #ok(stable_memory_sorted_single_field_indexes) = stable_memory_db.create_collection<Tx>("stable_memory_sorted_single_field_indexes", TxSchema, candify_tx, []);
-        let #ok(stable_memory_sorted_fully_covered_indexes) = stable_memory_db.create_collection<Tx>("stable_memory_sorted_fully_covered_indexes", TxSchema, candify_tx, []);
+        let #ok(stable_memory_no_index) = stable_memory_db.createCollection<Tx>("stable_memory_no_index", TxSchema, candify_tx, []);
+        let #ok(stable_memory_single_field_indexes) = stable_memory_db.createCollection<Tx>("stable_memory_single_field_indexes", TxSchema, candify_tx, []);
+        let #ok(stable_memory_fully_covered_indexes) = stable_memory_db.createCollection<Tx>("stable_memory_fully_covered_indexes", TxSchema, candify_tx, []);
+        let #ok(stable_memory_sorted_no_index) = stable_memory_db.createCollection<Tx>("stable_memory_sorted_no_index", TxSchema, candify_tx, []);
+        let #ok(stable_memory_sorted_single_field_indexes) = stable_memory_db.createCollection<Tx>("stable_memory_sorted_single_field_indexes", TxSchema, candify_tx, []);
+        let #ok(stable_memory_sorted_fully_covered_indexes) = stable_memory_db.createCollection<Tx>("stable_memory_sorted_fully_covered_indexes", TxSchema, candify_tx, []);
 
         func new_query() : () -> ZenDB.QueryBuilder {
             func() { ZenDB.QueryBuilder() };
@@ -307,7 +307,7 @@ module TxsBenchUtils {
 
                     case ("create and populate indexes") {
                         for ((i, index_details) in Itertools.enumerate(indexes.vals())) {
-                            let #ok(_) = collection.create_and_populate_index("index_" # debug_show (i), index_details);
+                            let #ok(_) = collection.createAndPopulateIndex("index_" # debug_show (i), index_details);
                         };
 
                     };
@@ -543,9 +543,9 @@ module TxsBenchUtils {
                         };
                     };
 
-                    case ("replaceRecord() -> replace half the tx with new tx") {
+                    case ("replace() -> replace half the tx with new tx") {
                         for (i in Itertools.take(tx_ids.vals(), limit)) {
-                            let #ok(_) = collection.replaceRecord(i, new_tx(fuzz, principals));
+                            let #ok(_) = collection.replace(i, new_tx(fuzz, principals));
                         };
                     };
 

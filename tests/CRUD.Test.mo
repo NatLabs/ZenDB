@@ -128,10 +128,10 @@ ZenDBSuite.newSuite(
             "CRUD operations",
             func() {
 
-                let #ok(crud_collection) = zendb.create_collection("CRUD", RecordWithAllTypesSchema, candify_record, []);
+                let #ok(crud_collection) = zendb.createCollection("CRUD", RecordWithAllTypesSchema, candify_record, null);
 
                 for (field in indexible_fields.vals()) {
-                    let #ok(_) = suite_utils.create_index(crud_collection.name(), field # "_idx", [(field, #Ascending)], false) else return assert false;
+                    let #ok(_) = suite_utils.createIndex(crud_collection.name(), field # "_idx", [(field, #Ascending)], null) else return assert false;
                 };
 
                 for (record in inputs.vals()) {

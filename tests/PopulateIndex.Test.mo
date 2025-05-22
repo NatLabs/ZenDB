@@ -159,7 +159,7 @@ let db_sstore = let sstore = ZenDB.newStableStore(
 );
 let db = ZenDB.launchDefaultDB(db_sstore);
 
-let #ok(txs) = db.create_collection<Tx>("transactions", TxSchema, candify_tx, []);
+let #ok(txs) = db.createCollection<Tx>("transactions", TxSchema, candify_tx, []);
 
 let limit = 1000;
 let pagination_limit = 3;
@@ -404,13 +404,13 @@ type TestQuery = {
 suite(
     "create indexes and verify they are populated correctly",
     func() {
-        let #ok(_) = txs.create_and_populate_index("index_1", [("btype", #Ascending), ("tx.amt", #Ascending)]);
-        let #ok(_) = txs.create_and_populate_index("index_2", [("btype", #Ascending), ("ts", #Ascending)]);
-        let #ok(_) = txs.create_and_populate_index("index_3", [("tx.amt", #Ascending)]);
-        let #ok(_) = txs.create_and_populate_index("index_4", [("ts", #Ascending)]);
-        let #ok(_) = txs.create_and_populate_index("index_5", [("tx.from.owner", #Ascending), ("tx.from.sub_account", #Ascending)]);
-        let #ok(_) = txs.create_and_populate_index("index_6", [("tx.to.owner", #Ascending), ("tx.to.sub_account", #Ascending)]);
-        let #ok(_) = txs.create_and_populate_index("index_7", [("tx.spender.owner", #Ascending), ("tx.spender.sub_account", #Ascending)]);
+        let #ok(_) = txs.createAndPopulateIndex("index_1", [("btype", #Ascending), ("tx.amt", #Ascending)]);
+        let #ok(_) = txs.createAndPopulateIndex("index_2", [("btype", #Ascending), ("ts", #Ascending)]);
+        let #ok(_) = txs.createAndPopulateIndex("index_3", [("tx.amt", #Ascending)]);
+        let #ok(_) = txs.createAndPopulateIndex("index_4", [("ts", #Ascending)]);
+        let #ok(_) = txs.createAndPopulateIndex("index_5", [("tx.from.owner", #Ascending), ("tx.from.sub_account", #Ascending)]);
+        let #ok(_) = txs.createAndPopulateIndex("index_6", [("tx.to.owner", #Ascending), ("tx.to.sub_account", #Ascending)]);
+        let #ok(_) = txs.createAndPopulateIndex("index_7", [("tx.spender.owner", #Ascending), ("tx.spender.sub_account", #Ascending)]);
 
         // test_suites();
     },

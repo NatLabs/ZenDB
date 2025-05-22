@@ -45,7 +45,7 @@ actor {
                     "Stress Test: Create 5000 collections",
                     func() {
                         for (i in Itertools.range(zendb.size(), 5000)) {
-                            let #ok(_) = zendb.create_collection("collection_" # debug_show (i), UserIdSchema, candify, []);
+                            let #ok(_) = zendb.createCollection("collection_" # debug_show (i), UserIdSchema, candify, null);
                             Debug.print("Created collection: " # debug_show (i));
                         };
                     },

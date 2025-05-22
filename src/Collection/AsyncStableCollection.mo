@@ -83,7 +83,7 @@ module {
     // };
 
     // public func async_find(query_builder : QueryBuilder, buffer : Buffer<T.WrapId<Record>>) : async* Result<(), Text> {
-    //     switch (search_iter(query_builder)) {
+    //     switch (searchIter(query_builder)) {
     //         case (#err(err)) #err(err);
     //         case (#ok(records)) {
     //             for (record in records) {

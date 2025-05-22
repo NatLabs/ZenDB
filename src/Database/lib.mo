@@ -133,10 +133,10 @@ module {
         ///   from_blob = func(blob: Blob) : ?User { from_candid(blob) };
         /// };
         ///
-        /// let #ok(users_collection) = db.create_collection<User>("users", UsersSchema, candify_users, []);
+        /// let #ok(users_collection) = db.createCollection<User>("users", UsersSchema, candify_users, []);
         /// ```
 
-        public func create_collection<Record>(name : Text, schema : T.Schema, external_candify : T.Candify<Record>, schema_constraints : [T.SchemaConstraint]) : Result<Collection<Record>, Text> {
+        public func createCollection<Record>(name : Text, schema : T.Schema, external_candify : T.Candify<Record>, options : ?T.CreateCollectionOptions) : Result<Collection<Record>, Text> {
             let validate_candify_result = Utils.handleResult(
                 stable_db.logger,
                 validate_candify(name, schema, external_candify),
@@ -148,7 +148,7 @@ module {
                 case (#err(msg)) return Utils.log_error_msg(stable_db.logger, msg);
             };
 
-            switch (StableDatabase.create_collection(stable_db, name, schema, schema_constraints)) {
+            switch (StableDatabase.create_collection(stable_db, name, schema, options)) {
                 case (#ok(stable_collection)) {
                     #ok(
                         Collection.Collection<Record>(
@@ -162,7 +162,7 @@ module {
             };
         };
 
-        public func get_collection<Record>(
+        public func getCollection<Record>(
             name : Text,
             external_candify : T.Candify<Record>,
         ) : Result<Collection<Record>, Text> {
@@ -179,25 +179,6 @@ module {
                 };
                 case (#err(msg)) #err(msg);
             };
-        };
-
-        public func get_or_create_collection<Record>(
-            name : Text,
-            schema : T.Schema,
-            blobify : T.Candify<Record>,
-            schema_constraints : [T.SchemaConstraint],
-        ) : Result<Collection<Record>, Text> {
-
-            switch (create_collection(name, schema, blobify, schema_constraints)) {
-                case (#ok(collection)) #ok(collection);
-                case (#err(msg)) {
-                    switch (get_collection(name, blobify)) {
-                        case (#ok(collection)) #ok(collection);
-                        case (#err(_)) #err(msg);
-                    };
-                };
-            };
-
         };
 
         public func create_index_on_collection(

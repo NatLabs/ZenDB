@@ -59,7 +59,12 @@ module {
 
     // public type CollectionOptions = T.CollectionOptions;
 
-    public func create_collection(db : T.StableDatabase, name : Text, schema : T.Schema, schema_constraints : [T.SchemaConstraint]) : Result<StableCollection, Text> {
+    public type CreateCollectionOptions = {
+        schemaConstraints : [T.SchemaConstraint];
+    };
+
+    public func create_collection(db : T.StableDatabase, name : Text, schema : T.Schema, options : ?T.CreateCollectionOptions) : Result<StableCollection, Text> {
+
         Logger.lazyInfo(
             db.logger,
             func() = "StableDatabase.create_collection(): Creating collection '" # name # "'",
@@ -86,6 +91,7 @@ module {
                     db.logger,
                     func() = "StableDatabase.create_collection(): Collection '" # name # "' already exists, checking schema compatibility",
                 );
+
                 if (stable_collection.schema != processed_schema) {
                     Logger.lazyError(
                         db.logger,
@@ -109,6 +115,11 @@ module {
         };
 
         let schema_map = SchemaMap.new(processed_schema);
+
+        let schema_constraints = switch (options) {
+            case (?options) { options.schemaConstraints };
+            case (null) { [] };
+        };
 
         // Validate schema constraints
         let { field_constraints; unique_constraints } = switch (SchemaMap.validate_schema_constraints(schema_map, schema_constraints)) {
@@ -249,52 +260,6 @@ module {
         };
 
         #ok(stable_collection);
-    };
-
-    public func get_or_create_collection<Record>(
-        db : T.StableDatabase,
-        name : Text,
-        schema : T.Schema,
-        schema_constraints : [T.SchemaConstraint],
-    ) : Result<StableCollection, Text> {
-        Logger.lazyInfo(
-            db.logger,
-            func() = "StableDatabase.get_or_create_collection(): Getting or creating collection '" # name # "'",
-        );
-
-        switch (create_collection(db, name, schema, schema_constraints)) {
-            case (#ok(collection)) {
-                Logger.lazyInfo(
-                    db.logger,
-                    func() = "StableDatabase.get_or_create_collection(): Created collection '" # name # "'",
-                );
-                #ok(collection);
-            };
-            case (#err(msg)) {
-                Logger.lazyDebug(
-                    db.logger,
-                    func() = "StableDatabase.get_or_create_collection(): Failed to create collection '" #
-                    name # "', trying to get existing collection. Error: " # msg,
-                );
-
-                switch (get_collection(db, name)) {
-                    case (#ok(collection)) {
-                        Logger.lazyInfo(
-                            db.logger,
-                            func() = "StableDatabase.get_or_create_collection(): Found existing collection '" # name # "'",
-                        );
-                        #ok(collection);
-                    };
-                    case (#err(_)) {
-                        Logger.lazyError(
-                            db.logger,
-                            func() = "StableDatabase.get_or_create_collection(): Failed to get or create collection '" # name # "': " # msg,
-                        );
-                        return log_error_msg(db.logger, msg);
-                    };
-                };
-            };
-        };
     };
 
 };
