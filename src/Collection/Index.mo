@@ -113,6 +113,10 @@ module {
 
     };
 
+    public func size(index : Index) : Nat {
+        BTree.size(index.data);
+    };
+
     public func insert(
         collection : StableCollection,
         index : Index,

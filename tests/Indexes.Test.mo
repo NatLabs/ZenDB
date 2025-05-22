@@ -706,13 +706,11 @@ ZenDBSuite.newZenDBSuite(
                         type TestRecord = {
                             text : Text;
                             blob : Blob;
-                            // array : [Nat];
                         };
 
                         let TestSchema : ZenDB.Types.Schema = #Record([
                             ("text", #Text),
                             ("blob", #Blob),
-                            // ("array", #Array(#Nat)),
                         ]);
 
                         let candify_test = {
@@ -727,7 +725,6 @@ ZenDBSuite.newZenDBSuite(
                         let schema_constraints : [ZenDB.Types.SchemaConstraint] = [
                             #Field("text", [#MinSize(5), #MaxSize(10)]),
                             #Field("blob", [#Size(3, 5)]),
-                            // #Field("array", [#MaxSize(5)]),
                         ];
 
                         let #ok(test_collection) = zendb.create_collection("schema_constraints_test_2", TestSchema, candify_test, schema_constraints);
@@ -735,7 +732,6 @@ ZenDBSuite.newZenDBSuite(
                         let valid_values : TestRecord = {
                             text = "hello";
                             blob = Blob.fromArray([0, 1, 2, 3, 4]);
-                            // array = [1, 2, 3];
                         };
 
                         test(
@@ -769,12 +765,6 @@ ZenDBSuite.newZenDBSuite(
                                 let invalid_values_4 : TestRecord = {
                                     valid_values with blob = Blob.fromArray([0]);
                                 };
-
-                                // let invalid_values_5 : TestRecord = {
-                                //     valid_values with array = [1, 2, 3, 4, 5, 6];
-                                // };
-
-                                // assert Result.isErr(test_collection.insert(invalid_values_5));
 
                             },
                         );

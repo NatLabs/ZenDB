@@ -230,12 +230,12 @@ module {
             self;
         };
 
-        public func Cursor(cursor : ?Cursor, direction : PaginationDirection) : QueryBuilder {
-            pagination_cursor := cursor;
-            // _cursor_offset := cursor_offset;
-            _direction := direction;
-            self;
-        };
+        // public func Cursor(cursor : ?Cursor, direction : PaginationDirection) : QueryBuilder {
+        //     pagination_cursor := cursor;
+        //     // _cursor_offset := cursor_offset;
+        //     _direction := direction;
+        //     self;
+        // };
 
         public func Limit(limit : Nat) : QueryBuilder {
             pagination_limit := ?limit;

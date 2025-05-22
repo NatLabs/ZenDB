@@ -31,6 +31,7 @@ import Itertools "mo:itertools/Iter";
 import RevIter "mo:itertools/RevIter";
 import BitMap "mo:bit-map";
 import Vector "mo:vector";
+import MemoryBTree "mo:memory-collection/MemoryBTree/Stable";
 import Ids "../Ids";
 
 import T "../Types";
@@ -168,17 +169,23 @@ module StableCollection {
         DocumentStore.rangeVals(collection.documents, main_btree_utils, start, end);
     };
 
-    // public func update_schema(collection : StableCollection, schema : T.Schema) : Result<(), Text> {
+    // public func update_schema<NewRecord>(collection : StableCollection, schema : T.Schema) : Result<(), Text> {
+    //     type PrevRecord = Record;
 
     //     let is_compatible = Schema.is_schema_backward_compatible(collection.schema, schema);
     //     if (not is_compatible) return Utils.log_error_msg(collection.logger, "Schema is not backward compatible");
 
-    //     let formatted_schema = Candid.formatCandidType([schema], null)[0];
+    //     let processed_schema = Schema.process_schema(schema);
+    //     let schema_keys = Utils.extract_schema_keys(processed_schema);
 
-    //     collection.schema := formatted_schema;
+    //     collection.schema := processed_schema;
+    //     collection.schema_keys := schema_keys;
+
+    //     let default_value_with_prev_schema = Schema.generate_default_value(collection.schema);
+
     //     Logger.lazyInfo(
     //         collection.logger,
-    //         func() = "Updating schema to: " # debug_show formatted_schema,
+    //         func() = "Updating schema to: " # debug_show processed_schema,
     //     );
     //     #ok;
     // };
@@ -1130,36 +1137,77 @@ module StableCollection {
         sort_records_by_field_cmp;
     };
 
-    // public func stats(collection : StableCollection) : T.CollectionStats {
-    //     let main_btree_index = {
-    //         stable_memory = {
-    //             metadata_bytes = DocumentStore.metadataBytes(collection.documents);
-    //             actual_data_bytes = DocumentStore.bytes(collection.documents);
-    //         };
-    //     };
+    func get_memory_stats<K, V>(btree : T.BTree<K, V>) : T.MemoryBTreeStats {
+        switch (btree) {
+            case (#stableMemory(btree)) { MemoryBTree.stats(btree) };
+            case (_) {
+                {
+                    allocatedPages = 0;
+                    bytesPerPage = 0;
+                    allocatedBytes = 0;
+                    usedBytes = 0;
+                    freeBytes = 0;
+                    dataBytes = 0;
+                    metadataBytes = 0;
+                    leafBytes = 0;
+                    branchBytes = 0;
+                    keyBytes = 0;
+                    valueBytes = 0;
+                    leafCount = 0;
+                    branchCount = 0;
+                    totalNodeCount = 0;
+                };
+            };
+        };
 
-    //     let indexes : [T.IndexStats] = Iter.toArray(
-    //         Iter.map<(Text, Index), T.IndexStats>(
-    //             Map.entries(collection.indexes),
-    //             func((index_name, index) : (Text, Index)) : T.IndexStats {
-    //                 let columns : [Text] = Array.map<(Text, Any), Text>(
-    //                     index.key_details,
-    //                     func((key, direction) : (Text, Any)) : Text = key,
-    //                 );
+    };
 
-    //                 let stable_memory : T.MemoryStats = {
-    //                     metadata_bytes = BTree.metadataBytes(index.data);
-    //                     actual_data_bytes = BTree.bytes(index.data);
-    //                 };
+    public func stats(collection : StableCollection) : T.CollectionStats {
 
-    //                 { columns; stable_memory };
+        let main_collection_memory : T.MemoryBTreeStats = get_memory_stats(collection.documents);
 
-    //             },
-    //         )
-    //     );
+        let total_records = StableCollection.size(collection);
 
-    //     { indexes; main_btree_index; records = size(collection) };
-    // };
+        let total_document_size = switch (collection.documents) {
+            case (#stableMemory(btree)) {
+                main_collection_memory.valueBytes;
+            };
+            case (_) 0;
+        };
+
+        let avg_document_size = total_document_size / total_records;
+
+        let indexes : [T.IndexStats] = Iter.toArray(
+            Iter.map<(Text, Index), T.IndexStats>(
+                Map.entries(collection.indexes),
+                func((index_name, index) : (Text, Index)) : T.IndexStats {
+
+                    {
+                        name = index_name;
+                        fields = index.key_details;
+                        entries = Index.size(index);
+                        memory = get_memory_stats(index.data);
+                        isUnique = index.is_unique;
+                        usedInternally = index.used_internally;
+
+                    };
+
+                },
+            )
+        );
+
+        let collection_stats : T.CollectionStats = {
+            name = collection.name;
+            schema = collection.schema;
+            entries = total_records;
+            memory = main_collection_memory;
+            avgDocumentSize = avg_document_size;
+            totalDocumentSize = total_document_size;
+            indexes;
+        };
+
+        collection_stats;
+    };
 
     public func count(collection : StableCollection, query_builder : QueryBuilder) : Result<Nat, Text> {
         let stable_query = query_builder.build();

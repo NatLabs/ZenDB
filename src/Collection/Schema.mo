@@ -54,8 +54,10 @@ module {
     //
     // Forward compatible types
     // These types can be updated in the following ways but not the other way around:
-    // - A record field can be update to become optional
+    // - A record field can be updated to an optional type
     //     #Record ([("field", #Nat)]) -> #Record ([("field", #Option(#Nat))])
+    // - A variant type can be extended to include new variant options, but can't remove existing ones
+    //     #Variant ([("id", #Nat)]) -> #Variant ([("id", #Nat), ("name", #Text)])
 
     public func is_schema_backward_compatible(curr : Schema, new : Schema) : Bool {
         switch (curr, new) {

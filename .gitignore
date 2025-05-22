@@ -12,8 +12,8 @@
 .vessel/
 .mops/
 .wasm/
-.bench/
 .tmp/
+.bench/
 
 # frontend code
 node_modules/

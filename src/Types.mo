@@ -288,12 +288,10 @@ module T {
         filter_bounds : Bounds;
         simple_operations : [(Text, T.ZqlOperators)];
     };
-
     public type ScanDetails = {
         #IndexScan : IndexScanDetails;
         #FullScan : FullScanDetails;
     };
-
     public type QueryPlan = {
         is_and_operation : Bool;
         subplans : [QueryPlan]; // result of nested #And/#Or operations
@@ -301,22 +299,55 @@ module T {
         scans : [ScanDetails]; // scan results from simple #Operation
     };
 
-    public type MemoryStats = {
-        metadata_bytes : Nat;
-        actual_data_bytes : Nat;
-    };
+    public type MemoryBTreeStats = MemoryBTree.MemoryBTreeStats;
 
     public type IndexStats = {
-        columns : [Text];
-        stable_memory : MemoryStats;
+        /// The name of the index
+        name : Text;
+
+        /// Composite index fields selected for the index
+        fields : [(Text, SortDirection)];
+
+        /// The number of records in the index
+        entries : Nat;
+
+        /// The memory information for the index
+        memory : MemoryBTreeStats;
+
+        /// Flag indicating if the index is unique
+        isUnique : Bool;
+
+        /// Flag indicating if the index is used internally (these indexes cannot be deleted by user)
+        usedInternally : Bool;
+
     };
 
     public type CollectionStats = {
-        records : Nat;
+        /// The name of the collection
+        name : Text;
+
+        /// The schema of the collection
+        schema : Schema;
+
+        /// The number of records in the collection
+        entries : Nat;
+
+        /// The btree's memory information for the collection
+        memory : MemoryBTreeStats;
+
+        /// The index information for the collection
         indexes : [IndexStats];
-        main_btree_index : {
-            stable_memory : MemoryStats;
-        };
+
+        /// The average size in bytes of a document in the collection
+        avgDocumentSize : Nat;
+
+        /// The total size in bytes of all documents in the collection
+        totalDocumentSize : Nat;
+
+        // replicated_query_instructions : Nat;
+
+        // schema_versions : [Schema]
+
     };
 
     public type EvalResult = {

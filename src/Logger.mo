@@ -5,7 +5,6 @@ import Array "mo:base/Array";
 import Order "mo:base/Order";
 import Option "mo:base/Option";
 import ExperimentalInternetComputer "mo:base/ExperimentalInternetComputer";
-import NewInternetComputer "mo:new-base/InternetComputer";
 
 import T "Types";
 
