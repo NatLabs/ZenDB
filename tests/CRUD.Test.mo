@@ -38,7 +38,7 @@ let indexible_fields = [
     "int16",
     "int32",
     "int64",
-    // "float",
+    "float",
     "principal",
     "blob",
     // "bool", // supported but has a low cardinality, has a lot of duplicates and returns a lot of results, which causes us to hit the memory limit faster
