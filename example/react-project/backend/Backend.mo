@@ -25,23 +25,12 @@ actor class Backend() {
     type Tx = T.Tx;
 
     stable let db_sstore = ZenDB.new();
-    // Debug.print("db_sstore: " # debug_show (db_sstore));
     let db = ZenDB.launchDefaultDB(db_sstore);
 
     let ledger : Ledger.Service = actor ("ryjl3-tyaaa-aaaaa-aaaba-cai");
 
-    // func blob_to_account(blob : Blob) : Account {
-    //     let account = Principal.fromBlob(blob);
-    //     { owner = account; sub_account = null };
-    // };
-
     let Billion = 1_000_000_000;
     let Trillion = 1_000_000_000_000;
-
-    // let AccountSchema = #Record([
-    //     ("owner", #Principal),
-    //     ("sub_account", #Option(#Blob)),
-    // ]);
 
     let BlockSchema : ZenDB.Types.Schema = #Record([
         ("btype", #Text),
@@ -72,7 +61,16 @@ actor class Backend() {
         };
     };
 
-    let #ok(txs) = db.createCollection<Block>("txs", BlockSchema, CandifyBlock);
+    let #ok(txs) = db.createCollection<Block>(
+        "txs",
+        BlockSchema,
+        CandifyBlock,
+        ?{
+            schemaConstraints = [
+                #Unique(["tx_index"]),
+            ];
+        },
+    );
 
     // because of the way indexes are selected, the order of the fields in the index matters
     // but also if there are more than one index selected as the best index,
@@ -81,21 +79,21 @@ actor class Backend() {
     // the first two are defined first so if all the indexes are equal for the query,
     // the first two indexes which starting with fields we use for sorting can be used
     // to avoid sorting internally in the db which is really slow and inefficient
-    let #ok(_) = txs.createIndex(["ts"]);
-    let #ok(_) = txs.createIndex(["tx.amt"]);
+    let #ok(_) = txs.createIndex("ts_idx", [("ts", #Ascending)], null);
+    let #ok(_) = txs.createIndex("tx_amt_idx", [("tx.amt", #Descending)], null);
 
-    let #ok(_) = txs.createIndex(["btype", "tx.amt"]);
-    let #ok(_) = txs.createIndex(["btype", "ts"]);
+    let #ok(_) = txs.createIndex("btype_tx_amt_idx", [("btype", #Ascending), ("tx.amt", #Descending)], null);
+    let #ok(_) = txs.createIndex("btype_ts_idx", [("btype", #Ascending), ("ts", #Ascending)], null);
 
-    let #ok(_) = txs.createIndex(["tx.from", "btype", "ts"]);
-    let #ok(_) = txs.createIndex(["tx.from", "btype", "tx.amt"]);
+    let #ok(_) = txs.createIndex("tx_from_btype_ts_idx", [("tx.from", #Ascending), ("btype", #Ascending), ("ts", #Ascending)], null);
+    let #ok(_) = txs.createIndex("tx_from_btype_tx_amt_idx", [("tx.from", #Ascending), ("btype", #Ascending), ("tx.amt", #Descending)], null);
 
-    let #ok(_) = txs.createIndex(["tx.to", "btype", "ts"]);
-    let #ok(_) = txs.createIndex(["tx.to", "btype", "tx.amt"]);
+    let #ok(_) = txs.createIndex("tx_to_btype_ts_idx", [("tx.to", #Ascending), ("btype", #Ascending), ("ts", #Ascending)], null);
+    let #ok(_) = txs.createIndex("tx_to_btype_tx_amt_idx", [("tx.to", #Ascending), ("btype", #Ascending), ("tx.amt", #Descending)], null);
 
     public func upload_blocks(blocks : [Block]) : async () {
         for (block in blocks.vals()) {
-            switch (txs.insert_with_id(block.tx_index, block)) {
+            switch (txs.insert(block)) {
                 case (#ok(_)) ();
                 case (#err(err)) Debug.trap("failed to insert block into txs db: " # debug_show (block) # " \n" # err);
             };
@@ -114,7 +112,7 @@ actor class Backend() {
         let blocks = await* BlockUtils.pull_blocks_from_ledger(ledger, start, length);
 
         for (block in blocks.vals()) {
-            switch (txs.insert_with_id(block.tx_index, block)) {
+            switch (txs.insert(block.tx_index, block)) {
                 case (#ok(_)) ();
                 case (#err(err)) Debug.trap("failed to insert block into txs db: " # debug_show (block) # " \n" # err);
             };
@@ -353,7 +351,13 @@ actor class Backend() {
     let LEDGER_DECIMALS = 8; // decimals will be handled in the frontend before the request is made
 
     public query func get_txs_from_tx_index_range(start : Nat, length : Nat) : async [Block] {
-        let Query = ZenDB.QueryBuilder().Where("tx_index", #gte(#Nat(start))).And("tx_index", #lt(#Nat(start + length)));
+        let Query = ZenDB.QueryBuilder().Where(
+            "tx_index",
+            #gte(#Nat(start)),
+        ).And(
+            "tx_index",
+            #lt(#Nat(start + length)),
+        );
 
         let query_res = txs.search(Query);
         let #ok(matching_txs) = query_res else Debug.trap("get_txs_from_tx_index_range failed: " # debug_show query_res);
@@ -389,13 +393,5 @@ actor class Backend() {
         heap : Nat;
         stable_memory : Nat;
     };
-
-    // public query func get_db_stats() : async {
-
-    // };
-
-    // public query func get_txs_in_range(start : Nat, length : Nat) : async [Block] {
-    //     txs.filter(func(block : Block) : Bool = block.tx_index >= start and block.tx_index < start + length);
-    // };
 
 };

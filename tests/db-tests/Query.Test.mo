@@ -12,9 +12,8 @@ import Fuzz "mo:fuzz";
 import Candid "mo:serde/Candid";
 import Record "mo:serde/Candid/Text/Parser/Record";
 import Itertools "mo:itertools/Iter";
-import ZenDB "../src";
-import TestUtils "TestUtils";
-import ZenDBSuite "TestFramework";
+import ZenDB "../../src";
+import ZenDBSuite "../test-utils/TestFramework";
 
 let fuzz = Fuzz.fromSeed(0x7eadbeef);
 let { QueryBuilder } = ZenDB;

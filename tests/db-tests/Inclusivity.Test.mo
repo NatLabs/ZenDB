@@ -17,11 +17,10 @@ import Bench "mo:bench";
 import Fuzz "mo:fuzz";
 import Candid "mo:serde/Candid";
 
-import ZenDB "../src";
-import TestUtils "TestUtils";
-import SchemaMap "../src/Collection/SchemaMap";
-import CandidMap "../src/CandidMap";
-import { Orchid } "../src/Collection/Orchid";
+import ZenDB "../../src";
+import SchemaMap "../../src/Collection/SchemaMap";
+import CandidMap "../../src/CandidMap";
+import { Orchid } "../../src/Collection/Orchid";
 
 let fuzz = Fuzz.fromSeed(0x7eadbeef);
 let { QueryBuilder } = ZenDB;

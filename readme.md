@@ -1,62 +1,26 @@
 # ZenDB: Document Database for the Internet Computer
 
 [![MOPS](https://img.shields.io/badge/MOPS-zendb-blue)](https://mops.one/zendb)
-[![License](https://img.shields.io/badge/License-MIT-green)](LICENSE)
+[![License](https://img.shields.io/badge/License-AGPL--3.0-blue)](LICENSE)
 [![Motoko](https://img.shields.io/badge/Language-Motoko-orange)](https://github.com/dfinity/motoko)
 
 > A high-performance document database built specifically for the Internet Computer ecosystem
 
-ZenDB is an embedded document database that leverages the Internet Computer's stable memory to provide scalable, performant data persistence with advanced query capabilities. Engineered to handle complex data models with up to 500GB per canister, it bridges the gap between Motoko's type system and Candid encoding to offer a seamless developer experience.
+
+ZenDB is an embedded document database that leverages the Internet Computer's unique features to provide a powerful, scalable, and efficient data storage solution for Motoko applications. With advanced querying capabilities, users can perform complex queries on large datasets efficiently, while also benefiting from the simplicity and safety of Motoko's type system.
+It is designed to work seamlessly with stable memory, allowing developers to store and query complex data models with a storage capacity of up to 500GB in a single canister. 
 
 ## Key Features
-
-### 🚀 Performance-Optimized
-- **B-Tree Indexes**: Sophisticated multi-field indexes for lightning-fast queries
-- **Query Execution Engine**: Intelligent query planner with cost-based optimization
-- **Memory Efficiency**: Carefully designed to maximize stable memory usage patterns
-
-### 💾 Data Architecture
-- **Document-Oriented Storage**: Flexible schema design for complex data structures
-- **Compound Indexes**: Support for multi-field indexes to accelerate complex queries
-- **Full Candid Integration**: Native support for all Motoko and Candid data types
-
-### 🔍 Advanced Querying
+- **Full Candid Integration**: Native support for candid which allows users to store all Motoko data types
+- **Compound Indexes**: Support for compound multi-field indexes to accelerate complex queries
 - **Rich Query Language**: Comprehensive set of operators including equality, range, logical operations
 - **Query Builder API**: Intuitive fluent interface for building complex queries
-- **Sorting & Pagination**: Efficient ordered result sets with skip/limit functionality
+- **Query Execution Engine**: Performanced optimized Query planner programmed to search for the path with the smallest result size to filter/traverse.
+- **Sorting & Pagination**: Efficient ordered result sets with skip/limit pagination
+- **Schema Validation**: Ensure data integrity with schema-based validation for each entry
+- **Schema Constraints**: Add limits on what can be stored in the db
 
-### 🔒 Data Integrity
-- **Schema Validation**: Ensure data integrity with schema-based validation
-- **Backward Compatibility**: Safe schema evolution with compatibility checking
-- **Transactional Operations**: Consistent data operations with rollback capability
-
-## Technical Architecture
-
-ZenDB is designed around a layered architecture with clear separation of concerns:
-
-### Core Components
-
-1. **Storage Engine**
-   - **BTree**: Implementation of ordered key-value storage (interfaces with both heap and stable memory)
-   - **Memory Management**: Automatic optimization of memory usage with freed memory reuse
-   - **Disk Paging**: Custom implementation that efficiently manages large datasets in stable memory
-
-2. **Query Processing**
-   - **QueryBuilder**: Fluent API that constructs complex query expressions
-   - **QueryPlan**: Analyzes query expressions and available indexes to determine execution strategy
-   - **QueryExecution**: Executes the most efficient query plan using bitmap intersections or index scans
-
-3. **Schema System**
-   - **SchemaMap**: Maps Candid types to internal schema representation
-   - **Candify**: Handles serialization/deserialization between Motoko types and storage
-   - **CandidMap**: Provides efficient access to nested fields in documents
-
-4. **Indexing Subsystem**
-   - **Index Creation**: Indexes are B-trees maintained alongside the main collection
-   - **Orchid**: Special type utility that orders Candid values without full deserialization
-   - **Bitmap Operations**: Uses bitmap intersections for efficient filtering operations
-
-### Internal Workflow
+## Internal Workflow
 
 When executing a query, ZenDB follows this optimized workflow:
 
@@ -72,37 +36,50 @@ This architecture allows ZenDB to handle complex queries efficiently, even with 
 
 ## Getting Started
 
-### 1. Installation
+### Installation
+
+Requires `moc` version `0.14.9"` or higher to run
+Install with mops: `mops toolchain use moc 0.14.9`  
+
+#### Install Directly from Mops (Recommended)
 
 ```bash
 mops add zendb
 ```
 
-> Requires `moc` version `0.14.9"` or higher to run
+#### Install Specific Github Branch/Commit
+- Replace the value after the pound sign `#` with the branch or the commit hash
 
-### 2. Initialize Your Database
+```bash
+mops add https://github.com/NatLabs/ZenDB#<branch/commit-hash>
+```
+
+### Basic Usage
+
+#### 1. Initialize the Database
 
 ```motoko
 import ZenDB "mo:zendb";
 
 actor {
-  stable var zendb_store = ZenDB.newStableStore();
+  stable var zendb = ZenDB.newStableStore(null);
   
   system func preupgrade() {
     // Store is automatically persisted in stable memory
   }
   
   system func postupgrade() {
-    zendb_store := ZenDB.upgrade(zendb_store);
+    zendb := ZenDB.upgrade(zendb);
   }
   
-  let db = ZenDB.launchDefaultDB(zendb_store);
+  let db = ZenDB.launchDefaultDB(zendb);
 }
 ```
 
-### 3. Define Your Schema
+#### 2. Define the Collection's Schema
 
 ```motoko
+// motoko type
 type User = {
   id: Nat;
   name: Text;
@@ -115,6 +92,7 @@ type User = {
   created_at: Int;
 };
 
+// corresponding schema type
 let UsersSchema : ZenDB.Types.Schema = #Record([
   ("id", #Nat),
   ("name", #Text),
@@ -127,13 +105,14 @@ let UsersSchema : ZenDB.Types.Schema = #Record([
   ("created_at", #Int),
 ]);
 
+// serializer
 let candify_users : ZenDB.Types.Candify<User> = {
   to_blob = func(user: User) : Blob { to_candid(user) };
   from_blob = func(blob: Blob) : ?User { from_candid(blob) };
 };
 ```
 
-### 4. Create a Collection & Indexes
+#### 3. Create a Collection & Indexes
 
 ```motoko
 // Create collection
@@ -141,8 +120,9 @@ let #ok(users) = db.createCollection("users", UsersSchema, candify_users, null);
 
 // Create optimal indexes for your query patterns
 let #ok(_) = users.createIndex("name_idx", [("name", #Ascending)], null);
+
 let #ok(_) = users.createIndex(
-  "location_created_idx", 
+  "location_created_at_idx", 
   [
     ("profile.location", #Ascending), 
     ("created_at", #Descending)
@@ -151,7 +131,7 @@ let #ok(_) = users.createIndex(
 );
 ```
 
-### 5. Insert & Query Data
+#### 4. Insert & Query Data
 
 ```motoko
 // Insert a document
@@ -169,7 +149,7 @@ let user : User = {
 
 let #ok(userId) = users.insert(user);
 
-// Query with the fluent QueryBuilder API
+// Query with the QueryBuilder API
 let #ok(queryResults) = users.search(
   ZenDB.QueryBuilder()
     .Where("profile.location", #eq(#Text("San Francisco")))
@@ -177,11 +157,44 @@ let #ok(queryResults) = users.search(
     .Sort("created_at", #Descending)
     .Limit(10)
 );
+
+assert queryResults == [user];
 ```
 
-## Advanced Usage
+#### 5. Field Updates & Transformations
 
-### Compound Filtering with Logical Operators
+```motoko
+// Atomic field updates
+let #ok(_) = users.updateById(
+  userId,
+  [
+    ("profile.location", #Text("New York")),
+    ("profile.interests", #Array([#Text("coding"), #Text("reading")]))
+  ]
+);
+
+// Field transformations
+let #ok(_) = users.updateById(
+  userId, 
+  [
+    ("login_count", #add(#currValue, #Nat(1))),
+    ("last_login", #Int(Time.now())),
+    ("name", #uppercase(#currValue))
+  ]
+);
+```
+
+#### 6. Statistics & Monitoring
+
+Monitor your collections to understand performance characteristics:
+
+```motoko
+let stats = users.stats();
+```
+
+### Advanced Usage
+
+#### Compound Filtering with Logical Operators
 
 ```motoko
 // Find active premium users who joined recently
@@ -206,53 +219,26 @@ let #ok(specialCaseUsers) = users.search(
 );
 ```
 
-### Field Updates & Transformations
+### Examples
 
-```motoko
-// Atomic field updates
-let #ok(_) = users.updateById(userId, [
-  ("profile.location", #Text("New York")),
-  ("profile.interests", #Array([#Text("coding"), #Text("reading")]))
-]);
+The repository includes several examples demonstrating ZenDB's capabilities:
 
-// Field transformations
-let #ok(_) = users.updateById(userId, [
-  ("login_count", #add(#currValue, #Nat(1))),
-  ("last_login", #Int(Time.now())),
-  ("name", #uppercase(#currValue))
-]);
-```
+- [**Simple Notes Dapp**](./example/notes/lib.mo#L9): Example Notes app, with simple CRUD operations
+- [**ICP Txs explorer**](./example/react-project/backend/Backend.mo): ZenDB test app to index ICP transactions
+  - https://2yfll-4qaaa-aaaap-anvaq-cai.icp0.io/
+- [**Flying Ninja**](./example/flying_ninja/backend/app.mo): Dapp from the [dfinity/examples](https://github.com/dfinity/examples/tree/master/motoko) repo migrated to use ZenDB.
 
 
-## Query Operators
+For more detailed examples and advanced usage, see the [Documentation](./zendb-doc.md) section below.
 
-ZenDB provides a rich set of query operators to build expressive queries:
 
-| Operator | Description | Example |
-|----------|-------------|---------|
-| `#eq` | Equality | `.Where("status", #eq(#Text("active")))` |
-| `#lt` | Less than | `.Where("age", #lt(#Nat(30)))` |
-| `#gt` | Greater than | `.Where("score", #gt(#Nat(100)))` |
-| `#lte` | Less than or equal | `.Where("priority", #lte(#Nat(3)))` |
-| `#gte` | Greater than or equal | `.Where("reputation", #gte(#Nat(500)))` |
-| `#between` | Range (inclusive) | `.Where("age", #between(#Nat(18), #Nat(65)))` |
-| `#exists` | Field exists | `.Where("profile.avatar", #exists)` |
-| `#startsWith` | Text starts with | `.Where("name", #startsWith(#Text("A")))` |
-| `#anyOf` | Value in set | `.Where("status", #anyOf([#Text("active"), #Text("pending")]))` |
-| `#not_` | Negates operator | `.Where("role", #not_(#eq(#Text("admin"))))` |
-
-Logical operators allow combining conditions:
-
-- `.And(field, operator)` - Field must match this condition AND previous conditions
-- `.Or(field, operator)` - Field must match this condition OR previous conditions
-- `.AndQuery(queryBuilder)` - Combines with another query using AND
-- `.OrQuery(queryBuilder)` - Combines with another query using OR
 
 ## Performance Optimization
 
 ### Index Selection Strategy
 
-ZenDB uses a sophisticated query planner to determine the most efficient indexes for each query. Create indexes that:
+ZenDB uses a sophisticated query planner to determine the most efficient indexes for each query. 
+To get the best performance from ZenDB, create indexes that:
 
 1. Match your most common query patterns
 2. Include fields used in sorting operations
@@ -260,10 +246,12 @@ ZenDB uses a sophisticated query planner to determine the most efficient indexes
 
 ```motoko
 // Great for queries filtering on status and sorting by date
-let #ok(_) = users.createIndex("status_date_idx", [
-  ("status", #Ascending), 
-  ("created_at", #Descending)
-]);
+let #ok(_) = users.createIndex(
+  "status_date_idx", [
+    ("status", #Ascending), 
+    ("created_at", #Descending)
+  ]
+);
 ```
 
 ### Statistics & Monitoring
@@ -272,73 +260,45 @@ Monitor your collections to understand performance characteristics:
 
 ```motoko
 let stats = users.stats();
-Debug.print("Records: " # Nat.toText(stats.records));
-Debug.print("Indexes: " # Nat.toText(stats.indexes.size()));
-Debug.print("Memory Used: " # Nat.toText(stats.memoryUsed));
 ```
-
-## Examples
-
-The repository includes several examples demonstrating ZenDB's capabilities:
-
-- [**Simple Notes Dapp**](./example/notes/): Complete CRUD application with task management functionality
-- **ICP Txs explorer**: High-performance financial transaction indexing
-- **React Integration**: Frontend integration example with React UI
-
-## Documentation 
-![](./zendb-doc.md)
 
 ## Limitations
 
-#### Indexes
-- Not capable of creating indexes on fields with `#Float` data type
-- Cannot create indexes on fields nested within an `#Array`
+- Limited array support - Can store arrays in db but cannot create indexes on array fields or perform operations on specific array elements
 - No support for text-based full-text search or pattern matching within indexes
-- Limited support for indexing variant types - must reference specific variant paths
 
-#### Query Execution
+- Cannot create indexes on fields nested within an `#Array`
+
 - Complex queries with many OR conditions may have suboptimal performance
-- No built-in support for geospatial queries or operations
-- Computation can spike during complex sorting operations on large result sets
 - The query planner may not always select the optimal index for complex queries
 
-#### Data Management
-- No automatic schema migration tools when changing collection schemas
-- Update operations on large collections with many indexes can be resource-intensive
-- Limited batch operation support for mass updates or deletes
-- No built-in support for time-to-live (TTL) or automatic document expiration
+- Schema updates and migrations not yet supported. As a result, changing the schema of an existing collection requires creating a new collection and migrating data
 
-#### Resource Constraints
-- Large result sets may encounter instruction limits on query operations
-- Pagination with skip can be inefficient for large offsets - cursor-based pagination recommended
-- No built-in horizontal scaling across multiple canisters
-- Complex aggregation operations must be implemented at the application level
-
-#### Size limitations
-- The max size of any record stored in a collection is 4GB
-- The max size for any field that will be stored in an index is only 64 KB. Actually the total size of the composite fields that would be stored in the index should be less than or equal to 64 KB.
-- 
+- Using Limit/Skip Pagination can be inefficient and may hit the instruction limits if the result set is large enough. It is recommended to created indexes that fully cover your queries where possible, to avoid this limitation.
 
 ## Roadmap
 
 - [x] Multi-field compound indexes
 - [x] Powerful query language with logical operators
-- [x] Schema validation and backward compatibility
-- [x] Efficient memory usage with garbage collection
+- [x] Schema validation and Schema constraints (required, unique, enum)
 - [ ] Data Certification of all database records, using the [ic-certification](https://mops.one/ic-certification) motoko library
-  - [ ] https://forum.dfinity.org/t/do-we-still-need-bigmap-nosql-database/13133/5
-- [ ] Multi-key array indexes and nested array support
-- [ ] Aggregation functions (count, sum, avg, etc.)
-- [ ] Schema constraints (required, unique, enum)
-- [ ] Support for transactions
+- [ ] Fully support Array fields and operations on them
+- [ ] Multi-key array indexes - for indexing fields within arrays
+- [ ] Backward compatible schema updates and versioning
+- [ ] Aggregation functions (min, max, sum, avg, etc.)
+- [ ] Better support for migrations
 - [ ] Enhanced fulltext search capabilities
-- [ ] Distributed querying across multiple canisters
+- [ ] Support for transactions
+- [ ] Dedicated database canister for use by clients in other languages (e.g. JavaScript, Rust)
+- [ ] Database management tools
+- [ ] Periodic backups to external canisters
+- [ ] Improved monitoring and analytics tools
 
 ## Contributing
 
-Contributions are welcome! Please feel free to submit a Pull Request to fix a bug.
+Contributions are welcome! Please feel free to create an isssue to report a bug or submit a Pull Request.
 For features, please create an issue first to discuss supporting it in this project.
 
 ## License
 
-This project is licensed under the MIT License - see the LICENSE file for details.
+This project is licensed under the GNU Affero General Public License v3.0 (AGPL-3.0) - see the [LICENSE](LICENSE) file for details.

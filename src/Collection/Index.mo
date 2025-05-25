@@ -23,7 +23,7 @@ import CandidMap "../CandidMap";
 import Utils "../Utils";
 import C "../Constants";
 import Logger "../Logger";
-import CandidMod "../CandidMod";
+import CandidUtils "../CandidUtils";
 
 import { Orchid } "Orchid";
 
@@ -387,9 +387,9 @@ module {
                     case ((_field, ?#Inclusive(#Maximum) or ?#Exclusive(#Maximum))) #Maximum;
                     case ((_field, ?#Inclusive(value))) value;
                     case ((_field, ?#Exclusive(value))) if (is_lower_bound) {
-                        CandidMod.get_next_value(value);
+                        CandidUtils.get_next_value(value);
                     } else {
-                        CandidMod.get_prev_value(value);
+                        CandidUtils.get_prev_value(value);
                     };
                     case (_) Debug.trap("filter_null_entries_in_query: received null value, should not happen");
                 };

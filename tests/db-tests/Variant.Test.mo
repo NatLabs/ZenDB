@@ -5,12 +5,12 @@ import Blob "mo:base/Blob";
 import Text "mo:base/Text";
 import Array "mo:base/Array";
 
-import ZenDB "../src";
+import ZenDB "../../src";
 
 import { test; suite } "mo:test";
 import Itertools "mo:itertools/Iter";
 import Map "mo:map/Map";
-import ZenDBSuite "TestFramework";
+import ZenDBSuite "../test-utils/TestFramework";
 
 type SizeVariant = {
     #known : Nat;
@@ -54,7 +54,7 @@ ZenDBSuite.newZenDBSuite(
     "Variant Tests",
     ?ZenDBSuite.withAndWithoutIndex,
     func collection_setup(zendb : ZenDB.Database) {
-        let #ok(data) = zendb.createCollection<Data>("data", DataSchema, data_type_to_candid, []);
+        let #ok(data) = zendb.createCollection<Data>("data", DataSchema, data_type_to_candid, null);
     },
     func index_setup(zendb : ZenDB.Database) {
         let #ok(data) = zendb.getCollection<Data>("data", data_type_to_candid);
@@ -110,13 +110,17 @@ ZenDBSuite.newZenDBSuite(
                             ZenDB.QueryBuilder().Where("version.v2.d", #eq(#Bool(true)))
                         ) == #ok([(1, { version = #v2({ c = "world"; d = true }) })]);
 
-                        // assert data.search(
-                        //     ZenDB.QueryBuilder().Where("version.v2.d", #eq(#Null))
-                        // ) == #ok([
-                        //     (0, { version = #v1({ a = 42; b = "hello" }) }),
-                        //     (2, { version = #v3({ size = #known(32) }) }),
-                        //     (3, { version = #v3({ size = #unknown }) }),
-                        // ]);
+                        assert data.search(
+                            ZenDB.QueryBuilder().Where("version.v2.d", #exists)
+                        ) == #ok([(1, { version = #v2({ c = "world"; d = true }) })]);
+
+                        Debug.print(
+                            "exists: " # debug_show (
+                                data.search(
+                                    ZenDB.QueryBuilder().Where("version.v2.d", #exists)
+                                )
+                            )
+                        );
 
                         assert data.search(
                             ZenDB.QueryBuilder().Where("version.v3.size", #eq(#Text("unknown")))

@@ -6,9 +6,9 @@ import Map "mo:map/Map";
 
 import { test; suite } "mo:test";
 import Candid "mo:serde/Candid";
-import SchemaMap "../src/Collection/SchemaMap";
-import T "../src/Types";
-import ZenDB "../src";
+import SchemaMap "../../../src/Collection/SchemaMap";
+import T "../../../src/Types";
+import ZenDB "../../../src";
 
 suite(
     "SchemaMap",

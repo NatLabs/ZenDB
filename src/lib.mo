@@ -42,6 +42,8 @@ module {
 
     public type Collection<T> = Collection.Collection<T>;
     public type Database = Database.Database;
+    public type Schema = T.Schema;
+    public type Candify<T> = T.Candify<T>;
 
     public module Schema {
         public func Tuple(a : T.Schema, b : T.Schema) : T.Schema {

@@ -111,6 +111,11 @@ A collection is a group of documents with the same schema definition.
 
 Creating a collection requires two key parameters: the schema and the candify definition.
 
+#### Size limitations
+
+- The max size of any record stored in a collection is 4GB
+- The max size for any field that will be stored in an index is only 64 KB. Actually the total size of the composite fields that would be stored in the index should be less than or equal to 64 KB.
+
 #### Schema
 How to define a schema? The schema must match the Motoko type you are trying to store. Our schema definition is a list of Motoko types.
 
@@ -240,6 +245,8 @@ let #ok(deletedUsers) = users_collection.deleteMany(
 ```
 
 ### Queries
+
+
 ZenDB offers a powerful query system through its QueryBuilder API:
 
 ```motoko
@@ -266,6 +273,31 @@ let #ok(results) = users_collection.search(
 ```
 
 Query execution is optimized by the internal query planner, which analyzes available indexes and query patterns to determine the most efficient execution path.
+
+#### Query Operators
+
+ZenDB provides a rich set of query operators to build expressive queries:
+
+| Operator | Description | Example |
+|----------|-------------|---------|
+| `#eq` | Equality | `.Where("status", #eq(#Text("active")))` |
+| `#lt` | Less than | `.Where("age", #lt(#Nat(30)))` |
+| `#gt` | Greater than | `.Where("score", #gt(#Nat(100)))` |
+| `#lte` | Less than or equal | `.Where("priority", #lte(#Nat(3)))` |
+| `#gte` | Greater than or equal | `.Where("reputation", #gte(#Nat(500)))` |
+| `#between` | Range (inclusive) | `.Where("age", #between(#Nat(18), #Nat(65)))` |
+| `#exists` | Field exists | `.Where("profile.avatar", #exists)` |
+| `#startsWith` | Text starts with | `.Where("name", #startsWith(#Text("A")))` |
+| `#anyOf` | Value in set | `.Where("status", #anyOf([#Text("active"), #Text("pending")]))` |
+| `#not_` | Negates operator | `.Where("role", #not_(#eq(#Text("admin"))))` |
+
+Logical operators allow combining conditions:
+
+- `.And(field, operator)` - Field must match this condition AND previous conditions
+- `.Or(field, operator)` - Field must match this condition OR previous conditions
+- `.AndQuery(queryBuilder)` - Combines with another query using AND
+- `.OrQuery(queryBuilder)` - Combines with another query using OR
+
 
 ### Index
 An index is a data structure that improves the speed of data retrieval operations on a database table.

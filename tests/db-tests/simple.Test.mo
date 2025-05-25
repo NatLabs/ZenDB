@@ -11,8 +11,8 @@ import Fuzz "mo:fuzz";
 import Itertools "mo:itertools/Iter";
 import Map "mo:map/Map";
 
-import ZenDB "../src";
-import ZenDBSuite "TestFramework";
+import ZenDB "../../src";
+import ZenDBSuite "../test-utils/TestFramework";
 
 let fuzz = Fuzz.fromSeed(0x7eadbeef);
 

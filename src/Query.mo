@@ -15,7 +15,7 @@ import C "Constants";
 import Logger "Logger";
 import Schema "Collection/Schema";
 import SchemaMap "Collection/SchemaMap";
-import CandidMod "CandidMod";
+import CandidUtils "CandidUtils";
 
 module {
 
@@ -113,7 +113,7 @@ module {
                 };
                 case (#startsWith(prefix)) {
                     let prefix_lower_bound = prefix;
-                    let #ok(prefix_upper_bound) = CandidMod.Ops.concat_bytes(prefix, "\FF") else {
+                    let #ok(prefix_upper_bound) = CandidUtils.Ops.concat_bytes(prefix, "\FF") else {
                         Debug.trap("QueryBuilder: Failed to create upper bound for #startsWith");
                     };
 
@@ -160,7 +160,7 @@ module {
                 };
                 case (#startsWith(prefix)) {
                     let prefix_lower_bound = prefix;
-                    let #ok(prefix_upper_bound) = CandidMod.Ops.concat_bytes(prefix, "\FF") else {
+                    let #ok(prefix_upper_bound) = CandidUtils.Ops.concat_bytes(prefix, "\FF") else {
                         Debug.trap("QueryBuilder: Failed to create upper bound for #startsWith");
                     };
 

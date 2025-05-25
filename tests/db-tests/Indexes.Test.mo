@@ -22,14 +22,14 @@ import Array "mo:base/Array";
 import Char "mo:base/Char";
 import Result "mo:base/Result";
 
-import ZenDB "../src";
-import Index "../src/Collection/Index";
+import ZenDB "../../src";
+import Index "../../src/Collection/Index";
 
 import { test; suite } "mo:test";
 import Itertools "mo:itertools/Iter";
 import Fuzz "mo:fuzz";
 import Map "mo:map/Map";
-import ZenDBSuite "TestFramework";
+import ZenDBSuite "../test-utils/TestFramework";
 
 let fuzz = Fuzz.fromSeed(0x7eadbeef);
 let { QueryBuilder } = ZenDB;

@@ -303,6 +303,8 @@ module TxsBenchUtils {
                             let tx = inputs.get(i);
                             let #ok(_) = collection.insert(tx);
                         };
+
+                        Debug.print("stats: " # debug_show (collection.stats()));
                     };
 
                     case ("create and populate indexes") {

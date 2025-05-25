@@ -110,22 +110,6 @@ module {
         };
     };
 
-    func flip_int8(i : Int8) : Int8 {
-        (-1 *% i) -% 1 : Int8;
-    };
-
-    func flip_int16(i : Int16) : Int16 {
-        (-1 *% i) -% 1 : Int16;
-    };
-
-    func flip_int32(i : Int32) : Int32 {
-        (-1 *% i) -% 1 : Int32;
-    };
-
-    func flip_int64(i : Int64) : Int64 {
-        (-1 *% i) -% 1 : Int64;
-    };
-
     func encode(buffer : Buffer.Buffer<Nat8>, candid : CandidQuery) {
 
         switch (candid) {
@@ -308,7 +292,6 @@ module {
     let to_blob = func(candid_values : [CandidQuery]) : Blob {
         let buffer = Buffer.Buffer<Nat8>(100);
         //! Do not store the size as it affects the ordering
-        //! - the size is not important for the comparison, the typecode is more important
         // buffer.add(candid_values.size() |> Nat8.fromNat(_));
 
         var i = 0;

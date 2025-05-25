@@ -5,7 +5,7 @@ import Nat "mo:base/Nat";
 import Itertools "mo:itertools/Iter";
 
 import T "../Types";
-import CandidMod "../CandidMod";
+import CandidUtils "../CandidUtils";
 import CandidMap "../CandidMap";
 import Utils "../Utils";
 import Logger "../Logger";
@@ -41,16 +41,16 @@ module {
 
         let res = switch (op) {
             case (#addAll(nested_operations)) {
-                handle_nested_operations(candid_map, nested_operations, CandidMod.MultiOps.add);
+                handle_nested_operations(candid_map, nested_operations, CandidUtils.MultiOps.add);
             };
             case (#subAll(nested_operations)) {
-                handle_nested_operations(candid_map, nested_operations, CandidMod.MultiOps.sub);
+                handle_nested_operations(candid_map, nested_operations, CandidUtils.MultiOps.sub);
             };
             case (#mulAll(nested_operations)) {
-                handle_nested_operations(candid_map, nested_operations, CandidMod.MultiOps.mul);
+                handle_nested_operations(candid_map, nested_operations, CandidUtils.MultiOps.mul);
             };
             case (#divAll(nested_operations)) {
-                handle_nested_operations(candid_map, nested_operations, CandidMod.MultiOps.div);
+                handle_nested_operations(candid_map, nested_operations, CandidUtils.MultiOps.div);
             };
             case (_) {
                 #err("Invalid FieldUpdateOperations in handle_multi_field_update_operations(): " # debug_show op);
@@ -108,43 +108,43 @@ module {
             // number operations
 
             case (#abs(inner_op)) {
-                extract_candid_and_apply_fn_to_one_parameter(inner_op, CandidMod.Ops.abs);
+                extract_candid_and_apply_fn_to_one_parameter(inner_op, CandidUtils.Ops.abs);
             };
             case (#neg(inner_op)) {
-                extract_candid_and_apply_fn_to_one_parameter(inner_op, CandidMod.Ops.neg);
+                extract_candid_and_apply_fn_to_one_parameter(inner_op, CandidUtils.Ops.neg);
             };
             case (#floor(inner_op)) {
-                extract_candid_and_apply_fn_to_one_parameter(inner_op, CandidMod.Ops.floor);
+                extract_candid_and_apply_fn_to_one_parameter(inner_op, CandidUtils.Ops.floor);
             };
             case (#ceil(inner_op)) {
-                extract_candid_and_apply_fn_to_one_parameter(inner_op, CandidMod.Ops.ceil);
+                extract_candid_and_apply_fn_to_one_parameter(inner_op, CandidUtils.Ops.ceil);
             };
             case (#sqrt(inner_op)) {
-                extract_candid_and_apply_fn_to_one_parameter(inner_op, CandidMod.Ops.sqrt);
+                extract_candid_and_apply_fn_to_one_parameter(inner_op, CandidUtils.Ops.sqrt);
             };
             case (#pow(base, exponent)) {
-                extract_candid_and_apply_fn_to_two_parameters(base, exponent, CandidMod.Ops.pow);
+                extract_candid_and_apply_fn_to_two_parameters(base, exponent, CandidUtils.Ops.pow);
             };
             case (#min(a, b)) {
-                extract_candid_and_apply_fn_to_two_parameters(a, b, CandidMod.Ops.min);
+                extract_candid_and_apply_fn_to_two_parameters(a, b, CandidUtils.Ops.min);
             };
             case (#max(a, b)) {
-                extract_candid_and_apply_fn_to_two_parameters(a, b, CandidMod.Ops.max);
+                extract_candid_and_apply_fn_to_two_parameters(a, b, CandidUtils.Ops.max);
             };
             case (#mod(a, b)) {
-                extract_candid_and_apply_fn_to_two_parameters(a, b, CandidMod.Ops.mod);
+                extract_candid_and_apply_fn_to_two_parameters(a, b, CandidUtils.Ops.mod);
             };
             case (#add(a, b)) {
-                extract_candid_and_apply_fn_to_two_parameters(a, b, CandidMod.Ops.add);
+                extract_candid_and_apply_fn_to_two_parameters(a, b, CandidUtils.Ops.add);
             };
             case (#sub(a, b)) {
-                extract_candid_and_apply_fn_to_two_parameters(a, b, CandidMod.Ops.sub);
+                extract_candid_and_apply_fn_to_two_parameters(a, b, CandidUtils.Ops.sub);
             };
             case (#mul(a, b)) {
-                extract_candid_and_apply_fn_to_two_parameters(a, b, CandidMod.Ops.mul);
+                extract_candid_and_apply_fn_to_two_parameters(a, b, CandidUtils.Ops.mul);
             };
             case (#div(a, b)) {
-                extract_candid_and_apply_fn_to_two_parameters(a, b, CandidMod.Ops.div);
+                extract_candid_and_apply_fn_to_two_parameters(a, b, CandidUtils.Ops.div);
             };
 
             // text operations
@@ -152,21 +152,21 @@ module {
                 extract_candid_and_apply_fn_to_one_parameter(
                     inner_op,
                     func(candid : T.Candid) : T.Result<T.Candid, Text> {
-                        CandidMod.Ops.trim(candid, toTrim);
+                        CandidUtils.Ops.trim(candid, toTrim);
                     },
                 );
             };
             case (#lowercase(text)) {
-                extract_candid_and_apply_fn_to_one_parameter(text, CandidMod.Ops.lowercase);
+                extract_candid_and_apply_fn_to_one_parameter(text, CandidUtils.Ops.lowercase);
             };
             case (#uppercase(text)) {
-                extract_candid_and_apply_fn_to_one_parameter(text, CandidMod.Ops.uppercase);
+                extract_candid_and_apply_fn_to_one_parameter(text, CandidUtils.Ops.uppercase);
             };
             case (#replaceSubText(inner_op, search, replacement)) {
                 extract_candid_and_apply_fn_to_one_parameter(
                     inner_op,
                     func(candid : T.Candid) : T.Result<T.Candid, Text> {
-                        CandidMod.Ops.replaceSubText(candid, search, replacement);
+                        CandidUtils.Ops.replaceSubText(candid, search, replacement);
                     },
                 );
             };
@@ -174,12 +174,12 @@ module {
                 extract_candid_and_apply_fn_to_one_parameter(
                     inner_op,
                     func(candid : T.Candid) : T.Result<T.Candid, Text> {
-                        CandidMod.Ops.slice(candid, start, end);
+                        CandidUtils.Ops.slice(candid, start, end);
                     },
                 );
             };
             case (#concat(a, b)) {
-                extract_candid_and_apply_fn_to_two_parameters(a, b, CandidMod.Ops.concat);
+                extract_candid_and_apply_fn_to_two_parameters(a, b, CandidUtils.Ops.concat);
             };
 
             case (_) {
@@ -282,7 +282,7 @@ module {
             case (#err(msg)) return #err("Failed to handle field update operation: " # msg);
         };
 
-        switch (CandidMod.Cast.cast(field_type, new_value)) {
+        switch (CandidUtils.Cast.cast(field_type, new_value)) {
             case (#ok(new_value_cast_to_type)) return #ok(new_value_cast_to_type);
             case (#err(err)) {
                 let err_msg = "Failed to cast field result (" # debug_show (new_value) # ") to type '" # debug_show field_type # "': " # err;

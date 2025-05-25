@@ -175,6 +175,24 @@ module {
             );
         };
 
+        // public func exists(db_query : QueryBuilder) : Result<Bool, Text> {
+        //     let internal_search_res = handleResult(
+        //         StableCollection.exists(collection, db_query),
+        //         "Failed to find records to check existence",
+        //     );
+
+        //     let results_iter = switch (internal_search_res) {
+        //         case (#err(err)) return #err(err);
+        //         case (#ok(records_iter)) records_iter;
+        //     };
+
+        //     #ok(
+        //         Option.isSome(
+        //             results_iter.next()
+        //         )
+        //     );
+        // };
+
         type RecordLimits = [(Text, ?State<T.CandidQuery>)];
         type FieldLimit = (Text, ?State<T.CandidQuery>);
 
@@ -272,9 +290,9 @@ module {
             };
         };
 
-        // public func stats() : T.CollectionStats {
-        //     StableCollection.stats(collection);
-        // };
+        public func stats() : T.CollectionStats {
+            StableCollection.stats(collection);
+        };
 
         /// Returns the total number of records that match the query.
         /// This ignores the limit and skip parameters.

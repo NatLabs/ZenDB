@@ -45,7 +45,6 @@ module {
         query_statements : [T.ZenQueryLang],
         sort_column : ?(Text, T.SortDirection),
         cursor_record : ?(Nat, Candid.Candid),
-        cursor_map : T.CandidMap,
     ) : QueryPlan {
         Logger.lazyDebug(
             collection.logger,
@@ -124,7 +123,6 @@ module {
                         nested_or_operations,
                         sort_column,
                         cursor_record,
-                        cursor_map,
                         Buffer.toArray(operations),
                     );
 
@@ -280,7 +278,6 @@ module {
         query_statements : [T.ZenQueryLang],
         sort_column : ?(Text, T.SortDirection),
         cursor_record : ?(Nat, Candid.Candid),
-        cursor_map : T.CandidMap,
         parent_simple_and_operations : [(Text, T.ZqlOperators)],
     ) : QueryPlan {
         Logger.lazyDebug(
@@ -391,7 +388,6 @@ module {
                         nested_query_statements,
                         sort_column,
                         cursor_record,
-                        cursor_map,
                     );
 
                     sub_query_plans.add(sub_query_plan);
@@ -420,7 +416,6 @@ module {
         db_query : ZenQueryLang,
         sort_column : ?(Text, T.SortDirection),
         cursor_record : ?(Nat, Candid.Candid),
-        cursor_map : T.CandidMap,
     ) : QueryPlan {
         Logger.lazyInfo(
             collection.logger,
@@ -440,7 +435,6 @@ module {
                     operations,
                     sort_column,
                     cursor_record,
-                    cursor_map,
                 );
             };
             case (#Or(operations)) {
@@ -455,7 +449,6 @@ module {
                     operations,
                     sort_column,
                     cursor_record,
-                    cursor_map,
                     [],
                 );
             };

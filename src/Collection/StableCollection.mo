@@ -49,7 +49,7 @@ import QueryPlan "QueryPlan";
 import C "../Constants";
 import QueryExecution "QueryExecution";
 import Intervals "Intervals";
-import CandidMod "../CandidMod";
+import CandidUtils "../CandidUtils";
 import Logger "../Logger";
 import UpdateOps "UpdateOps";
 import BTree "../BTree";
@@ -512,7 +512,7 @@ module StableCollection {
                 switch (unwrap_option(field_value), field_constraint) {
                     case (#Null, _) {}; // ignore validation for null values
                     case (_, #Max(max_value)) {
-                        switch (CandidMod.Ops.compare(field_value, #Float(max_value))) {
+                        switch (CandidUtils.Ops.compare(field_value, #Float(max_value))) {
                             case (#greater) {
                                 let error_msg = "Field '" # field_name # "' exceeds maximum value of " # debug_show max_value;
                                 return Utils.log_error_msg(collection.logger, error_msg);
@@ -523,7 +523,7 @@ module StableCollection {
                     };
 
                     case (_, #Min(min_value)) {
-                        switch (CandidMod.Ops.compare(field_value, #Float(min_value))) {
+                        switch (CandidUtils.Ops.compare(field_value, #Float(min_value))) {
                             case (#less) {
                                 let error_msg = "Field '" # field_name # "' is less than minimum value of " # debug_show min_value;
                                 return Utils.log_error_msg(collection.logger, error_msg);
@@ -534,9 +534,9 @@ module StableCollection {
                     };
 
                     case (_, #MinSize(min_size)) {
-                        let field_value_size = CandidMod.Ops.size(field_value);
+                        let field_value_size = CandidUtils.Ops.size(field_value);
 
-                        switch (CandidMod.Ops.compare(#Nat(field_value_size), #Nat(min_size))) {
+                        switch (CandidUtils.Ops.compare(#Nat(field_value_size), #Nat(min_size))) {
                             case (#less) {
                                 let error_msg = "Field '" # field_name # "' is less than minimum size of " # debug_show min_size;
                                 return Utils.log_error_msg(collection.logger, error_msg);
@@ -547,9 +547,9 @@ module StableCollection {
                     };
 
                     case (_, #MaxSize(max_size)) {
-                        let field_value_size = CandidMod.Ops.size(field_value);
+                        let field_value_size = CandidUtils.Ops.size(field_value);
 
-                        switch (CandidMod.Ops.compare(#Nat(field_value_size), #Nat(max_size))) {
+                        switch (CandidUtils.Ops.compare(#Nat(field_value_size), #Nat(max_size))) {
                             case (#greater) {
                                 let error_msg = "Field '" # field_name # "' exceeds maximum size of " # debug_show max_size;
                                 return Utils.log_error_msg(collection.logger, error_msg);
@@ -560,9 +560,9 @@ module StableCollection {
                     };
 
                     case (_, #Size(min_size, max_size)) {
-                        let field_value_size = CandidMod.Ops.size(field_value);
+                        let field_value_size = CandidUtils.Ops.size(field_value);
 
-                        switch (CandidMod.Ops.compare(#Nat(field_value_size), #Nat(min_size))) {
+                        switch (CandidUtils.Ops.compare(#Nat(field_value_size), #Nat(min_size))) {
                             case (#less) {
                                 let error_msg = "Field '" # field_name # "' is less than minimum size of " # debug_show min_size;
                                 return Utils.log_error_msg(collection.logger, error_msg);
@@ -570,7 +570,7 @@ module StableCollection {
                             case (_) {};
                         };
 
-                        switch (CandidMod.Ops.compare(#Nat(field_value_size), #Nat(max_size))) {
+                        switch (CandidUtils.Ops.compare(#Nat(field_value_size), #Nat(max_size))) {
                             case (#greater) {
                                 let error_msg = "Field '" # field_name # "' exceeds maximum size of " # debug_show max_size;
                                 return Utils.log_error_msg(collection.logger, error_msg);
@@ -1014,7 +1014,7 @@ module StableCollection {
             formatted_query_operations,
             sort_by,
             opt_cursor,
-            cursor_map,
+            // cursor_map,
         );
 
         let sort_records_by_field_cmp = switch (sort_by) {
@@ -1217,7 +1217,6 @@ module StableCollection {
             stable_query.query_operations,
             null,
             null,
-            CandidMap.new(collection.schema_map, 0, #Record([])),
         );
 
         let count = switch (QueryExecution.get_unique_record_ids_from_query_plan(collection, Map.new(), query_plan)) {
@@ -1249,7 +1248,6 @@ module StableCollection {
             stable_query.query_operations,
             null,
             null,
-            CandidMap.new(collection.schema_map, 0, #Record([])),
         );
 
         let sort_records_by_field_cmp = func(_ : Nat, _ : Nat) : Order = #equal;

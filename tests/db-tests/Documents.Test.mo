@@ -7,13 +7,13 @@ import Array "mo:base/Array";
 import Principal "mo:base/Principal";
 import Option "mo:base/Option";
 
-import ZenDB "../src";
+import ZenDB "../../src";
 
 import { test; suite } "mo:test";
 import Itertools "mo:itertools/Iter";
 import Map "mo:map/Map";
 import Record "mo:serde/Candid/Text/Parser/Record";
-import ZenDBSuite "TestFramework";
+import ZenDBSuite "../test-utils/TestFramework";
 
 ZenDBSuite.newNoIndexSetup(
     "Candid Documents Test",

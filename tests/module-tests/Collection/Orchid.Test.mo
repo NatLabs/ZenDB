@@ -26,12 +26,12 @@ import PeekableIter "mo:itertools/PeekableIter";
 import BpTree "mo:augmented-btrees/BpTree";
 import Cmp "mo:augmented-btrees/Cmp";
 
-import ZenDB "../src";
-import Orchid "../src/Collection/Orchid";
+import ZenDB "../../../src";
+import Orchid "../../../src/Collection/Orchid";
 import Fuzz "mo:fuzz";
-import CandidMap "../src/CandidMap";
-import SchemaMap "../src/Collection/SchemaMap";
-import Schema "../src/Collection/Schema";
+import CandidMap "../../../src/CandidMap";
+import SchemaMap "../../../src/Collection/SchemaMap";
+import Schema "../../../src/Collection/Schema";
 
 let T = ZenDB.Types;
 

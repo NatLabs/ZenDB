@@ -5,12 +5,12 @@ import Blob "mo:base/Blob";
 import Text "mo:base/Text";
 import Array "mo:base/Array";
 
-import ZenDB "../src";
+import ZenDB "../../src";
 
 import { test; suite } "mo:test";
 import Itertools "mo:itertools/Iter";
 import Map "mo:map/Map";
-import ZenDBSuite "TestFramework";
+import ZenDBSuite "../test-utils/TestFramework";
 
 type SizeVariant = {
     #known : Nat;
