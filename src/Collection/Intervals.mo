@@ -24,7 +24,6 @@ import Int8Cmp "mo:memory-collection/TypeUtils/Int8Cmp";
 import T "../Types";
 import Query "../Query";
 import Utils "../Utils";
-import ByteUtils "../ByteUtils";
 
 import Index "Index";
 import Orchid "Orchid";

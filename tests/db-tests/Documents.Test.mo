@@ -34,7 +34,7 @@ ZenDBSuite.newNoIndexSetup(
                                 from_blob = func(blob : Blob) : ?Null = from_candid (blob);
                                 to_blob = func(c : Null) : Blob = to_candid (c);
                             },
-                            [],
+                            null,
                         );
                     },
                 );
@@ -50,7 +50,7 @@ ZenDBSuite.newNoIndexSetup(
                             to_blob = func(c : ArrayType) : Blob = to_candid (c);
                         };
 
-                        let #err(_) = zendb.createCollection<ArrayType>("arrays_0", ArraySchema, candify, []) else return assert false;
+                        let #err(_) = zendb.createCollection<ArrayType>("arrays_0", ArraySchema, candify, null) else return assert false;
                     },
                 );
 
@@ -71,7 +71,7 @@ ZenDBSuite.newNoIndexSetup(
                                 from_blob = func(blob : Blob) : ?Bool = from_candid (blob);
                                 to_blob = func(c : Bool) : Blob = to_candid (c);
                             },
-                            [],
+                            null,
                         ) else return assert false;
 
                         let #ok(id_true) = bools.insert(true) else return assert false;
@@ -96,7 +96,7 @@ ZenDBSuite.newNoIndexSetup(
                                 from_blob = func(blob : Blob) : ?Principal = from_candid (blob);
                                 to_blob = func(c : Principal) : Blob = to_candid (c);
                             },
-                            [],
+                            null,
                         ) else return assert false;
 
                         let #ok(id) = principals.insert(testPrincipal) else return assert false;
@@ -116,7 +116,9 @@ ZenDBSuite.newNoIndexSetup(
                                 from_blob = func(blob : Blob) : ?Nat = from_candid (blob);
                                 to_blob = func(c : Nat) : Blob = to_candid (c);
                             },
-                            [#Field("", [#Min(1)]), #Unique([""])],
+                            ?{
+                                schemaConstraints = [#Field("", [#Min(1)]), #Unique([""])];
+                            },
                         ) else return assert false;
 
                         let #ok(id) = nats.insert(42) else return assert false;
@@ -137,7 +139,9 @@ ZenDBSuite.newNoIndexSetup(
                                 from_blob = func(blob : Blob) : ?Float = from_candid (blob);
                                 to_blob = func(c : Float) : Blob = to_candid (c);
                             },
-                            [#Field("", [#Min(1)]), #Unique([""])],
+                            ?{
+                                schemaConstraints = [#Field("", [#Min(1)]), #Unique([""])];
+                            },
                         ) else return assert false;
 
                         let #ok(id) = floats.insert(42.0) else return assert false;
@@ -159,7 +163,9 @@ ZenDBSuite.newNoIndexSetup(
                                 from_blob = func(blob : Blob) : ?Text = from_candid (blob);
                                 to_blob = func(c : Text) : Blob = to_candid (c);
                             },
-                            [#Field("", [#MinSize(1)]), #Unique([""])],
+                            ?{
+                                schemaConstraints = [#Field("", [#MinSize(1)]), #Unique([""])];
+                            },
                         ) else return assert false;
 
                         let #ok(id) = texts.insert("hello") else return assert false;
@@ -180,7 +186,9 @@ ZenDBSuite.newNoIndexSetup(
                                 from_blob = func(blob : Blob) : ?Blob = from_candid (blob);
                                 to_blob = func(c : Blob) : Blob = to_candid (c);
                             },
-                            [#Field("", [#MinSize(1)]), #Unique([""])],
+                            ?{
+                                schemaConstraints = [#Field("", [#MinSize(1)]), #Unique([""])];
+                            },
                         ) else return assert false;
 
                         let #ok(id) = blobs.insert(Blob.fromArray([0, 1, 2, 3])) else return assert false;
@@ -201,7 +209,9 @@ ZenDBSuite.newNoIndexSetup(
                                 from_blob = func(blob : Blob) : ??Text = from_candid (blob);
                                 to_blob = func(c : ?Text) : Blob = to_candid (c);
                             },
-                            [#Field("", [#MinSize(1)]), #Unique([""])],
+                            ?{
+                                schemaConstraints = [#Field("", [#MinSize(1)]), #Unique([""])];
+                            },
                         ) else return assert false;
 
                         let #ok(id) = options.insert(?("hello")) else return assert false;
@@ -225,7 +235,9 @@ ZenDBSuite.newNoIndexSetup(
                                 from_blob = func(blob : Blob) : ?NestedOption = from_candid (blob);
                                 to_blob = func(c : NestedOption) : Blob = to_candid (c);
                             },
-                            [#Field("", [#Min(1)]), #Unique([""])],
+                            ?{
+                                schemaConstraints = [#Field("", [#Min(1)]), #Unique([""])];
+                            },
                         ) else return assert false;
 
                         let #ok(id1) = nested_options.insert(???42) else return assert false;
@@ -282,7 +294,9 @@ ZenDBSuite.newNoIndexSetup(
                                 from_blob = func(blob : Blob) : ?Record = from_candid (blob);
                                 to_blob = func(c : Record) : Blob = to_candid (c);
                             },
-                            [#Field("a", [#Min(1)]), #Field("b", [#MinSize(1)]), #Unique(["a"]), #Unique(["b"])],
+                            ?{
+                                schemaConstraints = [#Field("a", [#Min(1)]), #Field("b", [#MinSize(1)]), #Unique(["a"]), #Unique(["b"])];
+                            },
                         ) else return assert false;
 
                         let #ok(id) = records.insert({ a = 42; b = "hello" }) else return assert false;
@@ -324,7 +338,9 @@ ZenDBSuite.newNoIndexSetup(
                             "notes",
                             NoteSchema,
                             candify,
-                            schema_constraints,
+                            ?{
+                                schemaConstraints = schema_constraints;
+                            },
                         ) else return assert false;
 
                         let #ok(id) = notes.insert({
@@ -393,16 +409,16 @@ ZenDBSuite.newNoIndexSetup(
                         };
 
                         // Should fail on indexes created on variant fields with #Null type
-                        let #err(_) = zendb.createCollection<Variant>("variants_0", VariantSchema, candify, [#Unique(["active"])]) else return assert false;
-                        let #err(_) = zendb.createCollection<Variant>("variants_0", VariantSchema, candify, [#Unique(["inactive"])]) else return assert false;
-                        let #err(_) = zendb.createCollection<Variant>("variants_0", VariantSchema, candify, [#Field("active", [#Min(1)])]) else return assert false;
-                        let #err(_) = zendb.createCollection<Variant>("variants_0", VariantSchema, candify, [#Field("inactive", [#Min(1)])]) else return assert false;
+                        let #err(_) = zendb.createCollection<Variant>("variants_0", VariantSchema, candify, ?{ schemaConstraints = [#Unique(["active"])] }) else return assert false;
+                        let #err(_) = zendb.createCollection<Variant>("variants_0", VariantSchema, candify, ?{ schemaConstraints = [#Unique(["inactive"])] }) else return assert false;
+                        let #err(_) = zendb.createCollection<Variant>("variants_0", VariantSchema, candify, ?{ schemaConstraints = [#Field("active", [#Min(1)])] }) else return assert false;
+                        let #err(_) = zendb.createCollection<Variant>("variants_0", VariantSchema, candify, ?{ schemaConstraints = [#Field("inactive", [#Min(1)])] }) else return assert false;
 
                         let #ok(variants) = zendb.createCollection<Variant>(
                             "variants_0",
                             VariantSchema,
                             candify,
-                            [],
+                            null,
                         ) else return assert false;
 
                         let #ok(id) = variants.insert(#active) else return assert false;
@@ -442,7 +458,9 @@ ZenDBSuite.newNoIndexSetup(
                                 from_blob = func(blob : Blob) : ?Variant = from_candid (blob);
                                 to_blob = func(c : Variant) : Blob = to_candid (c);
                             },
-                            [#Field("name", [#MinSize(1)]), #Field("id", [#Min(1)]), #Unique(["id"]), #Unique(["name"])],
+                            ?{
+                                schemaConstraints = [#Field("name", [#MinSize(1)]), #Field("id", [#Min(1)]), #Unique(["id"]), #Unique(["name"])];
+                            },
                         ) else return assert false;
 
                         let #ok(id) = variants.insert(#name("hello")) else return assert false;
@@ -485,7 +503,9 @@ ZenDBSuite.newNoIndexSetup(
                             "tuples",
                             TupleSchema,
                             candify,
-                            [#Field("0", [#Min(1)]), #Field("1", [#MinSize(1)]), #Unique(["0"]), #Unique(["1"])],
+                            ?{
+                                schemaConstraints = [#Field("0", [#Min(1)]), #Field("1", [#MinSize(1)]), #Unique(["0"]), #Unique(["1"])];
+                            },
                         ) else return assert false;
 
                         let #ok(id) = tuples.insert(ZenDB.Tuple(42, "hello")) else return assert false;
@@ -515,7 +535,9 @@ ZenDBSuite.newNoIndexSetup(
                                 from_blob = func(blob : Blob) : ?Triple = from_candid (blob);
                                 to_blob = func(c : Triple) : Blob = to_candid (c);
                             },
-                            [#Field("0", [#Min(1)]), #Field("1", [#MinSize(1)]), #Field("2", [#Min(1)]), #Unique(["0"]), #Unique(["1"]), #Unique(["2"])],
+                            ?{
+                                schemaConstraints = [#Field("0", [#Min(1)]), #Field("1", [#MinSize(1)]), #Field("2", [#Min(1)]), #Unique(["0"]), #Unique(["1"]), #Unique(["2"])];
+                            },
                         ) else return assert false;
 
                         let #ok(id) = triples.insert(ZenDB.Triple(42, "hello", 100)) else return assert false;
@@ -555,7 +577,9 @@ ZenDBSuite.newNoIndexSetup(
                                 from_blob = func(blob : Blob) : ?Quadruple = from_candid (blob);
                                 to_blob = func(c : Quadruple) : Blob = to_candid (c);
                             },
-                            [#Field("0", [#Min(1)]), #Field("1", [#MinSize(1)]), #Field("2", [#Min(1)]), #Field("3", [#MinSize(1)]), #Unique(["0"]), #Unique(["1"]), #Unique(["2"]), #Unique(["3"])],
+                            ?{
+                                schemaConstraints = [#Field("0", [#Min(1)]), #Field("1", [#MinSize(1)]), #Field("2", [#Min(1)]), #Field("3", [#MinSize(1)]), #Unique(["0"]), #Unique(["1"]), #Unique(["2"]), #Unique(["3"])];
+                            },
                         ) else return assert false;
 
                         let #ok(id) = quadruples.insert(ZenDB.Quadruple(42, "hello", 100, Blob.fromArray([0, 1, 2]))) else return assert false;
@@ -595,7 +619,9 @@ ZenDBSuite.newNoIndexSetup(
                                 from_blob = func(blob : Blob) : ?NestedRecord = from_candid (blob);
                                 to_blob = func(c : NestedRecord) : Blob = to_candid (c);
                             },
-                            [#Field("a.b", [#Min(1)]), #Field("a.c", [#MinSize(1)]), #Field("d", [#Min(1)]), #Unique(["a.b"]), #Unique(["a.c"]), #Unique(["d"])],
+                            ?{
+                                schemaConstraints = [#Field("a.b", [#Min(1)]), #Field("a.c", [#MinSize(1)]), #Field("d", [#Min(1)]), #Unique(["a.b"]), #Unique(["a.c"]), #Unique(["d"])];
+                            },
                         ) else return assert false;
 
                         let #ok(id) = nested_records.insert({
@@ -629,7 +655,9 @@ ZenDBSuite.newNoIndexSetup(
                                 from_blob = func(blob : Blob) : ?NestedVariant = from_candid (blob);
                                 to_blob = func(c : NestedVariant) : Blob = to_candid (c);
                             },
-                            [#Field("name", [#MinSize(1)]), #Field("id.active", [#Min(1)]), #Field("id.inactive", [#MinSize(1)]), #Unique(["name"]), #Unique(["id.active"]), #Unique(["id.inactive"])],
+                            ?{
+                                schemaConstraints = [#Field("name", [#MinSize(1)]), #Field("id.active", [#Min(1)]), #Field("id.inactive", [#MinSize(1)]), #Unique(["name"]), #Unique(["id.active"]), #Unique(["id.inactive"])];
+                            },
                         );
 
                         let #ok(id) = nested_variants.insert(#name("hello")) else return assert false;
@@ -673,7 +701,9 @@ ZenDBSuite.newNoIndexSetup(
                                 from_blob = func(blob : Blob) : ?NestedTuple = from_candid (blob);
                                 to_blob = func(c : NestedTuple) : Blob = to_candid (c);
                             },
-                            [#Field("0", [#Min(1)]), #Field("1.0", [#MinSize(1)]), #Field("1.1", [#Min(1)]), #Unique(["0"]), #Unique(["1.0"]), #Unique(["1.1"])],
+                            ?{
+                                schemaConstraints = [#Field("0", [#Min(1)]), #Field("1.0", [#MinSize(1)]), #Field("1.1", [#Min(1)]), #Unique(["0"]), #Unique(["1.0"]), #Unique(["1.1"])];
+                            },
                         ) else return assert false;
 
                         let #ok(id) = nested_tuples.insert(ZenDB.Tuple(42, ZenDB.Tuple("hello", 100))) else return assert false;
@@ -698,7 +728,9 @@ ZenDBSuite.newNoIndexSetup(
                                 from_blob = func(blob : Blob) : ?OptionalRecord = from_candid (blob);
                                 to_blob = func(c : OptionalRecord) : Blob = to_candid (c);
                             },
-                            [#Field("a", [#Min(1)]), #Field("b", [#MinSize(1)]), #Unique(["a"]), #Unique(["b"])],
+                            ?{
+                                schemaConstraints = [#Field("a", [#Min(1)]), #Field("b", [#MinSize(1)]), #Unique(["a"]), #Unique(["b"])];
+                            },
                         ) else return assert false;
 
                         let #ok(id) = optional_records.insert(?({ a = 42; b = "hello" })) else return assert false;
@@ -729,13 +761,15 @@ ZenDBSuite.newNoIndexSetup(
                             to_blob = func(c : OptionalVariant) : Blob = to_candid (c);
                         };
 
-                        let #err(_) = zendb.createCollection<OptionalVariant>("optional_variants", OptionalVariantSchema, candify, [#Unique([""])]) else return assert false;
+                        let #err(_) = zendb.createCollection<OptionalVariant>("optional_variants", OptionalVariantSchema, candify, ?{ schemaConstraints = [#Unique([""])] }) else return assert false;
 
                         let #ok(optional_variants) = zendb.createCollection<OptionalVariant>(
                             "optional_variants",
                             OptionalVariantSchema,
                             candify,
-                            [#Field("name", [#MinSize(1)]), #Field("id", [#Min(1)]), #Unique(["id"]), #Unique(["name"])],
+                            ?{
+                                schemaConstraints = [#Field("name", [#MinSize(1)]), #Field("id", [#Min(1)]), #Unique(["id"]), #Unique(["name"])];
+                            },
                         );
 
                         let #ok(id) = optional_variants.insert(?(#name("hello"))) else return assert false;
@@ -775,7 +809,9 @@ ZenDBSuite.newNoIndexSetup(
                                 from_blob = func(blob : Blob) : ?OptionalTuple = from_candid (blob);
                                 to_blob = func(c : OptionalTuple) : Blob = to_candid (c);
                             },
-                            [#Field("0", [#Min(1)]), #Field("1", [#MinSize(1)]), #Unique(["0"]), #Unique(["1"])],
+                            ?{
+                                schemaConstraints = [#Field("0", [#Min(1)]), #Field("1", [#MinSize(1)]), #Unique(["0"]), #Unique(["1"])];
+                            },
                         ) else return assert false;
 
                         let #ok(id) = optional_tuples.insert(?((42, "hello"))) else return assert false;
@@ -815,7 +851,9 @@ ZenDBSuite.newNoIndexSetup(
                                 from_blob = func(blob : Blob) : ?DeepOptional = from_candid (blob);
                                 to_blob = func(c : DeepOptional) : Blob = to_candid (c);
                             },
-                            [#Field("name", [#MinSize(1)]), #Field("details.id", [#Min(1)]), #Unique(["name"]), #Unique(["details.id"])],
+                            ?{
+                                schemaConstraints = [#Field("name", [#MinSize(1)]), #Field("details.id", [#Min(1)]), #Unique(["name"]), #Unique(["details.id"])];
+                            },
                         ) else return assert false;
 
                         // Full object with all fields
@@ -916,7 +954,7 @@ ZenDBSuite.newNoIndexSetup(
                                 from_blob = func(blob : Blob) : ?NumericRecord = from_candid (blob);
                                 to_blob = func(c : NumericRecord) : Blob = to_candid (c);
                             },
-                            [],
+                            null,
                         ) else return assert false;
 
                         let testNumericRecord : NumericRecord = {
@@ -1084,7 +1122,19 @@ ZenDBSuite.newNoIndexSetup(
                                 from_blob = func(blob : Blob) : ?ExtremeNesting = from_candid (blob);
                                 to_blob = func(c : ExtremeNesting) : Blob = to_candid (c);
                             },
-                            [#Field("id", [#Min(1)]), #Field("metadata.name", [#MinSize(1)]), #Field("status.active.level", [#Min(1)]), #Field("data.key", [#MinSize(1)]), #Unique(["id"]), #Unique(["metadata.name"]), #Unique(["status.active.level"]), #Unique(["data.key"])],
+                            ?{
+                                schemaConstraints = [
+                                    #Field("id", [#Min(1)]),
+                                    #Field("metadata.name", [#MinSize(1)]),
+                                    #Field("status.active.level", [#Min(1)]),
+                                    #Field("data.key", [#MinSize(1)]),
+                                    #Unique(["id"]),
+                                    #Unique(["metadata.name"]),
+                                    #Unique(["status.active.level"]),
+                                    #Unique(["data.key"]),
+                                ];
+                            }
+
                         ) else return assert false;
 
                         let testPrincipal = Principal.fromText("2vxsx-fae");

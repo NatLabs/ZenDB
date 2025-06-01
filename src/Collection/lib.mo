@@ -38,7 +38,6 @@ import T "../Types";
 import Query "../Query";
 import Utils "../Utils";
 import CandidMap "../CandidMap";
-import ByteUtils "../ByteUtils";
 import C "../Constants";
 import BTree "../BTree";
 

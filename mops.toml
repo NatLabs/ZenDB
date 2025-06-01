@@ -14,12 +14,13 @@ bit-map = "0.1.2"
 xtended-numbers = "0.4.0"
 vector = "0.4.1"
 augmented-btrees = "0.6.0"
+byte-utils = "0.0.1"
 
 [dev-dependencies]
 test = "2.1.1"
 bench = "1.0.0"
 fuzz = "1.0.0"
-zendb-migrations = "./migrations/src"
+
 
 [toolchain]
 wasmtime = "14.0.4"

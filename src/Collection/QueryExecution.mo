@@ -24,7 +24,6 @@ import BitMap "mo:bit-map";
 import T "../Types";
 import Query "../Query";
 import Utils "../Utils";
-import ByteUtils "../ByteUtils";
 import C "../Constants";
 import Logger "../Logger";
 import BTree "../BTree";

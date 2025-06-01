@@ -19,11 +19,10 @@ import Option "mo:base/Option";
 import Iter "mo:base/Iter";
 
 import TypeUtils "mo:memory-collection/TypeUtils";
-
+import ByteUtils "mo:byte-utils";
 import Itertools "mo:itertools/Iter";
 
 import T "../Types";
-import ByteUtils "../ByteUtils";
 
 module {
     type CandidQuery = T.CandidQuery;
@@ -162,109 +161,44 @@ module {
             };
             case (#Float(f)) {
                 buffer.add(OrchidTypeCode.Float);
-                let msbyte_index = buffer.size();
-                ByteUtils.Buffer.BigEndian.addFloat64(buffer, f);
-
-                if (f < 0.0) {
-                    // For negative numbers, flip all bits to reverse their order
-                    for (i in Iter.range(msbyte_index, msbyte_index + 7)) {
-                        buffer.put(i, ^(buffer.get(i)));
-                    };
-                } else {
-                    // For positive numbers, just flip the sign bit
-                    buffer.put(msbyte_index, buffer.get(msbyte_index) ^ 0x80);
-                };
+                ByteUtils.Buffer.Sorted.addFloat(buffer, f);
             };
 
             case (#Int8(i)) {
                 buffer.add(OrchidTypeCode.Int8);
-
-                let byte = Int8.toNat8(i);
-                let int8_with_flipped_msb = byte ^ 0x80;
-
-                buffer.add(int8_with_flipped_msb);
+                ByteUtils.Buffer.Sorted.addInt8(buffer, i);
             };
             case (#Int16(i)) {
                 buffer.add(OrchidTypeCode.Int16);
-
-                let n = Int16.toNat16(i);
-
-                let most_significant_byte = Nat8.fromNat(Nat16.toNat(n >> 8));
-                let msbyte_with_flipped_msbit = most_significant_byte ^ 0x80;
-
-                buffer.add(msbyte_with_flipped_msbit);
-                buffer.add(Nat8.fromNat(Nat16.toNat(n & 0xff)));
+                ByteUtils.Buffer.Sorted.addInt16(buffer, i);
             };
 
             case (#Int32(i)) {
                 buffer.add(OrchidTypeCode.Int32);
-
-                let n = Int32.toNat32(i);
-
-                // Need custom logic for the most significant byte to flip the sign bit
-                let msbyte = Nat8.fromNat(Nat32.toNat(n >> 24));
-                let msbyte_with_flipped_msbit = msbyte ^ 0x80;
-
-                buffer.add(msbyte_with_flipped_msbit);
-                buffer.add(Nat8.fromNat(Nat32.toNat((n >> 16) & 0xff)));
-                buffer.add(Nat8.fromNat(Nat32.toNat((n >> 8) & 0xff)));
-                buffer.add(Nat8.fromNat(Nat32.toNat(n & 0xff)));
-
+                ByteUtils.Buffer.Sorted.addInt32(buffer, i);
             };
             case (#Int64(i)) {
                 buffer.add(OrchidTypeCode.Int64);
-
-                let n = Int64.toNat64(i);
-
-                // Need custom logic for the most significant byte to flip the sign bit
-                let msbyte = Nat8.fromNat(Nat64.toNat(n >> 56));
-                let msbyte_with_flipped_msbit = msbyte ^ 0x80;
-
-                buffer.add(msbyte_with_flipped_msbit);
-
-                buffer.add(Nat8.fromNat(Nat64.toNat((n >> 48) & 0xff)));
-                buffer.add(Nat8.fromNat(Nat64.toNat((n >> 40) & 0xff)));
-                buffer.add(Nat8.fromNat(Nat64.toNat((n >> 32) & 0xff)));
-                buffer.add(Nat8.fromNat(Nat64.toNat((n >> 24) & 0xff)));
-                buffer.add(Nat8.fromNat(Nat64.toNat((n >> 16) & 0xff)));
-                buffer.add(Nat8.fromNat(Nat64.toNat((n >> 8) & 0xff)));
-                buffer.add(Nat8.fromNat(Nat64.toNat(n & 0xff)));
-
+                ByteUtils.Buffer.Sorted.addInt64(buffer, i);
             };
             case (#Int(int)) {
                 buffer.add(OrchidTypeCode.IntAsInt64);
-
-                let int64 = Int64.fromInt(int);
-                let n = Int64.toNat64(int64);
-
-                // Need custom logic for the most significant byte to flip the sign bit
-                let msbyte = Nat8.fromNat(Nat64.toNat(n >> 56));
-                let msbyte_with_flipped_msbit = msbyte ^ 0x80;
-
-                buffer.add(msbyte_with_flipped_msbit);
-
-                buffer.add(Nat8.fromNat(Nat64.toNat((n >> 48) & 0xff)));
-                buffer.add(Nat8.fromNat(Nat64.toNat((n >> 40) & 0xff)));
-                buffer.add(Nat8.fromNat(Nat64.toNat((n >> 32) & 0xff)));
-                buffer.add(Nat8.fromNat(Nat64.toNat((n >> 24) & 0xff)));
-                buffer.add(Nat8.fromNat(Nat64.toNat((n >> 16) & 0xff)));
-                buffer.add(Nat8.fromNat(Nat64.toNat((n >> 8) & 0xff)));
-                buffer.add(Nat8.fromNat(Nat64.toNat(n & 0xff)));
+                ByteUtils.Buffer.Sorted.addInt64(buffer, Int64.fromInt(int));
             };
 
             case (#Nat64(n)) {
                 buffer.add(OrchidTypeCode.Nat64);
-                ByteUtils.Buffer.BE.addNat64(buffer, n);
+                ByteUtils.Buffer.Sorted.addNat64(buffer, n);
             };
 
             case (#Nat32(n)) {
                 buffer.add(OrchidTypeCode.Nat32);
-                ByteUtils.Buffer.BE.addNat32(buffer, n);
+                ByteUtils.Buffer.Sorted.addNat32(buffer, n);
             };
 
             case (#Nat16(n)) {
                 buffer.add(OrchidTypeCode.Nat16);
-                ByteUtils.Buffer.BE.addNat16(buffer, n);
+                ByteUtils.Buffer.Sorted.addNat16(buffer, n);
             };
 
             case (#Nat8(n)) {
@@ -275,7 +209,7 @@ module {
             case (#Nat(n)) {
                 let n64 = Nat64.fromNat(n);
                 buffer.add(OrchidTypeCode.NatAsNat64);
-                ByteUtils.Buffer.BE.addNat64(buffer, n64);
+                ByteUtils.Buffer.Sorted.addNat64(buffer, n64);
             };
 
             case (#Bool(b)) {
@@ -324,11 +258,8 @@ module {
             let type_code = read();
 
             if (type_code == OrchidTypeCode.NatAsNat64) {
-
-                let n64 = ByteUtils.BE.toNat64(bytes);
-
+                let n64 = ByteUtils.Sorted.toNat64(bytes);
                 buffer.add(#Nat(Nat64.toNat(n64)));
-
             } else if (type_code == OrchidTypeCode.Text) {
                 var text = "";
 
@@ -344,61 +275,36 @@ module {
                 buffer.add(#Text(text));
 
             } else if (type_code == OrchidTypeCode.Nat8) {
-                let n = ByteUtils.BE.toNat8(bytes);
+                let n = ByteUtils.Sorted.toNat8(bytes);
                 buffer.add(#Nat8(n));
             } else if (type_code == OrchidTypeCode.Nat16) {
-                let n = ByteUtils.BE.toNat16(bytes);
+                let n = ByteUtils.Sorted.toNat16(bytes);
                 buffer.add(#Nat16(n));
             } else if (type_code == OrchidTypeCode.Nat32) {
-                let n = ByteUtils.BE.toNat32(bytes);
+                let n = ByteUtils.Sorted.toNat32(bytes);
                 buffer.add(#Nat32(n));
             } else if (type_code == OrchidTypeCode.Nat64) {
-                let n = ByteUtils.BE.toNat64(bytes);
+                let n = ByteUtils.Sorted.toNat64(bytes);
                 buffer.add(#Nat64(n));
             } else if (type_code == OrchidTypeCode.IntAsInt64) {
-                let msbyte = read() ^ 0x80;
-                let int64 = ByteUtils.BE.toInt64(Itertools.prepend(msbyte, bytes));
+                let int64 = ByteUtils.Sorted.toInt64(bytes);
                 buffer.add(#Int(Int64.toInt(int64)));
             } else if (type_code == OrchidTypeCode.Int8) {
-                let byte = read();
-                let int8_with_flipped_msb = byte ^ 0x80;
-                let i = Int8.fromNat8(int8_with_flipped_msb);
+                let i = ByteUtils.Sorted.toInt8(bytes);
                 buffer.add(#Int8(i));
             } else if (type_code == OrchidTypeCode.Int16) {
-                let msbyte = read() ^ 0x80;
-                let int16 = ByteUtils.BE.toInt16(Itertools.prepend(msbyte, bytes));
+                let int16 = ByteUtils.Sorted.toInt16(bytes);
                 buffer.add(#Int16(int16));
             } else if (type_code == OrchidTypeCode.Int32) {
-                let msbyte = read() ^ 0x80;
-                let int32 = ByteUtils.BE.toInt32(Itertools.prepend(msbyte, bytes));
+                let int32 = ByteUtils.Sorted.toInt32(bytes);
                 buffer.add(#Int32(int32));
 
             } else if (type_code == OrchidTypeCode.Int64) {
-                let msbyte = read() ^ 0x80;
-                let int64 = ByteUtils.BE.toInt64(Itertools.prepend(msbyte, bytes));
+                let int64 = ByteUtils.Sorted.toInt64(bytes);
                 buffer.add(#Int64(int64));
 
             } else if (type_code == OrchidTypeCode.Float) {
-                let msbyte = read();
-                let is_negative = msbyte & 0x80 == 0x00; //0x00 is negative because the sign bit is flipped
-
-                let float = if (is_negative) {
-                    // For negative numbers, flip all bits to reverse their order
-                    let float_bytes = Iter.map(
-                        Itertools.prepend(
-                            msbyte,
-                            Itertools.take(bytes, 7),
-                        ),
-                        Nat8.bitnot,
-                    );
-
-                    ByteUtils.BE.toFloat64(float_bytes);
-                } else {
-                    // For positive numbers, just flip the sign bit
-                    let float_bytes = Itertools.prepend(msbyte ^ 0x80, bytes);
-                    ByteUtils.BE.toFloat64(float_bytes);
-                };
-
+                let float = ByteUtils.Sorted.toFloat(bytes);
                 buffer.add(#Float(float));
             } else if (type_code == OrchidTypeCode.Bool) {
                 let byte = read();

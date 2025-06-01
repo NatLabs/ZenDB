@@ -7,10 +7,10 @@ import { test; suite } "mo:test";
 import Candid "mo:serde/Candid";
 import Map "mo:map/Map";
 
-import SchemaMap "../src/Collection/SchemaMap";
-import CandidMap "../src/CandidMap";
-import ZenDB "../src";
-import Constants "../src/Constants";
+import SchemaMap "../../src/Collection/SchemaMap";
+import CandidMap "../../src/CandidMap";
+import ZenDB "../../src";
+import Constants "../../src/Constants";
 
 let schema : ZenDB.Types.Schema = #Record([
     ("name", #Text),

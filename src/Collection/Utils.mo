@@ -42,7 +42,6 @@ import T "../Types";
 import Query "../Query";
 import Utils "../Utils";
 import CandidMap "../CandidMap";
-import ByteUtils "../ByteUtils";
 
 import Orchid "Orchid";
 import Schema "Schema";

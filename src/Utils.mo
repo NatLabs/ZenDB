@@ -30,7 +30,7 @@ import _TypeUtils "mo:memory-collection/TypeUtils";
 import Int8Cmp "mo:memory-collection/TypeUtils/Int8Cmp";
 
 import T "Types";
-import ByteUtils "ByteUtils";
+import ByteUtils "mo:byte-utils";
 
 module {
     type Order = Order.Order;

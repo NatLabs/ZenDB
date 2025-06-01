@@ -4,7 +4,7 @@ import Buffer "mo:base/Buffer";
 import MemoryBTree "mo:memory-collection/MemoryBTree/Stable";
 import BitMap "mo:bit-map";
 
-import T "../src/Types";
+import T "../../src/Types";
 
 module {
 

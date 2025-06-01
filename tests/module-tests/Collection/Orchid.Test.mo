@@ -32,6 +32,7 @@ import Fuzz "mo:fuzz";
 import CandidMap "../../../src/CandidMap";
 import SchemaMap "../../../src/Collection/SchemaMap";
 import Schema "../../../src/Collection/Schema";
+import Utils "../../../src/Utils";
 
 let T = ZenDB.Types;
 
@@ -51,7 +52,7 @@ func get_prefix(blob : Blob, other : Blob) : Blob {
     Blob.fromArray(Buffer.toArray(buffer));
 };
 
-let limit = 1_000;
+let limit = 5_000;
 
 type MotokoTypes = {
     text : Text;
@@ -93,18 +94,22 @@ let schema_map = SchemaMap.new(MotokoTypesSchema);
 let inputs = Buffer.Buffer<MotokoTypes>(limit);
 let candid_maps = Buffer.Buffer<T.CandidMap>(limit);
 
+let nat64_max = (2 ** 64 - 1);
+let int64_max = (2 ** 63 - 1);
+let int64_min = -(2 ** 63);
+
 for (i in Itertools.range(0, limit)) {
 
     let record : MotokoTypes = {
         text = fuzz.text.randomAlphanumeric(
-            fuzz.nat.randomRange(0, 100)
+            fuzz.nat.randomRange(0, 20)
         );
-        nat = fuzz.nat.randomRange(0, (2 ** 64) - 1);
+        nat = fuzz.nat.randomRange(0, nat64_max);
         nat8 = fuzz.nat8.random();
         nat16 = fuzz.nat16.random();
         nat32 = fuzz.nat32.random();
         nat64 = fuzz.nat64.random();
-        int = fuzz.int.randomRange(-(2 ** 63), (2 ** 63) - 1);
+        int = fuzz.int.randomRange(int64_min, int64_max);
         int8 = fuzz.int8.random();
         int16 = fuzz.int16.random();
         int32 = fuzz.int32.random();
@@ -121,7 +126,27 @@ for (i in Itertools.range(0, limit)) {
 
     inputs.add(record);
 
-    let candid_map = CandidMap.new(schema_map, 0, #Record([("text", #Text(record.text)), ("nat", #Nat(record.nat)), ("nat8", #Nat8(record.nat8)), ("nat16", #Nat16(record.nat16)), ("nat32", #Nat32(record.nat32)), ("nat64", #Nat64(record.nat64)), ("int", #Int(record.int)), ("int8", #Int8(record.int8)), ("int16", #Int16(record.int16)), ("int32", #Int32(record.int32)), ("int64", #Int64(record.int64)), ("float", #Float(record.float)), ("principal", #Principal(record.principal)), ("blob", #Blob(record.blob)), ("bool", #Bool(record.bool))]));
+    let candid_map = CandidMap.new(
+        schema_map,
+        0,
+        #Record([
+            ("text", #Text(record.text)),
+            ("nat", #Nat(record.nat)),
+            ("nat8", #Nat8(record.nat8)),
+            ("nat16", #Nat16(record.nat16)),
+            ("nat32", #Nat32(record.nat32)),
+            ("nat64", #Nat64(record.nat64)),
+            ("int", #Int(record.int)),
+            ("int8", #Int8(record.int8)),
+            ("int16", #Int16(record.int16)),
+            ("int32", #Int32(record.int32)),
+            ("int64", #Int64(record.int64)),
+            ("float", #Float(record.float)),
+            ("principal", #Principal(record.principal)),
+            ("blob", #Blob(record.blob)),
+            ("bool", #Bool(record.bool)),
+        ]),
+    );
     candid_maps.add(candid_map);
 
 };
@@ -790,8 +815,9 @@ suite(
                 let b = Orchid.Orchid.blobify.to_blob([#Text("this might be candid")]);
 
                 let prefix_bytes = get_prefix(a, b);
-                let ?prefix = Text.decodeUtf8(prefix_bytes);
-                Debug.print("prefix: " # debug_show (prefix));
+                assert prefix_bytes.size() == 14 + 1; // 14 bytes for the prefix and 1 byte for the type encoding
+
+                let ?prefix = Text.decodeUtf8(Utils.slice_blob(prefix_bytes, 1, prefix_bytes.size()));
 
                 assert Text.endsWith(prefix, #text("this might be "));
 
@@ -816,7 +842,9 @@ suite(
                 b := Orchid.Orchid.blobify.to_blob([#Int64(321)]);
 
                 prefix_bytes := get_prefix(a, b);
-                Debug.print("prefix_bytes: " # debug_show (prefix_bytes));
+
+                // The most significant bit is different for the two values, so the prefix is just the type encoding
+                assert prefix_bytes.size() == 1;
             },
         );
 
