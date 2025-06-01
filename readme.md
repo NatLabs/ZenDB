@@ -38,8 +38,8 @@ This architecture allows ZenDB to handle complex queries efficiently, even with 
 
 ### Installation
 
-Requires `moc` version `0.14.9"` or higher to run
-Install with mops: `mops toolchain use moc 0.14.9`  
+- Requires `moc` version `0.14.9"` or higher to run.
+- Install with mops: `mops toolchain use moc 0.14.9`  .
 
 #### Install Directly from Mops (Recommended)
 
@@ -54,25 +54,39 @@ mops add zendb
 mops add https://github.com/NatLabs/ZenDB#<branch/commit-hash>
 ```
 
+### Canister Configuration
+Canisters have a limit of how much stable memory they can use. This limit can be set in the `dfx.json` file in the root of your project. By default, the limit is set to 4GB, but for larger datasets, you can increase it up to 500GB.
+This measurement is in pages, where each page is 64KiB. For a 200GB limit, the limit would be `200 * (1024 * 1024) / 64 = 3276800` pages.
+
+```json
+  "canisters": {
+    "stress-test" : {
+      "type": "motoko",
+      "main": "./tests/Stress.Test.mo",
+      "args": "--max-stable-pages 3276800" 
+    }
+  },
+```
 ### Basic Usage
 
 #### 1. Initialize the Database
 
 ```motoko
 import ZenDB "mo:zendb";
+import ZenDBMigrations "mo:zendb-migrations";
 
 actor {
   stable var zendb = ZenDB.newStableStore(null);
+  let db = ZenDB.launchDefaultDB(zendb);
   
   system func preupgrade() {
     // Store is automatically persisted in stable memory
   }
   
   system func postupgrade() {
-    zendb := ZenDB.upgrade(zendb);
+    zendb := ZenDBMigrations.upgrade(zendb);
   }
   
-  let db = ZenDB.launchDefaultDB(zendb);
 }
 ```
 
@@ -90,6 +104,7 @@ type User = {
     interests: [Text];
   };
   created_at: Int;
+  updated_at: Int;
 };
 
 // corresponding schema type
@@ -103,9 +118,10 @@ let UsersSchema : ZenDB.Types.Schema = #Record([
     ("interests", #Array(#Text)),
   ])),
   ("created_at", #Int),
+  ("updated_at", #Int)
 ]);
 
-// serializer
+// serializer - boilerplate to convert between Motoko types and Candid blobs
 let candify_users : ZenDB.Types.Candify<User> = {
   to_blob = func(user: User) : Blob { to_candid(user) };
   from_blob = func(blob: Blob) : ?User { from_candid(blob) };
@@ -145,6 +161,7 @@ let user : User = {
     interests = ["coding", "hiking", "photography"];
   };
   created_at = Time.now();
+  updated_at = Time.now();
 };
 
 let #ok(userId) = users.insert(user);
@@ -164,7 +181,7 @@ assert queryResults == [user];
 #### 5. Field Updates & Transformations
 
 ```motoko
-// Atomic field updates
+// Update specific fields in a document
 let #ok(_) = users.updateById(
   userId,
   [
@@ -173,15 +190,35 @@ let #ok(_) = users.updateById(
   ]
 );
 
-// Field transformations
+let ?updatedUser1 = users.get(userId);
+
+assert updatedUser1.profile.location == "New York";
+assert updatedUser1.profile.interests == ["coding", "reading"];
+
+// Field transformations referencing the field's current value
 let #ok(_) = users.updateById(
   userId, 
   [
-    ("login_count", #add(#currValue, #Nat(1))),
-    ("last_login", #Int(Time.now())),
-    ("name", #uppercase(#currValue))
+    ("name", #uppercase(#currValue)),
+    ("age", #add(#currValue, #Nat(1))),
+    ("updated_at", #Int(Time.now())),
+    ("email", #lowercase(
+      #concatAll([
+        #concat(#get("name"), #Text("-")),
+        #replaceSubText(#get("profile.location"), " ", "-"),
+        #Text("@example.com")
+      ])
+    ))
   ]
 );
+
+let updatedUser2 = users.get(userId);
+
+assert updatedUser2.name == "ALICE";
+assert updatedUser2.age == ?36;
+assert updatedUser2.updated_at == Time.now(); // I believe Time.now() resets after each call, so this will always be the same value as before
+assert updatedUser2.email == "alice-san-francisco@example.com";
+
 ```
 
 #### 6. Statistics & Monitoring
@@ -191,6 +228,7 @@ Monitor your collections to understand performance characteristics:
 ```motoko
 let stats = users.stats();
 ```
+
 
 ### Advanced Usage
 
@@ -247,7 +285,8 @@ To get the best performance from ZenDB, create indexes that:
 ```motoko
 // Great for queries filtering on status and sorting by date
 let #ok(_) = users.createIndex(
-  "status_date_idx", [
+  "status_date_idx", 
+  [
     ("status", #Ascending), 
     ("created_at", #Descending)
   ]
@@ -280,19 +319,19 @@ let stats = users.stats();
 
 - [x] Multi-field compound indexes
 - [x] Powerful query language with logical operators
-- [x] Schema validation and Schema constraints (required, unique, enum)
-- [ ] Data Certification of all database records, using the [ic-certification](https://mops.one/ic-certification) motoko library
+- [x] Schema validation and Schema constraints
 - [ ] Fully support Array fields and operations on them
 - [ ] Multi-key array indexes - for indexing fields within arrays
 - [ ] Backward compatible schema updates and versioning
 - [ ] Aggregation functions (min, max, sum, avg, etc.)
 - [ ] Better support for migrations
-- [ ] Enhanced fulltext search capabilities
+- [ ] Full Text search capabilities by implementing an inverted text index
 - [ ] Support for transactions
+- [ ] Data Certification of all documents, using the [ic-certification](https://mops.one/ic-certification) motoko library
 - [ ] Dedicated database canister for use by clients in other languages (e.g. JavaScript, Rust)
-- [ ] Database management tools
+- [ ] Database management tools to handle collection creation, index management, and data migrations
 - [ ] Periodic backups to external canisters
-- [ ] Improved monitoring and analytics tools
+- [ ] Database canister monitoring and analytics tools
 
 ## Contributing
 

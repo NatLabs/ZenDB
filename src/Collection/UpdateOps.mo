@@ -52,6 +52,9 @@ module {
             case (#divAll(nested_operations)) {
                 handle_nested_operations(candid_map, nested_operations, CandidUtils.MultiOps.div);
             };
+            case (#concatAll(nested_operations)) {
+                handle_nested_operations(candid_map, nested_operations, CandidUtils.MultiOps.concat);
+            };
             case (_) {
                 #err("Invalid FieldUpdateOperations in handle_multi_field_update_operations(): " # debug_show op);
             };

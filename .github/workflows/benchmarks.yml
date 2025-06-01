@@ -101,7 +101,7 @@ jobs:
         if: github.event_name != 'pull_request'
         run: |
           set -o pipefail
-          mops bench  --gc incremental --save 2>&1
+          mops bench  --gc incremental --save --compare 2>&1 | tee bench-results.md
       - name: Move Generated Results
         if: github.event_name != 'pull_request'
         run: |

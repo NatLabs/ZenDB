@@ -227,8 +227,6 @@ module T {
         #exists;
         #startsWith : Candid;
 
-        // #regex : Candid;
-
     };
 
     public type ZenQueryLang = {
@@ -328,6 +326,15 @@ module T {
         /// Flag indicating if the index is used internally (these indexes cannot be deleted by user)
         usedInternally : Bool;
 
+        /// The average size in bytes of an index key
+        avgIndexKeySize : Nat;
+
+        /// The total size in bytes of all index keys
+        totalIndexKeySize : Nat;
+
+        avgDocumentIdSize : Nat;
+        totalDocumentIdSize : Nat;
+
     };
 
     public type CollectionStats = {
@@ -337,6 +344,9 @@ module T {
         /// The schema of the collection
         schema : Schema;
 
+        /// The collection's memory type
+        memoryType : MemoryType;
+
         /// The number of records in the collection
         entries : Nat;
 
@@ -345,6 +355,9 @@ module T {
 
         /// The index information for the collection
         indexes : [IndexStats];
+
+        avgDocumentIdSize : Nat;
+        totalDocumentIdSize : Nat;
 
         /// The average size in bytes of a document in the collection
         avgDocumentSize : Nat;
@@ -406,6 +419,7 @@ module T {
         #replaceSubText : (FieldUpdateOperations, Text, Text);
         #slice : (FieldUpdateOperations, Nat, Nat);
         #concat : (FieldUpdateOperations, FieldUpdateOperations);
+        #concatAll : [FieldUpdateOperations];
 
     } or Candid;
 

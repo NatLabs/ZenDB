@@ -1,24 +1,25 @@
 [profile]
 name = "zendb"
-description = "An embedded document database with native candid support for Motoko developers"
+description = "A high-performance document database built for the Internet Computer ecosystem."
 keywords = ["database", "candid", "stable-memory"]
 license = "AGPL-3.0"
 
 [dependencies]
-base = "0.14.9"
+base = "0.14.11"
 map = "9.0.1"
 serde = "3.2.2"
-itertools = "0.2.1"
-memory-collection = "0.0.4"
+itertools = "0.2.2"
+memory-collection = "0.2.0"
 bit-map = "0.1.2"
-xtended-numbers = "0.3.1"
+xtended-numbers = "0.4.0"
 vector = "0.4.1"
-augmented-btrees = "0.5.2"
+augmented-btrees = "0.6.0"
 
 [dev-dependencies]
-test = "2.0.0"
+test = "2.1.1"
 bench = "1.0.0"
-fuzz = "0.2.1"
+fuzz = "1.0.0"
+zendb-migrations = "./migrations/src"
 
 [toolchain]
 wasmtime = "14.0.4"

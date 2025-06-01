@@ -6,7 +6,7 @@ import Text "mo:base/Text";
 import Array "mo:base/Array";
 import Option "mo:base/Option";
 
-import ZenDB "../src";
+import ZenDB "../../src";
 
 import { test; suite } "mo:test";
 import Itertools "mo:itertools/Iter";

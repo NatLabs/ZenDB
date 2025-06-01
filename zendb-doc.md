@@ -1,7 +1,6 @@
-## Documentation and Core Modules
-This library is heavily inspired by MongoDB's document database, so you will see some of the same terms here.
+# Documentation and Core Modules
 
-### Terms
+## Terms
 List of terms as they are used in this library.
 
 | Term | Description |

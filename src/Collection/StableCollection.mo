@@ -1168,30 +1168,29 @@ module StableCollection {
 
         let total_records = StableCollection.size(collection);
 
-        let total_document_size = switch (collection.documents) {
-            case (#stableMemory(btree)) {
-                main_collection_memory.valueBytes;
-            };
-            case (_) 0;
-        };
-
-        let avg_document_size = total_document_size / total_records;
-
         let indexes : [T.IndexStats] = Iter.toArray(
             Iter.map<(Text, Index), T.IndexStats>(
                 Map.entries(collection.indexes),
                 func((index_name, index) : (Text, Index)) : T.IndexStats {
+                    let memory = get_memory_stats(index.data);
+                    let entries = Index.size(index);
 
                     {
                         name = index_name;
                         fields = index.key_details;
-                        entries = Index.size(index);
-                        memory = get_memory_stats(index.data);
+                        entries;
+                        memory;
                         isUnique = index.is_unique;
                         usedInternally = index.used_internally;
 
-                    };
+                        // the index fields values are stored as the keys
+                        avgIndexKeySize = memory.keyBytes / entries;
+                        totalIndexKeySize = memory.keyBytes;
 
+                        // document ids are stored as the values
+                        avgDocumentIdSize = memory.valueBytes / entries;
+                        totalDocumentIdSize = memory.valueBytes;
+                    };
                 },
             )
         );
@@ -1201,8 +1200,15 @@ module StableCollection {
             schema = collection.schema;
             entries = total_records;
             memory = main_collection_memory;
-            avgDocumentSize = avg_document_size;
-            totalDocumentSize = total_document_size;
+            memoryType = collection.memory_type;
+
+            // ids are stored as the keys in the collection
+            avgDocumentIdSize = main_collection_memory.keyBytes / total_records;
+            totalDocumentIdSize = main_collection_memory.keyBytes;
+
+            // documents are stored as the values in the collection
+            avgDocumentSize = main_collection_memory.valueBytes / total_records;
+            totalDocumentSize = main_collection_memory.valueBytes;
             indexes;
         };
 

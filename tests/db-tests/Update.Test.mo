@@ -71,7 +71,7 @@ ZenDBSuite.newZenDBSuite(
     "Update Tests",
     ?ZenDBSuite.withAndWithoutIndex,
     func collection_setup(zendb : ZenDB.Database) {
-        let #ok(data) = zendb.createCollection<Doc>("data", DocSchema, data_type_to_candid, []);
+        let #ok(data) = zendb.createCollection<Doc>("data", DocSchema, data_type_to_candid, null);
     },
     func index_setup(zendb : ZenDB.Database) {
         let #ok(data) = zendb.getCollection<Doc>("data", data_type_to_candid);
@@ -899,6 +899,31 @@ ZenDBSuite.newZenDBSuite(
                                 // Reset
                                 let #ok(_) = data.replace(item1_id, item1);
                             },
+                        );
+
+                        test(
+                            "#concatAll operation",
+                            func() {
+                                // Set initial text
+                                let #ok(_) = data.updateById(
+                                    item1_id,
+                                    [("version.v1.b", (#Text("Hello")))],
+                                );
+
+                                // Test concatenation with multiple strings
+                                let #ok(_) = data.updateById(
+                                    item1_id,
+                                    [("version.v1.b", (#concatAll([#currValue, #Text(" World"), #Text("!")])))],
+                                );
+
+                                assert data.get(item1_id) == ?{
+                                    version = #v1({ a = 42; b = "Hello World!" });
+                                };
+
+                                // Reset
+                                let #ok(_) = data.replace(item1_id, item1);
+                            }
+
                         );
                     },
                 );
