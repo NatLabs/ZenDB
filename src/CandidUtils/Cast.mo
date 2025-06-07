@@ -3,22 +3,21 @@ import Debug "mo:base/Debug";
 import Text "mo:base/Text";
 import Nat32 "mo:base/Nat32";
 import Result "mo:base/Result";
-import Order "mo:base/Order";
-import Iter "mo:base/Iter";
 import Buffer "mo:base/Buffer";
 import Nat "mo:base/Nat";
-import Option "mo:base/Option";
-import Hash "mo:base/Hash";
 import Float "mo:base/Float";
 import Int "mo:base/Int";
 import Int32 "mo:base/Int32";
-import Blob "mo:base/Blob";
 import Nat64 "mo:base/Nat64";
 import Int16 "mo:base/Int16";
 import Int64 "mo:base/Int64";
 import Int8 "mo:base/Int8";
 import Nat16 "mo:base/Nat16";
 import Nat8 "mo:base/Nat8";
+// Additional imports for new casting functionality
+import Principal "mo:base/Principal";
+import Bool "mo:base/Bool";
+import Char "mo:base/Char";
 
 import T "../Types";
 
@@ -27,6 +26,72 @@ module Cast {
     type Candid = T.Candid;
     type Result<A, B> = T.Result<A, B>;
     type Schema = T.Schema;
+
+    // Helper function to convert bool to numeric value
+    private func bool_to_int(b : Bool) : Int {
+        if (b) 1 else 0;
+    };
+
+    // Helper function to convert numeric types to text
+    private func numeric_to_text(candid : Candid) : Text {
+        switch (candid) {
+            case (#Nat(n)) Nat.toText(n);
+            case (#Nat8(n)) Nat8.toText(n);
+            case (#Nat16(n)) Nat16.toText(n);
+            case (#Nat32(n)) Nat32.toText(n);
+            case (#Nat64(n)) Nat64.toText(n);
+            case (#Int(n)) Int.toText(n);
+            case (#Int8(n)) Int8.toText(n);
+            case (#Int16(n)) Int16.toText(n);
+            case (#Int32(n)) Int32.toText(n);
+            case (#Int64(n)) Int64.toText(n);
+            case (#Float(f)) Float.toText(f);
+            case (_) Debug.trap("numeric_to_text: Unsupported numeric type");
+        };
+    };
+
+    public func cast_to_bool(candid : Candid) : Result<Candid, Text> {
+        let converted = switch (candid) {
+            case (#Bool(_)) candid;
+            // Convert numeric types: 0 = false, anything else = true
+            case (#Nat(n)) #Bool(n != 0);
+            case (#Nat8(n)) #Bool(n != 0);
+            case (#Nat16(n)) #Bool(n != 0);
+            case (#Nat32(n)) #Bool(n != 0);
+            case (#Nat64(n)) #Bool(n != 0);
+            case (#Int(n)) #Bool(n != 0);
+            case (#Int8(n)) #Bool(n != 0);
+            case (#Int16(n)) #Bool(n != 0);
+            case (#Int32(n)) #Bool(n != 0);
+            case (#Int64(n)) #Bool(n != 0);
+            case (#Float(f)) #Bool(f != 0.0);
+            // Convert text: "true", "1" = true; "false", "0", "" = false
+            case (#Text(t)) {
+                let lower = Text.toLowercase(t);
+                #Bool(lower == "true" or lower == "1");
+            };
+            case (unsupported_types) return #err(
+                "Can't convert " # debug_show (unsupported_types) # " to #Bool()"
+            );
+        };
+        #ok(converted);
+    };
+
+    public func cast_to_principal(candid : Candid) : Result<Candid, Text> {
+        let converted = switch (candid) {
+            case (#Principal(_)) candid;
+            case (#Text(t)) {
+                switch (Principal.fromText(t)) {
+                    case (principal) #Principal(principal);
+                };
+            };
+            case (#Blob(b)) #Principal(Principal.fromBlob(b));
+            case (unsupported_types) return #err(
+                "Can't convert " # debug_show (unsupported_types) # " to #Principal()"
+            );
+        };
+        #ok(converted);
+    };
 
     public func cast_to_nat(candid : Candid) : Result<Candid, Text> {
 
@@ -39,7 +104,7 @@ module Cast {
         };
 
         let converted = switch (candid) {
-            case (#Nat(n)) candid;
+            case (#Nat(_)) candid;
             case (#Nat8(nat8)) #Nat(Nat8.toNat(nat8));
             case (#Nat16(nat16)) #Nat(Nat16.toNat(nat16));
             case (#Nat32(nat32)) #Nat(Nat32.toNat(nat32));
@@ -53,6 +118,9 @@ module Cast {
 
             case (#Float(f)) return int_to_nat_if_positive(Float.toInt(f));
 
+            // Convert bool to nat (true=1, false=0)
+            case (#Bool(b)) #Nat(Int.abs(bool_to_int(b)));
+
             case (unsupported_nat_cast_types) return #err(
                 "Can't convert " # debug_show (unsupported_nat_cast_types) # " to #Nat()"
             );
@@ -64,10 +132,29 @@ module Cast {
 
     public func cast_to_nat8(candid : Candid) : Result<Candid, Text> {
 
+        func int_to_nat8_if_within_bounds(int : Int) : Result<Candid, Text> {
+            if (int >= 0 and int <= 255) {
+                #ok(#Nat8(Nat8.fromNat(Int.abs(int))));
+            } else {
+                return #err("Cannot convert " # debug_show candid # " with value " # Int.toText(int) # " to #Nat8()");
+            };
+        };
+
         let converted = switch (candid) {
-            case (#Nat8(n)) candid;
-            case (#Nat(n)) #Nat8(Nat8.fromNat(n));
-            case (#Int(int)) #Nat8(Nat8.fromNat(Int.abs(int)));
+            case (#Nat8(_)) candid;
+            case (#Nat16(nat16)) return int_to_nat8_if_within_bounds(Nat16.toNat(nat16));
+            case (#Nat32(nat32)) return int_to_nat8_if_within_bounds(Nat32.toNat(nat32));
+            case (#Nat64(nat64)) return int_to_nat8_if_within_bounds(Nat64.toNat(nat64));
+            case (#Nat(n)) return int_to_nat8_if_within_bounds(n);
+            case (#Int(int)) return int_to_nat8_if_within_bounds(int);
+            case (#Int8(int8)) return int_to_nat8_if_within_bounds(Int8.toInt(int8));
+            case (#Int16(int16)) return int_to_nat8_if_within_bounds(Int16.toInt(int16));
+            case (#Int32(int32)) return int_to_nat8_if_within_bounds(Int32.toInt(int32));
+            case (#Int64(int64)) return int_to_nat8_if_within_bounds(Int64.toInt(int64));
+            case (#Float(f)) return int_to_nat8_if_within_bounds(Float.toInt(f));
+
+            // Convert bool to nat8 (true=1, false=0)
+            case (#Bool(b)) return int_to_nat8_if_within_bounds(bool_to_int(b));
 
             case (unsupported_nat_cast_types) return #err(
                 "Can't convert " # debug_show (unsupported_nat_cast_types) # " to #Nat8()"
@@ -80,11 +167,27 @@ module Cast {
     };
 
     public func cast_to_nat16(candid : Candid) : Result<Candid, Text> {
+        func int_to_nat16_if_within_bounds(int : Int) : Result<Candid, Text> {
+            if (int >= 0 and int <= Nat16.toNat(Nat16.maximumValue)) {
+                #ok(#Nat16(Nat16.fromNat(Int.abs(int))));
+            } else {
+                return #err("Cannot convert " # debug_show candid # " with value " # Int.toText(int) # " to #Nat16()");
+            };
+        };
 
         let converted = switch (candid) {
-            case (#Nat16(n)) candid;
-            case (#Nat(n)) #Nat16(Nat16.fromNat(n));
-            case (#Int(int)) #Nat16(Nat16.fromNat(Int.abs(int)));
+            case (#Nat16(_)) candid;
+            case (#Nat8(nat8)) return int_to_nat16_if_within_bounds(Nat8.toNat(nat8));
+            case (#Nat32(nat32)) return int_to_nat16_if_within_bounds(Nat32.toNat(nat32));
+            case (#Nat64(nat64)) return int_to_nat16_if_within_bounds(Nat64.toNat(nat64));
+            case (#Nat(n)) return int_to_nat16_if_within_bounds(n);
+            case (#Int(int)) return int_to_nat16_if_within_bounds(int);
+            case (#Int8(int8)) return int_to_nat16_if_within_bounds(Int8.toInt(int8));
+            case (#Int16(int16)) return int_to_nat16_if_within_bounds(Int16.toInt(int16));
+            case (#Int32(int32)) return int_to_nat16_if_within_bounds(Int32.toInt(int32));
+            case (#Int64(int64)) return int_to_nat16_if_within_bounds(Int64.toInt(int64));
+            case (#Float(f)) return int_to_nat16_if_within_bounds(Float.toInt(f));
+            case (#Bool(b)) return int_to_nat16_if_within_bounds(bool_to_int(b));
             case (unsupported_nat_cast_types) return #err(
                 "Can't convert " # debug_show (unsupported_nat_cast_types) # " to #Nat16()"
             );
@@ -94,11 +197,28 @@ module Cast {
     };
 
     public func cast_to_nat32(candid : Candid) : Result<Candid, Text> {
+        func int_to_nat32_if_within_bounds(int : Int) : Result<Candid, Text> {
+            if (int >= 0 and int <= Nat32.toNat(Nat32.maximumValue)) {
+                #ok(#Nat32(Nat32.fromNat(Int.abs(int))));
+            } else {
+                return #err("Cannot convert " # debug_show candid # " with value " # Int.toText(int) # " to #Nat32()");
+            };
+        };
 
         let converted = switch (candid) {
             case (#Nat32(n)) candid;
-            case (#Nat(n)) #Nat32(Nat32.fromNat(n));
-            case (#Int(int)) #Nat32(Nat32.fromNat(Int.abs(int)));
+            case (#Nat8(nat8)) return int_to_nat32_if_within_bounds(Nat8.toNat(nat8));
+            case (#Nat16(nat16)) return int_to_nat32_if_within_bounds(Nat16.toNat(nat16));
+            case (#Nat64(nat64)) return int_to_nat32_if_within_bounds(Nat64.toNat(nat64));
+            case (#Nat(n)) return int_to_nat32_if_within_bounds(n);
+            case (#Int(int)) return int_to_nat32_if_within_bounds(int);
+            case (#Int8(int8)) return int_to_nat32_if_within_bounds(Int8.toInt(int8));
+            case (#Int16(int16)) return int_to_nat32_if_within_bounds(Int16.toInt(int16));
+            case (#Int32(int32)) return int_to_nat32_if_within_bounds(Int32.toInt(int32));
+            case (#Int64(int64)) return int_to_nat32_if_within_bounds(Int64.toInt(int64));
+            case (#Float(f)) return int_to_nat32_if_within_bounds(Float.toInt(f));
+            case (#Bool(b)) return int_to_nat32_if_within_bounds(bool_to_int(b));
+
             case (unsupported_nat_cast_types) return #err(
                 "Can't convert " # debug_show (unsupported_nat_cast_types) # " to #Nat32()"
             );
@@ -109,10 +229,27 @@ module Cast {
 
     public func cast_to_nat64(candid : Candid) : Result<Candid, Text> {
 
+        func int_to_nat64_if_positive(int : Int) : Result<Candid, Text> {
+            if (int >= 0 and int <= Nat64.toNat(Nat64.maximumValue)) {
+                #ok(#Nat64(Nat64.fromNat(Int.abs(int))));
+            } else {
+                return #err("Cannot convert " # debug_show candid # " with negative value to #Nat64()");
+            };
+        };
+
         let converted = switch (candid) {
             case (#Nat64(n)) candid;
             case (#Nat(n)) #Nat64(Nat64.fromNat(n));
-            case (#Int(int)) #Nat64(Nat64.fromNat(Int.abs(int)));
+            case (#Nat8(n)) #Nat64(Nat64.fromNat(Nat8.toNat(n)));
+            case (#Nat16(n)) #Nat64(Nat64.fromNat(Nat16.toNat(n)));
+            case (#Nat32(n)) #Nat64(Nat64.fromNat(Nat32.toNat(n)));
+            case (#Int(int)) return int_to_nat64_if_positive(int);
+            case (#Int8(int8)) return int_to_nat64_if_positive(Int8.toInt(int8));
+            case (#Int16(int16)) return int_to_nat64_if_positive(Int16.toInt(int16));
+            case (#Int32(int32)) return int_to_nat64_if_positive(Int32.toInt(int32));
+            case (#Int64(int64)) return int_to_nat64_if_positive(Int64.toInt(int64));
+            case (#Float(f)) return int_to_nat64_if_positive(Float.toInt(f));
+            case (#Bool(b)) return int_to_nat64_if_positive(bool_to_int(b));
             case (unsupported_nat_cast_types) return #err(
                 "Can't convert " # debug_show (unsupported_nat_cast_types) # " to #Nat64()"
             );
@@ -123,10 +260,27 @@ module Cast {
 
     public func cast_to_int8(candid : Candid) : Result<Candid, Text> {
 
+        func int_to_int8_if_within_bounds(int : Int) : Result<Candid, Text> {
+            if (int >= -128 and int <= 127) {
+                #ok(#Int8(Int8.fromInt(int)));
+            } else {
+                return #err("Cannot convert " # debug_show candid # " with value " # Int.toText(int) # " to #Int8()");
+            };
+        };
+
         let converted = switch (candid) {
             case (#Int8(n)) candid;
-            case (#Int(n)) #Int8(Int8.fromInt(n));
-            case (#Nat(n)) #Int8(Int8.fromInt(n));
+            case (#Int(n)) return int_to_int8_if_within_bounds(n);
+            case (#Int16(n)) return int_to_int8_if_within_bounds(Int16.toInt(n));
+            case (#Int32(n)) return int_to_int8_if_within_bounds(Int32.toInt(n));
+            case (#Int64(n)) return int_to_int8_if_within_bounds(Int64.toInt(n));
+            case (#Nat(n)) return int_to_int8_if_within_bounds(n);
+            case (#Nat8(n)) return int_to_int8_if_within_bounds(Nat8.toNat(n));
+            case (#Nat16(n)) return int_to_int8_if_within_bounds(Nat16.toNat(n));
+            case (#Nat32(n)) return int_to_int8_if_within_bounds(Nat32.toNat(n));
+            case (#Nat64(n)) return int_to_int8_if_within_bounds(Nat64.toNat(n));
+            case (#Float(f)) return int_to_int8_if_within_bounds(Float.toInt(f));
+            case (#Bool(b)) return int_to_int8_if_within_bounds(bool_to_int(b));
             case (unsupported_int_cast_types) return #err(
                 "Can't convert " # debug_show (unsupported_int_cast_types) # " to #Int8()"
             );
@@ -138,10 +292,27 @@ module Cast {
 
     public func cast_to_int16(candid : Candid) : Result<Candid, Text> {
 
+        func int_to_int16_if_within_bounds(int : Int) : Result<Candid, Text> {
+            if (int >= Int16.toInt(Int16.minimumValue) and int <= Int16.toInt(Int16.maximumValue)) {
+                #ok(#Int16(Int16.fromInt(int)));
+            } else {
+                return #err("Cannot convert " # debug_show candid # " with value " # Int.toText(int) # " to #Int16()");
+            };
+        };
+
         let converted = switch (candid) {
             case (#Int16(n)) candid;
-            case (#Int(n)) #Int16(Int16.fromInt(n));
-            case (#Nat(n)) #Int16(Int16.fromInt(n));
+            case (#Int(n)) return int_to_int16_if_within_bounds(n);
+            case (#Int8(n)) return int_to_int16_if_within_bounds(Int8.toInt(n));
+            case (#Int32(n)) return int_to_int16_if_within_bounds(Int32.toInt(n));
+            case (#Int64(n)) return int_to_int16_if_within_bounds(Int64.toInt(n));
+            case (#Nat(n)) return int_to_int16_if_within_bounds(n);
+            case (#Nat8(n)) return int_to_int16_if_within_bounds(Nat8.toNat(n));
+            case (#Nat16(n)) return int_to_int16_if_within_bounds(Nat16.toNat(n));
+            case (#Nat32(n)) return int_to_int16_if_within_bounds(Nat32.toNat(n));
+            case (#Nat64(n)) return int_to_int16_if_within_bounds(Nat64.toNat(n));
+            case (#Float(f)) return int_to_int16_if_within_bounds(Float.toInt(f));
+            case (#Bool(b)) return int_to_int16_if_within_bounds(bool_to_int(b));
             case (unsupported_int_cast_types) return #err(
                 "Can't convert " # debug_show (unsupported_int_cast_types) # " to #Int16()"
             );
@@ -153,10 +324,27 @@ module Cast {
 
     public func cast_to_int32(candid : Candid) : Result<Candid, Text> {
 
+        func int_to_int32_if_within_bounds(int : Int) : Result<Candid, Text> {
+            if (int >= Int32.toInt(Int32.minimumValue) and int <= Int32.toInt(Int32.maximumValue)) {
+                #ok(#Int32(Int32.fromInt(int)));
+            } else {
+                return #err("Cannot convert " # debug_show candid # " with value " # Int.toText(int) # " to #Int32()");
+            };
+        };
+
         let converted = switch (candid) {
             case (#Int32(n)) candid;
-            case (#Int(n)) #Int32(Int32.fromInt(n));
-            case (#Nat(n)) #Int32(Int32.fromInt(n));
+            case (#Int(n)) return int_to_int32_if_within_bounds(n);
+            case (#Int8(n)) return int_to_int32_if_within_bounds(Int8.toInt(n));
+            case (#Int16(n)) return int_to_int32_if_within_bounds(Int16.toInt(n));
+            case (#Int64(n)) return int_to_int32_if_within_bounds(Int64.toInt(n));
+            case (#Nat(n)) return int_to_int32_if_within_bounds(n);
+            case (#Nat8(n)) return int_to_int32_if_within_bounds(Nat8.toNat(n));
+            case (#Nat16(n)) return int_to_int32_if_within_bounds(Nat16.toNat(n));
+            case (#Nat32(n)) return int_to_int32_if_within_bounds(Nat32.toNat(n));
+            case (#Nat64(n)) return int_to_int32_if_within_bounds(Nat64.toNat(n));
+            case (#Float(f)) return int_to_int32_if_within_bounds(Float.toInt(f));
+            case (#Bool(b)) return int_to_int32_if_within_bounds(bool_to_int(b));
             case (unsupported_int_cast_types) return #err(
                 "Can't convert " # debug_show (unsupported_int_cast_types) # " to #Int32()"
             );
@@ -168,10 +356,27 @@ module Cast {
 
     public func cast_to_int64(candid : Candid) : Result<Candid, Text> {
 
+        func int_to_int64_if_within_bounds(int : Int) : Result<Candid, Text> {
+            if (int >= Int64.toInt(Int64.minimumValue) and int <= Int64.toInt(Int64.maximumValue)) {
+                #ok(#Int64(Int64.fromInt(int)));
+            } else {
+                return #err("Cannot convert " # debug_show candid # " with value " # Int.toText(int) # " to #Int64()");
+            };
+        };
+
         let converted = switch (candid) {
             case (#Int64(n)) candid;
-            case (#Int(n)) #Int64(Int64.fromInt(n));
-            case (#Nat(n)) #Int64(Int64.fromInt(n));
+            case (#Int(n)) return int_to_int64_if_within_bounds(n);
+            case (#Int8(n)) return int_to_int64_if_within_bounds(Int8.toInt(n));
+            case (#Int16(n)) return int_to_int64_if_within_bounds(Int16.toInt(n));
+            case (#Int32(n)) return int_to_int64_if_within_bounds(Int32.toInt(n));
+            case (#Nat(n)) return int_to_int64_if_within_bounds(n);
+            case (#Nat8(n)) return int_to_int64_if_within_bounds(Nat8.toNat(n));
+            case (#Nat16(n)) return int_to_int64_if_within_bounds(Nat16.toNat(n));
+            case (#Nat32(n)) return int_to_int64_if_within_bounds(Nat32.toNat(n));
+            case (#Nat64(n)) return int_to_int64_if_within_bounds(Nat64.toNat(n));
+            case (#Float(f)) return int_to_int64_if_within_bounds(Float.toInt(f));
+            case (#Bool(b)) return int_to_int64_if_within_bounds(bool_to_int(b));
             case (unsupported_int_cast_types) return #err(
                 "Can't convert " # debug_show (unsupported_int_cast_types) # " to #Int64()"
             );
@@ -187,6 +392,18 @@ module Cast {
             case (#Float(n)) candid;
             case (#Int(n)) #Float(Float.fromInt(n));
             case (#Nat(n)) #Float(Float.fromInt(n));
+            case (#Int8(n)) #Float(Float.fromInt(Int8.toInt(n)));
+            case (#Int16(n)) #Float(Float.fromInt(Int16.toInt(n)));
+            case (#Int32(n)) #Float(Float.fromInt(Int32.toInt(n)));
+            case (#Int64(n)) #Float(Float.fromInt(Int64.toInt(n)));
+            case (#Nat8(n)) #Float(Float.fromInt(Nat8.toNat(n)));
+            case (#Nat16(n)) #Float(Float.fromInt(Nat16.toNat(n)));
+            case (#Nat32(n)) #Float(Float.fromInt(Nat32.toNat(n)));
+            case (#Nat64(n)) #Float(Float.fromInt(Nat64.toNat(n)));
+
+            // Convert bool to float (true=1.0, false=0.0)
+            case (#Bool(b)) #Float(Float.fromInt(bool_to_int(b)));
+
             case (unsupported_float_cast_types) return #err(
                 "Can't convert " # debug_show (unsupported_float_cast_types) # " to #Float()"
             );
@@ -213,6 +430,9 @@ module Cast {
 
             case (#Float(n)) #Int(Float.toInt(n));
 
+            // Convert bool to int (true=1, false=0)
+            case (#Bool(b)) #Int(bool_to_int(b));
+
             case (unsupported_int_cast_types) return #err(
                 "Can't convert " # debug_show (unsupported_int_cast_types) # " to #Int()"
             );
@@ -230,6 +450,17 @@ module Cast {
                 case (?t) #Text(t);
                 case (null) return #err("cast_to_text: Could not decode blob to utf8");
             };
+            // Convert numeric types to text representation
+            case (
+                #Nat(_) or #Nat8(_) or #Nat16(_) or #Nat32(_) or #Nat64(_) or
+                #Int(_) or #Int8(_) or #Int16(_) or #Int32(_) or #Int64(_) or #Float(_)
+            ) {
+                #Text(numeric_to_text(candid));
+            };
+            // Convert bool to text
+            case (#Bool(b)) #Text(Bool.toText(b));
+            // Convert principal to text
+            case (#Principal(p)) #Text(Principal.toText(p));
             case (_) return #err("cast_to_text: Can't convert " # debug_show candid # " to #Text");
 
         };
@@ -242,6 +473,8 @@ module Cast {
         let converted = switch (candid) {
             case (#Blob(b)) candid;
             case (#Text(t)) #Blob(Text.encodeUtf8(t));
+            // Convert principal to blob
+            case (#Principal(p)) #Blob(Principal.toBlob(p));
             case (_) return #err("cast_to_blob: Can't convert " # debug_show candid # " to #Blob");
         };
 
@@ -265,6 +498,8 @@ module Cast {
             case (#Float(_)) cast_to_float(value_to_cast);
             case (#Text(_)) cast_to_text(value_to_cast);
             case (#Blob(_)) cast_to_blob(value_to_cast);
+            case (#Bool(_)) cast_to_bool(value_to_cast);
+            case (#Principal(_)) cast_to_principal(value_to_cast);
             case (#Option(inner)) {
                 switch (value_to_cast) {
                     case (#Null) #ok(#Null);
