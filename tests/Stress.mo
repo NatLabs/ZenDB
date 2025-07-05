@@ -1,6 +1,7 @@
 import Region "mo:base/Region";
 import Debug "mo:base/Debug";
 import Nat64 "mo:base/Nat64";
+import Buffer "mo:base/Buffer";
 
 import { test; suite } "mo:test";
 import Itertools "mo:itertools/Iter";
@@ -36,6 +37,8 @@ actor {
         to_blob = func(r : UserId) : Blob = to_candid (r);
     };
 
+    let collections = Buffer.Buffer<ZenDB.Collection<UserId>>(limit);
+
     public func runTests() {
 
         suite(
@@ -45,7 +48,14 @@ actor {
                     "Stress Test: Create 5000 collections",
                     func() {
                         for (i in Itertools.range(zendb.size(), 5000)) {
-                            let #ok(_) = zendb.createCollection("collection_" # debug_show (i), UserIdSchema, candify, null);
+                            let #ok(collection) = zendb.createCollection(
+                                "collection_" # debug_show (i),
+                                UserIdSchema,
+                                candify,
+                                ?{ schemaConstraints = [#Unique(["id"])] },
+                            );
+
+                            collections.add(collection);
                             Debug.print("Created collection: " # debug_show (i));
                         };
                     },

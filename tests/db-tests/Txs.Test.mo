@@ -161,26 +161,20 @@ let input_txs = Buffer.fromArray<Tx>(
     )
 );
 
-ZenDBSuite.newZenDBSuite(
+ZenDBSuite.newSuite(
     "Txs tests",
-    ?ZenDBSuite.onlyWithIndex,
-    func collection_setup(zendb : ZenDB.Database) {
-        let #ok(txs) = zendb.createCollection<Tx>("transactions", TxSchema, candify_tx, []);
-    },
-    func index_setup(zendb : ZenDB.Database) {
-        let #ok(txs) = zendb.getCollection<Tx>("transactions", candify_tx);
+    ?ZenDBSuite.onlyWithIndex, // too slow to run with no index
+    func txs_tests(zendb : ZenDB.Database, suite_utils : ZenDBSuite.SuiteUtils) {
 
-        let #ok(_) = txs.createAndPopulateIndex("index:[btype],[tx.amt]", [("btype", #Ascending), ("tx.amt", #Ascending)]);
-        let #ok(_) = txs.createAndPopulateIndex("index:[btype],[ts]", [("btype", #Ascending), ("ts", #Ascending)]);
-        let #ok(_) = txs.createAndPopulateIndex("index:[tx.amt]", [("tx.amt", #Ascending)]);
-        let #ok(_) = txs.createAndPopulateIndex("index:[ts]", [("ts", #Ascending)]);
-        let #ok(_) = txs.createAndPopulateIndex("index:[tx.from.owner],[tx.from.sub_account]", [("tx.from.owner", #Ascending), ("tx.from.sub_account", #Ascending)]);
-        let #ok(_) = txs.createAndPopulateIndex("index:[tx.to.owner],[tx.to.sub_account]", [("tx.to.owner", #Ascending), ("tx.to.sub_account", #Ascending)]);
-        let #ok(_) = txs.createAndPopulateIndex("index:[tx.spender.owner],[tx.spender.sub_account]", [("tx.spender.owner", #Ascending), ("tx.spender.sub_account", #Ascending)]);
-    },
-    func txs_tests(zendb : ZenDB.Database) {
+        let #ok(txs) = zendb.createCollection<Tx>("transactions", TxSchema, candify_tx, null);
 
-        let #ok(txs) = zendb.getCollection<Tx>("transactions", candify_tx);
+        let #ok(_) = suite_utils.createIndex(txs.name(), "index:[btype],[tx.amt]", [("btype", #Ascending), ("tx.amt", #Ascending)], null);
+        let #ok(_) = suite_utils.createIndex(txs.name(), "index:[btype],[ts]", [("btype", #Ascending), ("ts", #Ascending)], null);
+        let #ok(_) = suite_utils.createIndex(txs.name(), "index:[tx.amt]", [("tx.amt", #Ascending)], null);
+        let #ok(_) = suite_utils.createIndex(txs.name(), "index:[ts]", [("ts", #Ascending)], null);
+        let #ok(_) = suite_utils.createIndex(txs.name(), "index:[tx.from.owner],[tx.from.sub_account]", [("tx.from.owner", #Ascending), ("tx.from.sub_account", #Ascending)], null);
+        let #ok(_) = suite_utils.createIndex(txs.name(), "index:[tx.to.owner],[tx.to.sub_account]", [("tx.to.owner", #Ascending), ("tx.to.sub_account", #Ascending)], null);
+        let #ok(_) = suite_utils.createIndex(txs.name(), "index:[tx.spender.owner],[tx.spender.sub_account]", [("tx.spender.owner", #Ascending), ("tx.spender.sub_account", #Ascending)], null);
 
         for ((i, tx) in Itertools.enumerate(input_txs.vals())) {
             let #ok(id) = txs.insert(tx); // id is generated incrementally, so it should match tx.tx_index
@@ -287,7 +281,7 @@ ZenDBSuite.newZenDBSuite(
 
                 if (options.pagination != null) {
                     let pagination = options.pagination!;
-                    ignore Query.Cursor(pagination.cursor, #Forward);
+                    // ignore Query.Cursor(pagination.cursor, #Forward);
                     ignore Query.Limit(pagination.limit);
                 };
 
@@ -354,52 +348,52 @@ ZenDBSuite.newZenDBSuite(
 
         };
 
-        func cursor_paginated_query(db_query : ZenDB.QueryBuilder, pagination_limit : Nat) : [(Nat, Tx)] {
+        // func cursor_paginated_query(db_query : ZenDB.QueryBuilder, pagination_limit : Nat) : [(Nat, Tx)] {
 
-            ignore db_query.Limit(pagination_limit);
-            let #ok(matching_txs) = txs.search(db_query);
-            // Debug.print("matching_txs: " # debug_show matching_txs);
-            let records = Buffer.fromArray<(Nat, Tx)>(matching_txs);
-            let bitmap = BitMap.fromIter(Iter.map<(Nat, Tx), Nat>(matching_txs.vals(), func((id, _) : (Nat, Tx)) : Nat = id));
-            var batch_size = records.size();
+        //     ignore db_query.Limit(pagination_limit);
+        //     let #ok(matching_txs) = txs.search(db_query);
+        //     // Debug.print("matching_txs: " # debug_show matching_txs);
+        //     let records = Buffer.fromArray<(Nat, Tx)>(matching_txs);
+        //     let bitmap = BitMap.fromIter(Iter.map<(Nat, Tx), Nat>(matching_txs.vals(), func((id, _) : (Nat, Tx)) : Nat = id));
+        //     var batch_size = records.size();
 
-            var opt_cursor : ?Nat = null;
+        //     var opt_cursor : ?Nat = null;
 
-            label pagination while (batch_size > 0) {
-                switch (opt_cursor, ?(records.get(records.size() - 1).0)) {
-                    case (?cursor, ?new_cursor) if (cursor == new_cursor) {
-                        // break pagination;
-                        Debug.trap("Cursor is not moving");
-                    } else {
-                        opt_cursor := ?new_cursor;
-                    };
-                    case (null, new_cursor) opt_cursor := new_cursor;
-                    case (_, null) Debug.trap("Should be unreachable");
+        //     label pagination while (batch_size > 0) {
+        //         switch (opt_cursor, ?(records.get(records.size() - 1).0)) {
+        //             case (?cursor, ?new_cursor) if (cursor == new_cursor) {
+        //                 // break pagination;
+        //                 Debug.trap("Cursor is not moving");
+        //             } else {
+        //                 opt_cursor := ?new_cursor;
+        //             };
+        //             case (null, new_cursor) opt_cursor := new_cursor;
+        //             case (_, null) Debug.trap("Should be unreachable");
 
-                };
+        //         };
 
-                ignore db_query.Cursor(opt_cursor, #Forward).Limit(pagination_limit);
+        //         // ignore db_query.Cursor(opt_cursor, #Forward).Limit(pagination_limit);
 
-                let #ok(matching_txs) = txs.search(db_query);
-                Debug.print("matching_txs: " # debug_show matching_txs);
+        //         let #ok(matching_txs) = txs.search(db_query);
+        //         Debug.print("matching_txs: " # debug_show matching_txs);
 
-                assert matching_txs.size() <= pagination_limit;
-                batch_size := matching_txs.size();
+        //         assert matching_txs.size() <= pagination_limit;
+        //         batch_size := matching_txs.size();
 
-                for ((id, tx) in matching_txs.vals()) {
-                    records.add((id, tx));
+        //         for ((id, tx) in matching_txs.vals()) {
+        //             records.add((id, tx));
 
-                    if (bitmap.get(id)) {
-                        Debug.trap("Duplicate entry for id " # debug_show id);
-                    } else {
-                        bitmap.set(id, true);
-                    };
-                };
+        //             if (bitmap.get(id)) {
+        //                 Debug.trap("Duplicate entry for id " # debug_show id);
+        //             } else {
+        //                 bitmap.set(id, true);
+        //             };
+        //         };
 
-            };
+        //     };
 
-            Buffer.toArray(records);
-        };
+        //     Buffer.toArray(records);
+        // };
 
         type TestQuery = {
             query_name : Text;

@@ -97,56 +97,61 @@ module {
         switch (Map.get<Text, T.CandidType>(schema_map.map, T.thash, field_name)) {
             case (?candid_type) ?candid_type;
             case (null) {
-                // Debug.print("Field '" # field_name # "' not found in schema map");
-                // Debug.print("fields with array type: " # debug_show (schema_map.fields_with_array_type));
-                let ?index : ?Nat = Itertools.findIndex<Text>(
-                    schema_map.fields_with_array_type.vals(),
-                    func(field_with_array_type : Text) : Bool {
-                        Text.startsWith(field_name, #text(field_with_array_type));
-                    },
-                ) else {
-                    return null;
-                };
-
-                // Debug.print("index: " # debug_show (index));
-
-                var i = index;
-                var field_path = field_name;
-
-                label exclude_array_indexes while (i < schema_map.fields_with_array_type.size()) {
-                    let field_with_array_type = schema_map.fields_with_array_type[i];
-
-                    // Debug.print("field_with_array_type: " # debug_show (field_with_array_type));
-
-                    switch (Text.stripStart(field_name, #text(field_with_array_type))) {
-                        case (null) break exclude_array_indexes;
-                        case (?field_suffix_path) {
-                            // Debug.print("field_suffix_path: " # debug_show (field_suffix_path));
-
-                            let paths_within_suffix = Text.tokens(field_suffix_path, #text("."));
-
-                            ignore paths_within_suffix.next(); // todo: check if the skipped path is a number; also could have future conflicts between array index and tuple index
-
-                            // if (Text.isNumeric(next_suffix_path))
-
-                            field_path := Text.join(".", Itertools.prepend(field_with_array_type, paths_within_suffix));
-
-                            switch (Map.get<Text, T.CandidType>(schema_map.map, T.thash, field_path)) {
-                                case (?#Array(inner_type)) return ?inner_type;
-                                case (?candid_type) return ?candid_type;
-                                case (null) {};
-                            };
-
-                        };
-                    };
-                    i += 1;
-
-                };
-
-                null;
+                get_indexed_nested_array_type(schema_map, field_name);
 
             };
         };
+    };
+
+    // e.g -> 'array.0.field_name'
+    func get_indexed_nested_array_type(schema_map : SchemaMap, field_name : Text) : ?T.CandidType {
+        // Debug.print("Field '" # field_name # "' not found in schema map");
+        // Debug.print("fields with array type: " # debug_show (schema_map.fields_with_array_type));
+        let ?index : ?Nat = Itertools.findIndex<Text>(
+            schema_map.fields_with_array_type.vals(),
+            func(field_with_array_type : Text) : Bool {
+                Text.startsWith(field_name, #text(field_with_array_type));
+            },
+        ) else {
+            return null;
+        };
+
+        // Debug.print("index: " # debug_show (index));
+
+        var i = index;
+        var field_path = field_name;
+
+        label exclude_array_indexes while (i < schema_map.fields_with_array_type.size()) {
+            let field_with_array_type = schema_map.fields_with_array_type[i];
+
+            // Debug.print("field_with_array_type: " # debug_show (field_with_array_type));
+
+            switch (Text.stripStart(field_name, #text(field_with_array_type))) {
+                case (null) break exclude_array_indexes;
+                case (?field_suffix_path) {
+                    // Debug.print("field_suffix_path: " # debug_show (field_suffix_path));
+
+                    let paths_within_suffix = Text.tokens(field_suffix_path, #text("."));
+
+                    ignore paths_within_suffix.next(); // todo: check if the skipped path is a number; also could have future conflicts between array index and tuple index
+
+                    // if (Text.isNumeric(next_suffix_path))
+
+                    field_path := Text.join(".", Itertools.prepend(field_with_array_type, paths_within_suffix));
+
+                    switch (Map.get<Text, T.CandidType>(schema_map.map, T.thash, field_path)) {
+                        case (?#Array(inner_type)) return ?inner_type;
+                        case (?candid_type) return ?candid_type;
+                        case (null) {};
+                    };
+
+                };
+            };
+            i += 1;
+
+        };
+
+        null;
     };
 
     public func get_parent_field_path(field_name : Text) : ?(Text, Text) {

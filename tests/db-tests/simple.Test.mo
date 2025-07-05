@@ -49,21 +49,15 @@ let candify_user2 = {
     to_blob = func(c : User2) : Blob { to_candid (c) };
 };
 
-ZenDBSuite.newZenDBSuite(
+ZenDBSuite.newSuite(
     "Simple Record Tests",
-    ?ZenDBSuite.withAndWithoutIndex,
-    func collection_setup(zendb : ZenDB.Database) {
-        let #ok(users) = zendb.createCollection<User>("users", users_schema, candify_user, []);
-    },
-    func index_setup(zendb : ZenDB.Database) {
-        let #ok(users) = zendb.getCollection<User>("users", candify_user);
-        let #ok(_) = users.createIndex("name_idx", [("name", #Ascending)], null);
-        let #ok(_) = users.createIndex("age_idx", [("age", #Ascending)], null);
-        let #ok(_) = users.createIndex("email_idx", [("email", #Ascending)], null);
-    },
-    func suite_setup(zendb : ZenDB.Database) {
+    ?{ ZenDBSuite.withAndWithoutIndex with log_level = #Debug },
+    func suite_setup(zendb : ZenDB.Database, suite_utils : ZenDBSuite.SuiteUtils) {
+        let #ok(users) = zendb.createCollection<User>("users", users_schema, candify_user, null);
 
-        let #ok(users) = zendb.getCollection<User>("users", candify_user);
+        let #ok(_) = suite_utils.createIndex(users.name(), "name_idx", [("name", #Ascending)], null);
+        let #ok(_) = suite_utils.createIndex(users.name(), "age_idx", [("age", #Ascending)], null);
+        let #ok(_) = suite_utils.createIndex(users.name(), "email_idx", [("email", #Ascending)], null);
 
         let inputs = Buffer.Buffer<User>(20);
         for (i in Iter.range(1, 20)) {
@@ -134,6 +128,7 @@ ZenDBSuite.newZenDBSuite(
                         let db_query = ZenDB.QueryBuilder().Where("age", #gte(#Nat(3))).And("age", #lte(#Nat(7)));
 
                         let #ok(results) = users.search(db_query);
+                        Debug.print("results: " # debug_show (results));
                         assert results.size() == 10;
                         for ((_, user) in results.vals()) {
                             assert user.age >= 3 and user.age <= 7;
@@ -250,10 +245,12 @@ ZenDBSuite.newZenDBSuite(
                         };
 
                         // Update all "nam-do-san" users to have age 0
-                        let #ok() = users.update(db_query, [("age", #Nat(0))]);
+                        let #ok(updated_documents) = users.update(db_query, [("age", #Nat(0))]);
 
                         let #ok(updated) = users.search(db_query);
                         assert updated.size() == 10;
+                        assert updated_documents == 10;
+
                         for ((_, user) in updated.vals()) {
                             assert user.name == "nam-do-san";
                             assert user.age == 0;

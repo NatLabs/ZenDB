@@ -94,6 +94,17 @@ module T {
         { _0_ = a; _1_ = b; _2_ = c; _3_ = d };
     };
 
+    public type Quintuple<A, B, C, D, E> = {
+        _0_ : A;
+        _1_ : B;
+        _2_ : C;
+        _3_ : D;
+        _4_ : E;
+    };
+    public func Quintuple<A, B, C, D, E>(a : A, b : B, c : C, d : D, e : E) : Quintuple<A, B, C, D, E> {
+        { _0_ = a; _1_ = b; _2_ = c; _3_ = d; _4_ = e };
+    };
+
     public type SortDirection = {
         #Ascending;
         #Descending;

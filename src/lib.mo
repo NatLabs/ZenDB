@@ -55,12 +55,9 @@ module {
         public func Quadruple(a : T.Schema, b : T.Schema, c : T.Schema, d : T.Schema) : T.Schema {
             #Tuple([a, b, c, d]);
         };
-        // public func MultiTuple(schemas: [T.Schema]) : T.Schema {
-        //     let fields = Array.map<Nat, (Text, T.Schema)>(schemas, func(i: Nat, schema: T.Schema) : (Text, T.Schema) {
-        //         (Text.fromNat(i), schema)
-        //     });
-        //     #Record(fields)
-        // };
+        public func Quintuple(a : T.Schema, b : T.Schema, c : T.Schema, d : T.Schema, e : T.Schema) : T.Schema {
+            #Tuple([a, b, c, d, e]);
+        };
     };
 
     public type Tuple<A, B> = T.Tuple<A, B>;
@@ -91,6 +88,18 @@ module {
     };
     public func fromQuadruple<A, B, C, D>(t : T.Quadruple<A, B, C, D>) : (A, B, C, D) {
         (t._0_, t._1_, t._2_, t._3_);
+    };
+
+    public type Quintuple<A, B, C, D, E> = T.Quintuple<A, B, C, D, E>;
+    public func Quintuple<A, B, C, D, E>(a : A, b : B, c : C, d : D, e : E) : T.Quintuple<A, B, C, D, E> = {
+        _0_ = a;
+        _1_ = b;
+        _2_ = c;
+        _3_ = d;
+        _4_ = e;
+    };
+    public func fromQuintuple<A, B, C, D, E>(t : T.Quintuple<A, B, C, D, E>) : (A, B, C, D, E) {
+        (t._0_, t._1_, t._2_, t._3_, t._4_);
     };
 
     public type Settings = {

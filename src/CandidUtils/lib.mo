@@ -58,7 +58,7 @@ module {
                 Blob.fromArray(
                     Array.append(
                         Blob.toArray(b),
-                        [1 : Nat8],
+                        [0 : Nat8],
                     )
                 )
             );
@@ -67,7 +67,7 @@ module {
                     Blob.fromArray(
                         Array.append(
                             Blob.toArray(Principal.toBlob(p)),
-                            [1 : Nat8],
+                            [0 : Nat8],
                         )
                     )
                 )

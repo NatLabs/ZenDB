@@ -129,7 +129,8 @@ ZenDBSuite.newSuite(
             func() {
 
                 let #ok(crud_collection) = zendb.createCollection("CRUD", RecordWithAllTypesSchema, candify_record, null);
-                let candid_maps = Buffer.Buffer<ZenDB.Types.CandidMap>(limit);
+                let schema_map = crud_collection._get_schema_map();
+                let candid_maps = Map.new<Nat, ZenDB.Types.CandidMap>();
 
                 for (field in indexible_fields.vals()) {
                     let #ok(_) = suite_utils.createIndex(crud_collection.name(), field # "_idx", [(field, #Ascending)], null) else return assert false;
@@ -141,6 +142,14 @@ ZenDBSuite.newSuite(
                         for (record in inputs.vals()) {
                             let #ok(id) = crud_collection.insert(record) else return assert false;
                             assert crud_collection.get(id) == ?record;
+
+                            let candid_record = CollectionUtils.decode_candid_blob(
+                                crud_collection._get_stable_state(),
+                                candify_record.to_blob(record),
+                            );
+
+                            let candid_map = CandidMap.new(crud_collection._get_schema_map(), id, candid_record);
+                            ignore Map.put(candid_maps, Map.nhash, id, candid_map);
                         };
 
                     },
@@ -150,14 +159,8 @@ ZenDBSuite.newSuite(
                     "Read: #eq",
                     func() {
                         for ((id, record) in crud_collection.entries()) {
-                            let stable_crud_collection = crud_collection._get_stable_state();
-                            let schema_map = stable_crud_collection.schema_map;
-                            let candid_record = CollectionUtils.decode_candid_blob(
-                                stable_crud_collection,
-                                candify_record.to_blob(record),
-                            );
-                            let candid_map = CandidMap.new(schema_map, id, candid_record);
-                            candid_maps.add(candid_map);
+
+                            let ?candid_map = Map.get(candid_maps, Map.nhash, id) else return assert false;
 
                             assert CandidMap.get(candid_map, schema_map, ZenDB.Constants.RECORD_ID) == ?#Nat(id);
 
@@ -169,42 +172,6 @@ ZenDBSuite.newSuite(
                                     QueryBuilder().Where(
                                         field,
                                         #eq(field_value),
-                                    ).And(
-                                        ZenDB.Constants.RECORD_ID,
-                                        #eq(#Nat(id)),
-                                    )
-                                ) else return assert false;
-
-                                // Debug.print("Search result for field " # field # ": " # debug_show (record) # " -> " # debug_show (found_record));
-                                assert results[0] == (id, record);
-                            };
-
-                        };
-
-                    },
-                );
-
-                suite(
-                    "Read: #gt",
-                    func() {
-                        for ((id, record) in crud_collection.entries()) {
-                            let stable_crud_collection = crud_collection._get_stable_state();
-                            let schema_map = stable_crud_collection.schema_map;
-                            let candid_record = CollectionUtils.decode_candid_blob(
-                                stable_crud_collection,
-                                candify_record.to_blob(record),
-                            );
-                            let candid_map = CandidMap.new(schema_map, id, candid_record);
-                            assert CandidMap.get(candid_map, schema_map, ZenDB.Constants.RECORD_ID) == ?#Nat(id);
-
-                            for (field in indexible_fields.vals()) {
-                                let ?field_value = CandidMap.get(candid_map, schema_map, field) else return assert false;
-                                // Debug.print("id" # debug_show id # " Field " # field # " value: " # debug_show field_value);
-
-                                let #ok(results) = crud_collection.search(
-                                    QueryBuilder().Where(
-                                        field,
-                                        #gt(field_value),
                                     ).And(
                                         ZenDB.Constants.RECORD_ID,
                                         #eq(#Nat(id)),

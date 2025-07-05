@@ -67,20 +67,16 @@ let data_type_to_candid : ZenDB.Types.Candify<Doc> = {
     to_blob = func(c : Doc) : Blob { to_candid (c) };
 };
 
-ZenDBSuite.newZenDBSuite(
+ZenDBSuite.newSuite(
     "Update Tests",
     ?ZenDBSuite.withAndWithoutIndex,
-    func collection_setup(zendb : ZenDB.Database) {
+
+    func update_tests(zendb : ZenDB.Database, suite_utils : ZenDBSuite.SuiteUtils) {
         let #ok(data) = zendb.createCollection<Doc>("data", DocSchema, data_type_to_candid, null);
-    },
-    func index_setup(zendb : ZenDB.Database) {
-        let #ok(data) = zendb.getCollection<Doc>("data", data_type_to_candid);
-        let #ok(_) = data.createIndex("index_1", [("version", #Ascending)], null);
-        let #ok(_) = data.createIndex("index_2", [("version.v1.a", #Ascending)], null);
-        let #ok(_) = data.createIndex("index_3", [("version.v3.size.known", #Ascending)], null);
-    },
-    func update_tests(zendb : ZenDB.Database) {
-        let #ok(data) = zendb.getCollection<Doc>("data", data_type_to_candid);
+
+        let #ok(_) = suite_utils.createIndex(data.name(), "index_1", [("version", #Ascending)], null);
+        let #ok(_) = suite_utils.createIndex(data.name(), "index_2", [("version.v1.a", #Ascending)], null);
+        let #ok(_) = suite_utils.createIndex(data.name(), "index_3", [("version.v3.size.known", #Ascending)], null);
 
         var item1 : Doc = { version = #v1({ a = 42; b = "hello" }) };
         var item2 : Doc = { version = #v2({ c = "world"; d = true }) };
@@ -915,6 +911,8 @@ ZenDBSuite.newZenDBSuite(
                                     item1_id,
                                     [("version.v1.b", (#concatAll([#currValue, #Text(" World"), #Text("!")])))],
                                 );
+
+                                Debug.print("After concatAll: " # debug_show (data.get(item1_id)));
 
                                 assert data.get(item1_id) == ?{
                                     version = #v1({ a = 42; b = "Hello World!" });

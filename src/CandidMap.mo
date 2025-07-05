@@ -155,21 +155,18 @@ module CandidMap {
                     };
                     case (#Variant(variant_types), #Variant(variant)) {
 
-                        // let variants = Array.map<(Text, T.CandidType), (Text, Candid)>(
-                        //     variant_types,
-                        //     func(variant_tag : Text, variant_type : T.CandidType) : (Text, Candid) {
-                        //         if (variant_tag == variant.0) {
-                        //             return (variant_tag, variant.1);
-                        //         };
-                        //         (variant_tag, #Null);
-                        //     },
-                        // );
+                        let ?variant_type = Array.find<(Text, T.CandidType)>(
+                            variant_types,
+                            func(variant_type : (Text, T.CandidType)) : Bool {
+                                variant.0 == variant_type.0;
+                            },
+                        ) else Debug.trap("CandidMap: Could not find variant type for tag '" # variant.0 # "' in " # debug_show (variant_types));
 
-                        //    Debug.print(debug_show ({ variant }));
+                        // Debug.print(debug_show ({ variant; variant_types }));
 
-                        let nested_map = load_record_into_map(variant_types, [variant]);
+                        let nested_map = load_record_into_map([variant_type], [variant]);
 
-                        //    Debug.print(debug_show (Map.toArray(nested_map)));
+                        // Debug.print("nested_map: " #debug_show (Map.toArray(nested_map)));
                         ignore Map.put<Text, NestedCandid>(nested_map, thash, IS_COMPOUND_TYPE, #Candid(compound_types.variant(variant.0)));
 
                         ignore Map.put(map, thash, field, #CandidMap(nested_map));
@@ -305,7 +302,6 @@ module CandidMap {
         };
 
         // Debug.print("map: " # debug_show Map.toArray(map));
-        // Debug.print("is_optional: " # debug_show is_optional);
 
         let field = if (fields.size() == 0) "" else fields[fields.size() - 1];
         current_field := field;
@@ -316,12 +312,28 @@ module CandidMap {
 
         // Debug.print("types: " # debug_show (types));
 
-        let candid = switch (Map.get(map, thash, field)) {
-            case (null) switch (SchemaMap.unwrap_option_type(types), Map.get(map, thash, IS_COMPOUND_TYPE)) {
-                case (#Variant(_), ?#Candid(#Variant(_), #Text(tag))) return ?#Text(tag);
-                case (_) return null;
+        let candid : NestedCandid = switch (Map.get(map, thash, field)) {
+            case (?nested_candid) nested_candid;
+            case (null) {
+                switch (SchemaMap.unwrap_option_type(types), Map.get(map, thash, IS_COMPOUND_TYPE)) {
+                    case (#Variant(schema_map_types), ?#Candid(#Variant(candid_map_nested_types), #Text(tag))) {
+
+                        // Debug.print("schema_map_types: " # debug_show (schema_map_types));
+                        // Debug.print("candid_map_nested_types: " # debug_show (candid_map_nested_types));
+
+                        for ((variant_tag, _) in schema_map_types.vals()) {
+                            if (variant_tag == tag) {
+                                return ?#Text(tag);
+                            };
+                        };
+
+                        return null;
+
+                    };
+                    case (_) return null;
+                };
+
             };
-            case (?candid) candid;
         };
 
         // Debug.print("returned candid: " # debug_show (candid));

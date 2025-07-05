@@ -459,7 +459,6 @@ module CandidOps {
         };
 
         public func concat(values : Iter<Candid>) : Result<Candid, Text> {
-            let ?first = values.next() else return #err("Could not complete #concat operation with empty array");
 
             let ?res = Itertools.reduce(
                 values,

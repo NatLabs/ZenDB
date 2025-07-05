@@ -256,6 +256,8 @@ module CollectionUtils {
                 case (null) {};
             };
 
+            // Debug.print("candid_map_filter_condition(): retrieved field value for key '" # key # "': " # debug_show field_value # ", result: " # debug_show res);
+
             if (not res) return res;
 
         };
@@ -271,6 +273,8 @@ module CollectionUtils {
         } else {
             _intervals;
         };
+
+        // Debug.print("record_ids_from_index_intervals: intervals: " # debug_show intervals);
 
         if (index_name == C.RECORD_ID) {
             let main_btree_utils = DocumentStore.get_btree_utils(collection.documents);

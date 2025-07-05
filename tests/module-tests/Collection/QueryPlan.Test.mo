@@ -122,14 +122,14 @@ suite(
                 assert query_plan == {
                     is_and_operation = true;
                     scans = [
-                        #IndexScan({
-                            default_index_scan with
-                            index_name = "text_idx";
-                            scan_bounds = (
-                                [("text", ?(#Inclusive(#Text("rand")))), (":id", null)],
-                                [("text", ?(#Inclusive(#Text("rand")))), (":id", null)],
+                        #FullScan({
+                            filter_bounds = (
+                                [("text", ?(#Inclusive(#Text("rand"))))],
+                                [("text", ?(#Inclusive(#Text("rand"))))],
                             );
-                            simple_operations = [("text", #eq(#Text("rand")))];
+                            requires_additional_filtering = true;
+                            requires_additional_sorting = false;
+                            scan_bounds = ([], []);
                         })
                     ];
                     simple_operations = [("text", #eq(#Text("rand")))];
@@ -140,7 +140,7 @@ suite(
         );
 
         test(
-            "Query Plan on Collection with  indexes",
+            "Query Plan on Collection with indexes",
             func() {
 
                 let #ok(collection) = db.createCollection("query_plan_test", RecordWithAllTypesSchema, candify_record, null);

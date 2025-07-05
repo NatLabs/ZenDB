@@ -160,15 +160,13 @@ suite(
                 let sorted_bools = BpTree.new<Bool, Nat>(null);
                 let encoded_bools = BpTree.new<Blob, Nat>(null);
 
-                for ((i, r) in Itertools.enumerate(inputs.vals())) {
-                    ignore BpTree.insert(sorted_bools, Cmp.Bool, r.bool, i);
+                let encoded_true = Orchid.Orchid.blobify.to_blob([#Bool(true)]);
+                ignore BpTree.insert(sorted_bools, Cmp.Bool, true, 0);
+                ignore BpTree.insert(encoded_bools, Cmp.Blob, encoded_true, 0);
 
-                    let encoded_bool = Orchid.Orchid.blobify.to_blob([#Bool(r.bool)]);
-                    ignore BpTree.insert(encoded_bools, Cmp.Blob, encoded_bool, i);
-                };
-
-                Debug.print("sorted_bools size: " # debug_show (BpTree.size(sorted_bools)));
-                Debug.print("encoded_bools size: " # debug_show (BpTree.size(encoded_bools)));
+                let encoded_false = Orchid.Orchid.blobify.to_blob([#Bool(false)]);
+                ignore BpTree.insert(sorted_bools, Cmp.Bool, false, 1);
+                ignore BpTree.insert(encoded_bools, Cmp.Blob, encoded_false, 1);
 
                 assert Itertools.equal(
                     BpTree.vals(sorted_bools),
