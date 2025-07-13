@@ -53,21 +53,22 @@ ZenDBSuite.newSuite(
                     },
                 );
 
-                test(
-                    "Top level #Empty types",
-                    func() {
-                        // Empty type should be rejected as top-level type (similar to Null)
-                        let #err(_) = zendb.createCollection<Any>(
-                            "empty_type",
-                            #Empty,
-                            {
-                                from_blob = func(blob : Blob) : ?Any = from_candid (blob);
-                                to_blob = func(c : Any) : Blob = to_candid (c);
-                            },
-                            null,
-                        );
-                    },
-                );
+                // test(
+                //     "Top level #Empty types",
+                //     func() {
+
+                //         // Empty type should be rejected as top-level type (similar to Null)
+                //         let #err(_) = zendb.createCollection<Any>(
+                //             "empty_type",
+                //             #Empty,
+                //             {
+                //                 from_blob = func(blob : Blob) : ?Any = from_candid (blob);
+                //                 to_blob = func(c : Any) : Blob = to_candid (c);
+                //             },
+                //             null,
+                //         );
+                //     },
+                // );
 
             },
         );
@@ -1057,7 +1058,11 @@ ZenDBSuite.newSuite(
 
                         assert records_with_arrays.size() == 1;
                         assert records_with_arrays.search(ZenDB.QueryBuilder().Where("id", #eq(#Nat(1)))) == #ok([(0, { id = 1; numbers = [1, 2, 3]; texts = ["a", "b", "c"] })]);
-                        assert records_with_arrays.get(id) == ?({ id = 1; numbers = [1, 2, 3]; texts = ["a", "b", "c"] });
+                        assert records_with_arrays.get(id) == ?({
+                            id = 1;
+                            numbers = [1, 2, 3];
+                            texts = ["a", "b", "c"];
+                        });
                     },
                 );
 

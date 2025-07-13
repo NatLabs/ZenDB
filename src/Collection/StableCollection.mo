@@ -613,7 +613,7 @@ module StableCollection {
 
             let ?compsite_field_values = CollectionUtils.get_index_columns(collection, index.key_details, record_id, candid_map) else continue validating_unique_constraints;
             let index_data_utils = CollectionUtils.get_index_data_utils(collection);
-            Debug.print("compsite_field_values: " # debug_show compsite_field_values);
+            // Debug.print("compsite_field_values: " # debug_show compsite_field_values);
 
             let opt_prev_document_id = BTree.get(index.data, index_data_utils, compsite_field_values);
 
