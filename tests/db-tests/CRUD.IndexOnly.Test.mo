@@ -128,7 +128,7 @@ ZenDBSuite.newSuite(
             "CRUD operations",
             func() {
 
-                let #ok(crud_collection) = zendb.createCollection("CRUD", RecordWithAllTypesSchema, candify_record, null);
+                let #ok(crud_collection) = zendb.createCollection("CRUD", RecordWithAllTypesSchema, candify_record, null) else return assert false;
                 let schema_map = crud_collection._get_schema_map();
                 let candid_maps = Map.new<Nat, ZenDB.Types.CandidMap>();
 

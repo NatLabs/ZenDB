@@ -105,7 +105,7 @@ suite(
             "Query Plan on Collection with no indexes",
             func() {
 
-                let #ok(collection) = db.createCollection("query_plan_test", RecordWithAllTypesSchema, candify_record, null);
+                let #ok(collection) = db.createCollection("query_plan_test", RecordWithAllTypesSchema, candify_record, null) else return assert false;
 
                 let stable_collection = collection._get_stable_state();
 
@@ -143,8 +143,8 @@ suite(
             "Query Plan on Collection with indexes",
             func() {
 
-                let #ok(collection) = db.createCollection("query_plan_test", RecordWithAllTypesSchema, candify_record, null);
-                let #ok(_) = collection.createIndex("text_idx", [("text", #Ascending)], null);
+                let #ok(collection) = db.createCollection("query_plan_test", RecordWithAllTypesSchema, candify_record, null) else return assert false;
+                let #ok(_) = collection.createIndex("text_idx", [("text", #Ascending)], null) else return assert false;
 
                 let stable_collection = collection._get_stable_state();
 
@@ -158,6 +158,8 @@ suite(
                     null,
                 );
 
+                Debug.print("Query Plan: " # debug_show (query_plan));
+
                 assert query_plan == {
                     is_and_operation = true;
                     scans = [
@@ -165,10 +167,11 @@ suite(
                             default_index_scan with
                             index_name = "text_idx";
                             scan_bounds = (
-                                [("text", ?(#Inclusive(#Text("rand")))), (":id", null)],
-                                [("text", ?(#Inclusive(#Text("rand")))), (":id", null)],
+                                [("text", ?(#Inclusive(#Text("rand")))), (":id", ?#Inclusive(#Minimum))],
+                                [("text", ?(#Inclusive(#Text("rand")))), (":id", ?#Inclusive(#Maximum))],
                             );
                             simple_operations = [("text", #eq(#Text("rand")))];
+
                         })
                     ];
                     simple_operations = [("text", #eq(#Text("rand")))];

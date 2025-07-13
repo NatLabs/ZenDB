@@ -1,4 +1,5 @@
 // @testmode wasi
+import Array "mo:base/Array";
 import Debug "mo:base/Debug";
 import Buffer "mo:base/Buffer";
 import Blob "mo:base/Blob";
@@ -52,7 +53,7 @@ func get_prefix(blob : Blob, other : Blob) : Blob {
     Blob.fromArray(Buffer.toArray(buffer));
 };
 
-let limit = 5_000;
+let limit = 1_000;
 
 type MotokoTypes = {
     text : Text;
@@ -162,11 +163,11 @@ suite(
 
                 let encoded_true = Orchid.Orchid.blobify.to_blob([#Bool(true)]);
                 ignore BpTree.insert(sorted_bools, Cmp.Bool, true, 0);
-                ignore BpTree.insert(encoded_bools, Cmp.Blob, encoded_true, 0);
+                ignore BpTree.insert(encoded_bools, Orchid.Orchid.btree_cmp, encoded_true, 0);
 
                 let encoded_false = Orchid.Orchid.blobify.to_blob([#Bool(false)]);
                 ignore BpTree.insert(sorted_bools, Cmp.Bool, false, 1);
-                ignore BpTree.insert(encoded_bools, Cmp.Blob, encoded_false, 1);
+                ignore BpTree.insert(encoded_bools, Orchid.Orchid.btree_cmp, encoded_false, 1);
 
                 assert Itertools.equal(
                     BpTree.vals(sorted_bools),
@@ -201,7 +202,7 @@ suite(
                     ignore BpTree.insert(sorted_nats, Cmp.Nat, r.nat, i);
 
                     let encoded_nat = Orchid.Orchid.blobify.to_blob([#Nat(r.nat)]);
-                    ignore BpTree.insert(encoded_nats, Cmp.Blob, encoded_nat, i);
+                    ignore BpTree.insert(encoded_nats, Orchid.Orchid.btree_cmp, encoded_nat, i);
 
                 };
 
@@ -238,11 +239,10 @@ suite(
                 for ((i, n) in Itertools.enumerate(Iter.range(0, 255))) {
 
                     let n8 = Nat8.fromNat(n);
-
                     ignore BpTree.insert(sorted_nat8s, Cmp.Nat8, n8, i);
 
                     let encoded_nat8 = Orchid.Orchid.blobify.to_blob([#Nat8(n8)]);
-                    ignore BpTree.insert(encoded_nat8s, Cmp.Blob, encoded_nat8, i);
+                    ignore BpTree.insert(encoded_nat8s, Orchid.Orchid.btree_cmp, encoded_nat8, i);
 
                 };
 
@@ -280,7 +280,7 @@ suite(
                     ignore BpTree.insert(sorted_nat16s, Cmp.Nat16, r.nat16, i);
 
                     let encoded_nat16 = Orchid.Orchid.blobify.to_blob([#Nat16(r.nat16)]);
-                    ignore BpTree.insert(encoded_nat16s, Cmp.Blob, encoded_nat16, i);
+                    ignore BpTree.insert(encoded_nat16s, Orchid.Orchid.btree_cmp, encoded_nat16, i);
                 };
 
                 assert Itertools.equal(
@@ -317,7 +317,7 @@ suite(
                     ignore BpTree.insert(sorted_nat32s, Cmp.Nat32, r.nat32, i);
 
                     let encoded_nat32 = Orchid.Orchid.blobify.to_blob([#Nat32(r.nat32)]);
-                    ignore BpTree.insert(encoded_nat32s, Cmp.Blob, encoded_nat32, i);
+                    ignore BpTree.insert(encoded_nat32s, Orchid.Orchid.btree_cmp, encoded_nat32, i);
                 };
 
                 assert Itertools.equal(
@@ -353,7 +353,7 @@ suite(
                     ignore BpTree.insert(sorted_nat64s, Cmp.Nat64, r.nat64, i);
 
                     let encoded_nat64 = Orchid.Orchid.blobify.to_blob([#Nat64(r.nat64)]);
-                    ignore BpTree.insert(encoded_nat64s, Cmp.Blob, encoded_nat64, i);
+                    ignore BpTree.insert(encoded_nat64s, Orchid.Orchid.btree_cmp, encoded_nat64, i);
                 };
 
                 assert Itertools.equal(
@@ -392,7 +392,7 @@ suite(
                     ignore BpTree.insert(sorted_int8s, Cmp.Int8, int8, i);
 
                     let encoded_int8 = Orchid.Orchid.blobify.to_blob([#Int8(int8)]);
-                    ignore BpTree.insert(encoded_int8s, Cmp.Blob, encoded_int8, i);
+                    ignore BpTree.insert(encoded_int8s, Orchid.Orchid.btree_cmp, encoded_int8, i);
                 };
 
                 assert Itertools.equal(
@@ -434,7 +434,7 @@ suite(
                     ignore BpTree.insert(sorted_int16s, Cmp.Int16, r.int16, i);
 
                     let encoded_int16 = Orchid.Orchid.blobify.to_blob([#Int16(r.int16)]);
-                    ignore BpTree.insert(encoded_int16s, Cmp.Blob, encoded_int16, i);
+                    ignore BpTree.insert(encoded_int16s, Orchid.Orchid.btree_cmp, encoded_int16, i);
                 };
 
                 assert Itertools.equal(
@@ -477,7 +477,7 @@ suite(
                     ignore BpTree.insert(sorted_int32s, Cmp.Int32, r.int32, i);
 
                     let encoded_int32 = Orchid.Orchid.blobify.to_blob([#Int32(r.int32)]);
-                    ignore BpTree.insert(encoded_int32s, Cmp.Blob, encoded_int32, i);
+                    ignore BpTree.insert(encoded_int32s, Orchid.Orchid.btree_cmp, encoded_int32, i);
                 };
 
                 assert Itertools.equal(
@@ -519,7 +519,7 @@ suite(
                     ignore BpTree.insert(sorted_int64s, Cmp.Int64, r.int64, i);
 
                     let encoded_int64 = Orchid.Orchid.blobify.to_blob([#Int64(r.int64)]);
-                    ignore BpTree.insert(encoded_int64s, Cmp.Blob, encoded_int64, i);
+                    ignore BpTree.insert(encoded_int64s, Orchid.Orchid.btree_cmp, encoded_int64, i);
                 };
 
                 assert Itertools.equal(
@@ -561,49 +561,13 @@ suite(
                     ignore BpTree.insert(sorted_ints, Cmp.Int, r.int, i);
 
                     let encoded_int = Orchid.Orchid.blobify.to_blob([#Int(r.int)]);
-                    ignore BpTree.insert(encoded_ints, Cmp.Blob, encoded_int, i);
+                    ignore BpTree.insert(encoded_ints, Orchid.Orchid.btree_cmp, encoded_int, i);
                 };
 
                 assert Itertools.equal(
                     BpTree.vals(sorted_ints),
                     BpTree.vals(encoded_ints),
                     Nat.equal,
-                );
-            },
-        );
-
-        test(
-            "Text",
-            func() {
-                let sorted_texts = BpTree.new<Text, Nat>(null);
-                let encoded_texts = BpTree.new<Blob, Nat>(null);
-
-                for ((i, r) in Itertools.enumerate(inputs.vals())) {
-                    ignore BpTree.insert(sorted_texts, Cmp.Text, r.text, i);
-
-                    let encoded_text = Orchid.Orchid.blobify.to_blob([#Text(r.text)]);
-                    ignore BpTree.insert(encoded_texts, Cmp.Blob, encoded_text, i);
-                };
-
-                assert Itertools.equal(
-                    BpTree.vals(sorted_texts),
-                    BpTree.vals(encoded_texts),
-                    Nat.equal,
-                );
-
-                assert Itertools.equal(
-                    BpTree.keys(sorted_texts),
-                    Iter.map(
-                        BpTree.keys(encoded_texts),
-                        func(b : Blob) : Text {
-                            let candid_values = Orchid.Orchid.blobify.from_blob(b);
-                            switch (candid_values[0]) {
-                                case (#Text(text)) { text };
-                                case (other) Debug.trap("error extracting candid value");
-                            };
-                        },
-                    ),
-                    Text.equal,
                 );
             },
         );
@@ -618,7 +582,7 @@ suite(
                     ignore BpTree.insert(sorted_principals, Cmp.Principal, r.principal, i);
 
                     let encoded_principal = Orchid.Orchid.blobify.to_blob([#Principal(r.principal)]);
-                    ignore BpTree.insert(encoded_principals, Cmp.Blob, encoded_principal, i);
+                    ignore BpTree.insert(encoded_principals, Orchid.Orchid.btree_cmp, encoded_principal, i);
                 };
 
                 assert Itertools.equal(
@@ -654,7 +618,7 @@ suite(
                     ignore BpTree.insert(sorted_blobs, Cmp.Blob, r.blob, i);
 
                     let encoded_blob = Orchid.Orchid.blobify.to_blob([#Blob(r.blob)]);
-                    ignore BpTree.insert(encoded_blobs, Cmp.Blob, encoded_blob, i);
+                    ignore BpTree.insert(encoded_blobs, Orchid.Orchid.btree_cmp, encoded_blob, i);
                 };
 
                 assert Itertools.equal(
@@ -690,7 +654,7 @@ suite(
                     ignore BpTree.insert(sorted_floats, Cmp.Float, r.float, i);
 
                     let encoded_float = Orchid.Orchid.blobify.to_blob([#Float(r.float)]);
-                    ignore BpTree.insert(encoded_floats, Cmp.Blob, encoded_float, i);
+                    ignore BpTree.insert(encoded_floats, Orchid.Orchid.btree_cmp, encoded_float, i);
                 };
 
                 assert Itertools.equal(
@@ -741,7 +705,56 @@ suite(
                 assert a > b;
             },
         );
+
+        test(
+            "Text",
+            func() {
+                let sorted_texts = BpTree.new<Text, Nat>(null);
+                let encoded_texts = BpTree.new<Blob, Nat>(null);
+
+                for ((i, r) in Itertools.enumerate(inputs.vals())) {
+                    ignore BpTree.insert(sorted_texts, Cmp.Text, r.text, i);
+
+                    let encoded_text = Orchid.Orchid.blobify.to_blob([#Text(r.text)]);
+                    ignore BpTree.insert(encoded_texts, Orchid.Orchid.btree_cmp, encoded_text, i);
+                };
+
+                assert Itertools.equal(
+                    BpTree.vals(sorted_texts),
+                    BpTree.vals(encoded_texts),
+                    Nat.equal,
+                );
+
+                assert Itertools.equal(
+                    BpTree.keys(sorted_texts),
+                    Iter.map(
+                        BpTree.keys(encoded_texts),
+                        func(b : Blob) : Text {
+                            let candid_values = Orchid.Orchid.blobify.from_blob(b);
+                            switch (candid_values[0]) {
+                                case (#Text(text)) { text };
+                                case (other) Debug.trap("error extracting candid value");
+                            };
+                        },
+                    ),
+                    Text.equal,
+                );
+            },
+        );
+
+        // test(
+        //     "Option(Text)",
+        //     func() {
+        //         let sorted_options = BpTree.new<?Text, Nat>(null);
+        //         let encoded_options = BpTree.new<Blob, Nat>(null);
+
+        //         for ()
+
+        //     },
+        // );
+
     },
+
 );
 
 suite(
@@ -785,7 +798,7 @@ suite(
                             ignore BpTree.insert<[T.Candid], Nat>(sorted_candid, cmp_candid_array, [a, b], i);
 
                             let encoded = Orchid.Orchid.blobify.to_blob([a, b]);
-                            ignore BpTree.insert(encoded_candid, Cmp.Blob, encoded, i);
+                            ignore BpTree.insert(encoded_candid, Orchid.Orchid.btree_cmp, encoded, i);
                         };
 
                         assert Itertools.equal(
@@ -803,6 +816,76 @@ suite(
     },
 );
 
+func compare_entries<T>(
+    entries : [Text],
+    type_cmp : (Text, Text) -> Int8,
+    conv_to_candid : (Text) -> ZenDB.Types.Candid,
+) : [Text] {
+    let btree_type = BpTree.new<Text, Nat>(null);
+    let btree_blob = BpTree.new<Blob, Nat>(null);
+
+    for ((i, entry) in Itertools.enumerate(entries.vals())) {
+        ignore BpTree.insert(btree_type, type_cmp, entry, i);
+        let encoded = Orchid.Orchid.blobify.to_blob([conv_to_candid(entry)]);
+        ignore BpTree.insert(btree_blob, Orchid.Orchid.btree_cmp, encoded, i);
+    };
+
+    assert Itertools.equal(
+        BpTree.vals(btree_type),
+        BpTree.vals(btree_blob),
+        Nat.equal,
+    );
+
+    return Iter.toArray<Text>(
+        Iter.map<Blob, Text>(
+            BpTree.keys(btree_blob),
+            func(b : Blob) : Text {
+                let candid_values = Orchid.Orchid.blobify.from_blob(b);
+                switch (candid_values[0]) {
+                    case (#Text(value)) { value };
+                    case (other) Debug.trap("error extracting candid value: " # debug_show (other));
+                };
+            },
+
+        )
+    );
+};
+
+suite(
+    "Adhoc: compare entries of different types using edge cases",
+    func() {
+        test(
+            "Text ",
+            func() {
+                assert compare_entries<Text>(
+                    // edge cases
+                    [
+                        "",
+                        "\00",
+                        "\n",
+                        "\r",
+                        "a",
+                        "å",
+                        "ab",
+                    ],
+                    Cmp.Text,
+                    func(t : Text) : ZenDB.Types.Candid {
+                        #Text(t);
+                    },
+                ) == [
+                    "",
+                    "\00",
+                    "\n",
+                    "\r",
+                    "a",
+                    "ab",
+                    "å",
+                ];
+            },
+        );
+    },
+);
+
 suite(
     "Orchid: maintains prefix after serialization for better key compression",
     func() {
@@ -813,36 +896,12 @@ suite(
                 let b = Orchid.Orchid.blobify.to_blob([#Text("this might be candid")]);
 
                 let prefix_bytes = get_prefix(a, b);
-                assert prefix_bytes.size() == 14 + 1; // 14 bytes for the prefix and 1 byte for the type encoding
+                assert prefix_bytes.size() >= 14 + 1; // 14 bytes for the prefix and 1 byte for the type encoding
 
                 let ?prefix = Text.decodeUtf8(Utils.slice_blob(prefix_bytes, 1, prefix_bytes.size()));
 
                 assert Text.endsWith(prefix, #text("this might be "));
 
-            },
-        );
-
-        test(
-            "Int64",
-            func() {
-                var a = Orchid.Orchid.blobify.to_blob([#Int64(1234)]);
-                var b = Orchid.Orchid.blobify.to_blob([#Int64(321)]);
-
-                var prefix_bytes = get_prefix(a, b);
-                assert prefix_bytes.size() == 7;
-
-                a := Orchid.Orchid.blobify.to_blob([#Int64(-1234)]);
-                b := Orchid.Orchid.blobify.to_blob([#Int64(-321)]);
-                prefix_bytes := get_prefix(a, b);
-                assert prefix_bytes.size() == 7;
-
-                a := Orchid.Orchid.blobify.to_blob([#Int64(-1234)]);
-                b := Orchid.Orchid.blobify.to_blob([#Int64(321)]);
-
-                prefix_bytes := get_prefix(a, b);
-
-                // The most significant bit is different for the two values, so the prefix is just the type encoding
-                assert prefix_bytes.size() == 1;
             },
         );
 

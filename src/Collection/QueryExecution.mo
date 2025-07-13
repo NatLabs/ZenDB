@@ -1359,7 +1359,9 @@ module {
         opt_sort_column : ?(Text, T.SortDirection),
         sort_records_by_field_cmp : (Nat, Nat) -> Order,
     ) : EvalResult {
+
         Logger.lazyInfo(collection.logger, func() = "QueryExecution.generate_record_ids_for_query_plan(): Generating record IDs for query plan");
+        Logger.debugMsg(collection.logger, "QueryExecution.generate_record_ids_for_query_plan(): Query plan: " # debug_show query_plan);
 
         let result = if (query_plan.is_and_operation) {
             generate_record_ids_for_query_plan_with_and_operation(collection, query_plan, opt_sort_column, sort_records_by_field_cmp);
@@ -1393,17 +1395,19 @@ module {
             };
             case (#Interval(index_name, intervals, is_reversed)) {
                 var total = 0;
-                for (interval in intervals.vals()) {
-                    total += interval.1 - interval.0;
-                };
+
                 Logger.lazyInfo(
                     collection.logger,
                     func() = "QueryExecution.generate_record_ids_for_query_plan(): Query returned "
-                    # debug_show total # " records from " # debug_show intervals.size()
+                    # debug_show total # " records from " # debug_show intervals
                     # " intervals on index '" # index_name # "'"
                     # (if (is_reversed) " (reversed order)" else "")
                     # " in " # debug_show elapsed # " instructions",
                 );
+
+                for (interval in intervals.vals()) {
+                    total += interval.1 - interval.0;
+                };
             };
         };
 

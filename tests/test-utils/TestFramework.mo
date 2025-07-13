@@ -59,11 +59,11 @@ module TestFramework {
     ) {
         let settings = Option.get(options, defaultSettings);
 
-        func run_suite_with_or_without_indexes(zendb_sstore : ZenDB.Types.StableStore) {
+        func run_suite_with_or_without_indexes(memory_type_suite_name : Text, zendb_sstore : ZenDB.Types.StableStore) {
 
             if (settings.compare_with_no_index) {
                 suite(
-                    "with no index",
+                    memory_type_suite_name # " - with no index",
                     func() {
                         let #ok(zendb) = ZenDB.createDB(zendb_sstore, "no_index");
                         let suite_utils : SuiteUtils = {
@@ -86,7 +86,7 @@ module TestFramework {
 
             if (settings.compare_with_index) {
                 suite(
-                    "with indexes",
+                    memory_type_suite_name # " - with indexes",
                     func() {
                         let #ok(zendb) = ZenDB.createDB(zendb_sstore, "with_index");
 
@@ -135,7 +135,7 @@ module TestFramework {
                             }
                         );
 
-                        run_suite_with_or_without_indexes(zendb_sstore);
+                        run_suite_with_or_without_indexes("Stable Memory", zendb_sstore);
 
                     },
                 );
@@ -152,7 +152,7 @@ module TestFramework {
                                 memory_type = ?(#heap);
                             }
                         );
-                        run_suite_with_or_without_indexes(zendb_sstore);
+                        run_suite_with_or_without_indexes("Heap Memory", zendb_sstore);
 
                     },
                 );

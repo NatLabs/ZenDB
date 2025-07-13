@@ -382,12 +382,15 @@ module {
             let index_of_first_null = Option.get(opt_index_of_first_null, 0);
 
             func get_new_value_at_index(i : Nat) : T.CandidQuery {
-                switch (query_entries[index_of_first_null - 1]) {
+                switch (query_entries[i]) {
                     case ((_field, ?#Inclusive(#Minimum) or ?#Exclusive(#Minimum))) #Minimum;
                     case ((_field, ?#Inclusive(#Maximum) or ?#Exclusive(#Maximum))) #Maximum;
                     case ((_field, ?#Inclusive(value))) value;
                     case ((_field, ?#Exclusive(value))) if (is_lower_bound) {
-                        CandidUtils.get_next_value(value);
+                        let next = CandidUtils.get_next_value(value);
+                        // Debug.print("Retrieving the next value for " # debug_show value);
+                        // Debug.print("Next value: " # debug_show next);
+                        next;
                     } else {
                         CandidUtils.get_prev_value(value);
                     };
@@ -400,12 +403,7 @@ module {
                 func(i : Nat) : T.CandidQuery {
                     let (_field, inclusivity_query) = query_entries[i];
 
-                    if (i + 1 == index_of_first_null) return get_new_value_at_index(i);
-
-                    switch (inclusivity_query) {
-                        case (?#Exclusive(value) or ?#Inclusive(value)) value;
-                        case (null) if (is_lower_bound) #Minimum else #Maximum;
-                    };
+                    return get_new_value_at_index(i);
 
                 },
             );
@@ -477,6 +475,29 @@ module {
         BTree.entries<[T.CandidQuery], T.RecordId>(index.data, index_data_utils);
     };
 
+    // func unwrap_candid_option_value(option : T.CandidQuery) : T.CandidQuery {
+    //     switch (option_type) {
+    //         case (#Option(inner)) {
+    //             unwrap_candid_option_value(inner);
+    //         };
+    //         case (unwrapped) { unwrapped };
+    //     };
+    // };
+
+    // func wrap_index_key_with_n_options_from_type(index_key_type : T.CandidType, index_key : T.CandidQuery) : T.CandidQuery {
+    //     func helper(index_key_type : T.CandidType) : T.CandidQuery {
+    //         switch (index_key_type) {
+    //             case (#Option) {
+    //                 #Option(index_key);
+    //             };
+    //             case (other_types) index_key;
+    //         };
+    //     };
+
+    //     helper(unwrap_candid_option_value(index_key));
+
+    // };
+
     public func extract_scan_and_filter_bounds(lower : Map<Text, T.CandidInclusivityQuery>, upper : Map<Text, T.CandidInclusivityQuery>, opt_index_key_details : ?[(Text, T.SortDirection)], opt_fully_covered_equality_and_range_fields : ?Set.Set<Text>) : (Bounds, Bounds) {
 
         assert Option.isSome(opt_index_key_details) == Option.isSome(opt_fully_covered_equality_and_range_fields);
@@ -488,16 +509,24 @@ module {
                 let scan_lower_bound = Array.map(
                     index_key_details,
                     func((field, _) : (Text, SortDirection)) : FieldLimit {
-                        let lower_bound = Map.get(lower, thash, field);
-                        (field, lower_bound);
+                        let lower_bound = switch (Map.get(lower, thash, field)) {
+                            case (?lower_bound) lower_bound;
+                            case (null) #Inclusive(#Minimum);
+                        };
+
+                        (field, ?lower_bound);
                     },
                 );
 
                 let scan_upper_bound = Array.map(
                     index_key_details,
                     func((field, _) : (Text, SortDirection)) : FieldLimit {
-                        let upper_bound = Map.get(upper, thash, field);
-                        (field, upper_bound);
+                        let upper_bound = switch (Map.get(upper, thash, field)) {
+                            case (?upper_bound) upper_bound;
+                            case (null) #Inclusive(#Maximum);
+                        };
+
+                        (field, ?upper_bound);
                     },
                 );
 

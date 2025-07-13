@@ -334,32 +334,40 @@ module {
                 return #err("Field '" # field # "' not found in schema");
             };
 
-            func handle_value(value : T.Candid) : T.Candid {
-                switch (value) {
-                    case (#Option(_)) value;
-                    case (#Null) #Null;
-                    case (_) #Option(value);
+            func handle_operator_value(operator_type : T.CandidType, operator_value : T.Candid) : T.Candid {
+                switch (operator_type, operator_value) {
+                    case (#Option(_), #Option(_) or #Null) operator_value;
+                    case (#Option(_), _) {
+                        // wrap with #Option only if the type is an #Option
+                        // and the value is neither #Option nor #Null
+                        CandidUtils.inherit_options_from_type(operator_type, CandidUtils.unwrap_option(operator_value));
+                    };
+                    case (_) operator_value;
                 };
+
             };
 
-            func handle_operator(op : ZqlOperators) : T.ZqlOperators {
+            func handle_operator(op : ZqlOperators, operator_value_type : T.CandidType) : T.ZqlOperators {
+
                 switch (op) {
-                    case (#eq(value)) #eq(handle_value(value));
-                    case (#gte(value)) #gte(handle_value(value));
-                    case (#lte(value)) #lte(handle_value(value));
-                    case (#lt(value)) #lt(handle_value(value));
-                    case (#gt(value)) #gt(handle_value(value));
-                    case (#between(min, max)) #between(handle_value(min), handle_value(max));
+                    case (#eq(value)) #eq(handle_operator_value(operator_value_type, value));
+                    case (#gte(value)) #gte(handle_operator_value(operator_value_type, value));
+                    case (#lte(value)) #lte(handle_operator_value(operator_value_type, value));
+                    case (#lt(value)) #lt(handle_operator_value(operator_value_type, value));
+                    case (#gt(value)) #gt(handle_operator_value(operator_value_type, value));
+                    case (#between(min, max)) #between(handle_operator_value(operator_value_type, min), handle_operator_value(operator_value_type, max));
                     case (#exists) #exists;
-                    case (#startsWith(prefix)) #startsWith(handle_value(prefix));
-                    case (#anyOf(values)) #anyOf(Array.map(values, handle_value));
-                    case (#not_(op)) #not_(handle_operator(op));
+                    case (#startsWith(prefix)) #startsWith(handle_operator_value(operator_value_type, prefix));
+                    case (#anyOf(values)) #anyOf(Array.map(values, func(value : T.Candid) : T.Candid = handle_operator_value(operator_value_type, value)));
+                    case (#not_(op)) #not_(handle_operator(op, operator_value_type));
                 };
 
             };
 
             let res = switch (candid_type) {
-                case (#Option(_)) #Operation(field, handle_operator(op));
+                case (#Option(_)) {
+                    #Operation(field, handle_operator(op, candid_type));
+                };
                 case (_) #Operation(field, op);
             };
 

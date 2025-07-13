@@ -55,16 +55,16 @@ ZenDBSuite.newSuite(
     ?{ ZenDBSuite.withAndWithoutIndex with log_level = #Debug },
     func suite_setup(zendb : ZenDB.Database, suite_utils : ZenDBSuite.SuiteUtils) {
 
-        let #ok(data) = zendb.createCollection<Data>("data", DataSchema, data_type_to_candid, null);
+        let #ok(data) = zendb.createCollection<Data>("data", DataSchema, data_type_to_candid, null) else return assert false;
 
-        let #ok(_) = suite_utils.createIndex(data.name(), "index_1", [("version", #Ascending)], null);
-        let #ok(_) = suite_utils.createIndex(data.name(), "index_2", [("version.v1.a", #Ascending)], null);
-        let #ok(_) = suite_utils.createIndex(data.name(), "index_3", [("version.v3.size.known", #Ascending)], null);
+        let #ok(_) = suite_utils.createIndex(data.name(), "index_1", [("version", #Ascending)], null) else return assert false;
+        let #ok(_) = suite_utils.createIndex(data.name(), "index_2", [("version.v1.a", #Ascending)], null) else return assert false;
+        let #ok(_) = suite_utils.createIndex(data.name(), "index_3", [("version.v3.size.known", #Ascending)], null) else return assert false;
 
-        let #ok(_) = data.insert({ version = #v1({ a = 42; b = "hello" }) });
-        let #ok(_) = data.insert({ version = #v2({ c = "world"; d = true }) });
-        let #ok(_) = data.insert({ version = #v3({ size = #known(32) }) });
-        let #ok(_) = data.insert({ version = #v3({ size = #unknown }) });
+        let #ok(_) = data.insert({ version = #v1({ a = 42; b = "hello" }) }) else return assert false;
+        let #ok(_) = data.insert({ version = #v2({ c = "world"; d = true }) }) else return assert false;
+        let #ok(_) = data.insert({ version = #v3({ size = #known(32) }) }) else return assert false;
+        let #ok(_) = data.insert({ version = #v3({ size = #unknown }) }) else return assert false;
 
         assert data.size() == 4;
 

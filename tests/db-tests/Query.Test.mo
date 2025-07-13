@@ -22,7 +22,9 @@ let limit = 10_000;
 
 ZenDBSuite.newSuite(
     "Query Tests",
-    null,
+    ?{
+        ZenDBSuite.onlyWithIndex with log_level = #Debug;
+    },
     func query_tests(zendb : ZenDB.Database, suite_utils : ZenDBSuite.SuiteUtils) {
 
         type Data = {
@@ -57,7 +59,7 @@ ZenDBSuite.newSuite(
             test(
                 "#eq",
                 func() {
-                    Debug.print("Running #eq test");
+                    Debug.print("Running #eq test ");
 
                     let results = texts.search(
                         QueryBuilder().Where("value", #eq(#Text("a")))
@@ -73,6 +75,7 @@ ZenDBSuite.newSuite(
                 "#gt",
                 func() {
                     Debug.print(
+                        "Running #gt test" #
                         debug_show (
                             texts.search(
                                 QueryBuilder().Where("value", #gt(#Text("and")))
@@ -372,7 +375,7 @@ ZenDBSuite.newSuite(
                 "Negative Query Test",
                 func() {
                     let db_query = QueryBuilder().Where("value", #eq(#Text("item-not-in-store")));
-                    let #ok(records) = texts.search(db_query);
+                    let #ok(records) = texts.search(db_query) else return assert false;
 
                     assert records == [];
                 },

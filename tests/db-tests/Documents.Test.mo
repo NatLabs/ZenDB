@@ -16,7 +16,7 @@ import ZenDBSuite "../test-utils/TestFramework";
 
 ZenDBSuite.newSuite(
     "Candid Documents Test",
-    ?ZenDBSuite.withAndWithoutIndex,
+    ?ZenDBSuite.onlyWithIndex, // unique schema constraints are not supported without index
     func suite_setup(zendb : ZenDB.Database, suite_utils : ZenDBSuite.SuiteUtils) {
 
         suite(
@@ -53,6 +53,22 @@ ZenDBSuite.newSuite(
                     },
                 );
 
+                test(
+                    "Top level #Empty types",
+                    func() {
+                        // Empty type should be rejected as top-level type (similar to Null)
+                        let #err(_) = zendb.createCollection<Any>(
+                            "empty_type",
+                            #Empty,
+                            {
+                                from_blob = func(blob : Blob) : ?Any = from_candid (blob);
+                                to_blob = func(c : Any) : Blob = to_candid (c);
+                            },
+                            null,
+                        );
+                    },
+                );
+
             },
         );
 
@@ -79,6 +95,28 @@ ZenDBSuite.newSuite(
                         assert bools.size() == 2;
                         assert bools.search(ZenDB.QueryBuilder().Where("", #eq(#Bool(true)))) == #ok([(0, true)]);
                         assert bools.search(ZenDB.QueryBuilder().Where("", #eq(#Bool(false)))) == #ok([(1, false)]);
+                    },
+                );
+
+                test(
+                    "Int",
+                    func() {
+                        let #ok(ints) = zendb.createCollection<Int>(
+                            "ints",
+                            #Int,
+                            {
+                                from_blob = func(blob : Blob) : ?Int = from_candid (blob);
+                                to_blob = func(c : Int) : Blob = to_candid (c);
+                            },
+                            ?{
+                                schemaConstraints = [#Field("", [#Max(-1)]), #Unique([""])];
+                            },
+                        ) else return assert false;
+
+                        let #ok(id) = ints.insert(-42) else return assert false;
+                        assert ints.size() == 1;
+                        assert ints.search(ZenDB.QueryBuilder().Where("", #eq(#Int(-42)))) == #ok([(0, -42)]);
+                        assert ints.get(id) == ?(-42);
                     },
                 );
 
@@ -980,6 +1018,85 @@ ZenDBSuite.newSuite(
                         assert numeric_records.search(ZenDB.QueryBuilder().Where("nat64_val", #eq(#Nat64(64)))) == #ok([(0, testNumericRecord)]);
 
                         assert numeric_records.get(id) == ?(testNumericRecord);
+                    },
+                );
+
+                test(
+                    "Record with Array Fields",
+                    func() {
+                        type RecordWithArrays = {
+                            id : Nat;
+                            numbers : [Nat];
+                            texts : [Text];
+                        };
+
+                        let RecordWithArraysSchema = #Record([
+                            ("id", #Nat),
+                            ("numbers", #Array(#Nat)),
+                            ("texts", #Array(#Text)),
+                        ]);
+
+                        let #ok(records_with_arrays) = zendb.createCollection<RecordWithArrays>(
+                            "records_with_arrays",
+                            RecordWithArraysSchema,
+                            {
+                                from_blob = func(blob : Blob) : ?RecordWithArrays = from_candid (blob);
+                                to_blob = func(c : RecordWithArrays) : Blob = to_candid (c);
+                            },
+                            ?{
+                                schemaConstraints = [#Field("id", [#Min(1)]), #Unique(["id"])];
+                                // Note: Cannot add constraints on array fields since they're not queryable
+                            },
+                        ) else return assert false;
+
+                        let #ok(id) = records_with_arrays.insert({
+                            id = 1;
+                            numbers = [1, 2, 3];
+                            texts = ["a", "b", "c"];
+                        }) else return assert false;
+
+                        assert records_with_arrays.size() == 1;
+                        assert records_with_arrays.search(ZenDB.QueryBuilder().Where("id", #eq(#Nat(1)))) == #ok([(0, { id = 1; numbers = [1, 2, 3]; texts = ["a", "b", "c"] })]);
+                        assert records_with_arrays.get(id) == ?({ id = 1; numbers = [1, 2, 3]; texts = ["a", "b", "c"] });
+                    },
+                );
+
+                test(
+                    "Variant with Array Fields",
+                    func() {
+                        type VariantWithArrays = {
+                            #single : Nat;
+                            #list : [Text];
+                            #matrix : [[Nat]];
+                        };
+
+                        let VariantWithArraysSchema = #Variant([
+                            ("single", #Nat),
+                            ("list", #Array(#Text)),
+                            ("matrix", #Array(#Array(#Nat))),
+                        ]);
+
+                        let #ok(variants_with_arrays) = zendb.createCollection<VariantWithArrays>(
+                            "variants_with_arrays",
+                            VariantWithArraysSchema,
+                            {
+                                from_blob = func(blob : Blob) : ?VariantWithArrays = from_candid (blob);
+                                to_blob = func(c : VariantWithArrays) : Blob = to_candid (c);
+                            },
+                            ?{
+                                schemaConstraints = [#Field("single", [#Min(1)]), #Unique(["single"])];
+                                // Note: Cannot add constraints on array fields
+                            },
+                        ) else return assert false;
+
+                        let #ok(id1) = variants_with_arrays.insert(#single(42)) else return assert false;
+                        let #ok(id2) = variants_with_arrays.insert(#list(["a", "b", "c"])) else return assert false;
+                        let #ok(id3) = variants_with_arrays.insert(#matrix([[1, 2], [3, 4]])) else return assert false;
+
+                        assert variants_with_arrays.size() == 3;
+                        assert variants_with_arrays.search(ZenDB.QueryBuilder().Where("single", #eq(#Nat(42)))) == #ok([(0, #single(42))]);
+                        assert variants_with_arrays.search(ZenDB.QueryBuilder().Where("", #eq(#Text("list")))) == #ok([(1, #list(["a", "b", "c"]))]);
+                        assert variants_with_arrays.search(ZenDB.QueryBuilder().Where("", #eq(#Text("matrix")))) == #ok([(2, #matrix([[1, 2], [3, 4]]))]);
                     },
                 );
 

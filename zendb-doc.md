@@ -422,3 +422,5 @@ let #ok(_) = users_collection.createIndex("name_age_idx", [("name", #Ascending),
 ```
 
 This type of index can help optimize sorting operations and queries that filter on both fields. The internal query planner will use these indexes automatically when they match your query patterns.
+
+### Index Composite Fields Encoding Format

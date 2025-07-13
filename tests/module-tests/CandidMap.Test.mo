@@ -116,28 +116,28 @@ suite(
         test(
             "set() - simple types",
             func() {
-                let #ok(_) = CandidMap.set(candid_map, schema_map, "name", #Text("Bob"));
+                let #ok(_) = CandidMap.set(candid_map, schema_map, "name", #Text("Bob")) else return assert false;
                 assert CandidMap.get(candid_map, schema_map, "name") == ?#Text("Bob");
 
-                let #ok(_) = CandidMap.set(candid_map, schema_map, "age", #Nat(30));
+                let #ok(_) = CandidMap.set(candid_map, schema_map, "age", #Nat(30)) else return assert false;
                 assert CandidMap.get(candid_map, schema_map, "age") == ?#Nat(30);
 
-                let #ok(_) = CandidMap.set(candid_map, schema_map, "email", #Text("another_users_email@gmail.com"));
+                let #ok(_) = CandidMap.set(candid_map, schema_map, "email", #Text("another_users_email@gmail.com")) else return assert false;
                 assert CandidMap.get(candid_map, schema_map, "email") == ?#Text("another_users_email@gmail.com");
 
-                let #ok(_) = CandidMap.set(candid_map, schema_map, "details.phone", #Text("0987654321"));
+                let #ok(_) = CandidMap.set(candid_map, schema_map, "details.phone", #Text("0987654321")) else return assert false;
                 assert CandidMap.get(candid_map, schema_map, "details.phone") == ?#Text("0987654321");
 
-                let #ok(_) = CandidMap.set(candid_map, schema_map, "details.address", #Text("456, 5th Cross, 6th Main, Bangalore"));
+                let #ok(_) = CandidMap.set(candid_map, schema_map, "details.address", #Text("456, 5th Cross, 6th Main, Bangalore")) else return assert false;
                 assert CandidMap.get(candid_map, schema_map, "details.address") == ?#Text("456, 5th Cross, 6th Main, Bangalore");
 
-                let #ok(_) = CandidMap.set(candid_map, schema_map, "details.settings.theme", #Text("light"));
+                let #ok(_) = CandidMap.set(candid_map, schema_map, "details.settings.theme", #Text("light")) else return assert false;
                 assert CandidMap.get(candid_map, schema_map, "details.settings.theme") == ?#Text("light");
 
-                let #ok(_) = CandidMap.set(candid_map, schema_map, "details.settings.notifications", #Bool(false));
+                let #ok(_) = CandidMap.set(candid_map, schema_map, "details.settings.notifications", #Bool(false)) else return assert false;
                 assert CandidMap.get(candid_map, schema_map, "details.settings.notifications") == ?#Bool(false);
 
-                let #ok(_) = CandidMap.set(candid_map, schema_map, "version.v1", #Nat(2));
+                let #ok(_) = CandidMap.set(candid_map, schema_map, "version.v1", #Nat(2)) else return assert false;
                 assert CandidMap.get(candid_map, schema_map, "version.v1") == ?#Nat(2);
 
             },
@@ -147,19 +147,19 @@ suite(
             "set() - compound types",
             func() {
 
-                let #ok(_) = CandidMap.set(candid_map, schema_map, "details", #Record([("phone", #Text("2893749823")), ("address", #Text("789, 7th Cross, 8th Main, Bangalore")), ("settings", #Option(#Record([("theme", #Text("dark")), ("notifications", #Bool(true))])))]));
+                let #ok(_) = CandidMap.set(candid_map, schema_map, "details", #Record([("phone", #Text("2893749823")), ("address", #Text("789, 7th Cross, 8th Main, Bangalore")), ("settings", #Option(#Record([("theme", #Text("dark")), ("notifications", #Bool(true))])))])) else return assert false;
 
                 assert CandidMap.get(candid_map, schema_map, "details.phone") == ?#Text("2893749823");
                 assert CandidMap.get(candid_map, schema_map, "details.address") == ?#Text("789, 7th Cross, 8th Main, Bangalore");
                 assert CandidMap.get(candid_map, schema_map, "details.settings.theme") == ?#Text("dark");
                 assert CandidMap.get(candid_map, schema_map, "details.settings.notifications") == ?#Bool(true);
 
-                let #ok(_) = CandidMap.set(candid_map, schema_map, "version", #Variant("v2", #Text("1.0.2")));
+                let #ok(_) = CandidMap.set(candid_map, schema_map, "version", #Variant("v2", #Text("1.0.2"))) else return assert false;
                 assert CandidMap.get(candid_map, schema_map, "version") == ?#Text("v2");
                 assert CandidMap.get(candid_map, schema_map, "version.v2") == ?#Text("1.0.2");
                 assert CandidMap.get(candid_map, schema_map, "version.v1") == null;
 
-                let #ok(_) = CandidMap.set(candid_map, schema_map, "version", #Variant("v3", #Record([("major", #Nat(1)), ("minor", #Nat(0)), ("patch", #Nat(0))])));
+                let #ok(_) = CandidMap.set(candid_map, schema_map, "version", #Variant("v3", #Record([("major", #Nat(1)), ("minor", #Nat(0)), ("patch", #Nat(0))]))) else return assert false;
 
                 assert CandidMap.get(candid_map, schema_map, "version") == ?#Text("v3");
                 assert CandidMap.get(candid_map, schema_map, "version.v3.major") == ?#Nat(1);
@@ -173,14 +173,14 @@ suite(
         test(
             "set() - tuple",
             func() {
-                let #ok(_) = CandidMap.set(candid_map, schema_map, "tuple", #Tuple([#Nat(2), #Text("txet")]));
+                let #ok(_) = CandidMap.set(candid_map, schema_map, "tuple", #Tuple([#Nat(2), #Text("txet")])) else return assert false;
                 assert CandidMap.get(candid_map, schema_map, "tuple.0") == ?#Nat(2);
                 assert CandidMap.get(candid_map, schema_map, "tuple.1") == ?#Text("txet");
 
-                let #ok(_) = CandidMap.set(candid_map, schema_map, "tuple.0", #Nat(20));
+                let #ok(_) = CandidMap.set(candid_map, schema_map, "tuple.0", #Nat(20)) else return assert false;
                 assert CandidMap.get(candid_map, schema_map, "tuple.0") == ?#Nat(20);
 
-                let #ok(_) = CandidMap.set(candid_map, schema_map, "tuple.1", #Text("new_text"));
+                let #ok(_) = CandidMap.set(candid_map, schema_map, "tuple.1", #Text("new_text")) else return assert false;
                 assert CandidMap.get(candid_map, schema_map, "tuple.1") == ?#Text("new_text");
 
                 let #err(_) = CandidMap.set(candid_map, schema_map, "tuple.2", #Text("new_text"));
@@ -192,17 +192,17 @@ suite(
             "set() - array",
             func() {
 
-                let #ok(_) = CandidMap.set(candid_map, schema_map, "tags", #Array([#Text("archived"), #Text("trending"), #Text("new")]));
+                let #ok(_) = CandidMap.set(candid_map, schema_map, "tags", #Array([#Text("archived"), #Text("trending"), #Text("new")])) else return assert false;
 
                 assert CandidMap.get(candid_map, schema_map, "tags.0") == ?#Text("archived");
                 assert CandidMap.get(candid_map, schema_map, "tags.1") == ?#Text("trending");
                 assert CandidMap.get(candid_map, schema_map, "tags.2") == ?#Text("new");
                 assert CandidMap.get(candid_map, schema_map, "tags.3") == null;
 
-                let #ok(_) = CandidMap.set(candid_map, schema_map, "comments.0.content", #Text("comment2"));
+                let #ok(_) = CandidMap.set(candid_map, schema_map, "comments.0.content", #Text("comment2")) else return assert false;
                 assert CandidMap.get(candid_map, schema_map, "comments.0.content") == ?#Text("comment2");
 
-                let #ok(_) = CandidMap.set(candid_map, schema_map, "comments.0.created_at", #Nat(222_222_222));
+                let #ok(_) = CandidMap.set(candid_map, schema_map, "comments.0.created_at", #Nat(222_222_222)) else return assert false;
                 assert CandidMap.get(candid_map, schema_map, "comments.0.created_at") == ?#Nat(222_222_222);
 
                 // cannot update nested field of a missing element ...
@@ -219,13 +219,13 @@ suite(
         test(
             "set() - option",
             func() {
-                let #ok(_) = CandidMap.set(candid_map, schema_map, "details.settings.theme", #Option(#Text("light")));
-                assert CandidMap.get(candid_map, schema_map, "details.settings.theme") == ?#Option(#Text("light"));
+                let #ok(_) = CandidMap.set(candid_map, schema_map, "details.settings.theme", #Text("light")) else return assert false;
+                assert CandidMap.get(candid_map, schema_map, "details.settings.theme") == ?#Text("light");
 
-                let #ok(_) = CandidMap.set(candid_map, schema_map, "details.settings.notifications", #Option(#Bool(true)));
-                assert CandidMap.get(candid_map, schema_map, "details.settings.notifications") == ?#Option(#Bool(true));
+                let #ok(_) = CandidMap.set(candid_map, schema_map, "details.settings.notifications", #Bool(true)) else return assert false;
+                assert CandidMap.get(candid_map, schema_map, "details.settings.notifications") == ?#Bool(true);
 
-                let #ok(_) = CandidMap.set(candid_map, schema_map, "details.settings", #Option(#Record([("theme", #Text("dark")), ("notifications", #Bool(false))])));
+                let #ok(_) = CandidMap.set(candid_map, schema_map, "details.settings", #Option(#Record([("theme", #Text("dark")), ("notifications", #Bool(false))]))) else return assert false;
                 assert CandidMap.get(candid_map, schema_map, "details.settings.theme") == ?#Text("dark");
                 assert CandidMap.get(candid_map, schema_map, "details.settings.notifications") == ?#Bool(false);
 
@@ -239,7 +239,7 @@ suite(
                 // CandidMap.get(candid_map, schema_map, "details.settings.notifications") |> Debug.print("option - details.settings.notifications: " # debug_show _);
                 // let #err(_) = CandidMap.set(candid_map, schema_map,"details.settings.notifications", #Null);
 
-                let #ok(_) = CandidMap.set(candid_map, schema_map, "details.settings", #Null);
+                let #ok(_) = CandidMap.set(candid_map, schema_map, "details.settings", #Null) else return assert false;
 
                 Debug.print("option - details.settings.theme: " # debug_show CandidMap.get(candid_map, schema_map, "details.settings.theme"));
                 Debug.print("option - details.settings.notifications: " # debug_show CandidMap.get(candid_map, schema_map, "details.settings.notifications"));

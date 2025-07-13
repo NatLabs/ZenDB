@@ -613,15 +613,16 @@ module StableCollection {
 
             let ?compsite_field_values = CollectionUtils.get_index_columns(collection, index.key_details, record_id, candid_map) else continue validating_unique_constraints;
             let index_data_utils = CollectionUtils.get_index_data_utils(collection);
+            Debug.print("compsite_field_values: " # debug_show compsite_field_values);
 
-            let opt_prev_id = BTree.get(index.data, index_data_utils, compsite_field_values);
+            let opt_prev_document_id = BTree.get(index.data, index_data_utils, compsite_field_values);
 
-            switch (opt_prev_id) {
+            switch (opt_prev_document_id) {
                 case (null) {}; // no previous value, free to insert
-                case (?prev_id) {
+                case (?prev_document_id) {
 
-                    if (prev_id != record_id) {
-                        let error_msg = "Unique constraint violation: Inserting new record failed because unique constraint on " # debug_show composite_field_keys # " is violated because record with id " # debug_show prev_id # " already has composite values " # debug_show compsite_field_values # " the same as the new record about to be inserted";
+                    if (prev_document_id != record_id) {
+                        let error_msg = "Unique constraint violation: Inserting new record failed because unique constraint on " # debug_show composite_field_keys # " is violated because record with id " # debug_show prev_document_id # " already has composite values " # debug_show compsite_field_values # " the same as the new record about to be inserted";
                         Logger.error(
                             collection.logger,
                             error_msg,
@@ -1007,6 +1008,8 @@ module StableCollection {
                 return Utils.log_error_msg(collection.logger, "Failed to process query operations: " # err);
             };
         };
+
+        // Debug.print("Formatted query operations: " # debug_show formatted_query_operations);
 
         let query_plan : T.QueryPlan = QueryPlan.create_query_plan(
             collection,

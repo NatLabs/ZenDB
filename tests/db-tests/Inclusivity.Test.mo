@@ -28,7 +28,7 @@ let { QueryBuilder } = ZenDB;
 
 ZenDBSuite.newSuite(
     "ZenDB: Inclusivity Tests",
-    null,
+    ?{ ZenDBSuite.withAndWithoutIndex with log_level = #Debug },
     func inclusivity_tests(zendb : ZenDB.Database, suite_utils : ZenDBSuite.SuiteUtils) {
 
         // Define schemas for test collections
@@ -110,15 +110,15 @@ ZenDBSuite.newSuite(
         let #ok(edge_collection) = zendb.createCollection<EdgeDoc>("edge_test", EdgeCaseSchema, candify_edge, null) else return assert false;
 
         // Create indexes
-        let #ok(_) = numeric_collection.createIndex("id_index", [("id", #Ascending)], null) else return assert false;
-        let #ok(_) = numeric_collection.createIndex("int_val_index", [("int_val", #Ascending)], null) else return assert false;
-        // let #ok(_) = numeric_collection.createIndex("float_val_index", [("float_val", #Ascending)], null);
+        let #ok(_) = suite_utils.createIndex(numeric_collection.name(), "id_index", [("id", #Ascending)], null) else return assert false;
+        let #ok(_) = suite_utils.createIndex(numeric_collection.name(), "int_val_index", [("int_val", #Ascending)], null) else return assert false;
+        // let #ok(_) = suite_utils.createIndex(numeric_collection.name(), "float_val_index", [("float_val", #Ascending)], null);
 
-        let #ok(_) = text_collection.createIndex("text_val_index", [("text_val", #Ascending)], null) else return assert false;
-        let #ok(_) = text_collection.createIndex("case_sensitive_index", [("case_sensitive", #Ascending)], null) else return assert false;
+        let #ok(_) = suite_utils.createIndex(text_collection.name(), "text_val_index", [("text_val", #Ascending)], null) else return assert false;
+        let #ok(_) = suite_utils.createIndex(text_collection.name(), "case_sensitive_index", [("case_sensitive", #Ascending)], null) else return assert false;
 
-        let #ok(_) = edge_collection.createIndex("opt_field_index", [("opt_field", #Ascending)], null) else return assert false;
-        let #ok(_) = edge_collection.createIndex("text_field_index", [("text_field", #Ascending)], null) else return assert false;
+        let #ok(_) = suite_utils.createIndex(edge_collection.name(), "opt_field_index", [("opt_field", #Ascending)], null) else return assert false;
+        let #ok(_) = suite_utils.createIndex(edge_collection.name(), "text_field_index", [("text_field", #Ascending)], null) else return assert false;
 
         // Insert test data for numeric tests
         let #ok(numeric_id_0) = numeric_collection.insert({
@@ -255,8 +255,8 @@ ZenDBSuite.newSuite(
         let #ok(composite_collection) = zendb.createCollection<CompositeDoc>("composite_test", CompositeSchema, candify_composite, null) else return assert false;
 
         // Create composite index
-        let #ok(_) = composite_collection.createIndex("composite_index", [("category", #Ascending), ("number", #Ascending)], null) else return assert false;
-        let #ok(_) = composite_collection.createIndex("blob_index", [("category", #Ascending), ("data", #Ascending)], null) else return assert false;
+        let #ok(_) = suite_utils.createIndex(composite_collection.name(), "composite_index", [("category", #Ascending), ("number", #Ascending)], null) else return assert false;
+        let #ok(_) = suite_utils.createIndex(composite_collection.name(), "blob_index", [("category", #Ascending), ("data", #Ascending)], null) else return assert false;
 
         // Insert test documents
         let #ok(comp_id_1) = composite_collection.insert({
@@ -350,7 +350,7 @@ ZenDBSuite.newSuite(
                 );
 
                 test(
-                    "#neq operator excludes specific values",
+                    "#not_(#eq) operator excludes specific values",
                     func() {
                         // Test not-equal on indexed fields
                         let result1 = numeric_collection.search(
@@ -873,7 +873,7 @@ ZenDBSuite.newSuite(
                         );
 
                         assert Result.isOk(result);
-                        let #ok(data) = result;
+                        let #ok(data) = result else return assert false;
                         Debug.print(debug_show ({ gt_blob_data = data }));
 
                         // Should include [12, 32, 45, 0], [12, 32, 45, 1] but not [12, 32, 44]
@@ -924,7 +924,7 @@ ZenDBSuite.newSuite(
                         );
 
                         assert Result.isOk(result);
-                        let #ok(data) = result;
+                        let #ok(data) = result else return assert false;
                         Debug.print(debug_show ({ lt_blob_zero_data = data }));
 
                         // Should include [12, 32, 44] and [12, 32, 45] but not [12, 32, 45, x]

@@ -39,7 +39,7 @@ let limit = 1_000;
 ZenDBSuite.newSuite(
     "ZenDB Index Tests",
     ?{
-        ZenDBSuite.onlyWithIndex with log_level = #Error;
+        ZenDBSuite.onlyWithIndex with log_level = #Debug;
     },
     func index_tests(zendb : ZenDB.Database, suite_utils : ZenDBSuite.SuiteUtils) {
 
@@ -88,7 +88,7 @@ ZenDBSuite.newSuite(
             };
         };
 
-        let #ok(sorted_index_types) = zendb.createCollection("sorted_index_types", SupportedIndexTypes, candify_data, null);
+        let #ok(sorted_index_types) = zendb.createCollection("sorted_index_types", SupportedIndexTypes, candify_data, null) else return assert false;
         let inputs = Map.new<Nat, SupportedIndexTypes>();
 
         func get_field_and_sort_record_ids<A>(getter : (record : SupportedIndexTypes) -> A, cmp : (A, A) -> Order.Order) : ((Nat, Nat) -> Order.Order) {
@@ -132,7 +132,7 @@ ZenDBSuite.newSuite(
                 bool = fuzz.bool.random();
             };
 
-            let #ok(id) = sorted_index_types.insert(record);
+            let #ok(id) = sorted_index_types.insert(record) else return assert false;
 
             ignore Map.put(inputs, Map.nhash, id, record);
 
@@ -142,21 +142,21 @@ ZenDBSuite.newSuite(
             "Serialized values are orderd correctly",
             func() {
 
-                let #ok(_) = sorted_index_types.createIndex("text", [("text", #Ascending)], null);
-                let #ok(_) = sorted_index_types.createIndex("nat", [("nat", #Ascending)], null);
-                let #ok(_) = sorted_index_types.createIndex("nat8", [("nat8", #Ascending)], null);
-                let #ok(_) = sorted_index_types.createIndex("nat16", [("nat16", #Ascending)], null);
-                let #ok(_) = sorted_index_types.createIndex("nat32", [("nat32", #Ascending)], null);
-                let #ok(_) = sorted_index_types.createIndex("nat64", [("nat64", #Ascending)], null);
-                let #ok(_) = sorted_index_types.createIndex("int", [("int", #Ascending)], null);
-                let #ok(_) = sorted_index_types.createIndex("int8", [("int8", #Ascending)], null);
-                let #ok(_) = sorted_index_types.createIndex("int16", [("int16", #Ascending)], null);
-                let #ok(_) = sorted_index_types.createIndex("int32", [("int32", #Ascending)], null);
-                let #ok(_) = sorted_index_types.createIndex("int64", [("int64", #Ascending)], null);
-                let #ok(_) = sorted_index_types.createIndex("float", [("float", #Ascending)], null);
-                let #ok(_) = sorted_index_types.createIndex("principal", [("principal", #Ascending)], null);
-                let #ok(_) = sorted_index_types.createIndex("blob", [("blob", #Ascending)], null);
-                let #ok(_) = sorted_index_types.createIndex("bool", [("bool", #Ascending)], null);
+                let #ok(_) = suite_utils.createIndex(sorted_index_types.name(), "text", [("text", #Ascending)], null) else return assert false;
+                let #ok(_) = suite_utils.createIndex(sorted_index_types.name(), "nat", [("nat", #Ascending)], null) else return assert false;
+                let #ok(_) = suite_utils.createIndex(sorted_index_types.name(), "nat8", [("nat8", #Ascending)], null) else return assert false;
+                let #ok(_) = suite_utils.createIndex(sorted_index_types.name(), "nat16", [("nat16", #Ascending)], null) else return assert false;
+                let #ok(_) = suite_utils.createIndex(sorted_index_types.name(), "nat32", [("nat32", #Ascending)], null) else return assert false;
+                let #ok(_) = suite_utils.createIndex(sorted_index_types.name(), "nat64", [("nat64", #Ascending)], null) else return assert false;
+                let #ok(_) = suite_utils.createIndex(sorted_index_types.name(), "int", [("int", #Ascending)], null) else return assert false;
+                let #ok(_) = suite_utils.createIndex(sorted_index_types.name(), "int8", [("int8", #Ascending)], null) else return assert false;
+                let #ok(_) = suite_utils.createIndex(sorted_index_types.name(), "int16", [("int16", #Ascending)], null) else return assert false;
+                let #ok(_) = suite_utils.createIndex(sorted_index_types.name(), "int32", [("int32", #Ascending)], null) else return assert false;
+                let #ok(_) = suite_utils.createIndex(sorted_index_types.name(), "int64", [("int64", #Ascending)], null) else return assert false;
+                let #ok(_) = suite_utils.createIndex(sorted_index_types.name(), "float", [("float", #Ascending)], null) else return assert false;
+                let #ok(_) = suite_utils.createIndex(sorted_index_types.name(), "principal", [("principal", #Ascending)], null) else return assert false;
+                let #ok(_) = suite_utils.createIndex(sorted_index_types.name(), "blob", [("blob", #Ascending)], null) else return assert false;
+                let #ok(_) = suite_utils.createIndex(sorted_index_types.name(), "bool", [("bool", #Ascending)], null) else return assert false;
 
                 let sorted_texts = Buffer.Buffer<Nat>(inputs.size());
                 let sorted_nats = Buffer.Buffer<Nat>(inputs.size());
@@ -568,7 +568,7 @@ ZenDBSuite.newSuite(
                             #Field("float", [#Min(-1.0), #Max(1.0)]),
                         ];
 
-                        let #ok(test_collection) = zendb.createCollection("schema_constraints_test", TestSchema, candify_test, ?{ schemaConstraints });
+                        let #ok(test_collection) = zendb.createCollection("schema_constraints_test", TestSchema, candify_test, ?{ schemaConstraints }) else return assert false;
 
                         let valid_values : TestRecord = {
                             nat = 10_000;
@@ -656,7 +656,7 @@ ZenDBSuite.newSuite(
                             #Field("blob", [#Size(3, 5)]),
                         ];
 
-                        let #ok(test_collection) = zendb.createCollection("schema_constraints_test_2", TestSchema, candify_test, ?{ schemaConstraints });
+                        let #ok(test_collection) = zendb.createCollection("schema_constraints_test_2", TestSchema, candify_test, ?{ schemaConstraints }) else return assert false;
 
                         let valid_values : TestRecord = {
                             text = "hello";
@@ -731,7 +731,7 @@ ZenDBSuite.newSuite(
                             #Unique(["compound.0", "compound.1"]),
                         ];
 
-                        let #ok(test_collection) = zendb.createCollection("schema_constraints_test_3", TestSchema, candify_test, ?{ schemaConstraints });
+                        let #ok(test_collection) = zendb.createCollection("schema_constraints_test_3", TestSchema, candify_test, ?{ schemaConstraints }) else return assert false;
 
                         test(
                             "Succeeds with unique values",
@@ -782,14 +782,14 @@ ZenDBSuite.newSuite(
                     };
                 };
 
-                let #ok(test) = zendb.createCollection("unique_index_test", OptNatSchema, candify_test, null);
+                let #ok(test) = zendb.createCollection("unique_index_test", OptNatSchema, candify_test, null) else return assert false;
 
-                let #ok(_) = test.createIndex("opt_nat_idx", [("opt_nat", #Ascending)], ?{ isUnique = true });
+                let #ok(_) = suite_utils.createIndex(test.name(), "opt_nat_idx", [("opt_nat", #Ascending)], ?{ isUnique = true }) else return assert false;
 
-                let #ok(_) = test.insert({ opt_nat = ?1 });
-                let #ok(_) = test.insert({ opt_nat = ?2 });
-                let #ok(_) = test.insert({ opt_nat = null });
-                let #ok(_) = test.insert({ opt_nat = null }); // should succeed
+                let #ok(_) = test.insert({ opt_nat = ?1 }) else return assert false;
+                let #ok(_) = test.insert({ opt_nat = ?2 }) else return assert false;
+                let #ok(_) = test.insert({ opt_nat = null }) else return assert false;
+                let #ok(_) = test.insert({ opt_nat = null }) else return assert false; // should succeed
 
                 assert test.search(
                     QueryBuilder().Where("opt_nat", #eq(#Null))
@@ -832,8 +832,9 @@ ZenDBSuite.newSuite(
                     };
                 };
 
-                let #ok(composite_collection) = zendb.createCollection("composite_test", CompositeSchema, candify_composite, null);
-                let #ok(_) = composite_collection.createIndex(
+                let #ok(composite_collection) = zendb.createCollection("composite_test", CompositeSchema, candify_composite, null) else return assert false;
+                let #ok(_) = suite_utils.createIndex(
+                    composite_collection.name(),
                     "composite",
                     [
                         ("first", #Ascending),
@@ -854,7 +855,7 @@ ZenDBSuite.newSuite(
                 var record_ids = Buffer.Buffer<Nat>(4);
 
                 for (record in records.vals()) {
-                    let #ok(id) = composite_collection.insert(record);
+                    let #ok(id) = composite_collection.insert(record) else return assert false;
                     record_ids.add(id);
                 };
 
@@ -913,22 +914,23 @@ ZenDBSuite.newSuite(
                     };
                 };
 
-                let #ok(boundary_collection) = zendb.createCollection("boundary_test", BoundarySchema, candify_boundary, null);
-                let #ok(_) = boundary_collection.createIndex("nat_val", [("nat_val", #Ascending)], null);
-                let #ok(_) = boundary_collection.createIndex("text_val", [("text_val", #Ascending)], null);
-                let #ok(_) = boundary_collection.createIndex("blob_val", [("blob_val", #Ascending)], null);
+                let #ok(boundary_collection) = zendb.createCollection("boundary_test", BoundarySchema, candify_boundary, null) else return assert false;
+                let #ok(_) = suite_utils.createIndex(boundary_collection.name(), "nat_val", [("nat_val", #Ascending)], null) else return assert false;
+                let #ok(_) = suite_utils.createIndex(boundary_collection.name(), "text_val", [("text_val", #Ascending)], null) else return assert false;
+                let #ok(_) = suite_utils.createIndex(boundary_collection.name(), "blob_val", [("blob_val", #Ascending)], null) else return assert false;
 
                 // Insert consecutive values to test boundary behavior
                 let #ok(id1) = boundary_collection.insert({
                     nat_val = 0;
                     text_val = "";
                     blob_val = Blob.fromArray([]);
-                });
+                }) else return assert false;
+
                 let #ok(id2) = boundary_collection.insert({
                     nat_val = 1;
                     text_val = "\00";
                     blob_val = Blob.fromArray([0]);
-                });
+                }) else return assert false;
 
                 // Test consecutive value boundaries
                 test(
@@ -947,10 +949,10 @@ ZenDBSuite.newSuite(
                     "Text empty string and null byte respect exclusive range",
                     func() {
                         let #ok(results) = boundary_collection.search(
-                            QueryBuilder().Where("text_val", #gt(#Text ""))
+                            QueryBuilder().Where("text_val", #gt(#Text("")))
                         );
 
-                        // assert results.size() == 1;
+                        assert results.size() == 1;
                         assert results[0].1.text_val == "\00";
                     },
                 );

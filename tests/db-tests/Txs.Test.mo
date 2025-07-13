@@ -166,18 +166,18 @@ ZenDBSuite.newSuite(
     ?ZenDBSuite.onlyWithIndex, // too slow to run with no index
     func txs_tests(zendb : ZenDB.Database, suite_utils : ZenDBSuite.SuiteUtils) {
 
-        let #ok(txs) = zendb.createCollection<Tx>("transactions", TxSchema, candify_tx, null);
+        let #ok(txs) = zendb.createCollection<Tx>("transactions", TxSchema, candify_tx, null) else return assert false;
 
-        let #ok(_) = suite_utils.createIndex(txs.name(), "index:[btype],[tx.amt]", [("btype", #Ascending), ("tx.amt", #Ascending)], null);
-        let #ok(_) = suite_utils.createIndex(txs.name(), "index:[btype],[ts]", [("btype", #Ascending), ("ts", #Ascending)], null);
-        let #ok(_) = suite_utils.createIndex(txs.name(), "index:[tx.amt]", [("tx.amt", #Ascending)], null);
-        let #ok(_) = suite_utils.createIndex(txs.name(), "index:[ts]", [("ts", #Ascending)], null);
-        let #ok(_) = suite_utils.createIndex(txs.name(), "index:[tx.from.owner],[tx.from.sub_account]", [("tx.from.owner", #Ascending), ("tx.from.sub_account", #Ascending)], null);
-        let #ok(_) = suite_utils.createIndex(txs.name(), "index:[tx.to.owner],[tx.to.sub_account]", [("tx.to.owner", #Ascending), ("tx.to.sub_account", #Ascending)], null);
-        let #ok(_) = suite_utils.createIndex(txs.name(), "index:[tx.spender.owner],[tx.spender.sub_account]", [("tx.spender.owner", #Ascending), ("tx.spender.sub_account", #Ascending)], null);
+        let #ok(_) = suite_utils.createIndex(txs.name(), "index:[btype],[tx.amt]", [("btype", #Ascending), ("tx.amt", #Ascending)], null) else return assert false;
+        let #ok(_) = suite_utils.createIndex(txs.name(), "index:[btype],[ts]", [("btype", #Ascending), ("ts", #Ascending)], null) else return assert false;
+        let #ok(_) = suite_utils.createIndex(txs.name(), "index:[tx.amt]", [("tx.amt", #Ascending)], null) else return assert false;
+        let #ok(_) = suite_utils.createIndex(txs.name(), "index:[ts]", [("ts", #Ascending)], null) else return assert false;
+        let #ok(_) = suite_utils.createIndex(txs.name(), "index:[tx.from.owner],[tx.from.sub_account]", [("tx.from.owner", #Ascending), ("tx.from.sub_account", #Ascending)], null) else return assert false;
+        let #ok(_) = suite_utils.createIndex(txs.name(), "index:[tx.to.owner],[tx.to.sub_account]", [("tx.to.owner", #Ascending), ("tx.to.sub_account", #Ascending)], null) else return assert false;
+        let #ok(_) = suite_utils.createIndex(txs.name(), "index:[tx.spender.owner],[tx.spender.sub_account]", [("tx.spender.owner", #Ascending), ("tx.spender.sub_account", #Ascending)], null) else return assert false;
 
         for ((i, tx) in Itertools.enumerate(input_txs.vals())) {
-            let #ok(id) = txs.insert(tx); // id is generated incrementally, so it should match tx.tx_index
+            let #ok(id) = txs.insert(tx) else return assert false; // id is generated incrementally, so it should match tx.tx_index
         };
 
         assert txs.size() == limit;

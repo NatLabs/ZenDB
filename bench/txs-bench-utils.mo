@@ -304,7 +304,7 @@ module TxsBenchUtils {
                             let #ok(_) = collection.insert(tx);
                         };
 
-                        Debug.print("stats: " # debug_show (collection.stats()));
+                        // Debug.print("stats: " # debug_show (collection.stats()));
                     };
 
                     case ("create and populate indexes") {
@@ -502,7 +502,7 @@ module TxsBenchUtils {
                         let #ok(matching_txs) = collection.search(db_query);
                     };
                     case ("update(): single operation -> #add amt += 100") {
-                        Debug.print("tx_ids.size(): " # debug_show (tx_ids.size()));
+                        // Debug.print("tx_ids.size(): " # debug_show (tx_ids.size()));
                         for (i in Itertools.take(tx_ids.vals(), limit)) {
                             let #ok(_) = collection.updateById(i, [("tx.amt", #add(#currValue, #Nat(100)))]);
                         };

@@ -107,7 +107,7 @@ module CollectionUtils {
             case (#heap(_)) {
                 #heap({
                     blobify = Orchid.Orchid.blobify;
-                    cmp = Cmp.Blob;
+                    cmp = Orchid.Orchid.btree_cmp;
                 });
             };
         };

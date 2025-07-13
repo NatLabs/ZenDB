@@ -53,11 +53,11 @@ ZenDBSuite.newSuite(
     "Simple Record Tests",
     ?{ ZenDBSuite.withAndWithoutIndex with log_level = #Debug },
     func suite_setup(zendb : ZenDB.Database, suite_utils : ZenDBSuite.SuiteUtils) {
-        let #ok(users) = zendb.createCollection<User>("users", users_schema, candify_user, null);
+        let #ok(users) = zendb.createCollection<User>("users", users_schema, candify_user, null) else return assert false;
 
-        let #ok(_) = suite_utils.createIndex(users.name(), "name_idx", [("name", #Ascending)], null);
-        let #ok(_) = suite_utils.createIndex(users.name(), "age_idx", [("age", #Ascending)], null);
-        let #ok(_) = suite_utils.createIndex(users.name(), "email_idx", [("email", #Ascending)], null);
+        let #ok(_) = suite_utils.createIndex(users.name(), "name_idx", [("name", #Ascending)], null) else return assert false;
+        let #ok(_) = suite_utils.createIndex(users.name(), "age_idx", [("age", #Ascending)], null) else return assert false;
+        let #ok(_) = suite_utils.createIndex(users.name(), "email_idx", [("email", #Ascending)], null) else return assert false;
 
         let inputs = Buffer.Buffer<User>(20);
         for (i in Iter.range(1, 20)) {
@@ -75,7 +75,7 @@ ZenDBSuite.newSuite(
                 email = "email";
             };
 
-            let #ok(id) = users.insert(user);
+            let #ok(id) = users.insert(user) else return assert false;
             Debug.print("id: " # debug_show (id, user));
             inputs.put(id, user);
         };
@@ -87,7 +87,7 @@ ZenDBSuite.newSuite(
                 email = "email";
             };
 
-            let #ok(id) = users.insert(user);
+            let #ok(id) = users.insert(user) else return assert false;
             Debug.print("id: " # debug_show (id, user));
             inputs.put(id, user);
         };
@@ -100,7 +100,7 @@ ZenDBSuite.newSuite(
                 test(
                     "retrieve all records",
                     func() {
-                        let #ok(results) = users.search(ZenDB.QueryBuilder());
+                        let #ok(results) = users.search(ZenDB.QueryBuilder()) else return assert false;
                         assert results.size() == inputs.size();
 
                         for ((id, user) in results.vals()) {
@@ -113,7 +113,7 @@ ZenDBSuite.newSuite(
                     "db_query by name equality",
                     func() {
                         let db_query = ZenDB.QueryBuilder().Where("name", #eq(#Text("nam-do-san")));
-                        let #ok(results) = users.search(db_query);
+                        let #ok(results) = users.search(db_query) else return assert false;
 
                         assert results.size() == 10;
                         for ((_, user) in results.vals()) {
@@ -127,7 +127,7 @@ ZenDBSuite.newSuite(
                     func() {
                         let db_query = ZenDB.QueryBuilder().Where("age", #gte(#Nat(3))).And("age", #lte(#Nat(7)));
 
-                        let #ok(results) = users.search(db_query);
+                        let #ok(results) = users.search(db_query) else return assert false;
                         Debug.print("results: " # debug_show (results));
                         assert results.size() == 10;
                         for ((_, user) in results.vals()) {
@@ -147,7 +147,7 @@ ZenDBSuite.newSuite(
                             #gte(#Nat(3)),
                         ).And("age", #lte(#Nat(7)));
 
-                        let #ok(results) = users.search(db_query);
+                        let #ok(results) = users.search(db_query) else return assert false;
                         assert results.size() == 5;
                         for ((_, user) in results.vals()) {
                             assert user.name == "nam-do-san";
@@ -185,7 +185,7 @@ ZenDBSuite.newSuite(
 
                         // We need to use User2 to check the result structure but
                         // without relying on the optional phone field
-                        let #ok(results) = users.search(db_query);
+                        let #ok(results) = users.search(db_query) else return assert false;
 
                         assert results.size() == 5;
                         for ((_, user) in results.vals()) {
@@ -208,7 +208,7 @@ ZenDBSuite.newSuite(
                             #eq(#Nat(9)),
                         );
 
-                        let #ok(results) = users.search(db_query);
+                        let #ok(results) = users.search(db_query) else return assert false;
                         assert results.size() == 4;
                         for ((_, user) in results.vals()) {
                             assert user.age == 1 or user.age == 9;
@@ -224,7 +224,7 @@ ZenDBSuite.newSuite(
                             #eq(#Nat(0)),
                         );
 
-                        let #ok(results) = users.search(db_query);
+                        let #ok(results) = users.search(db_query) else return assert false;
                         assert results.size() == 0;
 
                     },
@@ -238,16 +238,16 @@ ZenDBSuite.newSuite(
                             #eq(#Text("nam-do-san")),
                         );
 
-                        let #ok(results) = users.search(db_query);
+                        let #ok(results) = users.search(db_query) else return assert false;
                         assert results.size() == 10;
                         for ((_, user) in results.vals()) {
                             assert user.name == "nam-do-san";
                         };
 
                         // Update all "nam-do-san" users to have age 0
-                        let #ok(updated_documents) = users.update(db_query, [("age", #Nat(0))]);
+                        let #ok(updated_documents) = users.update(db_query, [("age", #Nat(0))]) else return assert false;
 
-                        let #ok(updated) = users.search(db_query);
+                        let #ok(updated) = users.search(db_query) else return assert false;
                         assert updated.size() == 10;
                         assert updated_documents == 10;
 
@@ -268,7 +268,7 @@ ZenDBSuite.newSuite(
                             #eq(#Nat(0)),
                         );
 
-                        let #ok(before_results) = users.search(db_query);
+                        let #ok(before_results) = users.search(db_query) else return assert false;
                         let before_count = before_results.size();
 
                         Debug.print("results before deletion (" # debug_show (before_count) # ") " # debug_show (before_results));
@@ -277,13 +277,13 @@ ZenDBSuite.newSuite(
                             assert user.age == 0;
                         };
 
-                        let #ok(deleted) = users.delete(db_query);
+                        let #ok(deleted) = users.delete(db_query) else return assert false;
                         Debug.print("deleted (" # debug_show (deleted.size()) # ") " # debug_show (deleted));
                         for ((_, user) in deleted.vals()) {
                             assert user.age == 0;
                         };
 
-                        let #ok(after_results) = users.search(db_query);
+                        let #ok(after_results) = users.search(db_query) else return assert false;
 
                         Debug.print("results after deletion (" # debug_show (after_results.size()) # ") " # debug_show (after_results));
 

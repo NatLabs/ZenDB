@@ -15,6 +15,7 @@ import T "Types";
 import C "Constants";
 import Schema "Collection/Schema";
 import SchemaMap "Collection/SchemaMap";
+import CandidUtils "CandidUtils";
 
 module CandidMap {
 
@@ -278,12 +279,21 @@ module CandidMap {
 
     };
 
+    // Helper function to wrap a Candid value in #Option if is_option_type is true
+    func wrap_option(candid_type : T.CandidType, value : Candid) : Candid {
+        // CandidUtils.inherit_options_from_type(
+        //     candid_type,
+        //     CandidUtils.unwrap_option(value),
+        // );
+        value;
+    };
+
     public func get(candid_map_state : CandidMap, schema_map : T.SchemaMap, key : Text) : ?Candid {
         let { candid_map } = candid_map_state;
 
         if (key == C.RECORD_ID) {
             let ?#Candid(#Nat, #Nat(id)) = Map.get(candid_map, thash, C.RECORD_ID) else Debug.trap("CandidMap: Could not find candid id");
-            return ?#Nat(id);
+            return ?#Nat(id); // exclude wrap_option for id
         };
 
         let fields = Iter.toArray(Text.split(key, #text(".")));
@@ -292,57 +302,42 @@ module CandidMap {
         var prefix_path = "";
         var current_field = "";
         var is_compound_type = true;
-
-        // Debug.print("key: " # debug_show (key));
-        // Debug.print("map: " # debug_show (Map.toArray(candid_map)));
+        let is_option_type = switch (types) {
+            case (#Option(_)) true;
+            case (_) false;
+        };
 
         let map = switch (get_and_cache_map_for_field(candid_map_state, schema_map, key)) {
             case (?map) map;
             case (_) return null;
         };
 
-        // Debug.print("map: " # debug_show Map.toArray(map));
-
         let field = if (fields.size() == 0) "" else fields[fields.size() - 1];
         current_field := field;
         prefix_path := if (prefix_path == "") field else prefix_path # "." # field;
-
-        // Debug.print("field: " # debug_show field);
-        // Debug.print("opt_candid: " # debug_show Map.get(map, thash, field));
-
-        // Debug.print("types: " # debug_show (types));
 
         let candid : NestedCandid = switch (Map.get(map, thash, field)) {
             case (?nested_candid) nested_candid;
             case (null) {
                 switch (SchemaMap.unwrap_option_type(types), Map.get(map, thash, IS_COMPOUND_TYPE)) {
                     case (#Variant(schema_map_types), ?#Candid(#Variant(candid_map_nested_types), #Text(tag))) {
-
-                        // Debug.print("schema_map_types: " # debug_show (schema_map_types));
-                        // Debug.print("candid_map_nested_types: " # debug_show (candid_map_nested_types));
-
                         for ((variant_tag, _) in schema_map_types.vals()) {
                             if (variant_tag == tag) {
-                                return ?#Text(tag);
+                                return ?wrap_option(types, #Text(tag));
                             };
                         };
-
                         return null;
-
                     };
                     case (_) return null;
                 };
-
             };
         };
-
-        // Debug.print("returned candid: " # debug_show (candid));
 
         switch (candid) {
             case (#CandidMap(nested_map)) {
                 switch (Map.get(nested_map, thash, IS_COMPOUND_TYPE)) {
                     case (?#Candid(#Variant(_), #Text(tag))) {
-                        return ?#Text(tag);
+                        return ?wrap_option(types, #Text(tag));
                     };
                     case (_) Debug.trap("CandidMap.get(): Recieved unexpected #CandidMap");
                 };
@@ -352,10 +347,10 @@ module CandidMap {
                     case ((#Record(_) or #Map(_) or #Variant(_) or #Option(#Record(_)) or #Option(#Map(_)) or #Option(#Variant(_)) or #Tuple(_) or #Array(_), #Record(_) or #Map(_) or #Variant(_) or #Option(#Record(_)) or #Option(#Map(_)) or #Option(#Variant(_)))) {
                         Debug.trap("CandidMap.get(): Should have cached the nested map");
                     };
-                    case (_, #Null) return ?#Null;
+                    case (_, #Null) return ?wrap_option(types, #Null);
                     case (_) {
                         is_compound_type := false;
-                        result := ?candid;
+                        result := ?wrap_option(types, candid);
                     };
                 };
             };
@@ -364,7 +359,7 @@ module CandidMap {
         let opt_compound_tag = Map.get(map, thash, IS_COMPOUND_TYPE);
 
         if (is_compound_type) switch (SchemaMap.unwrap_option_type(types), opt_compound_tag) {
-            case (#Variant(_), ?#Candid(#Variant(_), #Text(tag))) return ?#Text(tag);
+            case (#Variant(_), ?#Candid(#Variant(_), #Text(tag))) return ?wrap_option(types, #Text(tag));
             case (_) {};
         };
 

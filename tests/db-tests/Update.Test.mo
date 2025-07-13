@@ -72,11 +72,11 @@ ZenDBSuite.newSuite(
     ?ZenDBSuite.withAndWithoutIndex,
 
     func update_tests(zendb : ZenDB.Database, suite_utils : ZenDBSuite.SuiteUtils) {
-        let #ok(data) = zendb.createCollection<Doc>("data", DocSchema, data_type_to_candid, null);
+        let #ok(data) = zendb.createCollection<Doc>("data", DocSchema, data_type_to_candid, null) else return assert false;
 
-        let #ok(_) = suite_utils.createIndex(data.name(), "index_1", [("version", #Ascending)], null);
-        let #ok(_) = suite_utils.createIndex(data.name(), "index_2", [("version.v1.a", #Ascending)], null);
-        let #ok(_) = suite_utils.createIndex(data.name(), "index_3", [("version.v3.size.known", #Ascending)], null);
+        let #ok(_) = suite_utils.createIndex(data.name(), "index_1", [("version", #Ascending)], null) else return assert false;
+        let #ok(_) = suite_utils.createIndex(data.name(), "index_2", [("version.v1.a", #Ascending)], null) else return assert false;
+        let #ok(_) = suite_utils.createIndex(data.name(), "index_3", [("version.v3.size.known", #Ascending)], null) else return assert false;
 
         var item1 : Doc = { version = #v1({ a = 42; b = "hello" }) };
         var item2 : Doc = { version = #v2({ c = "world"; d = true }) };
@@ -89,11 +89,11 @@ ZenDBSuite.newSuite(
             });
         };
 
-        let #ok(item1_id) = data.insert(item1);
-        let #ok(item2_id) = data.insert(item2);
-        let #ok(item3_id) = data.insert(item3);
-        let #ok(item4_id) = data.insert(item4);
-        let #ok(item5_id) = data.insert(item5);
+        let #ok(item1_id) = data.insert(item1) else return assert false;
+        let #ok(item2_id) = data.insert(item2) else return assert false;
+        let #ok(item3_id) = data.insert(item3) else return assert false;
+        let #ok(item4_id) = data.insert(item4) else return assert false;
+        let #ok(item5_id) = data.insert(item5) else return assert false;
 
         suite(
             "Update Tests",
@@ -112,7 +112,7 @@ ZenDBSuite.newSuite(
                         let new_doc : Doc = {
                             version = #v1({ a = 33; b = "text" });
                         };
-                        let #ok(_) = data.replace(item1_id, (new_doc));
+                        let #ok(_) = data.replace(item1_id, (new_doc)) else return assert false;
 
                         assert #ok([]) == data.search(
                             ZenDB.QueryBuilder().Where("version.v1.a", #eq(#Int(42)))
@@ -185,7 +185,7 @@ ZenDBSuite.newSuite(
                         Debug.print(
                             "#subAll item: " # debug_show (
                                 data.search(
-                                    ZenDB.QueryBuilder().Where("version.v3.size.known", #eq(#Option(#Nat(32))))
+                                    ZenDB.QueryBuilder().Where("version.v3.size.known", #eq(#Nat(32)))
                                 )
                             )
                         );
@@ -570,7 +570,7 @@ ZenDBSuite.newSuite(
                         };
 
                         // Reset
-                        let #ok(_) = data.replace(item1_id, item1);
+                        let #ok(_) = data.replace(item1_id, item1) else return assert false;
                     },
                 );
 
@@ -584,7 +584,7 @@ ZenDBSuite.newSuite(
                                 let new_doc : Doc = {
                                     version = #v1({ a = 0; b = "text" });
                                 };
-                                let #ok(_) = data.replace(item1_id, new_doc);
+                                let #ok(_) = data.replace(item1_id, new_doc) else return assert false;
 
                                 // Apply negative operation
                                 let #ok(_) = data.updateById(
@@ -616,7 +616,7 @@ ZenDBSuite.newSuite(
                                 let temp_doc : Doc = {
                                     version = #v0({ decimal = 7.6 });
                                 };
-                                let #ok(temp_id) = data.insert(temp_doc);
+                                let #ok(temp_id) = data.insert(temp_doc) else return assert false;
 
                                 // Test floor operation
                                 let #ok(_) = data.updateById(
@@ -674,7 +674,7 @@ ZenDBSuite.newSuite(
                                 };
 
                                 // Reset
-                                let #ok(_) = data.replace(item1_id, item1);
+                                let #ok(_) = data.replace(item1_id, item1) else return assert false;
                             },
                         );
 
@@ -691,7 +691,7 @@ ZenDBSuite.newSuite(
                                 };
 
                                 // Reset
-                                let #ok(_) = data.replace(item1_id, item1);
+                                let #ok(_) = data.replace(item1_id, item1) else return assert false;
                             },
                         );
 
@@ -719,7 +719,7 @@ ZenDBSuite.newSuite(
                                 };
 
                                 // Reset
-                                let #ok(_) = data.replace(item1_id, item1);
+                                let #ok(_) = data.replace(item1_id, item1) else return assert false;
                             },
                         );
 
@@ -736,7 +736,7 @@ ZenDBSuite.newSuite(
                                 };
 
                                 // Reset
-                                let #ok(_) = data.replace(item1_id, item1);
+                                let #ok(_) = data.replace(item1_id, item1) else return assert false;
                             },
                         );
                     },
@@ -784,7 +784,7 @@ ZenDBSuite.newSuite(
                                 };
 
                                 // Reset
-                                let #ok(_) = data.replace(item1_id, item1);
+                                let #ok(_) = data.replace(item1_id, item1) else return assert false;
                             },
                         );
 
@@ -818,7 +818,7 @@ ZenDBSuite.newSuite(
                                 };
 
                                 // Reset
-                                let #ok(_) = data.replace(item1_id, item1);
+                                let #ok(_) = data.replace(item1_id, item1) else return assert false;
                             },
                         );
 
@@ -845,7 +845,7 @@ ZenDBSuite.newSuite(
                                 };
 
                                 // Reset
-                                let #ok(_) = data.replace(item1_id, item1);
+                                let #ok(_) = data.replace(item1_id, item1) else return assert false;
                             },
                         );
 
@@ -869,7 +869,7 @@ ZenDBSuite.newSuite(
                                 };
 
                                 // Reset
-                                let #ok(_) = data.replace(item1_id, item1);
+                                let #ok(_) = data.replace(item1_id, item1) else return assert false;
                             },
                         );
 
@@ -893,7 +893,7 @@ ZenDBSuite.newSuite(
                                 };
 
                                 // Reset
-                                let #ok(_) = data.replace(item1_id, item1);
+                                let #ok(_) = data.replace(item1_id, item1) else return assert false;
                             },
                         );
 
@@ -919,7 +919,7 @@ ZenDBSuite.newSuite(
                                 };
 
                                 // Reset
-                                let #ok(_) = data.replace(item1_id, item1);
+                                let #ok(_) = data.replace(item1_id, item1) else return assert false;
                             }
 
                         );

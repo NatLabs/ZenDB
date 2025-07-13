@@ -53,7 +53,7 @@ module {
             case (#Int32(n)) if (n == Int32.maximumValue) #Maximum else #Int32(n + 1);
             case (#Int64(n)) if (n == Int64.maximumValue) #Maximum else #Int64(n + 1);
             case (#Float(n)) #Float(n + 1e-30);
-            case (#Text(t)) #Text(t # Text.fromChar(Char.fromNat32(1 : Nat32)));
+            case (#Text(t)) #Text(t # Text.fromChar(Char.fromNat32(0 : Nat32)));
             case (#Blob(b)) #Blob(
                 Blob.fromArray(
                     Array.append(
@@ -160,6 +160,66 @@ module {
 
         };
 
+    };
+
+    public func from_candid_query(value : T.CandidQuery) : T.Candid {
+        switch (value) {
+            case (#Nat(n)) #Nat(n);
+            case (#Nat8(n)) #Nat8(n);
+            case (#Nat16(n)) #Nat16(n);
+            case (#Nat32(n)) #Nat32(n);
+            case (#Nat64(n)) #Nat64(n);
+            case (#Int(n)) #Int(n);
+            case (#Int8(n)) #Int8(n);
+            case (#Int16(n)) #Int16(n);
+            case (#Int32(n)) #Int32(n);
+            case (#Int64(n)) #Int64(n);
+            case (#Float(f)) #Float(f);
+            case (#Text(t)) #Text(t);
+            case (#Blob(b)) #Blob(b);
+            case (#Principal(p)) #Principal(p);
+            case (#Bool(b)) #Bool(b);
+            case (#Null) #Null;
+            case (#Empty) #Empty;
+            case (_candid_value) Debug.trap("from_candid_query(): Does not support this type: " # debug_show (_candid_value));
+        };
+    };
+
+    public func to_candid_query(value : T.Candid) : T.CandidQuery {
+        switch (value) {
+            case (#Nat(n)) #Nat(n);
+            case (#Nat8(n)) #Nat8(n);
+            case (#Nat16(n)) #Nat16(n);
+            case (#Nat32(n)) #Nat32(n);
+            case (#Nat64(n)) #Nat64(n);
+            case (#Int(n)) #Int(n);
+            case (#Int8(n)) #Int8(n);
+            case (#Int16(n)) #Int16(n);
+            case (#Int32(n)) #Int32(n);
+            case (#Int64(n)) #Int64(n);
+            case (#Float(f)) #Float(f);
+            case (#Text(t)) #Text(t);
+            case (#Blob(b)) #Blob(b);
+            case (#Principal(p)) #Principal(p);
+            case (#Bool(b)) #Bool(b);
+            case (#Null) #Null;
+            case (#Empty) #Empty;
+            case (_candid_value) Debug.trap("to_candid_query(): Does not support this type: " # debug_show (_candid_value));
+        };
+    };
+
+    public func unwrap_option(value : T.Candid) : T.Candid {
+        switch (value) {
+            case (#Option(nested_value)) unwrap_option(nested_value);
+            case (_) value;
+        };
+    };
+
+    public func inherit_options_from_type(candid_type : T.CandidType, value : T.Candid) : T.Candid {
+        switch (candid_type) {
+            case (#Option(nested_type)) inherit_options_from_type(nested_type, #Option(value));
+            case (_) value;
+        };
     };
 
 };
