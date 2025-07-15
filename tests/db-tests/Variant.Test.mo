@@ -52,7 +52,7 @@ let data_type_to_candid : ZenDB.Types.Candify<Data> = {
 
 ZenDBSuite.newSuite(
     "Variant Tests",
-    ?{ ZenDBSuite.withAndWithoutIndex with log_level = #Debug },
+    ?{ ZenDBSuite.withAndWithoutIndex with log_level = #Error },
     func suite_setup(zendb : ZenDB.Database, suite_utils : ZenDBSuite.SuiteUtils) {
 
         let #ok(data) = zendb.createCollection<Data>("data", DataSchema, data_type_to_candid, null) else return assert false;

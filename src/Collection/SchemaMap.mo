@@ -17,7 +17,7 @@ module {
 
     public func new(schema : T.Schema) : T.SchemaMap {
         let schema_map = Map.new<Text, T.Schema>();
-        ignore Map.put(schema_map, T.thash, C.RECORD_ID, #Nat);
+        ignore Map.put(schema_map, T.thash, C.DOCUMENT_ID, #Nat);
 
         let list_of_fields_with_array_type = Buffer.Buffer<Text>(8);
 
@@ -154,7 +154,7 @@ module {
         null;
     };
 
-    public func get_parent_field_path(field_name : Text) : ?(Text, Text) {
+    public func getParentPath(field_name : Text) : ?(Text, Text) {
         let fields = Iter.toArray(Text.split(field_name, #text(".")));
 
         if (fields.size() == 0) {
@@ -172,7 +172,7 @@ module {
 
     };
 
-    public func is_valid_path(schema_map : SchemaMap, field_name : Text) : Bool {
+    public func isValidPath(schema_map : SchemaMap, field_name : Text) : Bool {
         switch (Map.get<Text, T.CandidType>(schema_map.map, T.thash, field_name)) {
             case (?_) true;
             case (null) false;
@@ -184,10 +184,10 @@ module {
         unique_constraints : [[Text]];
     };
 
-    public func is_nested_variant_field(schema_map : SchemaMap, field_name : Text) : Bool {
+    public func isNestedVariantField(schema_map : SchemaMap, field_name : Text) : Bool {
         if (field_name == "") return false;
 
-        let ?(parent_field_name, last_field_name) = get_parent_field_path(field_name) else {
+        let ?(parent_field_name, last_field_name) = getParentPath(field_name) else {
             return false;
         };
 
@@ -204,15 +204,15 @@ module {
                     },
                 );
             };
-            case (_) is_nested_variant_field(schema_map, parent_field_name);
+            case (_) isNestedVariantField(schema_map, parent_field_name);
         };
 
     };
 
-    public func is_nested_option_field(schema_map : SchemaMap, field_name : Text) : Bool {
+    public func isNestedOptionField(schema_map : SchemaMap, field_name : Text) : Bool {
         if (field_name == "") return false;
 
-        let ?(parent_field_name, last_field_name) = get_parent_field_path(field_name) else {
+        let ?(parent_field_name, last_field_name) = getParentPath(field_name) else {
             return false;
         };
 
@@ -222,29 +222,29 @@ module {
 
         switch (parent_field_type) {
             case (#Option(_)) true;
-            case (_) is_nested_option_field(schema_map, parent_field_name);
+            case (_) isNestedOptionField(schema_map, parent_field_name);
         };
     };
 
-    public func unwrap_option_type(option_type : T.CandidType) : T.CandidType {
+    public func unwrapOptionType(option_type : T.CandidType) : T.CandidType {
         switch (option_type) {
             case (#Option(inner)) {
-                unwrap_option_type(inner);
+                unwrapOptionType(inner);
             };
             case (unwrapped) { unwrapped };
         };
     };
 
-    public func unwrap_array_type(array_type : T.CandidType) : T.CandidType {
+    public func unwrapArrayType(array_type : T.CandidType) : T.CandidType {
         switch (array_type) {
             case (#Array(inner)) {
-                unwrap_array_type(inner);
+                unwrapArrayType(inner);
             };
             case (unwrapped) { unwrapped };
         };
     };
 
-    public func validate_schema_constraints(
+    public func validateSchemaConstraints(
         schema_map : SchemaMap,
         constraints : [T.SchemaConstraint],
     ) : T.Result<ValidateSchemaConstraintResponse, Text> {
@@ -274,7 +274,7 @@ module {
                         };
                     };
 
-                    let unwrapped_type = unwrap_option_type(field_type);
+                    let unwrapped_type = unwrapOptionType(field_type);
 
                     let buffer = Buffer.Buffer<T.SchemaFieldConstraint>(8);
 
@@ -367,7 +367,7 @@ module {
                             return #err("Field '" # unique_field_name # "' not found in schema");
                         };
 
-                        switch (unwrap_option_type(unique_field_type)) {
+                        switch (unwrapOptionType(unique_field_type)) {
                             case (#Record(_) or #Map(_) or #Array(_) or #Variant(_) or #Tuple(_) or #Null or #Empty or #Recursive(_)) {
                                 return #err(
                                     "Error creating unique constraint on field " # unique_field_name # "' as unique constraint is not supported with type " # debug_show (unique_field_type) # "."

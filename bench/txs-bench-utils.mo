@@ -309,7 +309,7 @@ module TxsBenchUtils {
 
                     case ("create and populate indexes") {
                         for ((i, index_details) in Itertools.enumerate(indexes.vals())) {
-                            let #ok(_) = collection.createAndPopulateIndex("index_" # debug_show (i), index_details);
+                            let #ok(_) = collection.createIndex("index_" # debug_show (i), index_details, null);
                         };
 
                     };
@@ -781,20 +781,20 @@ module TxsBenchUtils {
         func skip_limit_paginated_query(db_query : ZenDB.QueryBuilder) {
             ignore db_query.Limit(pagination_limit);
             let #ok(matching_txs) = txs.search(db_query);
-            var records = matching_txs;
+            var documents = matching_txs;
             var skip = 0;
             var opt_cursor : ?Nat = null;
 
-            label pagination while (records.size() > 0) {
+            label pagination while (documents.size() > 0) {
                 ignore db_query.Skip(skip).Limit(pagination_limit);
 
                 let #ok(matching_txs) = txs.search(db_query);
 
-                records := matching_txs;
+                documents := matching_txs;
 
             };
 
-            skip += records.size();
+            skip += documents.size();
         };
 
         func skip_limit_skip_limit_paginated_query(db_query : ZenDB.QueryBuilder, pagination_limit : Nat) : [(Nat, Tx)] {
@@ -802,11 +802,11 @@ module TxsBenchUtils {
             ignore db_query.Limit(pagination_limit);
             let #ok(matching_txs) = txs.search(db_query);
             let bitmap = BitMap.fromIter(Iter.map<(Nat, Tx), Nat>(matching_txs.vals(), func((id, _) : (Nat, Tx)) : Nat = id));
-            let records = Buffer.fromArray<(Nat, Tx)>(matching_txs);
-            var batch_size = records.size();
+            let documents = Buffer.fromArray<(Nat, Tx)>(matching_txs);
+            var batch_size = documents.size();
 
             label skip_limit_pagination while (batch_size > 0) {
-                ignore db_query.Skip(records.size()).Limit(pagination_limit);
+                ignore db_query.Skip(documents.size()).Limit(pagination_limit);
 
                 let #ok(matching_txs) = txs.search(db_query);
                 // Debug.print("matching_txs: " # debug_show matching_txs);
@@ -815,7 +815,7 @@ module TxsBenchUtils {
                 batch_size := matching_txs.size();
 
                 for ((id, tx) in matching_txs.vals()) {
-                    records.add((id, tx));
+                    documents.add((id, tx));
 
                     if (bitmap.get(id)) {
                         Debug.trap("Duplicate entry for id " # debug_show id);
@@ -826,7 +826,7 @@ module TxsBenchUtils {
 
             };
 
-            Buffer.toArray(records);
+            Buffer.toArray(documents);
 
         };
 

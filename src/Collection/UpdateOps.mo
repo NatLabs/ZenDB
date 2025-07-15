@@ -104,7 +104,7 @@ module {
         let res : T.Result<T.Candid, Text> = switch (op) {
             case (#currValue) { return #ok(field_value) };
             case (#get(requested_field_name)) {
-                let ?value = CandidMap.get(candid_map, collection.schema_map, requested_field_name) else return #err("Field '" # requested_field_name # "' not found in record");
+                let ?value = CandidMap.get(candid_map, collection.schema_map, requested_field_name) else return #err("Field '" # requested_field_name # "' not found in document");
                 return #ok(value);
             };
 
@@ -272,7 +272,7 @@ module {
 
     };
 
-    public func handle_field_update_operation(
+    public func handleFieldUpdateOperation(
         collection : T.StableCollection,
         candid_map : T.CandidMap,
         field_type : T.CandidType,
@@ -289,7 +289,7 @@ module {
             case (#ok(new_value_cast_to_type)) return #ok(new_value_cast_to_type);
             case (#err(err)) {
                 let err_msg = "Failed to cast field result (" # debug_show (new_value) # ") to type '" # debug_show field_type # "': " # err;
-                return Utils.log_error_msg(collection.logger, err_msg);
+                return Utils.logErrorMsg(collection.logger, err_msg);
             };
         };
 

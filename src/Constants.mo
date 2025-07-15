@@ -1,5 +1,5 @@
 module {
-    public let RECORD_ID = ":id";
+    public let DOCUMENT_ID = ":id";
 
     // This field is used to allow multiple null values in a unique index by attaching the document's id to the null value.
     public let UNIQUE_INDEX_NULL_EXEMPT_ID = ":unique_index_null_exempt_id";

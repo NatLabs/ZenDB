@@ -87,7 +87,7 @@ ZenDBSuite.newSuite(
             ("bool", #Bool),
         ]);
 
-        let candify_record : ZenDB.Types.Candify<RecordWithAllTypes> = {
+        let candify_document : ZenDB.Types.Candify<RecordWithAllTypes> = {
             to_blob = func(data : RecordWithAllTypes) : Blob = to_candid (data);
             from_blob = func(blob : Blob) : ?RecordWithAllTypes = from_candid (blob);
         };
@@ -95,7 +95,7 @@ ZenDBSuite.newSuite(
         let inputs = Buffer.Buffer<RecordWithAllTypes>(limit);
 
         for (i in Itertools.range(0, limit)) {
-            let record : RecordWithAllTypes = {
+            let document : RecordWithAllTypes = {
                 text = fuzz.text.randomAlphanumeric(
                     fuzz.nat.randomRange(0, 100)
                 );
@@ -119,7 +119,7 @@ ZenDBSuite.newSuite(
                 bool = fuzz.bool.random();
             };
 
-            inputs.add(record);
+            inputs.add(document);
         };
 
         let input_ids = Buffer.Buffer<Nat>(limit);
@@ -128,7 +128,7 @@ ZenDBSuite.newSuite(
             "CRUD operations",
             func() {
 
-                let #ok(crud_collection) = zendb.createCollection("CRUD", RecordWithAllTypesSchema, candify_record, null) else return assert false;
+                let #ok(crud_collection) = zendb.createCollection("CRUD", RecordWithAllTypesSchema, candify_document, null) else return assert false;
                 let schema_map = crud_collection._get_schema_map();
                 let candid_maps = Map.new<Nat, ZenDB.Types.CandidMap>();
 
@@ -139,16 +139,16 @@ ZenDBSuite.newSuite(
                 suite(
                     "Create",
                     func() {
-                        for (record in inputs.vals()) {
-                            let #ok(id) = crud_collection.insert(record) else return assert false;
-                            assert crud_collection.get(id) == ?record;
+                        for (document in inputs.vals()) {
+                            let #ok(id) = crud_collection.insert(document) else return assert false;
+                            assert crud_collection.get(id) == ?document;
 
-                            let candid_record = CollectionUtils.decode_candid_blob(
+                            let candid_document = CollectionUtils.decodeCandidBlob(
                                 crud_collection._get_stable_state(),
-                                candify_record.to_blob(record),
+                                candify_document.to_blob(document),
                             );
 
-                            let candid_map = CandidMap.new(crud_collection._get_schema_map(), id, candid_record);
+                            let candid_map = CandidMap.new(crud_collection._get_schema_map(), id, candid_document);
                             ignore Map.put(candid_maps, Map.nhash, id, candid_map);
                         };
 
@@ -158,11 +158,11 @@ ZenDBSuite.newSuite(
                 suite(
                     "Read: #eq",
                     func() {
-                        for ((id, record) in crud_collection.entries()) {
+                        for ((id, document) in crud_collection.entries()) {
 
                             let ?candid_map = Map.get(candid_maps, Map.nhash, id) else return assert false;
 
-                            assert CandidMap.get(candid_map, schema_map, ZenDB.Constants.RECORD_ID) == ?#Nat(id);
+                            assert CandidMap.get(candid_map, schema_map, ZenDB.Constants.DOCUMENT_ID) == ?#Nat(id);
 
                             for (field in indexible_fields.vals()) {
                                 let ?field_value = CandidMap.get(candid_map, schema_map, field) else return assert false;
@@ -173,13 +173,13 @@ ZenDBSuite.newSuite(
                                         field,
                                         #eq(field_value),
                                     ).And(
-                                        ZenDB.Constants.RECORD_ID,
+                                        ZenDB.Constants.DOCUMENT_ID,
                                         #eq(#Nat(id)),
                                     )
                                 ) else return assert false;
 
-                                // Debug.print("Search result for field " # field # ": " # debug_show (record) # " -> " # debug_show (found_record));
-                                assert results[0] == (id, record);
+                                // Debug.print("Search result for field " # field # ": " # debug_show (document) # " -> " # debug_show (found_document));
+                                assert results[0] == (id, document);
                             };
 
                         };

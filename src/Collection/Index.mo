@@ -31,7 +31,9 @@ import CollectionUtils "Utils";
 import Schema "Schema";
 import BTree "../BTree";
 import SchemaMap "SchemaMap";
-module {
+import DocumentStore "DocumentStore";
+
+module Index {
 
     type BestIndexResult = T.BestIndexResult;
 
@@ -69,7 +71,7 @@ module {
         collection : StableCollection,
         name : Text,
         index_key_details : [(Text, SortDirection)],
-        is_unique : Bool, // if true, the index is unique and the record ids are not concatenated with the index key values to make duplicate values appear unique
+        is_unique : Bool, // if true, the index is unique and the document ids are not concatenated with the index key values to make duplicate values appear unique
         used_internally : Bool, // cannot be deleted by user if true
     ) : T.Index {
 
@@ -97,14 +99,14 @@ module {
         } else {
             Array.append(
                 index_key_details,
-                [(C.RECORD_ID, #Ascending)],
+                [(C.DOCUMENT_ID, #Ascending)],
             );
         };
 
         let index : Index = {
             name;
             key_details;
-            data = CollectionUtils.new_btree(collection);
+            data = CollectionUtils.newBtree(collection);
             used_internally;
             is_unique;
         };
@@ -124,14 +126,14 @@ module {
         candid_map : T.CandidMap,
     ) : T.Result<(), Text> {
 
-        let index_data_utils = CollectionUtils.get_index_data_utils(collection);
+        let index_data_utils = CollectionUtils.getIndexDataUtils(collection);
 
-        let index_key_values = switch (CollectionUtils.get_index_columns(collection, index.key_details, id, candid_map)) {
+        let index_key_values = switch (CollectionUtils.getIndexColumns(collection, index.key_details, id, candid_map)) {
             case (?index_key_values) index_key_values;
             case (null) {
                 Logger.lazyDebug(
                     collection.logger,
-                    func() = "Skipping indexing for record with id " # debug_show id # " because it does not have any values in the index",
+                    func() = "Skipping indexing for document with id " # debug_show id # " because it does not have any values in the index",
                 );
 
                 return #ok();
@@ -144,14 +146,14 @@ module {
                 ignore BTree.put(index.data, index_data_utils, index_key_values, prev_id);
 
                 return #err(
-                    "Failed to insert record with id " # debug_show id # " into index " # index.name # ", because a duplicate entry with id " # debug_show prev_id # " already exists"
+                    "Failed to insert document with id " # debug_show id # " into index " # index.name # ", because a duplicate entry with id " # debug_show prev_id # " already exists"
                 );
             };
         };
 
         Logger.lazyDebug(
             collection.logger,
-            func() = "Storing record with id " # debug_show id # " in index " # index.name # ", originally "
+            func() = "Storing document with id " # debug_show id # " in index " # index.name # ", originally "
             # debug_show (index_key_values) # ", now encoded as " # (
                 switch (index_data_utils) {
                     case (#stableMemory(utils)) debug_show utils.key.blobify.to_blob(index_key_values);
@@ -164,14 +166,14 @@ module {
     };
 
     public func remove(collection : StableCollection, index : Index, id : Nat, prev_candid_map : T.CandidMap) : T.Result<(), Text> {
-        let index_data_utils = CollectionUtils.get_index_data_utils(collection);
+        let index_data_utils = CollectionUtils.getIndexDataUtils(collection);
 
-        let index_key_values = switch (CollectionUtils.get_index_columns(collection, index.key_details, id, prev_candid_map)) {
+        let index_key_values = switch (CollectionUtils.getIndexColumns(collection, index.key_details, id, prev_candid_map)) {
             case (?index_key_values) index_key_values;
             case (null) {
                 Logger.lazyDebug(
                     collection.logger,
-                    func() = "Skipping indexing for record with id " # debug_show id # " because it does not have any values in the index",
+                    func() = "Skipping indexing for document with id " # debug_show id # " because it does not have any values in the index",
                 );
 
                 return #ok();
@@ -180,7 +182,7 @@ module {
 
         switch (BTree.remove(index.data, index_data_utils, index_key_values)) {
             case (null) return #err(
-                "Failed to remove record with id " # debug_show id # " from index " # index.name # ", because it does not exist"
+                "Failed to remove document with id " # debug_show id # " from index " # index.name # ", because it does not exist"
             );
             case (?prev_id) {
                 if (prev_id != id) {
@@ -188,7 +190,7 @@ module {
                     ignore BTree.put(index.data, index_data_utils, index_key_values, prev_id);
 
                     return #err(
-                        "Failed to remove record with id " # debug_show id # " from index " # index.name # ", because it was not found in the index. The record with id " # debug_show prev_id # " was found instead"
+                        "Failed to remove document with id " # debug_show id # " from index " # index.name # ", because it was not found in the index. The document with id " # debug_show prev_id # " was found instead"
                     );
                 };
             };
@@ -197,20 +199,125 @@ module {
         #ok();
     };
 
+    public func clear(collection : StableCollection, index : Index) {
+        BTree.clear(index.data);
+    };
+
+    public func populateIndex(
+        collection : StableCollection,
+        index : Index,
+    ) : T.Result<(), Text> {
+        assert Index.size(index) == 0;
+
+        let doc_store_utils = DocumentStore.getBtreeUtils(collection.documents);
+
+        for ((id, candid_blob) in DocumentStore.entries(collection.documents, doc_store_utils)) {
+            let candid = CollectionUtils.decodeCandidBlob(collection, candid_blob);
+            let candid_map = CandidMap.new(collection.schema_map, id, candid);
+
+            switch (Index.insert(collection, index, id, candid_map)) {
+                case (#err(err)) {
+                    return #err("populate_index() failed on index '" # index.name # "': " # err);
+                };
+                case (#ok(_)) {};
+            };
+
+        };
+
+        #ok();
+
+    };
+
+    /// Clears the index and repopulates it with all documents from the collection.
+    public func repopulateIndex(collection : StableCollection, index : Index) : T.Result<(), Text> {
+        // clear the index first
+        Index.clear(collection, index);
+        populateIndex(collection, index);
+    };
+
+    func populateIndexesFromCandidMapDocumentEntries(
+        collection : StableCollection,
+        indexes : [T.Index],
+        document_entries : T.Iter<(Nat, T.CandidMap)>,
+        on_start : (T.Index) -> (),
+    ) : T.Result<(), Text> {
+
+        for ((id, candid_map) in document_entries) {
+
+            for (index in indexes.vals()) {
+                on_start(index);
+                switch (Index.insert(collection, index, id, candid_map)) {
+                    case (#err(err)) {
+                        return #err("populate_index() failed on index '" # index.name # "': " # err);
+                    };
+                    case (#ok(_)) {};
+                };
+            };
+
+        };
+
+        #ok();
+    };
+
+    public func populateIndexes(
+        collection : StableCollection,
+        indexes : [T.Index],
+    ) : T.Result<(), Text> {
+
+        let candid_map_document_entries = Iter.map<(Nat, Blob), (Nat, T.CandidMap)>(
+            DocumentStore.entries(collection.documents, DocumentStore.getBtreeUtils(collection.documents)),
+            func((id, candid_blob) : (Nat, Blob)) : (Nat, T.CandidMap) {
+                let candid = CollectionUtils.decodeCandidBlob(collection, candid_blob);
+                (id, CandidMap.new(collection.schema_map, id, candid));
+            },
+        );
+
+        populateIndexesFromCandidMapDocumentEntries(
+            collection,
+            indexes,
+            candid_map_document_entries,
+            func(_index : T.Index) {},
+        );
+
+    };
+
+    public func repopulateIndexes(
+        collection : StableCollection,
+        indexes : [T.Index],
+    ) : T.Result<(), Text> {
+
+        let candid_map_document_entries = Iter.map<(Nat, Blob), (Nat, T.CandidMap)>(
+            DocumentStore.entries(collection.documents, DocumentStore.getBtreeUtils(collection.documents)),
+            func((id, candid_blob) : (Nat, Blob)) : (Nat, T.CandidMap) {
+                let candid = CollectionUtils.decodeCandidBlob(collection, candid_blob);
+                (id, CandidMap.new(collection.schema_map, id, candid));
+            },
+        );
+
+        populateIndexesFromCandidMapDocumentEntries(
+            collection,
+            indexes,
+            candid_map_document_entries,
+            func(index : T.Index) {
+                Index.clear(collection, index);
+            },
+        );
+    };
+
     // public func exists(
     //     collection : StableCollection,
     //     index : Index,
     //     id : Nat,
     //     candid_map : T.CandidMap,
     // ) : Bool {
-    //     let index_data_utils = CollectionUtils.get_index_data_utils(collection);
+    //     let index_data_utils = CollectionUtils.getIndexDataUtils(collection);
 
-    //     let index_key_values = switch (CollectionUtils.get_index_columns(collection, index.key_details, id, candid_map)) {
+    //     let index_key_values = switch (CollectionUtils.getIndexColumns(collection, index.key_details, id, candid_map)) {
     //         case (?index_key_values) index_key_values;
     //         case (null) {
     //             Logger.lazyDebug(
     //                 collection.logger,
-    //                 func() = "Skipping indexing for record with id " # debug_show id # " because it does not have any values in the index",
+    //                 func() = "Skipping indexing for document with id " # debug_show id # " because it does not have any values in the index",
     //             );
 
     //             return false;
@@ -247,7 +354,7 @@ module {
             case (#gte(candid)) {
                 switch (Map.get(lower, thash, field)) {
                     case (?#Inclusive(val) or ?#Exclusive(val)) {
-                        if (Schema.cmp_candid(#Empty, candid, val) == 1) {
+                        if (Schema.cmpCandid(#Empty, candid, val) == 1) {
                             ignore Map.put(lower, thash, field, #Inclusive(candid));
                         };
                     };
@@ -257,7 +364,7 @@ module {
             case (#lte(candid)) {
                 switch (Map.get(upper, thash, field)) {
                     case (?#Inclusive(val) or ?#Exclusive(val)) {
-                        if (Schema.cmp_candid(#Empty, candid, val) == -1) {
+                        if (Schema.cmpCandid(#Empty, candid, val) == -1) {
                             ignore Map.put(upper, thash, field, #Inclusive(candid));
                         };
                     };
@@ -267,7 +374,7 @@ module {
             case (#lt(candid)) {
                 switch (Map.get(upper, thash, field)) {
                     case (?#Inclusive(val) or ?#Exclusive(val)) {
-                        let cmp = Schema.cmp_candid(#Empty, candid, val);
+                        let cmp = Schema.cmpCandid(#Empty, candid, val);
                         if (cmp == -1 or cmp == 0) {
                             ignore Map.put(upper, thash, field, #Exclusive(candid));
                         };
@@ -278,7 +385,7 @@ module {
             case (#gt(candid)) {
                 switch (Map.get(lower, thash, field)) {
                     case (?#Inclusive(val) or ?#Exclusive(val)) {
-                        let cmp = Schema.cmp_candid(#Empty, candid, val);
+                        let cmp = Schema.cmpCandid(#Empty, candid, val);
                         if (cmp == 1 or cmp == 0) {
                             ignore Map.put(lower, thash, field, #Exclusive(candid));
                         };
@@ -299,7 +406,7 @@ module {
         };
     };
 
-    public func scan<Record>(
+    public func scan<Document>(
         collection : T.StableCollection,
         index : T.Index,
         start_query : [(Text, ?T.CandidInclusivityQuery)],
@@ -309,15 +416,15 @@ module {
         // Debug.print("start_query: " # debug_show start_query);
         // Debug.print("end_query: " # debug_show end_query);
 
-        let index_data_utils = CollectionUtils.get_index_data_utils(collection);
+        let index_data_utils = CollectionUtils.getIndexDataUtils(collection);
 
         func sort_by_key_details(a : (Text, Any), b : (Text, Any)) : Order {
-            let pos_a = switch (Array.indexOf<(Text, SortDirection)>((a.0, #Ascending), index.key_details, Utils.tuple_eq(Text.equal))) {
+            let pos_a = switch (Array.indexOf<(Text, SortDirection)>((a.0, #Ascending), index.key_details, Utils.tupleEq(Text.equal))) {
                 case (?pos) pos;
                 case (null) index.key_details.size();
             };
 
-            let pos_b = switch (Array.indexOf<(Text, SortDirection)>((b.0, #Ascending), index.key_details, Utils.tuple_eq(Text.equal))) {
+            let pos_b = switch (Array.indexOf<(Text, SortDirection)>((b.0, #Ascending), index.key_details, Utils.tupleEq(Text.equal))) {
                 case (?pos) pos;
                 case (null) index.key_details.size();
             };
@@ -341,10 +448,10 @@ module {
                     let index_key_tuple = index.key_details[i];
 
                     switch (opt_cursor) {
-                        case (?(id, pagination_direction)) if (index.key_details[i].0 == C.RECORD_ID) {
-                            // RECORD_ID is only added in the query if it is a cursor
+                        case (?(id, pagination_direction)) if (index.key_details[i].0 == C.DOCUMENT_ID) {
+                            // DOCUMENT_ID is only added in the query if it is a cursor
                             // todo: update based on pagination_direction and is_lower_bound
-                            return (C.RECORD_ID, ?#Inclusive(#Nat(id + 1)));
+                            return (C.DOCUMENT_ID, ?#Inclusive(#Nat(id + 1)));
                         };
                         case (null) {};
                     };
@@ -387,12 +494,12 @@ module {
                     case ((_field, ?#Inclusive(#Maximum) or ?#Exclusive(#Maximum))) #Maximum;
                     case ((_field, ?#Inclusive(value))) value;
                     case ((_field, ?#Exclusive(value))) if (is_lower_bound) {
-                        let next = CandidUtils.get_next_value(value);
+                        let next = CandidUtils.getNextValue(value);
                         // Debug.print("Retrieving the next value for " # debug_show value);
                         // Debug.print("Next value: " # debug_show next);
                         next;
                     } else {
-                        CandidUtils.get_prev_value(value);
+                        CandidUtils.getPrevValue(value);
                     };
                     case (_) Debug.trap("filter_null_entries_in_query: received null value, should not happen");
                 };
@@ -452,27 +559,27 @@ module {
         scans;
     };
 
-    public func from_interval(
+    public func fromInterval(
         collection : T.StableCollection,
         index : Index,
         interval : (Nat, Nat),
-    ) : [([T.CandidQuery], T.RecordId)] {
-        let index_data_utils = CollectionUtils.get_index_data_utils(collection);
+    ) : [([T.CandidQuery], T.DocumentId)] {
+        let index_data_utils = CollectionUtils.getIndexDataUtils(collection);
 
         let (start, end) = interval;
 
-        Iter.toArray<([T.CandidQuery], T.RecordId)>(
-            BTree.range<[T.CandidQuery], T.RecordId>(index.data, index_data_utils, start, end)
+        Iter.toArray<([T.CandidQuery], T.DocumentId)>(
+            BTree.range<[T.CandidQuery], T.DocumentId>(index.data, index_data_utils, start, end)
         );
     };
 
     public func entries(
         collection : T.StableCollection,
         index : Index,
-    ) : T.RevIter<([T.CandidQuery], T.RecordId)> {
-        let index_data_utils = CollectionUtils.get_index_data_utils(collection);
+    ) : T.RevIter<([T.CandidQuery], T.DocumentId)> {
+        let index_data_utils = CollectionUtils.getIndexDataUtils(collection);
 
-        BTree.entries<[T.CandidQuery], T.RecordId>(index.data, index_data_utils);
+        BTree.entries<[T.CandidQuery], T.DocumentId>(index.data, index_data_utils);
     };
 
     // func unwrap_candid_option_value(option : T.CandidQuery) : T.CandidQuery {
@@ -498,7 +605,7 @@ module {
 
     // };
 
-    public func extract_scan_and_filter_bounds(lower : Map<Text, T.CandidInclusivityQuery>, upper : Map<Text, T.CandidInclusivityQuery>, opt_index_key_details : ?[(Text, T.SortDirection)], opt_fully_covered_equality_and_range_fields : ?Set.Set<Text>) : (Bounds, Bounds) {
+    public func extractBounds(lower : Map<Text, T.CandidInclusivityQuery>, upper : Map<Text, T.CandidInclusivityQuery>, opt_index_key_details : ?[(Text, T.SortDirection)], opt_fully_covered_equality_and_range_fields : ?Set.Set<Text>) : (Bounds, Bounds) {
 
         assert Option.isSome(opt_index_key_details) == Option.isSome(opt_fully_covered_equality_and_range_fields);
 
@@ -596,7 +703,7 @@ module {
 
     };
 
-    public func convert_simple_operations_to_scan_and_filter_bounds(is_and_operation : Bool, simple_operations : [(Text, T.ZqlOperators)], opt_index_key_details : ?[(Text, T.SortDirection)], opt_fully_covered_equality_and_range_fields : ?Set.Set<Text>) : (T.Bounds, T.Bounds) {
+    public func convertSimpleOpsToBounds(is_and_operation : Bool, simple_operations : [(Text, T.ZqlOperators)], opt_index_key_details : ?[(Text, T.SortDirection)], opt_fully_covered_equality_and_range_fields : ?Set.Set<Text>) : (T.Bounds, T.Bounds) {
 
         let lower_bound = Map.new<Text, T.State<T.CandidQuery>>();
         let upper_bound = Map.new<Text, T.State<T.CandidQuery>>();
@@ -636,7 +743,7 @@ module {
 
         };
 
-        extract_scan_and_filter_bounds(lower_bound, upper_bound, opt_index_key_details, opt_fully_covered_equality_and_range_fields);
+        extractBounds(lower_bound, upper_bound, opt_index_key_details, opt_fully_covered_equality_and_range_fields);
 
     };
 
@@ -680,7 +787,7 @@ module {
 
     };
 
-    public func fill_field_maps(equal_fields : Set.Set<Text>, sort_fields : Buffer<(Text, T.SortDirection)>, range_fields : Set.Set<Text>, operations : [(Text, T.ZqlOperators)], sort_field : ?(Text, T.SortDirection)) {
+    public func fillFieldMaps(equal_fields : Set.Set<Text>, sort_fields : Buffer<(Text, T.SortDirection)>, range_fields : Set.Set<Text>, operations : [(Text, T.ZqlOperators)], sort_field : ?(Text, T.SortDirection)) {
 
         sort_fields.clear();
 
@@ -699,13 +806,13 @@ module {
         };
     };
 
-    public func get_best_index(collection : StableCollection, operations : [(Text, T.ZqlOperators)], sort_field : ?(Text, T.SortDirection)) : ?BestIndexResult {
+    public func getBestIndex(collection : StableCollection, operations : [(Text, T.ZqlOperators)], sort_field : ?(Text, T.SortDirection)) : ?BestIndexResult {
         let equal_fields = Set.new<Text>();
         let sort_fields = Buffer.Buffer<(Text, T.SortDirection)>(8);
         let range_fields = Set.new<Text>();
         // let partially_covered_fields = Set.new<Text>();
 
-        fill_field_maps(equal_fields, sort_fields, range_fields, operations, sort_field);
+        fillFieldMaps(equal_fields, sort_fields, range_fields, operations, sort_field);
 
         // the sorting direction of the query and the index can either be a direct match
         // or a direct opposite in order to return the results without additional sorting
@@ -732,7 +839,7 @@ module {
             label scoring_indexes for ((index_key, direction) in index.key_details.vals()) {
                 index_key_details_position += 1;
 
-                // if (index_key == C.RECORD_ID) break scoring_indexes;
+                // if (index_key == C.DOCUMENT_ID) break scoring_indexes;
 
                 var matches_at_least_one_column = false;
 
@@ -807,7 +914,7 @@ module {
 
             if (num_of_equal_fields_covered > 0 or num_of_range_fields_covered > 0 or num_of_sort_fields_covered > 0) {
 
-                let (scan_bounds, filter_bounds) = convert_simple_operations_to_scan_and_filter_bounds(false, operations, ?index.key_details, ?fully_covered_equality_and_range_fields);
+                let (scan_bounds, filter_bounds) = convertSimpleOpsToBounds(false, operations, ?index.key_details, ?fully_covered_equality_and_range_fields);
 
                 let interval = scan(collection, index, scan_bounds.0, scan_bounds.1, null);
 
@@ -900,13 +1007,13 @@ module {
 
     };
 
-    // public func get_best_index_v1(collection : StableCollection, operations : [(Text, T.ZqlOperators)], sort_field : ?(Text, T.SortDirection)) : ?BestIndexResult {
+    // public func getIndexDataUtils_v1(collection : StableCollection, operations : [(Text, T.ZqlOperators)], sort_field : ?(Text, T.SortDirection)) : ?BestIndexResult {
     //     let equal_fields = Set.new<Text>();
     //     let sort_fields = Buffer.Buffer<(Text, T.SortDirection)>(8);
     //     let range_fields = Set.new<Text>();
     //     // let partially_covered_fields = Set.new<Text>();
 
-    //     func fill_field_maps(equal_fields : Set.Set<Text>, sort_fields : Buffer<(Text, T.SortDirection)>, range_fields : Set.Set<Text>, operations : [(Text, T.ZqlOperators)], sort_field : ?(Text, T.SortDirection)) {
+    //     func fillFieldMaps(equal_fields : Set.Set<Text>, sort_fields : Buffer<(Text, T.SortDirection)>, range_fields : Set.Set<Text>, operations : [(Text, T.ZqlOperators)], sort_field : ?(Text, T.SortDirection)) {
 
     //         sort_fields.clear();
 
@@ -925,7 +1032,7 @@ module {
     //         };
     //     };
 
-    //     fill_field_maps(equal_fields, sort_fields, range_fields, operations, sort_field);
+    //     fillFieldMaps(equal_fields, sort_fields, range_fields, operations, sort_field);
 
     //     var best_score = 0;
     //     var best_index : ?Index = null;
@@ -960,7 +1067,7 @@ module {
     //         label scoring_indexes for ((index_key, direction) in index.key_details.vals()) {
     //             index_key_details_position += 1;
 
-    //             if (index_key == C.RECORD_ID) break scoring_indexes;
+    //             if (index_key == C.DOCUMENT_ID) break scoring_indexes;
 
     //             var matches_at_least_one_column = false;
 

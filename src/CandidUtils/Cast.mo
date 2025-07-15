@@ -50,7 +50,7 @@ module Cast {
         };
     };
 
-    public func cast_to_bool(candid : Candid) : Result<Candid, Text> {
+    public func castToBool(candid : Candid) : Result<Candid, Text> {
         let converted = switch (candid) {
             case (#Bool(_)) candid;
             // Convert numeric types: 0 = false, anything else = true
@@ -77,7 +77,7 @@ module Cast {
         #ok(converted);
     };
 
-    public func cast_to_principal(candid : Candid) : Result<Candid, Text> {
+    public func castToPrincipal(candid : Candid) : Result<Candid, Text> {
         let converted = switch (candid) {
             case (#Principal(_)) candid;
             case (#Text(t)) {
@@ -93,7 +93,7 @@ module Cast {
         #ok(converted);
     };
 
-    public func cast_to_nat(candid : Candid) : Result<Candid, Text> {
+    public func castToNat(candid : Candid) : Result<Candid, Text> {
 
         func int_to_nat_if_positive(int : Int) : Result<Candid, Text> {
             if (int >= 0) {
@@ -130,7 +130,7 @@ module Cast {
         #ok(converted);
     };
 
-    public func cast_to_nat8(candid : Candid) : Result<Candid, Text> {
+    public func castToNat8(candid : Candid) : Result<Candid, Text> {
 
         func int_to_nat8_if_within_bounds(int : Int) : Result<Candid, Text> {
             if (int >= 0 and int <= 255) {
@@ -166,7 +166,7 @@ module Cast {
 
     };
 
-    public func cast_to_nat16(candid : Candid) : Result<Candid, Text> {
+    public func castToNat16(candid : Candid) : Result<Candid, Text> {
         func int_to_nat16_if_within_bounds(int : Int) : Result<Candid, Text> {
             if (int >= 0 and int <= Nat16.toNat(Nat16.maximumValue)) {
                 #ok(#Nat16(Nat16.fromNat(Int.abs(int))));
@@ -196,7 +196,7 @@ module Cast {
         #ok(converted);
     };
 
-    public func cast_to_nat32(candid : Candid) : Result<Candid, Text> {
+    public func castToNat32(candid : Candid) : Result<Candid, Text> {
         func int_to_nat32_if_within_bounds(int : Int) : Result<Candid, Text> {
             if (int >= 0 and int <= Nat32.toNat(Nat32.maximumValue)) {
                 #ok(#Nat32(Nat32.fromNat(Int.abs(int))));
@@ -227,7 +227,7 @@ module Cast {
         #ok(converted);
     };
 
-    public func cast_to_nat64(candid : Candid) : Result<Candid, Text> {
+    public func castToNat64(candid : Candid) : Result<Candid, Text> {
 
         func int_to_nat64_if_positive(int : Int) : Result<Candid, Text> {
             if (int >= 0 and int <= Nat64.toNat(Nat64.maximumValue)) {
@@ -258,7 +258,7 @@ module Cast {
         #ok(converted);
     };
 
-    public func cast_to_int8(candid : Candid) : Result<Candid, Text> {
+    public func castToInt8(candid : Candid) : Result<Candid, Text> {
 
         func int_to_int8_if_within_bounds(int : Int) : Result<Candid, Text> {
             if (int >= -128 and int <= 127) {
@@ -290,7 +290,7 @@ module Cast {
 
     };
 
-    public func cast_to_int16(candid : Candid) : Result<Candid, Text> {
+    public func castToInt16(candid : Candid) : Result<Candid, Text> {
 
         func int_to_int16_if_within_bounds(int : Int) : Result<Candid, Text> {
             if (int >= Int16.toInt(Int16.minimumValue) and int <= Int16.toInt(Int16.maximumValue)) {
@@ -322,7 +322,7 @@ module Cast {
 
     };
 
-    public func cast_to_int32(candid : Candid) : Result<Candid, Text> {
+    public func castToInt32(candid : Candid) : Result<Candid, Text> {
 
         func int_to_int32_if_within_bounds(int : Int) : Result<Candid, Text> {
             if (int >= Int32.toInt(Int32.minimumValue) and int <= Int32.toInt(Int32.maximumValue)) {
@@ -354,7 +354,7 @@ module Cast {
 
     };
 
-    public func cast_to_int64(candid : Candid) : Result<Candid, Text> {
+    public func castToInt64(candid : Candid) : Result<Candid, Text> {
 
         func int_to_int64_if_within_bounds(int : Int) : Result<Candid, Text> {
             if (int >= Int64.toInt(Int64.minimumValue) and int <= Int64.toInt(Int64.maximumValue)) {
@@ -386,7 +386,7 @@ module Cast {
 
     };
 
-    public func cast_to_float(candid : Candid) : Result<Candid, Text> {
+    public func castToFloat(candid : Candid) : Result<Candid, Text> {
 
         let converted = switch (candid) {
             case (#Float(n)) candid;
@@ -413,7 +413,7 @@ module Cast {
 
     };
 
-    public func cast_to_int(candid : Candid) : Result<Candid, Text> {
+    public func castToInt(candid : Candid) : Result<Candid, Text> {
 
         let converted = switch (candid) {
             case (#Int(n)) candid;
@@ -443,7 +443,7 @@ module Cast {
 
     };
 
-    public func cast_to_text(candid : Candid) : Result<Candid, Text> {
+    public func castToText(candid : Candid) : Result<Candid, Text> {
         let converted = switch (candid) {
             case (#Text(_)) candid;
             case (#Blob(b)) switch (Text.decodeUtf8(b)) {
@@ -469,7 +469,7 @@ module Cast {
 
     };
 
-    public func cast_to_blob(candid : Candid) : Result<Candid, Text> {
+    public func castToBlob(candid : Candid) : Result<Candid, Text> {
         let converted = switch (candid) {
             case (#Blob(b)) candid;
             case (#Text(t)) #Blob(Text.encodeUtf8(t));
@@ -485,21 +485,21 @@ module Cast {
     public func cast(candid_type : CandidType, value_to_cast : Candid) : Result<Candid, Text> {
 
         switch (candid_type) {
-            case (#Nat(_)) cast_to_nat(value_to_cast);
-            case (#Nat8(_)) cast_to_nat8(value_to_cast);
-            case (#Nat16(_)) cast_to_nat16(value_to_cast);
-            case (#Nat32(_)) cast_to_nat32(value_to_cast);
-            case (#Nat64(_)) cast_to_nat64(value_to_cast);
-            case (#Int8(_)) cast_to_int8(value_to_cast);
-            case (#Int16(_)) cast_to_int16(value_to_cast);
-            case (#Int32(_)) cast_to_int32(value_to_cast);
-            case (#Int64(_)) cast_to_int64(value_to_cast);
-            case (#Int(_)) cast_to_int(value_to_cast);
-            case (#Float(_)) cast_to_float(value_to_cast);
-            case (#Text(_)) cast_to_text(value_to_cast);
-            case (#Blob(_)) cast_to_blob(value_to_cast);
-            case (#Bool(_)) cast_to_bool(value_to_cast);
-            case (#Principal(_)) cast_to_principal(value_to_cast);
+            case (#Nat(_)) castToNat(value_to_cast);
+            case (#Nat8(_)) castToNat8(value_to_cast);
+            case (#Nat16(_)) castToNat16(value_to_cast);
+            case (#Nat32(_)) castToNat32(value_to_cast);
+            case (#Nat64(_)) castToNat64(value_to_cast);
+            case (#Int8(_)) castToInt8(value_to_cast);
+            case (#Int16(_)) castToInt16(value_to_cast);
+            case (#Int32(_)) castToInt32(value_to_cast);
+            case (#Int64(_)) castToInt64(value_to_cast);
+            case (#Int(_)) castToInt(value_to_cast);
+            case (#Float(_)) castToFloat(value_to_cast);
+            case (#Text(_)) castToText(value_to_cast);
+            case (#Blob(_)) castToBlob(value_to_cast);
+            case (#Bool(_)) castToBool(value_to_cast);
+            case (#Principal(_)) castToPrincipal(value_to_cast);
             case (#Option(inner)) {
                 switch (value_to_cast) {
                     case (#Null) #ok(#Null);
@@ -514,14 +514,14 @@ module Cast {
 
             //     validate(schema, inner);
             // };
-            // case (#Tuple(tuples), #Record(records)) {
-            //     if (records.size() != tuples.size()) return #err("Tuple size mismatch: expected " # debug_show (tuples.size()) # ", got " # debug_show (records.size()));
+            // case (#Tuple(tuples), #Record(documents)) {
+            //     if (documents.size() != tuples.size()) return #err("Tuple size mismatch: expected " # debug_show (tuples.size()) # ", got " # debug_show (documents.size()));
 
-            //     for ((i, (key, _)) in Itertools.enumerate(records.vals())) {
+            //     for ((i, (key, _)) in Itertools.enumerate(documents.vals())) {
             //         if (key != Nat.toText(i)) return #err("Tuple key mismatch: expected " # Nat.toText(i) # ", got " # debug_show (key));
             //     };
 
-            //     for ((i, (key, value)) in Itertools.enumerate(records.vals())) {
+            //     for ((i, (key, value)) in Itertools.enumerate(documents.vals())) {
             //         let res = validate(tuples[i], value);
             //         let #ok(_) = res else return send_error(res);
             //     };
@@ -530,10 +530,10 @@ module Cast {
 
             // };
             case (#Record(fields)) {
-                let #Record(records) = value_to_cast else return #err("Expected a record");
+                let #Record(documents) = value_to_cast else return #err("Expected a document");
 
-                if (fields.size() != records.size()) {
-                    return #err("Record size mismatch: " # debug_show (("schema", fields.size()), ("record", records.size())));
+                if (fields.size() != documents.size()) {
+                    return #err("Record size mismatch: " # debug_show (("schema", fields.size()), ("document", documents.size())));
                 };
 
                 let sorted_fields = Array.sort(
@@ -544,23 +544,23 @@ module Cast {
                 );
 
                 let sorted_records = Array.sort(
-                    records,
+                    documents,
                     func(a : (Text, Candid), b : (Text, Candid)) : T.Order {
                         Text.compare(a.0, b.0);
                     },
                 );
 
-                let buffer = Buffer.Buffer<(Text, Candid)>(records.size());
+                let buffer = Buffer.Buffer<(Text, Candid)>(documents.size());
 
-                // should sort fields and records
+                // should sort fields and documents
                 var i = 0;
                 while (i < fields.size()) {
                     let field = sorted_fields[i];
-                    let record = sorted_records[i];
+                    let document = sorted_records[i];
 
-                    if (field.0 != record.0) return #err("Record field mismatch: " # debug_show (("field", field.0), ("record", record.0)) # debug_show (fields, records));
+                    if (field.0 != document.0) return #err("Record field mismatch: " # debug_show (("field", field.0), ("document", document.0)) # debug_show (fields, documents));
 
-                    let value = switch (cast(field.1, record.1)) {
+                    let value = switch (cast(field.1, document.1)) {
                         case (#ok(c)) c;
                         case (#err(e)) return #err(e);
                     };
@@ -573,11 +573,11 @@ module Cast {
                 #ok(#Record(Buffer.toArray(buffer)));
             };
             case (#Array(inner)) {
-                let #Array(records) = value_to_cast else return #err("Expected an array");
+                let #Array(documents) = value_to_cast else return #err("Expected an array");
                 var i = 0;
-                let buffer = Buffer.Buffer<Candid>(records.size());
-                while (i < records.size()) {
-                    let val = switch (cast(inner, records[i])) {
+                let buffer = Buffer.Buffer<Candid>(documents.size());
+                while (i < documents.size()) {
+                    let val = switch (cast(inner, documents[i])) {
                         case (#ok(c)) c;
                         case (#err(e)) return #err(e);
                     };
@@ -600,7 +600,7 @@ module Cast {
                 );
 
                 // Debug.print("schema: " # debug_show (schema));
-                // Debug.print("record: " # debug_show (record));
+                // Debug.print("document: " # debug_show (document));
 
                 switch (result) {
                     case (null) return #err("Variant not found in schema");

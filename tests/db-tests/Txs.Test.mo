@@ -315,14 +315,14 @@ ZenDBSuite.newSuite(
             ignore db_query.Limit(pagination_limit);
             let #ok(matching_txs) = txs.search(db_query);
             let bitmap = BitMap.fromIter(Iter.map<(Nat, Tx), Nat>(matching_txs.vals(), func((id, _) : (Nat, Tx)) : Nat = id));
-            let records = Buffer.fromArray<(Nat, Tx)>(matching_txs);
-            var batch_size = records.size();
+            let documents = Buffer.fromArray<(Nat, Tx)>(matching_txs);
+            var batch_size = documents.size();
 
             label skip_limit_pagination while (batch_size > 0) {
-                // Debug.print("total size: " # debug_show records.size());
-                // Debug.print("records: " # debug_show (Array.map<(Nat, Tx), Nat>(Buffer.toArray(records), func((id, tx) : (Nat, Tx)) : Nat = id)));
+                // Debug.print("total size: " # debug_show documents.size());
+                // Debug.print("documents: " # debug_show (Array.map<(Nat, Tx), Nat>(Buffer.toArray(documents), func((id, tx) : (Nat, Tx)) : Nat = id)));
 
-                ignore db_query.Skip(records.size()).Limit(pagination_limit);
+                ignore db_query.Skip(documents.size()).Limit(pagination_limit);
 
                 let #ok(matching_txs) = txs.search(db_query);
                 // Debug.print("matching_txs: " # debug_show matching_txs);
@@ -331,7 +331,7 @@ ZenDBSuite.newSuite(
                 batch_size := matching_txs.size();
 
                 for ((id, tx) in matching_txs.vals()) {
-                    records.add((id, tx));
+                    documents.add((id, tx));
 
                     if (bitmap.get(id)) {
                         Debug.trap("Duplicate entry for id " # debug_show id);
@@ -344,7 +344,7 @@ ZenDBSuite.newSuite(
 
             ignore db_query.Skip(0).Limit(10000000000000000000000);
 
-            Buffer.toArray(records);
+            Buffer.toArray(documents);
 
         };
 
@@ -353,14 +353,14 @@ ZenDBSuite.newSuite(
         //     ignore db_query.Limit(pagination_limit);
         //     let #ok(matching_txs) = txs.search(db_query);
         //     // Debug.print("matching_txs: " # debug_show matching_txs);
-        //     let records = Buffer.fromArray<(Nat, Tx)>(matching_txs);
+        //     let documents = Buffer.fromArray<(Nat, Tx)>(matching_txs);
         //     let bitmap = BitMap.fromIter(Iter.map<(Nat, Tx), Nat>(matching_txs.vals(), func((id, _) : (Nat, Tx)) : Nat = id));
-        //     var batch_size = records.size();
+        //     var batch_size = documents.size();
 
         //     var opt_cursor : ?Nat = null;
 
         //     label pagination while (batch_size > 0) {
-        //         switch (opt_cursor, ?(records.get(records.size() - 1).0)) {
+        //         switch (opt_cursor, ?(documents.get(documents.size() - 1).0)) {
         //             case (?cursor, ?new_cursor) if (cursor == new_cursor) {
         //                 // break pagination;
         //                 Debug.trap("Cursor is not moving");
@@ -381,7 +381,7 @@ ZenDBSuite.newSuite(
         //         batch_size := matching_txs.size();
 
         //         for ((id, tx) in matching_txs.vals()) {
-        //             records.add((id, tx));
+        //             documents.add((id, tx));
 
         //             if (bitmap.get(id)) {
         //                 Debug.trap("Duplicate entry for id " # debug_show id);
@@ -392,7 +392,7 @@ ZenDBSuite.newSuite(
 
         //     };
 
-        //     Buffer.toArray(records);
+        //     Buffer.toArray(documents);
         // };
 
         type TestQuery = {
@@ -400,7 +400,7 @@ ZenDBSuite.newSuite(
             db_query : ZenDB.QueryBuilder;
             expected_query_resolution : ZenDB.Types.ZenQueryLang;
             check_if_result_matches_query : (Nat, Tx) -> Bool;
-            display_record : Tx -> Text;
+            display_document : Tx -> Text;
             sort : [(Text, ZenDB.Types.SortDirection)];
             check_if_results_are_sorted : (Tx, Tx) -> Bool;
         };
@@ -421,7 +421,7 @@ ZenDBSuite.newSuite(
                 check_if_result_matches_query = func(id : Nat, tx : Tx) : Bool {
                     tx.btype == "1mint";
                 };
-                display_record = func(tx : Tx) : Text = debug_show tx;
+                display_document = func(tx : Tx) : Text = debug_show tx;
                 sort = [
                     ("ts", #Ascending),
                 ];
@@ -444,7 +444,7 @@ ZenDBSuite.newSuite(
                 check_if_result_matches_query = func(id : Nat, tx : Tx) : Bool {
                     tx.tx.amt >= 355;
                 };
-                display_record = func(tx : Tx) : Text = debug_show tx;
+                display_document = func(tx : Tx) : Text = debug_show tx;
                 sort = [
                     ("ts", #Ascending),
                 ];
@@ -467,7 +467,7 @@ ZenDBSuite.newSuite(
                 check_if_result_matches_query = func(id : Nat, tx : Tx) : Bool {
                     tx.btype == "1xfer";
                 };
-                display_record = func(tx : Tx) : Text = debug_show tx;
+                display_document = func(tx : Tx) : Text = debug_show tx;
                 sort = [
                     ("ts", #Descending),
                 ];
@@ -490,7 +490,7 @@ ZenDBSuite.newSuite(
                 check_if_result_matches_query = func(id : Nat, tx : Tx) : Bool {
                     tx.btype == "2approve";
                 };
-                display_record = func(tx : Tx) : Text = debug_show tx;
+                display_document = func(tx : Tx) : Text = debug_show tx;
                 sort = [
                     ("tx.amt", #Ascending),
                 ];
@@ -517,7 +517,7 @@ ZenDBSuite.newSuite(
                 check_if_result_matches_query = func(id : Nat, tx : Tx) : Bool {
                     tx.btype == "1burn" or tx.btype == "1xfer";
                 };
-                display_record = func(tx : Tx) : Text = debug_show tx;
+                display_document = func(tx : Tx) : Text = debug_show tx;
                 sort = [
                     ("ts", #Descending),
                 ];
@@ -544,7 +544,7 @@ ZenDBSuite.newSuite(
                         }
                     );
                 };
-                display_record = func(tx : Tx) : Text = debug_show tx;
+                display_document = func(tx : Tx) : Text = debug_show tx;
                 sort = [
                     ("ts", #Ascending),
                 ];
@@ -572,7 +572,7 @@ ZenDBSuite.newSuite(
                         }
                     );
                 };
-                display_record = func(tx : Tx) : Text = debug_show tx;
+                display_document = func(tx : Tx) : Text = debug_show tx;
                 sort = [
                     ("ts", #Ascending),
                 ];
@@ -599,7 +599,7 @@ ZenDBSuite.newSuite(
                         }
                     );
                 };
-                display_record = func(tx : Tx) : Text = debug_show tx;
+                display_document = func(tx : Tx) : Text = debug_show tx;
                 sort = [
                     ("ts", #Ascending),
                 ];
@@ -657,7 +657,7 @@ ZenDBSuite.newSuite(
                     );
 
                 };
-                display_record = func(tx : Tx) : Text = debug_show tx;
+                display_document = func(tx : Tx) : Text = debug_show tx;
                 sort = [
                     ("ts", #Ascending),
                 ];
@@ -689,7 +689,7 @@ ZenDBSuite.newSuite(
                 check_if_result_matches_query = func(id : Nat, tx : Tx) : Bool {
                     tx.tx.amt > 1 and tx.tx.amt < 50;
                 };
-                display_record = func(tx : Tx) : Text = debug_show tx;
+                display_document = func(tx : Tx) : Text = debug_show tx;
                 sort = [
                     ("tx.amt", #Ascending),
                 ];
@@ -760,7 +760,7 @@ ZenDBSuite.newSuite(
                     );
 
                 };
-                display_record = func(tx : Tx) : Text = debug_show tx;
+                display_document = func(tx : Tx) : Text = debug_show tx;
                 sort = [
                     ("ts", #Ascending),
                 ];
@@ -790,7 +790,7 @@ ZenDBSuite.newSuite(
                 check_if_result_matches_query = func(id : Nat, tx : Tx) : Bool {
                     tx.btype == "1xfer" and tx.tx.amt > 10;
                 };
-                display_record = func(tx : Tx) : Text = debug_show tx;
+                display_document = func(tx : Tx) : Text = debug_show tx;
                 sort = [
                     ("tx.amt", #Ascending),
                 ];
@@ -816,7 +816,7 @@ ZenDBSuite.newSuite(
 
                             let results = get_txs_from_query(q.db_query);
 
-                            TestUtils.validate_records(
+                            TestUtils.validate_documents(
                                 input_txs,
                                 results,
                                 q.check_if_result_matches_query,
@@ -841,7 +841,7 @@ ZenDBSuite.newSuite(
                         func() {
                             let paginated_results = skip_limit_paginated_query(q.db_query, pagination_limit);
 
-                            TestUtils.validate_records(
+                            TestUtils.validate_documents(
                                 input_txs,
                                 paginated_results,
                                 q.check_if_result_matches_query,
@@ -869,12 +869,12 @@ ZenDBSuite.newSuite(
 
                             let results = get_txs_from_query(q.db_query);
 
-                            TestUtils.validate_sorted_records(
+                            TestUtils.validate_sorted_documents(
                                 input_txs,
                                 results,
                                 q.check_if_result_matches_query,
                                 q.check_if_results_are_sorted,
-                                q.display_record,
+                                q.display_document,
                             );
                         },
                     );
@@ -897,12 +897,12 @@ ZenDBSuite.newSuite(
 
                             let paginated_results = skip_limit_paginated_query(q.db_query, pagination_limit);
 
-                            TestUtils.validate_sorted_records(
+                            TestUtils.validate_sorted_documents(
                                 input_txs,
                                 paginated_results,
                                 q.check_if_result_matches_query,
                                 q.check_if_results_are_sorted,
-                                q.display_record,
+                                q.display_document,
                             );
 
                         },

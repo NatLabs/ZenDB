@@ -36,7 +36,7 @@ module {
             "put() with 3 indexes",
             "updateById() 4",
             "get()",
-            "scan(): all records",
+            "scan(): all documents",
             "search(): users named 'nam-do-dan'",
             "search(): users between the age of 20 and 35",
             "search(): users between the age of 20 and 35 and named 'nam-do-dan'",
@@ -230,7 +230,7 @@ module {
                         let #ok(item) = ZenDB.get<StoreItem>(hydra_db, "store_items", candify_store_item, i);
                     };
                 };
-                case ("ZenDB", "scan(): all records") {
+                case ("ZenDB", "scan(): all documents") {
                     let result = ZenDB.scan<StoreItem>(hydra_db, "store_items", candify_store_item, [], []);
                     Debug.print("results: " # debug_show (Iter.toArray(result)));
                 };

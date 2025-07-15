@@ -79,7 +79,7 @@ module CollectionUtils {
 
     public let { thash; bhash } = Map;
 
-    public func new_btree<K, V>(collection : StableCollection) : T.BTree<K, V> {
+    public func newBtree<K, V>(collection : StableCollection) : T.BTree<K, V> {
         switch (collection.memory_type) {
             case (#heap) { BTree.newHeap() };
             case (#stableMemory) {
@@ -95,14 +95,14 @@ module CollectionUtils {
         };
     };
 
-    public func get_index_key_utils() : TypeUtils.TypeUtils<[T.CandidQuery]> {
+    public func getIndexKeyUtils() : TypeUtils.TypeUtils<[T.CandidQuery]> {
         Orchid.Orchid;
     };
 
-    public func get_index_data_utils(collection : StableCollection) : T.BTreeUtils<[T.CandidQuery], T.RecordId> {
+    public func getIndexDataUtils(collection : StableCollection) : T.BTreeUtils<[T.CandidQuery], T.DocumentId> {
         switch (collection.memory_type) {
             case (#stableMemory(_)) {
-                #stableMemory(MemoryBTree.createUtils<[T.CandidQuery], T.RecordId>(Orchid.Orchid, TypeUtils.Nat));
+                #stableMemory(MemoryBTree.createUtils<[T.CandidQuery], T.DocumentId>(Orchid.Orchid, TypeUtils.Nat));
             };
             case (#heap(_)) {
                 #heap({
@@ -114,14 +114,14 @@ module CollectionUtils {
 
     };
 
-    public func get_main_btree_utils(collection : StableCollection) : T.BTreeUtils<Nat, T.Document> {
-        DocumentStore.get_btree_utils(collection.documents);
+    public func getMainBtreeUtils(collection : StableCollection) : T.BTreeUtils<Nat, T.Document> {
+        DocumentStore.getBtreeUtils(collection.documents);
     };
 
-    public func get_index_columns(collection : T.StableCollection, index_key_details : [(Text, SortDirection)], id : Nat, candid_map : T.CandidMap) : ?[Candid] {
+    public func getIndexColumns(collection : T.StableCollection, index_key_details : [(Text, SortDirection)], id : Nat, candid_map : T.CandidMap) : ?[Candid] {
         let buffer = Buffer.Buffer<Candid>(8);
 
-        var field_columns_excluding_record_id = 0;
+        var field_columns_excluding_document_id = 0;
         var field_columns_with_missing_value_at_path = 0;
 
         var option_field_type_count = 0;
@@ -130,7 +130,7 @@ module CollectionUtils {
         for ((index_key, dir) in index_key_details.vals()) {
             if (index_key == C.UNIQUE_INDEX_NULL_EXEMPT_ID) {
                 let val = if (null_option_field_value_count == option_field_type_count) {
-                    #Nat(id); // use the record id to ensure the key is unique in the index
+                    #Nat(id); // use the document id to ensure the key is unique in the index
                 } else {
                     // if at least one optional field has a value, we don't need to exempt the key from the btree's uniqueness restriction
                     // so we can set the value to a dummy value
@@ -139,12 +139,12 @@ module CollectionUtils {
 
                 buffer.add(val)
 
-            } else if (index_key == C.RECORD_ID) {
+            } else if (index_key == C.DOCUMENT_ID) {
                 buffer.add(#Nat(id));
             } else {
-                field_columns_excluding_record_id += 1;
+                field_columns_excluding_document_id += 1;
 
-                let candid_value = switch (CandidMap.get(candid_map, collection.schema_map, index_key)) {
+                let candidValue = switch (CandidMap.get(candid_map, collection.schema_map, index_key)) {
                     case (?val) {
                         switch (val) {
                             case (#Option(_)) {
@@ -165,69 +165,69 @@ module CollectionUtils {
                     };
                 };
 
-                buffer.add(candid_value);
+                buffer.add(candidValue);
             };
         };
 
-        if (field_columns_excluding_record_id == field_columns_with_missing_value_at_path) {
-            // In this case, all the index key values for the fields are missing, so we will return a null value so this record is not indexed
+        if (field_columns_excluding_document_id == field_columns_with_missing_value_at_path) {
+            // In this case, all the index key values for the fields are missing, so we will return a null value so this document is not indexed
 
             return null;
         };
 
-        let index_key_values = Buffer.toArray(buffer);
+        let indexKeyValues = Buffer.toArray(buffer);
 
         Logger.lazyDebug(
             collection.logger,
             func() : Text {
-                "Retrieved index key values (" # debug_show (index_key_values) # ") for index key details (" # debug_show (index_key_details) # ") for id [" # debug_show id # "] in collection (" # debug_show collection.name # ")";
+                "Retrieved index key values (" # debug_show (indexKeyValues) # ") for index key details (" # debug_show (index_key_details) # ") for id [" # debug_show id # "] in collection (" # debug_show collection.name # ")";
             },
         );
 
-        ?index_key_values;
+        ?indexKeyValues;
 
     };
 
-    public func lookup_record<Record>(collection : T.StableCollection, blobify : T.InternalCandify<Record>, id : Nat) : Record {
-        let ?record_details = DocumentStore.get(collection.documents, DocumentStore.get_btree_utils(collection.documents), id) else Debug.trap("lookup_record: record not found for id: " # debug_show id);
-        let record = blobify.from_blob(record_details);
-        record;
+    public func lookupDocument<Record>(collection : T.StableCollection, blobify : T.InternalCandify<Record>, id : Nat) : Record {
+        let ?documentDetails = DocumentStore.get(collection.documents, DocumentStore.getBtreeUtils(collection.documents), id) else Debug.trap("lookupDocument: document not found for id: " # debug_show id);
+        let document = blobify.from_blob(documentDetails);
+        document;
     };
 
-    public func lookup_candid_blob(collection : StableCollection, id : Nat) : Blob {
-        let ?record_details : ?Blob = DocumentStore.get(collection.documents, DocumentStore.get_btree_utils(collection.documents), id) else Debug.trap("lookup_candid_blob: record not found for id: " # debug_show id);
-        record_details;
+    public func lookupCandidBlob(collection : StableCollection, id : Nat) : Blob {
+        let ?documentDetails : ?Blob = DocumentStore.get(collection.documents, DocumentStore.getBtreeUtils(collection.documents), id) else Debug.trap("lookupCandidBlob: document not found for id: " # debug_show id);
+        documentDetails;
     };
 
-    public func decode_candid_blob(collection : StableCollection, candid_blob : Blob) : Candid.Candid {
+    public func decodeCandidBlob(collection : StableCollection, candid_blob : Blob) : Candid.Candid {
         let candid_result = Candid.decode(candid_blob, collection.schema_keys, null);
-        let #ok(candid_values) = candid_result else Debug.trap("decode_candid_blob: decoding candid blob failed: " # debug_show candid_result);
+        let #ok(candid_values) = candid_result else Debug.trap("decodeCandidBlob: decoding candid blob failed: " # debug_show candid_result);
         let candid = candid_values[0];
         candid;
     };
 
-    public func lookup_candid_record(collection : StableCollection, id : Nat) : ?Candid.Candid {
-        let ?record_details = DocumentStore.get(collection.documents, DocumentStore.get_btree_utils(collection.documents), id) else return null;
-        let candid = decode_candid_blob(collection, record_details);
+    public func lookupCandidDocument(collection : StableCollection, id : Nat) : ?Candid.Candid {
+        let ?document_details = DocumentStore.get(collection.documents, DocumentStore.getBtreeUtils(collection.documents), id) else return null;
+        let candid = decodeCandidBlob(collection, document_details);
 
         ?candid;
     };
 
     // public func lookup_candid_map_bytes(collection : StableCollection, id : Nat) : ?[Nat8] {
-    //     let ?record_details = MemoryBTree.get(collection.documents, get_main_btree_utils(collection), id) else return null;
-    //     let bytes = record_details.1;
+    //     let ?document_details = MemoryBTree.get(collection.documents, getMainBtreeUtils(collection), id) else return null;
+    //     let bytes = document_details.1;
 
     //     ?bytes;
     // };
 
-    public func candid_map_filter_condition(collection : StableCollection, id : Nat, candid_record : Candid.Candid, lower : [(Text, ?T.CandidInclusivityQuery)], upper : [(Text, ?T.CandidInclusivityQuery)]) : Bool {
+    public func candidMapFilterCondition(collection : StableCollection, id : Nat, candid_document : Candid.Candid, lower : [(Text, ?T.CandidInclusivityQuery)], upper : [(Text, ?T.CandidInclusivityQuery)]) : Bool {
 
-        let candid_map = CandidMap.new(collection.schema_map, id, candid_record);
+        let candid_map = CandidMap.new(collection.schema_map, id, candid_document);
 
         for (((key, opt_lower_val), (upper_key, opt_upper_val)) in Itertools.zip(lower.vals(), upper.vals())) {
             assert key == upper_key;
 
-            //    Debug.print("candid_map: " # debug_show candid_map.extract_candid());
+            //    Debug.print("candid_map: " # debug_show candid_map.extractCandid());
 
             let field_value = switch (CandidMap.get(candid_map, collection.schema_map, key)) {
                 case (?val) val;
@@ -238,25 +238,25 @@ module CollectionUtils {
 
             switch (opt_lower_val) {
                 case (?(#Inclusive(lower_val))) {
-                    if (Schema.cmp_candid_ignore_option(collection.schema, field_value, lower_val) == -1) res := false;
+                    if (Schema.cmpCandidIgnoreOption(collection.schema, field_value, lower_val) == -1) res := false;
                 };
                 case (?(#Exclusive(lower_val))) {
-                    if (Schema.cmp_candid_ignore_option(collection.schema, field_value, lower_val) < 1) res := false;
+                    if (Schema.cmpCandidIgnoreOption(collection.schema, field_value, lower_val) < 1) res := false;
                 };
                 case (null) {};
             };
 
             switch (opt_upper_val) {
                 case (?(#Inclusive(upper_val))) {
-                    if (Schema.cmp_candid_ignore_option(collection.schema, field_value, upper_val) == 1) res := false;
+                    if (Schema.cmpCandidIgnoreOption(collection.schema, field_value, upper_val) == 1) res := false;
                 };
                 case (?(#Exclusive(upper_val))) {
-                    if (Schema.cmp_candid_ignore_option(collection.schema, field_value, upper_val) > -1) res := false;
+                    if (Schema.cmpCandidIgnoreOption(collection.schema, field_value, upper_val) > -1) res := false;
                 };
                 case (null) {};
             };
 
-            // Debug.print("candid_map_filter_condition(): retrieved field value for key '" # key # "': " # debug_show field_value # ", result: " # debug_show res);
+            // Debug.print("candidMapFilterCondition(): retrieved field value for key '" # key # "': " # debug_show field_value # ", result: " # debug_show res);
 
             if (not res) return res;
 
@@ -266,7 +266,7 @@ module CollectionUtils {
 
     };
 
-    public func record_ids_from_index_intervals(collection : StableCollection, index_name : Text, _intervals : [(Nat, Nat)], sorted_in_reverse : Bool) : Iter<Nat> {
+    public func documentIdsFromIndexIntervals(collection : StableCollection, index_name : Text, _intervals : [(Nat, Nat)], sorted_in_reverse : Bool) : Iter<Nat> {
 
         let intervals = if (sorted_in_reverse) {
             Array.reverse(_intervals);
@@ -274,65 +274,65 @@ module CollectionUtils {
             _intervals;
         };
 
-        // Debug.print("record_ids_from_index_intervals: intervals: " # debug_show intervals);
+        // Debug.print("documentIdsFromIndexIntervals: intervals: " # debug_show intervals);
 
-        if (index_name == C.RECORD_ID) {
-            let main_btree_utils = DocumentStore.get_btree_utils(collection.documents);
+        if (index_name == C.DOCUMENT_ID) {
+            let main_btree_utils = DocumentStore.getBtreeUtils(collection.documents);
 
-            let record_ids = Itertools.flatten(
+            let document_ids = Itertools.flatten(
                 Iter.map(
                     intervals.vals(),
                     func(interval : (Nat, Nat)) : Iter<(Nat)> {
-                        let record_ids = DocumentStore.rangeKeys(collection.documents, main_btree_utils, interval.0, interval.1);
+                        let document_ids = DocumentStore.rangeKeys(collection.documents, main_btree_utils, interval.0, interval.1);
 
                         if (sorted_in_reverse) {
-                            return record_ids.rev();
+                            return document_ids.rev();
                         };
 
-                        record_ids;
+                        document_ids;
                     },
                 )
             );
 
-            return record_ids;
+            return document_ids;
         };
 
         let ?index = Map.get(collection.indexes, thash, index_name) else Debug.trap("Unreachable: IndexMap not found for index: " # index_name);
 
-        let index_data_utils = CollectionUtils.get_index_data_utils(collection);
+        let index_data_utils = CollectionUtils.getIndexDataUtils(collection);
 
         Itertools.flatten(
             Iter.map(
                 intervals.vals(),
                 func(interval : (Nat, Nat)) : Iter<(Nat)> {
-                    let record_ids = BTree.rangeVals(index.data, index_data_utils, interval.0, interval.1);
+                    let document_ids = BTree.rangeVals(index.data, index_data_utils, interval.0, interval.1);
 
                     if (sorted_in_reverse) {
-                        return record_ids.rev();
+                        return document_ids.rev();
                     };
-                    record_ids;
+                    document_ids;
                 },
             )
         );
     };
 
-    public func multi_filter(
+    public func multiFilter(
         collection : StableCollection,
-        records : Iter<Nat>,
+        documents : Iter<Nat>,
         bounds : Buffer.Buffer<(lower : [(Text, ?T.CandidInclusivityQuery)], upper : [(Text, ?T.CandidInclusivityQuery)])>,
         is_and : Bool,
     ) : Iter<Nat> {
 
         Iter.filter<Nat>(
-            records,
+            documents,
             func(id : Nat) : Bool {
-                let ?candid = CollectionUtils.lookup_candid_record(collection, id) else Debug.trap("multi_filter: candid_map_bytes not found");
+                let ?candid = CollectionUtils.lookupCandidDocument(collection, id) else Debug.trap("multiFilter: candid_map_bytes not found");
 
                 func filter_fn(
                     (lower, upper) : (([(Text, ?T.CandidInclusivityQuery)], [(Text, ?T.CandidInclusivityQuery)]))
                 ) : Bool {
 
-                    let res = candid_map_filter_condition(collection, id, candid, lower, upper);
+                    let res = candidMapFilterCondition(collection, id, candid, lower, upper);
 
                     res;
                 };

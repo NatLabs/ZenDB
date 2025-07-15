@@ -59,7 +59,7 @@ module {
 
     };
 
-    public func type_code_to_text(type_code : Nat8) : Text {
+    public func typeCodeToText(type_code : Nat8) : Text {
         let type_code_name_map = [
             (TypeCode.Minimum, "Minimum"),
             (TypeCode.Null, "Null"),
@@ -159,7 +159,8 @@ module {
             };
             case (#Int(int)) {
                 buffer.add(TypeCode.IntAsInt64);
-                ByteUtils.Buffer.Sorted.addInt64(buffer, Int64.fromInt(int));
+                let int64 = Int64.fromInt(int);
+                ByteUtils.Buffer.Sorted.addInt64(buffer, int64);
             };
 
             case (#Nat64(n)) {
@@ -429,7 +430,7 @@ module {
                     // Null is less than any other type code
                     if (type_code_a == TypeCode.Null) return -1;
                     if (type_code_b == TypeCode.Null) return 1;
-                } else Debug.trap("Orchid: type codes do not match: " # debug_show (type_code_to_text(type_code_a)) # " != " # debug_show type_code_to_text(type_code_b) # "\n" # debug_show (a, b));
+                } else Debug.trap("Orchid: type codes do not match: " # debug_show (typeCodeToText(type_code_a)) # " != " # debug_show typeCodeToText(type_code_b) # "\n" # debug_show (a, b));
             };
 
             let type_code = type_code_a;

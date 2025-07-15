@@ -57,7 +57,7 @@ let candid : Candid.Candid = #Record([
 ]);
 
 let candid_map = CandidMap.new(schema_map, 0, candid);
-assert CandidMap.get(candid_map, schema_map, Constants.RECORD_ID) == ?#Nat(0);
+assert CandidMap.get(candid_map, schema_map, Constants.DOCUMENT_ID) == ?#Nat(0);
 
 suite(
     "CandidMap",
@@ -250,9 +250,9 @@ suite(
         );
 
         test(
-            "extract_candid()",
+            "extractCandid()",
             func() {
-                let extracted_candid = CandidMap.extract_candid(candid_map);
+                let extracted_candid = CandidMap.extractCandid(candid_map);
 
                 assert extracted_candid == #Record([
                     ("name", #Text("Bob")),

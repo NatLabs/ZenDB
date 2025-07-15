@@ -28,7 +28,7 @@ let { QueryBuilder } = ZenDB;
 
 ZenDBSuite.newSuite(
     "ZenDB: Inclusivity Tests",
-    ?{ ZenDBSuite.withAndWithoutIndex with log_level = #Debug },
+    ?{ ZenDBSuite.withAndWithoutIndex with log_level = #Error },
     func inclusivity_tests(zendb : ZenDB.Database, suite_utils : ZenDBSuite.SuiteUtils) {
 
         // Define schemas for test collections
@@ -814,7 +814,7 @@ ZenDBSuite.newSuite(
                     "Numeric next value operations",
                     func() {
                         // Test greater than on category "A" and number > 7
-                        // This should internally use get_next_value() to transform the query
+                        // This should internally use getNextValue() to transform the query
                         let result = composite_collection.search(
                             QueryBuilder().Where("category", #eq(#Text("A"))).And("number", #gt(#Nat(7)))
                         );
@@ -840,7 +840,7 @@ ZenDBSuite.newSuite(
                     "Numeric prev value operations",
                     func() {
                         // Test less than on category "A" and number < 10
-                        // This should internally use get_prev_value() to transform the query
+                        // This should internally use getPrevValue() to transform the query
                         let result = composite_collection.search(
                             QueryBuilder().Where("category", #eq(#Text("A"))).And("number", #lt(#Nat(10)))
                         );
@@ -867,7 +867,7 @@ ZenDBSuite.newSuite(
                     func() {
                         // Test greater than with blobs
                         // Should match blobs that are lexicographically greater than [12, 32, 45]
-                        // get_next_value() will append a 0 to the blob
+                        // getNextValue() will append a 0 to the blob
                         let result = composite_collection.search(
                             QueryBuilder().Where("category", #eq(#Text("X"))).And("data", #gt(#Blob(Blob.fromArray([12, 32, 45]))))
                         );
@@ -893,7 +893,7 @@ ZenDBSuite.newSuite(
                     "Blob prev value operations",
                     func() {
                         // Test less than with blobs
-                        // get_prev_value() will transform the query to match lexicographically smaller blobs
+                        // getPrevValue() will transform the query to match lexicographically smaller blobs
                         let result = composite_collection.search(
                             QueryBuilder().Where("category", #eq(#Text("X"))).And("data", #lt(#Blob(Blob.fromArray([12, 32, 45]))))
                         );
@@ -918,7 +918,7 @@ ZenDBSuite.newSuite(
                     "Edge case: prev value for blob ending in zero",
                     func() {
                         // Test the edge case where we have a blob ending with 0
-                        // For [12, 32, 45, 0], get_prev_value() should remove the 0 and return [12, 32, 45]
+                        // For [12, 32, 45, 0], getPrevValue() should remove the 0 and return [12, 32, 45]
                         let result = composite_collection.search(
                             QueryBuilder().Where("category", #eq(#Text("X"))).And("data", #lt(#Blob(Blob.fromArray([12, 32, 45, 0]))))
                         );

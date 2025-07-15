@@ -38,7 +38,7 @@ module DocumentStore {
         to_blob = func(document : T.Document) : Blob {
             switch (document) {
                 case (#v0(candid_blob)) {
-                    Utils.concat_blob("\00", candid_blob);
+                    Utils.concatBlob("\00", candid_blob);
                 };
             };
         };
@@ -46,7 +46,7 @@ module DocumentStore {
             let version_id = blob.get(0);
 
             switch (version_id) {
-                case (0) { #v0(Utils.slice_blob(blob, 1, blob.size())) };
+                case (0) { #v0(Utils.sliceBlob(blob, 1, blob.size())) };
                 case (_) Debug.trap("Decoding document failed: Unsupported version id " # debug_show version_id);
             };
 
@@ -72,7 +72,7 @@ module DocumentStore {
         } : T.BpTreeUtils<Nat>
     );
 
-    public func get_btree_utils(store : DocumentStore) : T.BTreeUtils<Nat, T.Document> {
+    public func getBtreeUtils(store : DocumentStore) : T.BTreeUtils<Nat, T.Document> {
         switch (store) {
             case (#stableMemory(_)) StableMemoryUtils;
             case (#heap(_)) HeapUtils;

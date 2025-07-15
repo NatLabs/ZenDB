@@ -23,7 +23,7 @@ let limit = 10_000;
 ZenDBSuite.newSuite(
     "Query Tests",
     ?{
-        ZenDBSuite.onlyWithIndex with log_level = #Debug;
+        ZenDBSuite.onlyWithIndex with log_level = #Error;
     },
     func query_tests(zendb : ZenDB.Database, suite_utils : ZenDBSuite.SuiteUtils) {
 
@@ -375,9 +375,9 @@ ZenDBSuite.newSuite(
                 "Negative Query Test",
                 func() {
                     let db_query = QueryBuilder().Where("value", #eq(#Text("item-not-in-store")));
-                    let #ok(records) = texts.search(db_query) else return assert false;
+                    let #ok(documents) = texts.search(db_query) else return assert false;
 
-                    assert records == [];
+                    assert documents == [];
                 },
             );
 
@@ -407,7 +407,7 @@ ZenDBSuite.newSuite(
             "testing on indexed field",
             func() {
                 Debug.print("trying to index field");
-                let #ok(_) = texts.createAndPopulateIndex("value_index", [("value", #Ascending)]) else return assert false;
+                let #ok(_) = texts.createIndex("value_index", [("value", #Ascending)], null) else return assert false;
                 Debug.print("field indexed");
 
                 run_query_tests(texts);

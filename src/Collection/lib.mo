@@ -1,4 +1,4 @@
-/// A collection is a set of records of the same type.
+/// A collection is a set of documents of the same type.
 
 import Principal "mo:base/Principal";
 import Array "mo:base/Array";
@@ -110,63 +110,65 @@ module {
         /// Returns the collection name.
         public func name() : Text = collection_name;
 
-        /// Returns the total number of records in the collection.
+        /// Returns the total number of documents in the collection.
         public func size() : Nat = StableCollection.size(collection);
 
-        let main_btree_utils : T.BTreeUtils<Nat, T.Document> = DocumentStore.get_btree_utils(collection.documents);
+        let main_btree_utils : T.BTreeUtils<Nat, T.Document> = DocumentStore.getBtreeUtils(collection.documents);
 
-        /// Returns an iterator over all the record ids in the collection.
+        /// Returns an iterator over all the document ids in the collection.
         public func keys() : Iter<Nat> {
             StableCollection.keys(collection, main_btree_utils);
         };
 
-        /// Returns an iterator over all the records in the collection.
+        /// Returns an iterator over all the documents in the collection.
         public func vals() : Iter<Record> {
             let iter = StableCollection.vals(collection, main_btree_utils);
-            let records = Iter.map<Blob, Record>(
+            let documents = Iter.map<Blob, Record>(
                 iter,
                 func(candid_blob : Blob) {
                     blobify.from_blob(candid_blob);
                 },
             );
-            records;
+            documents;
         };
 
-        /// Returns an iterator over a tuple containing the id and record for all entries in the collection.
+        /// Returns an iterator over a tuple containing the id and document for all entries in the collection.
         public func entries() : Iter<(Nat, Record)> {
             let iter = StableCollection.entries(collection, main_btree_utils);
 
-            let records = Iter.map<(Nat, Blob), (Nat, Record)>(
+            let documents = Iter.map<(Nat, Blob), (Nat, Record)>(
                 iter,
                 func((id, candid_blob) : (Nat, Blob)) {
                     (id, blobify.from_blob(candid_blob));
                 },
             );
-            records;
+            documents;
         };
 
-        /// Insert a record that matches the collection's schema.
-        /// If the record passes the schema validation and schema constraints, it will be inserted into the collection and a unique id will be assigned to it and returned.
+        /// Insert a document that matches the collection's schema.
+        /// If the document passes the schema validation and schema constraints, it will be inserted into the collection and a unique id will be assigned to it and returned.
         ///
         /// Example:
         /// ```motoko
-        /// let #ok(id) = collection.insert(record);
+        /// let #ok(id) = collection.insert(document);
         /// ```
         ///
-        /// If the record does not pass the schema validation or schema constraints, an error will be returned.
-        public func insert(record : Record) : Result<(Nat), Text> {
-            put(record);
+        /// If the document does not pass the schema validation or schema constraints, an error will be returned.
+        public func insert(document : Record) : Result<(Nat), Text> {
+            put(document);
         };
 
-        public func put(record : Record) : Result<(Nat), Text> {
-            let candid_blob = blobify.to_blob(record);
+        public func put(document : Record) : Result<(Nat), Text> {
+
+            let candid_blob = blobify.to_blob(document);
+
             handleResult(
                 StableCollection.put(collection, main_btree_utils, candid_blob),
-                "Failed to put record",
+                "Failed to put document",
             );
         };
 
-        /// Retrieves a record by its id.
+        /// Retrieves a document by its id.
         public func get(id : Nat) : ?Record {
             Option.map(
                 StableCollection.get(collection, main_btree_utils, id),
@@ -177,12 +179,12 @@ module {
         // public func exists(db_query : QueryBuilder) : Result<Bool, Text> {
         //     let internal_search_res = handleResult(
         //         StableCollection.exists(collection, db_query),
-        //         "Failed to find records to check existence",
+        //         "Failed to find documents to check existence",
         //     );
 
         //     let results_iter = switch (internal_search_res) {
         //         case (#err(err)) return #err(err);
-        //         case (#ok(records_iter)) records_iter;
+        //         case (#ok(documents_iter)) documents_iter;
         //     };
 
         //     #ok(
@@ -192,10 +194,10 @@ module {
         //     );
         // };
 
-        type RecordLimits = [(Text, ?State<T.CandidQuery>)];
+        type DocumentLimits = [(Text, ?State<T.CandidQuery>)];
         type FieldLimit = (Text, ?State<T.CandidQuery>);
 
-        type Bounds = (RecordLimits, RecordLimits);
+        type Bounds = (DocumentLimits, DocumentLimits);
 
         type IndexDetails = {
             var sorted_in_reverse : ?Bool;
@@ -207,40 +209,40 @@ module {
         public func searchIter(query_builder : QueryBuilder) : Result<Iter<T.WrapId<Record>>, Text> {
             switch (
                 handleResult(
-                    StableCollection.internal_search(collection, query_builder),
+                    StableCollection.internalSearch(collection, query_builder),
                     "Failed to execute search",
                 )
             ) {
                 case (#err(err)) return #err(err);
-                case (#ok(record_ids_iter)) {
-                    let record_iter = StableCollection.id_to_record_iter(collection, blobify, record_ids_iter);
-                    #ok(record_iter);
+                case (#ok(document_ids_iter)) {
+                    let document_iter = StableCollection.idsToDocuments(collection, blobify, document_ids_iter);
+                    #ok(document_iter);
                 };
             };
         };
 
-        /// This function is used to search for records in the collection by using a query builder.
-        /// The query builder takes a set of queries or filters on the fields in the records and uses this as instructions to search for the specified records.
+        /// This function is used to search for documents in the collection by using a query builder.
+        /// The query builder takes a set of queries or filters on the fields in the documents and uses this as instructions to search for the specified documents.
         ///
         /// Example:
-        /// - Search for all records with a field "name" equal to "John":
+        /// - Search for all documents with a field "name" equal to "John":
         /// ```motoko
         ///
-        /// let #ok(records_named_john) = collection.search(
+        /// let #ok(documents_named_john) = collection.search(
         ///     ZenDB.QueryBuilder().Where("name", #eq("John"))
         /// );
         /// ```
         ///
-        /// - Search for all records with a field "age" greater than 18, sorted by "age" in descending order:
+        /// - Search for all documents with a field "age" greater than 18, sorted by "age" in descending order:
         /// ```motoko
-        /// let #ok(records_older_than_18) = collection.search(
+        /// let #ok(documents_older_than_18) = collection.search(
         ///     ZenDB.QueryBuilder().Where("age", #gt(18)).Sort("age", #Descending)
         /// );
         /// ```
         ///
-        /// - Search for all records with name "John" or "Jane", and age greater than 18:
+        /// - Search for all documents with name "John" or "Jane", and age greater than 18:
         /// ```motoko
-        /// let #ok(records_named_john_or_jane) = collection.search(
+        /// let #ok(documents_named_john_or_jane) = collection.search(
         ///     ZenDB.QueryBuilder()
         ///         .Where("name", #anyOf([#Text("John"), #Text("Jane")]))
         ///         .And("age", #gt(18))
@@ -249,7 +251,7 @@ module {
         ///
         /// Could also be written as:
         /// ```motoko
-        /// let #ok(records_named_john_or_jane) = collection.search(
+        /// let #ok(documents_named_john_or_jane) = collection.search(
         ///     ZenDB.QueryBuilder()
         ///         .Where("name", #eq(#Text("John")))
         ///            .Or("name", #eq(#Text("Jane")))
@@ -259,7 +261,7 @@ module {
         ///
         /// Or as nested queries:
         /// ```motoko
-        /// let #ok(records_named_john_or_jane) = collection.search(
+        /// let #ok(documents_named_john_or_jane) = collection.search(
         ///     ZenDB.QueryBuilder()
         ///          .Where("age", #gt(18))
         ///          .AndQuery(
@@ -270,21 +272,21 @@ module {
         /// );
         /// ```
         ///
-        /// @returns A Result containing an array of tuples containing the id and the record for all matching records.
+        /// @returns A Result containing an array of tuples containing the id and the document for all matching documents.
         /// If the search fails, an error message will be returned.
 
         public func search(query_builder : QueryBuilder) : Result<[T.WrapId<Record>], Text> {
             switch (
                 handleResult(
-                    StableCollection.internal_search(collection, query_builder),
+                    StableCollection.internalSearch(collection, query_builder),
                     "Failed to execute search",
                 )
             ) {
                 case (#err(err)) return #err(err);
-                case (#ok(record_ids_iter)) {
-                    let record_iter = StableCollection.id_to_record_iter(collection, blobify, record_ids_iter);
-                    let records = Iter.toArray(record_iter);
-                    #ok(records);
+                case (#ok(document_ids_iter)) {
+                    let document_iter = StableCollection.idsToDocuments(collection, blobify, document_ids_iter);
+                    let documents = Iter.toArray(document_iter);
+                    #ok(documents);
                 };
             };
         };
@@ -293,25 +295,25 @@ module {
             StableCollection.stats(collection);
         };
 
-        /// Returns the total number of records that match the query.
+        /// Returns the total number of documents that match the query.
         /// This ignores the limit and skip parameters.
         public func count(query_builder : QueryBuilder) : Result<Nat, Text> {
             handleResult(
                 StableCollection.count(collection, query_builder),
-                "Failed to count records",
+                "Failed to count documents",
             );
         };
 
-        public func replace(id : Nat, record : Record) : Result<(), Text> {
+        public func replace(id : Nat, document : Record) : Result<(), Text> {
             handleResult(
-                StableCollection.replace_record_by_id(collection, main_btree_utils, id, blobify.to_blob(record)),
-                "Failed to replace record with id: " # debug_show (id),
+                StableCollection.replaceById(collection, main_btree_utils, id, blobify.to_blob(document)),
+                "Failed to replace document with id: " # debug_show (id),
             );
         };
 
-        public func replaceDocs(records : [(Nat, Record)]) : Result<(), Text> {
-            for ((id, record) in records.vals()) {
-                switch (replace(id, record)) {
+        public func replaceDocs(documents : [(Nat, Record)]) : Result<(), Text> {
+            for ((id, document) in documents.vals()) {
+                switch (replace(id, document)) {
                     case (#ok(_)) {};
                     case (#err(err)) return #err(err);
                 };
@@ -320,33 +322,33 @@ module {
             #ok();
         };
 
-        /// Updates a record by its id with the given update operations.
+        /// Updates a document by its id with the given update operations.
         public func updateById(id : Nat, update_operations : [(Text, T.FieldUpdateOperations)]) : Result<(), Text> {
             handleResult(
-                StableCollection.update_by_id(collection, main_btree_utils, id, update_operations),
-                "Failed to update record with id: " # debug_show (id),
+                StableCollection.updateById(collection, main_btree_utils, id, update_operations),
+                "Failed to update document with id: " # debug_show (id),
             );
         };
 
         public func update(query_builder : QueryBuilder, update_operations : [(Text, T.FieldUpdateOperations)]) : Result<Nat, Text> {
-            let records_iter = switch (
+            let documents_iter = switch (
                 handleResult(
-                    StableCollection.internal_search(collection, query_builder),
-                    "Failed to find records to update",
+                    StableCollection.internalSearch(collection, query_builder),
+                    "Failed to find documents to update",
                 )
             ) {
                 case (#err(err)) return #err(err);
-                case (#ok(records_iter)) records_iter;
+                case (#ok(documents_iter)) documents_iter;
             };
 
             var total_updated = 0;
 
-            for (id in records_iter) {
-                switch (StableCollection.update_by_id(collection, main_btree_utils, id, update_operations)) {
+            for (id in documents_iter) {
+                switch (StableCollection.updateById(collection, main_btree_utils, id, update_operations)) {
                     case (#ok(_)) total_updated += 1;
                     case (#err(err)) {
-                        Logger.lazyError(collection.logger, func() = "Failed to update record with id: " # debug_show (id) # ": " # err);
-                        return #err("Failed to update record with id: " # debug_show (id) # ": " # err);
+                        Logger.lazyError(collection.logger, func() = "Failed to update document with id: " # debug_show (id) # ": " # err);
+                        return #err("Failed to update document with id: " # debug_show (id) # ": " # err);
                     };
                 };
             };
@@ -357,27 +359,27 @@ module {
         public func deleteById(id : Nat) : Result<Record, Text> {
             switch (
                 handleResult(
-                    StableCollection.delete_by_id(collection, main_btree_utils, id),
-                    "Failed to delete record with id: " # debug_show (id),
+                    StableCollection.deleteById(collection, main_btree_utils, id),
+                    "Failed to delete document with id: " # debug_show (id),
                 )
             ) {
                 case (#err(err)) return #err(err);
-                case (#ok(record_details)) {
-                    let record = blobify.from_blob(record_details);
-                    #ok(record);
+                case (#ok(document_details)) {
+                    let document = blobify.from_blob(document_details);
+                    #ok(document);
                 };
             };
         };
 
-        public func delete(query_builder : QueryBuilder) : Result<[(T.RecordId, Record)], Text> {
+        public func delete(query_builder : QueryBuilder) : Result<[(T.DocumentId, Record)], Text> {
             let internal_search_res = handleResult(
-                StableCollection.internal_search(collection, query_builder),
-                "Failed to find records to delete",
+                StableCollection.internalSearch(collection, query_builder),
+                "Failed to find documents to delete",
             );
 
             let results_iter = switch (internal_search_res) {
                 case (#err(err)) return #err(err);
-                case (#ok(records_iter)) records_iter;
+                case (#ok(documents_iter)) documents_iter;
             };
 
             // need to convert the iterator to an array before deleting
@@ -386,10 +388,10 @@ module {
 
             let results = Iter.toArray(results_iter);
 
-            let buffer = Buffer.Buffer<(T.RecordId, Record)>(8);
+            let buffer = Buffer.Buffer<(T.DocumentId, Record)>(8);
             for ((id) in results.vals()) {
                 switch (deleteById(id)) {
-                    case (#ok(record)) buffer.add(id, record);
+                    case (#ok(document)) buffer.add(id, document);
                     case (#err(err)) return #err(err);
                 };
             };
@@ -400,13 +402,13 @@ module {
         public func filterIter(condition : (Record) -> Bool) : Iter<Record> {
 
             let iter = StableCollection.vals(collection, main_btree_utils);
-            let records = Iter.map<Blob, Record>(
+            let documents = Iter.map<Blob, Record>(
                 iter,
                 func(candid_blob : Blob) {
                     blobify.from_blob(candid_blob);
                 },
             );
-            let filtered = Iter.filter<Record>(records, condition);
+            let filtered = Iter.filter<Record>(documents, condition);
 
         };
 
@@ -428,7 +430,7 @@ module {
         };
 
         /// Creates a new index with the given index keys.
-        /// If `isUnique` is true, the index will be unique on the index keys and records with duplicate index keys will be rejected.
+        /// If `isUnique` is true, the index will be unique on the index keys and documents with duplicate index keys will be rejected.
         public func createIndex(name : Text, index_key_details : [(Text, SortDirection)], options : ?CreateIndexOptions) : Result<(), Text> {
 
             let isUnique = switch (options) {
@@ -436,10 +438,10 @@ module {
                 case (null) false;
             };
 
-            switch (StableCollection.create_index(collection, main_btree_utils, name, index_key_details, isUnique)) {
+            switch (StableCollection.createIndex(collection, main_btree_utils, name, index_key_details, isUnique)) {
                 case (#ok(success)) #ok();
                 case (#err(errorMsg)) {
-                    return Utils.log_error_msg(collection.logger, "Failed to create index (" # name # "): " # errorMsg);
+                    return Utils.logErrorMsg(collection.logger, "Failed to create index (" # name # "): " # errorMsg);
                 };
             };
 
@@ -448,7 +450,7 @@ module {
         /// Deletes an index from the collection that is not used internally.
         public func deleteIndex(name : Text) : Result<(), Text> {
             handleResult(
-                StableCollection.delete_index(collection, main_btree_utils, name),
+                StableCollection.deleteIndex(collection, main_btree_utils, name),
                 "Failed to delete index: " # name,
             );
         };
@@ -456,28 +458,21 @@ module {
         /// Clears an index from the collection that is not used internally.
         public func clearIndex(name : Text) : Result<(), Text> {
             handleResult(
-                StableCollection.clear_index(collection, main_btree_utils, name),
+                StableCollection.clearIndex(collection, main_btree_utils, name),
                 "Failed to clear index: " # name,
             );
         };
 
-        public func createAndPopulateIndex(name : Text, index_key_details : [(Text, SortDirection)]) : Result<(), Text> {
+        public func repopulateIndex(name : Text) : Result<(), Text> {
             handleResult(
-                StableCollection.create_and_populate_index(collection, main_btree_utils, name, index_key_details),
-                "Failed to create and populate index: " # name,
-            );
-        };
-
-        public func populateIndex(name : Text) : Result<(), Text> {
-            handleResult(
-                StableCollection.populate_index(collection, main_btree_utils, name),
+                StableCollection.repopulateIndex(collection, main_btree_utils, name),
                 "Failed to populate index: " # name,
             );
         };
 
-        public func populateIndexes(names : [Text]) : Result<(), Text> {
+        public func repopulateIndexes(names : [Text]) : Result<(), Text> {
             handleResult(
-                StableCollection.populate_indexes(collection, main_btree_utils, names),
+                StableCollection.repopulateIndexes(collection, main_btree_utils, names),
                 "Failed to populate indexes: " # debug_show (names),
             );
         };

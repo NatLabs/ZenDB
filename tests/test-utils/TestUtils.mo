@@ -8,20 +8,20 @@ import T "../../src/Types";
 
 module {
 
-    // record ids should match the index of the record in the data buffer
-    public func validate_records<A>(data : Buffer.Buffer<A>, records : [(Nat, A)], pred : (Nat, A) -> Bool, print : (A) -> Text) {
+    // document ids should match the index of the document in the data buffer
+    public func validate_documents<A>(data : Buffer.Buffer<A>, documents : [(Nat, A)], pred : (Nat, A) -> Bool, print : (A) -> Text) {
 
         let expected_bitmap = BitMap.BitMap(100);
         let actual_bitmap = BitMap.BitMap(100);
 
-        for ((id, record) in records.vals()) {
-            if (not pred(id, record)) {
-                Debug.print("record does not match query: " # debug_show (id, print(record)));
+        for ((id, document) in documents.vals()) {
+            if (not pred(id, document)) {
+                Debug.print("document does not match query: " # debug_show (id, print(document)));
                 assert false;
             };
 
             if (actual_bitmap.get(id)) {
-                Debug.print("duplicate record: " # debug_show (id, print(record)));
+                Debug.print("duplicate document: " # debug_show (id, print(document)));
                 assert false;
             };
 
@@ -33,28 +33,28 @@ module {
 
         var i = 0;
 
-        for ((record) in data.vals()) {
-            if (pred(i, record)) {
+        for ((document) in data.vals()) {
+            if (pred(i, document)) {
                 count += 1;
                 expected_bitmap.set(i, true);
             };
             i += 1;
         };
 
-        if (count != records.size()) {
-            Debug.print("size mismatch (expected, actual): " # debug_show (count, records.size()));
+        if (count != documents.size()) {
+            Debug.print("size mismatch (expected, actual): " # debug_show (count, documents.size()));
 
             actual_bitmap.difference(expected_bitmap);
 
             let difference = actual_bitmap;
 
             for (id in difference.vals()) {
-                Debug.print("expected record not found in actual data: " # debug_show (id, print(data.get(id))));
+                Debug.print("expected document not found in actual data: " # debug_show (id, print(data.get(id))));
             };
 
-            for ((id, record) in records.vals()) {
+            for ((id, document) in documents.vals()) {
                 if (difference.get(id)) {
-                    Debug.print("actual data record not found in expected: " # debug_show (id, print(record)));
+                    Debug.print("actual data document not found in expected: " # debug_show (id, print(document)));
                 };
             };
 
@@ -63,18 +63,18 @@ module {
 
     };
 
-    public func validate_sorted_records<A>(data : Buffer.Buffer<A>, records : [(Nat, A)], pred : (Nat, A) -> Bool, sorted : (A, A) -> Bool, print : (A) -> Text) {
-        validate_records<A>(data, records, pred, print);
+    public func validate_sorted_documents<A>(data : Buffer.Buffer<A>, documents : [(Nat, A)], pred : (Nat, A) -> Bool, sorted : (A, A) -> Bool, print : (A) -> Text) {
+        validate_documents<A>(data, documents, pred, print);
 
-        if (records.size() == 0) return;
+        if (documents.size() == 0) return;
 
-        var prev = records[0].1;
-        for ((id, record) in records.vals()) {
-            if (not sorted(prev, record)) {
-                Debug.print("records are not sorted: " # debug_show (print(prev), print(record)));
+        var prev = documents[0].1;
+        for ((id, document) in documents.vals()) {
+            if (not sorted(prev, document)) {
+                Debug.print("documents are not sorted: " # debug_show (print(prev), print(document)));
                 assert false;
             };
-            prev := record;
+            prev := document;
         };
     };
 

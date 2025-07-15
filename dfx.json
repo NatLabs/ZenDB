@@ -1,10 +1,10 @@
 {
   "version": 1,
   "canisters": {
-    "stress-test" : {
+    "stress-test": {
       "type": "motoko",
       "main": "./tests/Stress.Test.mo",
-      "args": "--max-stable-pages 6553600" 
+      "args": "--max-stable-pages 6553600"
     }
   },
   "defaults": {

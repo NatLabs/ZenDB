@@ -101,7 +101,7 @@ let int64_min = -(2 ** 63);
 
 for (i in Itertools.range(0, limit)) {
 
-    let record : MotokoTypes = {
+    let document : MotokoTypes = {
         text = fuzz.text.randomAlphanumeric(
             fuzz.nat.randomRange(0, 20)
         );
@@ -125,27 +125,27 @@ for (i in Itertools.range(0, limit)) {
         bool = fuzz.bool.random();
     };
 
-    inputs.add(record);
+    inputs.add(document);
 
     let candid_map = CandidMap.new(
         schema_map,
         0,
         #Record([
-            ("text", #Text(record.text)),
-            ("nat", #Nat(record.nat)),
-            ("nat8", #Nat8(record.nat8)),
-            ("nat16", #Nat16(record.nat16)),
-            ("nat32", #Nat32(record.nat32)),
-            ("nat64", #Nat64(record.nat64)),
-            ("int", #Int(record.int)),
-            ("int8", #Int8(record.int8)),
-            ("int16", #Int16(record.int16)),
-            ("int32", #Int32(record.int32)),
-            ("int64", #Int64(record.int64)),
-            ("float", #Float(record.float)),
-            ("principal", #Principal(record.principal)),
-            ("blob", #Blob(record.blob)),
-            ("bool", #Bool(record.bool)),
+            ("text", #Text(document.text)),
+            ("nat", #Nat(document.nat)),
+            ("nat8", #Nat8(document.nat8)),
+            ("nat16", #Nat16(document.nat16)),
+            ("nat32", #Nat32(document.nat32)),
+            ("nat64", #Nat64(document.nat64)),
+            ("int", #Int(document.int)),
+            ("int8", #Int8(document.int8)),
+            ("int16", #Int16(document.int16)),
+            ("int32", #Int32(document.int32)),
+            ("int64", #Int64(document.int64)),
+            ("float", #Float(document.float)),
+            ("principal", #Principal(document.principal)),
+            ("blob", #Blob(document.blob)),
+            ("bool", #Bool(document.bool)),
         ]),
     );
     candid_maps.add(candid_map);
@@ -781,7 +781,7 @@ suite(
                                     Iter.map<(T.Candid, T.Candid), Int8>(
                                         Itertools.zip(a.vals(), b.vals()),
                                         func((a, b) : (T.Candid, T.Candid)) : Int8 {
-                                            Schema.cmp_candid(MotokoTypesSchema, a, b);
+                                            Schema.cmpCandid(MotokoTypesSchema, a, b);
                                         },
                                     )
                                 );
@@ -898,7 +898,7 @@ suite(
                 let prefix_bytes = get_prefix(a, b);
                 assert prefix_bytes.size() >= 14 + 1; // 14 bytes for the prefix and 1 byte for the type encoding
 
-                let ?prefix = Text.decodeUtf8(Utils.slice_blob(prefix_bytes, 1, prefix_bytes.size()));
+                let ?prefix = Text.decodeUtf8(Utils.sliceBlob(prefix_bytes, 1, prefix_bytes.size()));
 
                 assert Text.endsWith(prefix, #text("this might be "));
 

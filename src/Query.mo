@@ -113,7 +113,7 @@ module {
                 };
                 case (#startsWith(prefix)) {
                     let prefix_lower_bound = prefix;
-                    let #ok(prefix_upper_bound) = CandidUtils.Ops.concat_bytes(prefix, "\FF") else {
+                    let #ok(prefix_upper_bound) = CandidUtils.Ops.concatBytes(prefix, "\FF") else {
                         Debug.trap("QueryBuilder: Failed to create upper bound for #startsWith");
                     };
 
@@ -160,7 +160,7 @@ module {
                 };
                 case (#startsWith(prefix)) {
                     let prefix_lower_bound = prefix;
-                    let #ok(prefix_upper_bound) = CandidUtils.Ops.concat_bytes(prefix, "\FF") else {
+                    let #ok(prefix_upper_bound) = CandidUtils.Ops.concatBytes(prefix, "\FF") else {
                         Debug.trap("QueryBuilder: Failed to create upper bound for #startsWith");
                     };
 
@@ -275,7 +275,7 @@ module {
     };
 
     // validate that all the query fields are defined in the schema
-    public func validate_query(collection : T.StableCollection, hydra_query : T.ZenQueryLang) : T.Result<(), Text> {
+    public func validateQuery(collection : T.StableCollection, hydra_query : T.ZenQueryLang) : T.Result<(), Text> {
 
         switch (hydra_query) {
             case (#Operation(field, op)) {
@@ -285,7 +285,7 @@ module {
                     field != "" and
                     Option.isNull(Nat.fromText(field)) and
                     not Set.has(collection.schema_keys_set, thash, field) and
-                    field != C.RECORD_ID
+                    field != C.DOCUMENT_ID
                 ) {
 
                     if (Text.contains(field, #text("."))) {
@@ -301,7 +301,7 @@ module {
             };
             case (#And(buffer)) {
                 for (expr in buffer.vals()) {
-                    switch (validate_query(collection, expr)) {
+                    switch (validateQuery(collection, expr)) {
                         case (#err(err)) return #err(err);
                         case (#ok(_)) ();
                     };
@@ -310,7 +310,7 @@ module {
             };
             case (#Or(buffer)) {
                 for (expr in buffer.vals()) {
-                    switch (validate_query(collection, expr)) {
+                    switch (validateQuery(collection, expr)) {
                         case (#err(err)) return #err(err);
                         case (#ok(_)) ();
                     };
@@ -322,7 +322,7 @@ module {
     };
 
     // Process the query and convert it to a format most suitable for the collection
-    public func process_query(collection : T.StableCollection, zendb_query : T.ZenQueryLang) : T.Result<T.ZenQueryLang, Text> {
+    public func processQuery(collection : T.StableCollection, zendb_query : T.ZenQueryLang) : T.Result<T.ZenQueryLang, Text> {
 
         func handle_operation(field : Text, op : T.ZqlOperators) : T.Result<T.ZenQueryLang, Text> {
             // Debug.print(debug_show (Set.toArray(collection.schema_keys_set)));
@@ -340,7 +340,7 @@ module {
                     case (#Option(_), _) {
                         // wrap with #Option only if the type is an #Option
                         // and the value is neither #Option nor #Null
-                        CandidUtils.inherit_options_from_type(operator_type, CandidUtils.unwrap_option(operator_value));
+                        CandidUtils.inheritOptionsFromType(operator_type, CandidUtils.unwrapOption(operator_value));
                     };
                     case (_) operator_value;
                 };
@@ -381,7 +381,7 @@ module {
             case (#And(buffer)) {
                 let new_buffer = Buffer.Buffer<ZenQueryLang>(buffer.size());
                 for (expr in buffer.vals()) {
-                    switch (process_query(collection, expr)) {
+                    switch (processQuery(collection, expr)) {
                         case (#err(err)) return #err(err);
                         case (#ok(new_expr)) new_buffer.add(new_expr);
                     };
@@ -391,7 +391,7 @@ module {
             case (#Or(buffer)) {
                 let new_buffer = Buffer.Buffer<ZenQueryLang>(buffer.size());
                 for (expr in buffer.vals()) {
-                    switch (process_query(collection, expr)) {
+                    switch (processQuery(collection, expr)) {
                         case (#err(err)) return #err(err);
                         case (#ok(new_expr)) new_buffer.add(new_expr);
                     };

@@ -40,7 +40,7 @@ module {
     type Index = T.Index;
     type Order = Order.Order;
 
-    public func query_plan_from_and_operation(
+    public func fromAndOperation(
         collection : T.StableCollection,
         query_statements : [T.ZenQueryLang],
         sort_column : ?(Text, T.SortDirection),
@@ -48,7 +48,7 @@ module {
     ) : QueryPlan {
         Logger.lazyDebug(
             collection.logger,
-            func() = "QueryPlan.query_plan_from_and_operation(): Creating query plan for AND operation with " #
+            func() = "QueryPlan.fromAndOperation(): Creating query plan for AND operation with " #
             Nat.toText(query_statements.size()) # " statements",
         );
 
@@ -57,7 +57,7 @@ module {
             let (sort_field, direction) = Option.unwrap(sort_column);
             Logger.lazyDebug(
                 collection.logger,
-                func() = "QueryPlan.query_plan_from_and_operation(): Sorting required on field '" #
+                func() = "QueryPlan.fromAndOperation(): Sorting required on field '" #
                 sort_field # "' in " # debug_show direction # " order",
             );
         };
@@ -73,7 +73,7 @@ module {
         var num_of_nested_or_operations = 0;
 
         if (query_statements.size() == 0 and not requires_sorting) {
-            Logger.lazyDebug(collection.logger, func() = "QueryPlan.query_plan_from_and_operation(): Empty query with no sorting, using full scan");
+            Logger.lazyDebug(collection.logger, func() = "QueryPlan.fromAndOperation(): Empty query with no sorting, using full scan");
 
             return {
                 is_and_operation = true;
@@ -95,7 +95,7 @@ module {
                 case (#Operation(field, op)) {
                     Logger.lazyDebug(
                         collection.logger,
-                        func() = "QueryPlan.query_plan_from_and_operation(): Adding simple operation on field '" #
+                        func() = "QueryPlan.fromAndOperation(): Adding simple operation on field '" #
                         field # "': " # debug_show op,
                     );
                     simple_operations.add((field, op));
@@ -112,13 +112,13 @@ module {
                 case (#Or(nested_or_operations)) {
                     Logger.lazyDebug(
                         collection.logger,
-                        func() = "QueryPlan.query_plan_from_and_operation(): Processing nested OR operation with " #
+                        func() = "QueryPlan.fromAndOperation(): Processing nested OR operation with " #
                         Nat.toText(nested_or_operations.size()) # " statements",
                     );
 
                     num_of_nested_or_operations += 1;
 
-                    let sub_query_plan = query_plan_from_or_operation(
+                    let sub_query_plan = fromOrOperation(
                         collection,
                         nested_or_operations,
                         sort_column,
@@ -142,7 +142,7 @@ module {
         //
         // in terms of size of each operation, the first statement has been reduced from scanning a range of 5 values to only scanning 1 value in the btree
         //
-        // the actual feature for reducing the query is implemented in the query_plan_from_or_operation function where the parent_simple_and_operations from this function is passed in. Here we just remove dangling #And operations that will be applied to the #Or operations, by leaving scans empty
+        // the actual feature for reducing the query is implemented in the fromOrOperation function where the parent_simple_and_operations from this function is passed in. Here we just remove dangling #And operations that will be applied to the #Or operations, by leaving scans empty
         // consider query: (0 < x < 5 or y = 6) and (x = 3)
         // we want to reduce the query so the scan size of the #Or operations are smaller
         // so apply the #And operations on the #Or operations to get:
@@ -152,22 +152,22 @@ module {
         //
         // in terms of size of each operation, the first statement has been reduced from scanning a range of 5 values to only scanning 1 value in the btree
         //
-        // the actual feature for reducing the query is implemented in the query_plan_from_or_operation function where the parent_simple_and_operations from this function is passed in. Here we just remove dangling #And operations that will be applied to the #Or operations, by leaving scans empty
+        // the actual feature for reducing the query is implemented in the fromOrOperation function where the parent_simple_and_operations from this function is passed in. Here we just remove dangling #And operations that will be applied to the #Or operations, by leaving scans empty
         if (sub_query_plans.size() > 0) {
             Logger.lazyDebug(
                 collection.logger,
-                func() = "QueryPlan.query_plan_from_and_operation(): Query has " #
+                func() = "QueryPlan.fromAndOperation(): Query has " #
                 Nat.toText(sub_query_plans.size()) # " nested OR subplans",
             );
 
             if (sub_query_plans.size() == 1) {
-                Logger.lazyDebug(collection.logger, func() = "QueryPlan.query_plan_from_and_operation(): Single subplan, returning it directly");
+                Logger.lazyDebug(collection.logger, func() = "QueryPlan.fromAndOperation(): Single subplan, returning it directly");
                 return sub_query_plans.get(0);
             };
 
             Logger.lazyDebug(
                 collection.logger,
-                func() = "QueryPlan.query_plan_from_and_operation(): Returning combined AND plan with " #
+                func() = "QueryPlan.fromAndOperation(): Returning combined AND plan with " #
                 Nat.toText(sub_query_plans.size()) # " OR subplans",
             );
             return {
@@ -182,10 +182,10 @@ module {
 
         // if there where #Operation types in the operations
 
-        let best_index_result = switch (Index.get_best_index(collection, Buffer.toArray(operations), sort_column)) {
+        let best_index_result = switch (Index.getBestIndex(collection, Buffer.toArray(operations), sort_column)) {
             case (null) {
-                Logger.lazyDebug(collection.logger, func() = "QueryPlan.query_plan_from_and_operation(): No suitable index found, using full scan");
-                let (scan_bounds, filter_bounds) = Index.convert_simple_operations_to_scan_and_filter_bounds(true, Buffer.toArray(simple_operations), null, null);
+                Logger.lazyDebug(collection.logger, func() = "QueryPlan.fromAndOperation(): No suitable index found, using full scan");
+                let (scan_bounds, filter_bounds) = Index.convertSimpleOpsToBounds(true, Buffer.toArray(simple_operations), null, null);
 
                 return {
                     is_and_operation = true;
@@ -205,7 +205,7 @@ module {
             case (?best_index_result) {
                 Logger.lazyDebug(
                     collection.logger,
-                    func() = "QueryPlan.query_plan_from_and_operation(): Found best index: '" #
+                    func() = "QueryPlan.fromAndOperation(): Found best index: '" #
                     best_index_result.index.name # "'",
                 );
                 best_index_result;
@@ -219,7 +219,7 @@ module {
 
         Logger.lazyDebug(
             collection.logger,
-            func() = "QueryPlan.query_plan_from_and_operation(): Index details - " #
+            func() = "QueryPlan.fromAndOperation(): Index details - " #
             "requires_additional_filtering: " # debug_show requires_additional_filtering # ", " #
             "requires_additional_sorting: " # debug_show requires_additional_sorting # ", " #
             "sorted_in_reverse: " # debug_show sorted_in_reverse,
@@ -227,11 +227,11 @@ module {
 
         let operations_array = Buffer.toArray(operations);
 
-        let (scan_bounds, filter_bounds) = Index.convert_simple_operations_to_scan_and_filter_bounds(true, Buffer.toArray(simple_operations), ?index.key_details, ?best_index_result.fully_covered_equality_and_range_fields);
+        let (scan_bounds, filter_bounds) = Index.convertSimpleOpsToBounds(true, Buffer.toArray(simple_operations), ?index.key_details, ?best_index_result.fully_covered_equality_and_range_fields);
 
         Logger.lazyDebug(
             collection.logger,
-            func() = "QueryPlan.query_plan_from_and_operation(): Scan bounds - " #
+            func() = "QueryPlan.fromAndOperation(): Scan bounds - " #
             "lower: " # debug_show scan_bounds.0 # ", " #
             "upper: " # debug_show scan_bounds.1,
         );
@@ -241,13 +241,15 @@ module {
         Logger.lazyDebug(
             collection.logger,
             func() {
-                "QueryPlan.query_plan_from_or_operation(): Index scan intervals: " # debug_show interval;
+                "QueryPlan.fromOrOperation(): Index scan intervals: " # debug_show interval;
             },
         );
 
+        // Debug.print("Index entries: " # debug_show (Iter.toArray(Index.entries(collection, index))));
+
         if (requires_additional_filtering) {
             // we need to do index interval intersection with the filter bounds
-            Logger.debugMsg(collection.logger, "QueryPlan.query_plan_from_and_operation(): Additional filtering required with filter bounds");
+            Logger.debugMsg(collection.logger, "QueryPlan.fromAndOperation(): Additional filtering required with filter bounds");
         };
 
         let query_plan : QueryPlan = {
@@ -268,12 +270,12 @@ module {
             ];
         };
 
-        Logger.lazyDebug(collection.logger, func() = "QueryPlan.query_plan_from_and_operation(): Created index scan query plan using index '" # index.name # "'");
+        Logger.lazyDebug(collection.logger, func() = "QueryPlan.fromAndOperation(): Created index scan query plan using index '" # index.name # "'");
         return query_plan;
 
     };
 
-    public func query_plan_from_or_operation(
+    public func fromOrOperation(
         collection : T.StableCollection,
         query_statements : [T.ZenQueryLang],
         sort_column : ?(Text, T.SortDirection),
@@ -282,7 +284,7 @@ module {
     ) : QueryPlan {
         Logger.lazyDebug(
             collection.logger,
-            func() = "QueryPlan.query_plan_from_or_operation(): Creating query plan for OR operation with " #
+            func() = "QueryPlan.fromOrOperation(): Creating query plan for OR operation with " #
             Nat.toText(query_statements.size()) # " statements and " # Nat.toText(parent_simple_and_operations.size()) # " parent AND operations",
         );
 
@@ -291,7 +293,7 @@ module {
             let (sort_field, direction) = Option.unwrap(sort_column);
             Logger.lazyDebug(
                 collection.logger,
-                func() = "QueryPlan.query_plan_from_or_operation(): Sorting required on field '" #
+                func() = "QueryPlan.fromOrOperation(): Sorting required on field '" #
                 sort_field # "' in " # debug_show direction # " order",
             );
         };
@@ -306,17 +308,17 @@ module {
                 case (#Operation(field, op)) {
                     Logger.lazyDebug(
                         collection.logger,
-                        func() = "QueryPlan.query_plan_from_or_operation(): Processing operation on field '" #
+                        func() = "QueryPlan.fromOrOperation(): Processing operation on field '" #
                         field # "': " # debug_show op,
                     );
 
                     let operations = Array.append(parent_simple_and_operations, [(field, op)]);
-                    let opt_index = Index.get_best_index(collection, operations, sort_column);
+                    let opt_index = Index.getBestIndex(collection, operations, sort_column);
 
                     let scan_details = switch (opt_index) {
                         case (null) {
-                            Logger.lazyDebug(collection.logger, func() = "QueryPlan.query_plan_from_or_operation(): No suitable index found for operation, using full scan");
-                            let (scan_bounds, filter_bounds) = Index.convert_simple_operations_to_scan_and_filter_bounds(false, operations, null, null);
+                            Logger.lazyDebug(collection.logger, func() = "QueryPlan.fromOrOperation(): No suitable index found for operation, using full scan");
+                            let (scan_bounds, filter_bounds) = Index.convertSimpleOpsToBounds(false, operations, null, null);
 
                             let scan_details : ScanDetails = #FullScan({
                                 requires_additional_sorting = requires_sorting;
@@ -329,7 +331,7 @@ module {
                         case (?best_index_info) {
                             Logger.lazyDebug(
                                 collection.logger,
-                                func() = "QueryPlan.query_plan_from_or_operation(): Found best index for operation: '" #
+                                func() = "QueryPlan.fromOrOperation(): Found best index for operation: '" #
                                 best_index_info.index.name # "'",
                             );
 
@@ -340,13 +342,13 @@ module {
 
                             Logger.lazyDebug(
                                 collection.logger,
-                                func() = "QueryPlan.query_plan_from_or_operation(): Index details - " #
+                                func() = "QueryPlan.fromOrOperation(): Index details - " #
                                 "requires_additional_filtering: " # debug_show requires_additional_filtering # ", " #
                                 "requires_additional_sorting: " # debug_show requires_additional_sorting # ", " #
                                 "sorted_in_reverse: " # debug_show sorted_in_reverse,
                             );
 
-                            let (scan_bounds, filter_bounds) = Index.convert_simple_operations_to_scan_and_filter_bounds(
+                            let (scan_bounds, filter_bounds) = Index.convertSimpleOpsToBounds(
                                 false,
                                 operations,
                                 ?index.key_details,
@@ -357,7 +359,7 @@ module {
                             Logger.lazyDebug(
                                 collection.logger,
                                 func() {
-                                    "QueryPlan.query_plan_from_or_operation(): Index scan intervals: " # debug_show interval;
+                                    "QueryPlan.fromOrOperation(): Index scan intervals: " # debug_show interval;
                                 },
                             );
 
@@ -379,11 +381,11 @@ module {
                 case (#And(nested_query_statements)) {
                     Logger.lazyDebug(
                         collection.logger,
-                        func() = "QueryPlan.query_plan_from_or_operation(): Processing nested AND operation with " #
+                        func() = "QueryPlan.fromOrOperation(): Processing nested AND operation with " #
                         Nat.toText(nested_query_statements.size()) # " statements",
                     );
 
-                    let sub_query_plan = query_plan_from_and_operation(
+                    let sub_query_plan = fromAndOperation(
                         collection,
                         nested_query_statements,
                         sort_column,
@@ -404,14 +406,14 @@ module {
 
         Logger.lazyDebug(
             collection.logger,
-            func() = "QueryPlan.query_plan_from_or_operation(): Created OR query plan with " #
+            func() = "QueryPlan.fromOrOperation(): Created OR query plan with " #
             Nat.toText(sub_query_plans.size()) # " AND subplans and " # Nat.toText(scans.size()) # " scans",
         );
 
         return query_plan;
     };
 
-    public func create_query_plan(
+    public func createQueryPlan(
         collection : T.StableCollection,
         db_query : ZenQueryLang,
         sort_column : ?(Text, T.SortDirection),
@@ -419,18 +421,18 @@ module {
     ) : QueryPlan {
         Logger.lazyInfo(
             collection.logger,
-            func() = "QueryPlan.create_query_plan(): Creating query plan",
+            func() = "QueryPlan.createQueryPlan(): Creating query plan",
         );
 
         let query_plan = switch (db_query) {
             case (#And(operations)) {
                 Logger.lazyDebug(
                     collection.logger,
-                    func() = "QueryPlan.create_query_plan(): Processing top-level AND query with " #
+                    func() = "QueryPlan.createQueryPlan(): Processing top-level AND query with " #
                     Nat.toText(operations.size()) # " operations",
                 );
 
-                query_plan_from_and_operation(
+                fromAndOperation(
                     collection,
                     operations,
                     sort_column,
@@ -440,11 +442,11 @@ module {
             case (#Or(operations)) {
                 Logger.lazyDebug(
                     collection.logger,
-                    func() = "QueryPlan.create_query_plan(): Processing top-level OR query with " #
+                    func() = "QueryPlan.createQueryPlan(): Processing top-level OR query with " #
                     Nat.toText(operations.size()) # " operations",
                 );
 
-                query_plan_from_or_operation(
+                fromOrOperation(
                     collection,
                     operations,
                     sort_column,
@@ -455,15 +457,15 @@ module {
             case (_) {
                 Logger.lazyError(
                     collection.logger,
-                    func() = "QueryPlan.create_query_plan(): Unsupported query type: " # debug_show db_query,
+                    func() = "QueryPlan.createQueryPlan(): Unsupported query type: " # debug_show db_query,
                 );
-                Debug.trap("create_query_plan(): Unsupported query type");
+                Debug.trap("createQueryPlan(): Unsupported query type");
             };
         };
 
         Logger.lazyInfo(
             collection.logger,
-            func() = "QueryPlan.create_query_plan(): Query plan created successfully -> " # debug_show query_plan,
+            func() = "QueryPlan.createQueryPlan(): Query plan created successfully -> " # debug_show query_plan,
         );
         query_plan;
     };

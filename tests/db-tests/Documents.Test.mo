@@ -325,8 +325,8 @@ ZenDBSuite.newSuite(
 
                         let RecordSchema = #Record([("a", #Nat), ("b", #Text)]);
 
-                        let #ok(records) = zendb.createCollection<Record>(
-                            "records",
+                        let #ok(documents) = zendb.createCollection<Record>(
+                            "documents",
                             RecordSchema,
                             {
                                 from_blob = func(blob : Blob) : ?Record = from_candid (blob);
@@ -337,11 +337,11 @@ ZenDBSuite.newSuite(
                             },
                         ) else return assert false;
 
-                        let #ok(id) = records.insert({ a = 42; b = "hello" }) else return assert false;
-                        assert records.size() == 1;
-                        assert records.search(ZenDB.QueryBuilder().Where("a", #eq(#Nat(42)))) == #ok([(0, { a = 42; b = "hello" })]);
-                        assert records.search(ZenDB.QueryBuilder().Where("b", #eq(#Text("hello"))).And("a", #eq(#Nat(42)))) == #ok([(0, { a = 42; b = "hello" })]);
-                        assert records.get(id) == ?({ a = 42; b = "hello" });
+                        let #ok(id) = documents.insert({ a = 42; b = "hello" }) else return assert false;
+                        assert documents.size() == 1;
+                        assert documents.search(ZenDB.QueryBuilder().Where("a", #eq(#Nat(42)))) == #ok([(0, { a = 42; b = "hello" })]);
+                        assert documents.search(ZenDB.QueryBuilder().Where("b", #eq(#Text("hello"))).And("a", #eq(#Nat(42)))) == #ok([(0, { a = 42; b = "hello" })]);
+                        assert documents.get(id) == ?({ a = 42; b = "hello" });
 
                     },
                 );
@@ -522,8 +522,8 @@ ZenDBSuite.newSuite(
                 test(
                     "Tuples: (Nat, Text)",
                     func() {
-                        // Tuples are converted to records in Candid
-                        // They become records with numbered fields, that can be accessed by their index
+                        // Tuples are converted to documents in Candid
+                        // They become documents with numbered fields, that can be accessed by their index
                         // e.g. (Nat, Text) becomes { _0_ : Nat; _1_ : Text }
                         //
                         // ZenDB provides helpers for the most common tuple types
@@ -950,7 +950,7 @@ ZenDBSuite.newSuite(
                         // Test null field handling
                         assert deep_optionals.search(ZenDB.QueryBuilder().Where("", #eq(#Null))) == #ok([(4, completelyNull)]);
 
-                        // Retrieving records
+                        // Retrieving documents
                         assert deep_optionals.get(id1) == ?(complete);
                         assert deep_optionals.get(id5) == ?(completelyNull);
                     },

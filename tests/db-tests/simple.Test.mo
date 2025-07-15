@@ -51,7 +51,7 @@ let candify_user2 = {
 
 ZenDBSuite.newSuite(
     "Simple Record Tests",
-    ?{ ZenDBSuite.withAndWithoutIndex with log_level = #Debug },
+    ?{ ZenDBSuite.withAndWithoutIndex with log_level = #Error },
     func suite_setup(zendb : ZenDB.Database, suite_utils : ZenDBSuite.SuiteUtils) {
         let #ok(users) = zendb.createCollection<User>("users", users_schema, candify_user, null) else return assert false;
 
@@ -92,13 +92,13 @@ ZenDBSuite.newSuite(
             inputs.put(id, user);
         };
 
-        let total_records = 20;
+        let total_documents = 20;
 
         suite(
             "Record API Tests",
             func() {
                 test(
-                    "retrieve all records",
+                    "retrieve all documents",
                     func() {
                         let #ok(results) = users.search(ZenDB.QueryBuilder()) else return assert false;
                         assert results.size() == inputs.size();
@@ -217,7 +217,7 @@ ZenDBSuite.newSuite(
                 );
 
                 test(
-                    "query records with age == 0",
+                    "query documents with age == 0",
                     func() {
                         let db_query = ZenDB.QueryBuilder().Where(
                             "age",
@@ -231,7 +231,7 @@ ZenDBSuite.newSuite(
                 );
 
                 test(
-                    "update records matching a db_query",
+                    "update documents matching a db_query",
                     func() {
                         let db_query = ZenDB.QueryBuilder().Where(
                             "name",
@@ -260,7 +260,7 @@ ZenDBSuite.newSuite(
                 );
 
                 test(
-                    "delete records matching a db_query",
+                    "delete documents matching a db_query",
                     func() {
                         // Count before deletion
                         let db_query = ZenDB.QueryBuilder().Where(

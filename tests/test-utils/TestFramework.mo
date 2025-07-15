@@ -98,7 +98,7 @@ module TestFramework {
                                 options : ?ZenDB.Types.CreateIndexOptions,
                             ) {
 
-                                zendb.create_index_on_collection(
+                                zendb._create_index_on_collection(
                                     collection_name,
                                     index_name,
                                     index_key_details,

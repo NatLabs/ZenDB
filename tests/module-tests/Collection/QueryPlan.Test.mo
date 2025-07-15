@@ -85,7 +85,7 @@ suite(
             ("bool", #Bool),
         ]);
 
-        let candify_record : ZenDB.Types.Candify<RecordWithAllTypes> = {
+        let candify_document : ZenDB.Types.Candify<RecordWithAllTypes> = {
             to_blob = func(data : RecordWithAllTypes) : Blob = to_candid (data);
             from_blob = func(blob : Blob) : ?RecordWithAllTypes = from_candid (blob);
         };
@@ -105,11 +105,11 @@ suite(
             "Query Plan on Collection with no indexes",
             func() {
 
-                let #ok(collection) = db.createCollection("query_plan_test", RecordWithAllTypesSchema, candify_record, null) else return assert false;
+                let #ok(collection) = db.createCollection("query_plan_test", RecordWithAllTypesSchema, candify_document, null) else return assert false;
 
                 let stable_collection = collection._get_stable_state();
 
-                let query_plan = QueryPlan.create_query_plan(
+                let query_plan = QueryPlan.createQueryPlan(
                     stable_collection,
                     ZenDB.QueryBuilder().Where(
                         "text",
@@ -143,12 +143,12 @@ suite(
             "Query Plan on Collection with indexes",
             func() {
 
-                let #ok(collection) = db.createCollection("query_plan_test", RecordWithAllTypesSchema, candify_record, null) else return assert false;
+                let #ok(collection) = db.createCollection("query_plan_test", RecordWithAllTypesSchema, candify_document, null) else return assert false;
                 let #ok(_) = collection.createIndex("text_idx", [("text", #Ascending)], null) else return assert false;
 
                 let stable_collection = collection._get_stable_state();
 
-                let query_plan = QueryPlan.create_query_plan(
+                let query_plan = QueryPlan.createQueryPlan(
                     stable_collection,
                     ZenDB.QueryBuilder().Where(
                         "text",

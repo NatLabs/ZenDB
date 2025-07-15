@@ -37,11 +37,11 @@ module {
 
     public let TypeUtils = _TypeUtils;
 
-    public func ignore_this() : None {
-        Debug.trap("trap caused by ignore_this()");
+    public func ignoreThis() : None {
+        Debug.trap("trap caused by ignoreThis()");
     };
 
-    public func concat_blob(blob1 : Blob, blob2 : Blob) : Blob {
+    public func concatBlob(blob1 : Blob, blob2 : Blob) : Blob {
         let size = blob1.size() + blob2.size();
         let res = Blob.fromArray(
             Array.tabulate(
@@ -58,7 +58,7 @@ module {
         res;
     };
 
-    public func slice_blob(blob : Blob, start : Nat, end : Nat) : Blob {
+    public func sliceBlob(blob : Blob, start : Nat, end : Nat) : Blob {
         let size = end - start;
 
         Blob.fromArray(
@@ -86,14 +86,14 @@ module {
         Float.log(n) / Float.log(2);
     };
 
-    public func text_strip_start(text : Text, prefix : Text) : Text {
+    public func stripStart(text : Text, prefix : Text) : Text {
         switch (Text.stripStart(text, #text(prefix))) {
             case (?stripped) stripped;
             case (null) text;
         };
     };
 
-    public func buffer_concat_freeze<A>(buffers : [Buffer.Buffer<A>]) : [A] {
+    public func concatFreeze<A>(buffers : [Buffer.Buffer<A>]) : [A] {
         var i = 0;
         var total_size = 0;
         while (i < buffers.size()) {
@@ -119,7 +119,7 @@ module {
 
     };
 
-    public func extract_schema_keys(schema : T.Schema) : [Text] {
+    public func getSchemaKeys(schema : T.Schema) : [Text] {
         let buffer = Buffer.Buffer<Text>(8);
 
         func extract(schema : T.Schema) {
@@ -152,7 +152,7 @@ module {
         Buffer.toArray(buffer);
     };
 
-    public func reverse_order(order : T.Order) : T.Order {
+    public func reverseOrder(order : T.Order) : T.Order {
         switch (order) {
             case (#less) #greater;
             case (#greater) #less;
@@ -160,26 +160,26 @@ module {
         };
     };
 
-    public func unwrap_or_err<A>(res : T.Result<A, Text>) : A {
+    public func unwrapOrErr<A>(res : T.Result<A, Text>) : A {
         switch (res) {
             case (#ok(success)) success;
-            case (#err(err)) Debug.trap("unwrap_or_err: " # err);
+            case (#err(err)) Debug.trap("unwrapOrErr: " # err);
         };
     };
 
-    public func assert_result<A>(res : T.Result<A, Text>) {
+    public func assertResult<A>(res : T.Result<A, Text>) {
         switch (res) {
             case (#ok(_)) ();
-            case (#err(err)) Debug.trap("assert_result: " # err);
+            case (#err(err)) Debug.trap("assertResult: " # err);
         };
     };
 
-    public func log_error_msg<A>(logger : T.Logger, err_msg : Text) : T.Result<A, Text> {
+    public func logErrorMsg<A>(logger : T.Logger, err_msg : Text) : T.Result<A, Text> {
         Logger.error(logger, err_msg);
         #err(err_msg);
     };
 
-    public func log_error<A>(logger : T.Logger, res : T.Result<A, Text>, opt_prefix_msg : ?Text) : T.Result<A, Text> {
+    public func logError<A>(logger : T.Logger, res : T.Result<A, Text>, opt_prefix_msg : ?Text) : T.Result<A, Text> {
         switch (res) {
             case (#ok(success)) #ok(success);
             case (#err(errorMsg)) {
@@ -197,13 +197,13 @@ module {
         };
     };
 
-    public func tuple_cmp<A, B>(cmp : (A, A) -> T.Order) : ((A, B), (A, B)) -> Order {
+    public func tupleCmp<A, B>(cmp : (A, A) -> T.Order) : ((A, B), (A, B)) -> Order {
         func(a : (A, B), b : (A, B)) : T.Order {
             cmp(a.0, b.0);
         };
     };
 
-    public func tuple_eq<A, B>(eq : (A, A) -> Bool) : ((A, B), (A, B)) -> Bool {
+    public func tupleEq<A, B>(eq : (A, A) -> Bool) : ((A, B), (A, B)) -> Bool {
         func(a : (A, B), b : (A, B)) : Bool {
             eq(a.0, b.0);
         };
@@ -235,12 +235,12 @@ module {
 
     };
 
-    public func buffer_add_all<A>(buffer : Buffer.Buffer<A>, iter : Iter.Iter<A>) {
+    public func addAll<A>(buffer : Buffer.Buffer<A>, iter : Iter.Iter<A>) {
         for (elem in iter) { buffer.add(elem) };
     };
 
     // add all elements from an iterator to a bufferlike object that has the add method
-    public func buffer_like_add_all<A>(buffer : { add : (A) -> () }, iter : Iter.Iter<A>) {
+    public func addAllLike<A>(buffer : { add : (A) -> () }, iter : Iter.Iter<A>) {
         for (elem in iter) { buffer.add(elem) };
     };
 

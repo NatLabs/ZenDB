@@ -56,8 +56,8 @@ module CandidMap {
         );
     };
 
-    // this loads the first level of a candid record into the map
-    // it stores information about the nested records as is and only caches the nested fields when they are accessed in the get method
+    // this loads the first level of a candid document into the map
+    // it stores information about the nested documents as is and only caches the nested fields when they are accessed in the get method
     func load_record_into_map(types : [(Text, T.Schema)], fields : [(Text, Candid)]) : Map.Map<Text, NestedCandid> {
         let map = Map.new<Text, NestedCandid>();
 
@@ -91,7 +91,7 @@ module CandidMap {
         // Debug.print("CandidMap.new(): " # debug_show (types, candid));
 
         ignore Map.put(map, T.thash, "", #Candid(types, candid));
-        ignore Map.put(map, T.thash, C.RECORD_ID, #Candid(#Nat, #Nat(id)));
+        ignore Map.put(map, T.thash, C.DOCUMENT_ID, #Candid(#Nat, #Nat(id)));
 
         let candid_map = { candid_map = map };
 
@@ -149,8 +149,8 @@ module CandidMap {
                     case (#Option(inner_type), candid_value) {
                         return handle_candid(inner_type, candid_value, true);
                     };
-                    case ((#Record(record_types) or #Map(record_types), #Record(records) or #Map(records))) {
-                        let nested_map = load_record_into_map(record_types, records);
+                    case ((#Record(record_types) or #Map(record_types), #Record(documents) or #Map(documents))) {
+                        let nested_map = load_record_into_map(record_types, documents);
                         ignore Map.put(map, thash, field, #CandidMap(nested_map));
                         nested_map;
                     };
@@ -201,11 +201,11 @@ module CandidMap {
                         nested_map;
 
                     };
-                    case (#Tuple(tuple_types), #Record(records)) {
+                    case (#Tuple(tuple_types), #Record(documents)) {
                         let tuples = Array.tabulate(
                             tuple_types.size(),
                             func(i : Nat) : Candid {
-                                let (field, record_value) = records[i];
+                                let (field, record_value) = documents[i];
                                 assert field == Nat.toText(i);
                                 record_value;
                             },
@@ -281,9 +281,9 @@ module CandidMap {
 
     // Helper function to wrap a Candid value in #Option if is_option_type is true
     func wrap_option(candid_type : T.CandidType, value : Candid) : Candid {
-        // CandidUtils.inherit_options_from_type(
+        // CandidUtils.inheritOptionsFromType(
         //     candid_type,
-        //     CandidUtils.unwrap_option(value),
+        //     CandidUtils.unwrapOption(value),
         // );
         value;
     };
@@ -291,8 +291,8 @@ module CandidMap {
     public func get(candid_map_state : CandidMap, schema_map : T.SchemaMap, key : Text) : ?Candid {
         let { candid_map } = candid_map_state;
 
-        if (key == C.RECORD_ID) {
-            let ?#Candid(#Nat, #Nat(id)) = Map.get(candid_map, thash, C.RECORD_ID) else Debug.trap("CandidMap: Could not find candid id");
+        if (key == C.DOCUMENT_ID) {
+            let ?#Candid(#Nat, #Nat(id)) = Map.get(candid_map, thash, C.DOCUMENT_ID) else Debug.trap("CandidMap: Could not find candid id");
             return ?#Nat(id); // exclude wrap_option for id
         };
 
@@ -319,7 +319,7 @@ module CandidMap {
         let candid : NestedCandid = switch (Map.get(map, thash, field)) {
             case (?nested_candid) nested_candid;
             case (null) {
-                switch (SchemaMap.unwrap_option_type(types), Map.get(map, thash, IS_COMPOUND_TYPE)) {
+                switch (SchemaMap.unwrapOptionType(types), Map.get(map, thash, IS_COMPOUND_TYPE)) {
                     case (#Variant(schema_map_types), ?#Candid(#Variant(candid_map_nested_types), #Text(tag))) {
                         for ((variant_tag, _) in schema_map_types.vals()) {
                             if (variant_tag == tag) {
@@ -358,7 +358,7 @@ module CandidMap {
 
         let opt_compound_tag = Map.get(map, thash, IS_COMPOUND_TYPE);
 
-        if (is_compound_type) switch (SchemaMap.unwrap_option_type(types), opt_compound_tag) {
+        if (is_compound_type) switch (SchemaMap.unwrapOptionType(types), opt_compound_tag) {
             case (#Variant(_), ?#Candid(#Variant(_), #Text(tag))) return ?wrap_option(types, #Text(tag));
             case (_) {};
         };
@@ -530,7 +530,7 @@ module CandidMap {
             case (_) return #err("set(): Could not find field '" # field # "' in map");
         };
 
-        //    Debug.print("updated candid: " # debug_show extract_candid());
+        //    Debug.print("updated candid: " # debug_show extractCandid());
 
         #ok()
 
@@ -542,11 +542,11 @@ module CandidMap {
 
         Map.clear(candid_map);
         ignore Map.put(candid_map, thash, "", #Candid(types, new_candid));
-        ignore Map.put(candid_map, thash, C.RECORD_ID, #Candid(#Nat, #Nat(new_id)));
+        ignore Map.put(candid_map, thash, C.DOCUMENT_ID, #Candid(#Nat, #Nat(new_id)));
 
-        // // unlike the `load()` method, we already have a map that might have cached nested records
-        // // these cached records are indicative of the fields that have been accessed and would most likely be accessed again
-        // // so we replace the values in the cached record fields with the new values
+        // // unlike the `load()` method, we already have a map that might have cached nested documents
+        // // these cached documents are indicative of the fields that have been accessed and would most likely be accessed again
+        // // so we replace the values in the cached document fields with the new values
         // func reload_record_into_map(map : Map.Map<Text, NestedCandid>, types : [(Text, T.Schema)], fields : [(Text, Candid)]) {
         //     var var_fields = fields;
 
@@ -592,14 +592,14 @@ module CandidMap {
     };
 
     public func clone(candid_map : CandidMap, schema_map : T.SchemaMap) : CandidMap {
-        let extracted_candid = extract_candid(candid_map);
-        let ?(#Candid(#Nat, #Nat(id))) = Map.get(candid_map.candid_map, thash, C.RECORD_ID) else Debug.trap("CandidMap.clone(): Could not find candid id");
+        let extracted_candid = extractCandid(candid_map);
+        let ?(#Candid(#Nat, #Nat(id))) = Map.get(candid_map.candid_map, thash, C.DOCUMENT_ID) else Debug.trap("CandidMap.clone(): Could not find candid id");
         let cloned = CandidMap.new(schema_map, id, extracted_candid);
 
         cloned;
     };
 
-    public func extract_candid(state : CandidMap) : Candid {
+    public func extractCandid(state : CandidMap) : Candid {
         let { candid_map = map } = state;
 
         func extract_candid_helper(map : Map.Map<Text, NestedCandid>) : Candid {

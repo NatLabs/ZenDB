@@ -53,7 +53,7 @@ module {
             {
                 from_blob = func(blob : Blob) : A {
                     switch (external_candify.from_blob(blob)) {
-                        case (?record) record;
+                        case (?document) document;
                         case (null) Debug.trap("
                         Could not convert candid blob (" # debug_show blob # ") to motoko using the '" # collection_name # "' collection's schema.
                         If the schema and the candify encoding function are correct, then the blob might be corrupted or not a valid candid blob.
@@ -66,14 +66,14 @@ module {
 
         func validate_candify<A>(collection_name : Text, schema : T.Schema, external_candify : T.Candify<A>) : Result<T.InternalCandify<A>, Text> {
 
-            let default_candid_value : T.Candid = switch (Schema.generate_default_value(schema)) {
+            let default_candid_value : T.Candid = switch (Schema.generateDefaultValue(schema)) {
                 case (#ok(default_candid)) default_candid;
                 case (#err(msg)) return #err("Failed to generate default value for schema for candify validation: " # msg);
             };
 
             let default_candid_blob = switch (Serde.Candid.encodeOne(default_candid_value, null)) {
                 case (#ok(blob)) blob;
-                case (#err(msg)) return #err("Failed to encode generated schema record to Candid blob using serde: " # msg);
+                case (#err(msg)) return #err("Failed to encode generated schema document to Candid blob using serde: " # msg);
             };
 
             let opt_deserialized_candid_value = external_candify.from_blob(default_candid_blob);
@@ -145,10 +145,10 @@ module {
 
             let internal_candify : T.InternalCandify<Record> = switch (validate_candify_result) {
                 case (#ok(internal_candify)) internal_candify;
-                case (#err(msg)) return Utils.log_error_msg(stable_db.logger, msg);
+                case (#err(msg)) return Utils.logErrorMsg(stable_db.logger, msg);
             };
 
-            switch (StableDatabase.create_collection(stable_db, name, schema, options)) {
+            switch (StableDatabase.createCollection(stable_db, name, schema, options)) {
                 case (#ok(stable_collection)) {
                     #ok(
                         Collection.Collection<Record>(
@@ -158,16 +158,18 @@ module {
                         )
                     );
                 };
-                case (#err(msg)) Utils.log_error_msg(stable_db.logger, msg);
+                case (#err(msg)) Utils.logErrorMsg(stable_db.logger, msg);
             };
         };
 
+        /// Retrieves an existing collection by its name.
+        /// It is required to pass the correct `Candify` function that matches the schema of the collection.
         public func getCollection<Record>(
             name : Text,
             external_candify : T.Candify<Record>,
         ) : Result<Collection<Record>, Text> {
 
-            switch (StableDatabase.get_collection(stable_db, name)) {
+            switch (StableDatabase.getCollection(stable_db, name)) {
                 case (#ok(stable_collection)) {
                     #ok(
                         Collection.Collection<Record>(
@@ -181,21 +183,21 @@ module {
             };
         };
 
-        public func create_index_on_collection(
+        public func _create_index_on_collection(
             collection_name : Text,
             index_name : Text,
             index_fields : [(Text, T.SortDirection)],
             is_unique : Bool,
         ) : T.Result<(), Text> {
-            let stable_collection = switch (StableDatabase.get_collection(stable_db, collection_name)) {
+            let stable_collection = switch (StableDatabase.getCollection(stable_db, collection_name)) {
                 case (#ok(stable_collection)) stable_collection;
                 case (#err(msg)) return #err(msg);
             };
 
             switch (
-                StableCollection.create_index(
+                StableCollection.createIndex(
                     stable_collection,
-                    CollectionUtils.get_main_btree_utils(stable_collection),
+                    CollectionUtils.getMainBtreeUtils(stable_collection),
                     index_name,
                     index_fields,
                     is_unique,

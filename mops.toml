@@ -5,14 +5,14 @@ keywords = [ "database", "candid", "stable-memory" ]
 license = "AGPL-3.0"
 
 [dependencies]
-base = "0.14.11"
+base = "0.14.14"
 map = "9.0.1"
-serde = "3.2.2"
+serde = "3.3.1"
 itertools = "0.2.2"
 memory-collection = "0.2.1"
 bit-map = "0.1.2"
 xtended-numbers = "0.4.0"
-vector = "0.4.1"
+vector = "0.4.2"
 augmented-btrees = "0.7.0"
 byte-utils = "0.0.1"
 test = "2.1.1"
@@ -24,4 +24,4 @@ fuzz = "1.0.0"
 
 [toolchain]
 wasmtime = "30.0.2"
-moc = "0.14.14"
+moc = "0.14.13"

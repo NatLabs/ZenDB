@@ -45,7 +45,7 @@ module {
         };
     };
 
-    public func process_schema(schema : Schema) : Schema {
+    public func processSchema(schema : Schema) : Schema {
         sort_candid_type(schema);
     };
 
@@ -54,12 +54,12 @@ module {
     //
     // Forward compatible types
     // These types can be updated in the following ways but not the other way around:
-    // - A record field can be updated to an optional type
+    // - A document field can be updated to an optional type
     //     #Record ([("field", #Nat)]) -> #Record ([("field", #Option(#Nat))])
     // - A variant type can be extended to include new variant options, but can't remove existing ones
     //     #Variant ([("id", #Nat)]) -> #Variant ([("id", #Nat), ("name", #Text)])
 
-    public func is_schema_backward_compatible(curr : Schema, new : Schema) : Bool {
+    public func isSchemaBackwardCompatible(curr : Schema, new : Schema) : Bool {
         switch (curr, new) {
             case (#Empty, #Empty) true;
             case (#Null, #Null) true;
@@ -69,16 +69,16 @@ module {
             case (#Float, #Float) true;
             case (#Bool, #Bool) true;
             case (#Principal, #Principal) true;
-            case (#Option(inner_curr), #Option(inner_new)) is_schema_backward_compatible(inner_curr, inner_new);
+            case (#Option(inner_curr), #Option(inner_new)) isSchemaBackwardCompatible(inner_curr, inner_new);
             // types can be updated to become optional but not the other way around
-            case (curr, #Option(inner_new)) is_schema_backward_compatible(curr, inner_new);
+            case (curr, #Option(inner_new)) isSchemaBackwardCompatible(curr, inner_new);
             case (#Blob, #Array(#Nat8)) true;
             case (#Array(#Nat8), #Blob) true;
-            case (#Array(inner_curr), #Array(inner_new)) is_schema_backward_compatible(inner_curr, inner_new);
+            case (#Array(inner_curr), #Array(inner_new)) isSchemaBackwardCompatible(inner_curr, inner_new);
             case (#Tuple(curr), #Tuple(new)) {
                 if (curr.size() != new.size()) return false;
                 for ((a, b) in Itertools.zip(curr.vals(), new.vals())) {
-                    if (not is_schema_backward_compatible(a, b)) return false;
+                    if (not isSchemaBackwardCompatible(a, b)) return false;
                 };
                 true;
             };
@@ -97,7 +97,7 @@ module {
                     let (name_curr, schema_curr) = fields_curr[i];
                     let (name_new, schema_new) = sorted_fields_new[i];
                     if (name_curr != name_new) return false;
-                    if (not is_schema_backward_compatible(schema_curr, schema_new)) return false;
+                    if (not isSchemaBackwardCompatible(schema_curr, schema_new)) return false;
                 };
 
                 for (i in Itertools.range(fields_curr.size(), sorted_fields_new.size())) {
@@ -125,7 +125,7 @@ module {
                     let (name_curr, schema_curr) = variants_curr[i];
                     let (name_new, schema_new) = variants_new[i];
                     if (name_curr != name_new) return false;
-                    if (not is_schema_backward_compatible(schema_curr, schema_new)) return false;
+                    if (not isSchemaBackwardCompatible(schema_curr, schema_new)) return false;
                 };
 
                 // no need to validate new variants
@@ -135,7 +135,7 @@ module {
         };
     };
 
-    public func validate_schema(schema : Schema) : Result<(), Text> {
+    public func validateSchema(schema : Schema) : Result<(), Text> {
         switch (schema) {
             case (#Array(_)) #err("Top level #Array is not supported");
             case (#Empty) #err("A schema with a single #Empty type is not valid, translated to () in motoko");
@@ -144,9 +144,9 @@ module {
         };
     };
 
-    public func validate(schema : Schema, record : Candid) : Result<(), Text> {
+    public func validate(schema : Schema, document : Candid) : Result<(), Text> {
 
-        switch (schema, record) {
+        switch (schema, document) {
             case (#Empty, #Empty) #ok;
             case (#Null, #Null) #ok;
             case (#Text, #Text(_)) #ok;
@@ -165,11 +165,11 @@ module {
             case (#Principal, #Principal(_)) #ok;
             case (#Blob, #Blob(_)) #ok;
             case (#Option(inner), #Null) #ok;
-            case (#Option(inner), record) {
+            case (#Option(inner), document) {
 
                 // it should pass in
                 // the case where you update a schema type to be optional
-                return validate(inner, record);
+                return validate(inner, document);
             };
             case (schema, #Option(inner)) {
                 if (inner == #Null) return #ok;
@@ -187,14 +187,14 @@ module {
                 #ok;
 
             };
-            case (#Tuple(tuples), #Record(records)) {
-                if (records.size() != tuples.size()) return #err("Tuple size mismatch: expected " # debug_show (tuples.size()) # ", got " # debug_show (records.size()));
+            case (#Tuple(tuples), #Record(documents)) {
+                if (documents.size() != tuples.size()) return #err("Tuple size mismatch: expected " # debug_show (tuples.size()) # ", got " # debug_show (documents.size()));
 
-                for ((i, (key, _)) in Itertools.enumerate(records.vals())) {
+                for ((i, (key, _)) in Itertools.enumerate(documents.vals())) {
                     if (key != Nat.toText(i)) return #err("Tuple key mismatch: expected " # Nat.toText(i) # ", got " # debug_show (key));
                 };
 
-                for ((i, (key, value)) in Itertools.enumerate(records.vals())) {
+                for ((i, (key, value)) in Itertools.enumerate(documents.vals())) {
                     let res = validate(tuples[i], value);
                     let #ok(_) = res else return send_error(res);
                 };
@@ -202,9 +202,9 @@ module {
                 #ok;
 
             };
-            case (#Record(fields), #Record(records)) {
-                if (fields.size() != records.size()) {
-                    return #err("Record size mismatch: " # debug_show (("schema", fields.size()), ("record", records.size())));
+            case (#Record(fields), #Record(documents)) {
+                if (fields.size() != documents.size()) {
+                    return #err("Record size mismatch: " # debug_show (("schema", fields.size()), ("document", documents.size())));
                 };
 
                 let sorted_fields = Array.sort(
@@ -215,21 +215,21 @@ module {
                 );
 
                 let sorted_records = Array.sort(
-                    records,
+                    documents,
                     func(a : (Text, Candid), b : (Text, Candid)) : Order {
                         Text.compare(a.0, b.0);
                     },
                 );
 
-                // should sort fields and records
+                // should sort fields and documents
                 var i = 0;
                 while (i < fields.size()) {
                     let field = sorted_fields[i];
-                    let record = sorted_records[i];
+                    let document = sorted_records[i];
 
-                    if (field.0 != record.0) return #err("Record field mismatch: " # debug_show (("field", field.0), ("record", record.0)) # debug_show (fields, records));
+                    if (field.0 != document.0) return #err("Record field mismatch: " # debug_show (("field", field.0), ("document", document.0)) # debug_show (fields, documents));
 
-                    let res = validate(field.1, record.1);
+                    let res = validate(field.1, document.1);
                     let #ok(_) = res else return send_error(res);
 
                     i += 1;
@@ -237,10 +237,10 @@ module {
 
                 #ok;
             };
-            case (#Array(inner), #Array(records)) {
+            case (#Array(inner), #Array(documents)) {
                 var i = 0;
-                while (i < records.size()) {
-                    let res = validate(inner, records[i]);
+                while (i < documents.size()) {
+                    let res = validate(inner, documents[i]);
                     let #ok(_) = res else return send_error(res);
                     i += 1;
                 };
@@ -256,7 +256,7 @@ module {
                 );
 
                 // Debug.print("schema: " # debug_show (schema));
-                // Debug.print("record: " # debug_show (record));
+                // Debug.print("document: " # debug_show (document));
 
                 switch (result) {
                     case (null) return #err("Variant not found in schema");
@@ -264,12 +264,12 @@ module {
                 };
             };
 
-            case (a, b) return #err("validate(): schema and record mismatch: " # debug_show (a, b) # " in " # debug_show (schema, record));
+            case (a, b) return #err("validate(): schema and document mismatch: " # debug_show (a, b) # " in " # debug_show (schema, document));
         };
     };
 
     // schema is added here to get the order of the #Variant type
-    public func cmp_candid(schema : Schema, a : CandidQuery, b : CandidQuery) : Int8 {
+    public func cmpCandid(schema : Schema, a : CandidQuery, b : CandidQuery) : Int8 {
 
         switch (schema, a, b) {
             // The #Minimum variant is used in queries to represent the minimum value
@@ -307,7 +307,7 @@ module {
                     case (#Null, #Null) 0;
                     case (#Null, _) -1;
                     case (_, #Null) 1;
-                    case (_, _) cmp_candid(schema, a, b);
+                    case (_, _) cmpCandid(schema, a, b);
                 };
             };
             case (#Variant(schema), #Variant(a), #Variant(b)) {
@@ -318,7 +318,7 @@ module {
                     func((name, _) : (Text, Any), (name2, _) : (Text, Any)) : Bool {
                         name == name2;
                     },
-                ) else Debug.trap("cmp_candid: variant not found in schema");
+                ) else Debug.trap("cmpCandid: variant not found in schema");
 
                 let ?j = Array.indexOf<(Text, Any)>(
                     b,
@@ -326,12 +326,12 @@ module {
                     func((name, _) : (Text, Any), (name2, _) : (Text, Any)) : Bool {
                         name == name2;
                     },
-                ) else Debug.trap("cmp_candid: variant not found in schema");
+                ) else Debug.trap("cmpCandid: variant not found in schema");
 
                 let res = Int8Cmp.Nat(i, j);
 
                 if (res == 0) {
-                    cmp_candid(schema[i].1, a.1, b.1);
+                    cmpCandid(schema[i].1, a.1, b.1);
                 } else {
                     res;
                 };
@@ -345,7 +345,7 @@ module {
 
             //     let min_len = Nat.min(a.size(), b.size());
             //     for (i in Iter.range(0, min_len - 1)) {
-            //         let cmp_result = cmp_candid(a[i], b[i]);
+            //         let cmp_result = cmpCandid(a[i], b[i]);
             //         if (cmp_result != 0) return cmp_result;
             //     };
             //     Int8Cmp.Nat(a.size(), b.size());
@@ -353,12 +353,12 @@ module {
 
             case (schema, a, b) {
                 // Debug.print(debug_show (a, b));
-                Debug.trap("cmp_candid: unexpected candid type " # debug_show { schema; a; b });
+                Debug.trap("cmpCandid: unexpected candid type " # debug_show { schema; a; b });
             };
         };
     };
 
-    public func cmp_candid_ignore_option(schema : Schema, a : CandidQuery, b : CandidQuery) : Int8 {
+    public func cmpCandidIgnoreOption(schema : Schema, a : CandidQuery, b : CandidQuery) : Int8 {
 
         switch (schema, a, b) {
             // The #Minimum variant is used in queries to represent the minimum value
@@ -396,11 +396,11 @@ module {
                     case (#Null, #Null) 0;
                     case (#Null, _) -1;
                     case (_, #Null) 1;
-                    case (_, _) cmp_candid(schema, a, b);
+                    case (_, _) cmpCandid(schema, a, b);
                 };
             };
-            case (_, #Option(a), b) cmp_candid_ignore_option(schema, a, b);
-            case (_, a, #Option(b)) cmp_candid_ignore_option(schema, a, b);
+            case (_, #Option(a), b) cmpCandidIgnoreOption(schema, a, b);
+            case (_, a, #Option(b)) cmpCandidIgnoreOption(schema, a, b);
             case (#Variant(schema), #Variant(a), #Variant(b)) {
 
                 let ?i = Array.indexOf<(Text, Any)>(
@@ -409,7 +409,7 @@ module {
                     func((name, _) : (Text, Any), (name2, _) : (Text, Any)) : Bool {
                         name == name2;
                     },
-                ) else Debug.trap("cmp_candid: variant not found in schema");
+                ) else Debug.trap("cmpCandid: variant not found in schema");
 
                 let ?j = Array.indexOf<(Text, Any)>(
                     b,
@@ -417,12 +417,12 @@ module {
                     func((name, _) : (Text, Any), (name2, _) : (Text, Any)) : Bool {
                         name == name2;
                     },
-                ) else Debug.trap("cmp_candid: variant not found in schema");
+                ) else Debug.trap("cmpCandid: variant not found in schema");
 
                 let res = Int8Cmp.Nat(i, j);
 
                 if (res == 0) {
-                    cmp_candid(schema[i].1, a.1, b.1);
+                    cmpCandid(schema[i].1, a.1, b.1);
                 } else {
                     res;
                 };
@@ -436,7 +436,7 @@ module {
 
             //     let min_len = Nat.min(a.size(), b.size());
             //     for (i in Iter.range(0, min_len - 1)) {
-            //         let cmp_result = cmp_candid(a[i], b[i]);
+            //         let cmp_result = cmpCandid(a[i], b[i]);
             //         if (cmp_result != 0) return cmp_result;
             //     };
             //     Int8Cmp.Nat(a.size(), b.size());
@@ -444,12 +444,12 @@ module {
 
             case (schema, a, b) {
                 // Debug.print(debug_show (a, b));
-                Debug.trap("cmp_candid: unexpected candid type " # debug_show { schema; a; b });
+                Debug.trap("cmpCandid: unexpected candid type " # debug_show { schema; a; b });
             };
         };
     };
 
-    public func generate_default_value(schema : Schema) : Result<Candid, Text> {
+    public func generateDefaultValue(schema : Schema) : Result<Candid, Text> {
         let candid : Candid = switch (schema) {
             case (#Empty) #Empty;
             case (#Null) #Null;
@@ -468,11 +468,11 @@ module {
             case (#Bool) #Bool(false);
             case (#Principal) #Principal(Principal.fromBlob("\04")); // anonymous principal
             case (#Blob) #Blob("");
-            case (#Option(inner)) switch (generate_default_value(inner)) {
+            case (#Option(inner)) switch (generateDefaultValue(inner)) {
                 case (#ok(value)) #Option(value);
                 case (#err(err)) return #err(err);
             };
-            case (#Array(inner)) switch (generate_default_value(inner)) {
+            case (#Array(inner)) switch (generateDefaultValue(inner)) {
                 case (#ok(val)) #Array([val]);
                 case (#err(err)) return #err(err);
             };
@@ -482,7 +482,7 @@ module {
 
                 for (i in Itertools.range(0, tuples.size())) {
                     let tuple_type = tuples[i];
-                    let value = switch (generate_default_value(tuple_type)) {
+                    let value = switch (generateDefaultValue(tuple_type)) {
                         case (#ok(value)) value;
                         case (#err(err)) return #err(err);
                     };
@@ -498,7 +498,7 @@ module {
                 let buffer = Buffer.Buffer<(Text, Candid)>(fields.size());
                 for (i in Itertools.range(0, fields.size())) {
                     let (name, record_type) = fields[i];
-                    let value = switch (generate_default_value(record_type)) {
+                    let value = switch (generateDefaultValue(record_type)) {
                         case (#ok(value)) value;
                         case (#err(err)) return #err(err);
                     };
@@ -513,13 +513,13 @@ module {
             case (#Variant(variants)) {
                 let (name, variant_type) = variants[0];
 
-                switch (generate_default_value(variant_type)) {
+                switch (generateDefaultValue(variant_type)) {
                     case (#ok(value)) #Variant((name, value));
                     case (#err(err)) return #err(err);
                 };
             };
 
-            case (_) return #err("generate_default_value: unexpected schema type " # debug_show (schema));
+            case (_) return #err("generateDefaultValue: unexpected schema type " # debug_show (schema));
         };
 
         #ok(candid);

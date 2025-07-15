@@ -190,7 +190,7 @@ module Logger {
         // the thread should be logged as individual messages not linked to the thread
         // Each of these logs will include the name of the thread at the start
 
-        public func format_thread_msg(msg : Text) : Text {
+        public func formatMsg(msg : Text) : Text {
             if (LogLevel.compare(#Info, logger.log_level) == #less) {
                 return name # ": " # msg;
             } else {
@@ -199,7 +199,7 @@ module Logger {
         };
 
         public func logAtLevel(log_level : LogLevel, msg : Text) {
-            Logger.logAtLevel(logger, log_level, format_thread_msg(msg));
+            Logger.logAtLevel(logger, log_level, formatMsg(msg));
         };
 
         public func log(msg : Text) {
@@ -223,7 +223,7 @@ module Logger {
         };
 
         public func trap(msg : Text) : None {
-            Debug.trap(format_thread_msg(msg));
+            Debug.trap(formatMsg(msg));
         };
 
         public func end() {
@@ -240,7 +240,7 @@ module Logger {
                 logger,
                 log_level,
                 func() {
-                    format_thread_msg(msgFn());
+                    formatMsg(msgFn());
                 },
             );
         };

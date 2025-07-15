@@ -38,8 +38,8 @@ This architecture allows ZenDB to handle complex queries efficiently, even with 
 
 ### Installation
 
-- Requires `moc` version `0.14.9` or higher to run.
-- Install with mops: `mops toolchain use moc 0.14.9`  .
+- Requires `moc` version `0.14.13` or higher to run.
+- Install with mops: `mops toolchain use moc 0.14.13`  .
 
 #### Install Directly from Mops (Recommended)
 

@@ -40,7 +40,7 @@ module {
     public let Cast = CastModule;
 
     // todo: should consider moving this to the Orchid module so we can directly encode these values
-    public func get_next_value(value : T.CandidQuery) : T.CandidQuery {
+    public func getNextValue(value : T.CandidQuery) : T.CandidQuery {
         switch (value) {
             case (#Nat(n)) #Nat(n + 1);
             case (#Nat8(n)) if (n == Nat8.maximumValue) #Maximum else #Nat8(n + 1);
@@ -74,11 +74,11 @@ module {
             );
             case (#Bool(b)) if (not b) #Bool(true) else #Maximum;
             case (#Null) #Option(#Null); // todo: need to ensure this is accurate
-            case (#Option(inner_value)) get_next_value(inner_value);
+            case (#Option(inner_value)) getNextValue(inner_value);
             case (#Empty) #Maximum;
             case (#Maximum) #Maximum;
             case (#Minimum) #Minimum;
-            case (candid_value) Debug.trap("get_next_value(): Does not support this type: " # debug_show (candid_value))
+            case (candid_value) Debug.trap("getNextValue(): Does not support this type: " # debug_show (candid_value))
 
         };
 
@@ -116,7 +116,7 @@ module {
 
     };
 
-    public func get_prev_value(value : T.CandidQuery) : T.CandidQuery {
+    public func getPrevValue(value : T.CandidQuery) : T.CandidQuery {
         switch (value) {
             case (#Nat(n)) if (n == 0) #Minimum else #Nat(n - 1);
             case (#Nat8(n)) if (n == 0) #Minimum else #Nat8(n - 1);
@@ -135,7 +135,7 @@ module {
                 let opt_text = Text.decodeUtf8(blob);
                 switch (opt_text) {
                     case (?new_text) #Text(new_text);
-                    case (null) Debug.trap("get_prev_value(): Failed to decode text from blob: " # debug_show (blob));
+                    case (null) Debug.trap("getPrevValue(): Failed to decode text from blob: " # debug_show (blob));
                 };
             };
             case (#Blob(b)) if (b.size() == 0) #Minimum else {
@@ -151,18 +151,18 @@ module {
                 };
             };
             case (#Bool(b)) if (b) #Bool(false) else #Minimum;
-            case (#Option(inner_value)) get_prev_value(inner_value);
+            case (#Option(inner_value)) getPrevValue(inner_value);
             case (#Null) #Minimum;
             case (#Empty) #Minimum;
             case (#Maximum) #Maximum;
             case (#Minimum) #Minimum;
-            case (_) Debug.trap("get_prev_value(): Does not support this type: " # debug_show (value));
+            case (_) Debug.trap("getPrevValue(): Does not support this type: " # debug_show (value));
 
         };
 
     };
 
-    public func from_candid_query(value : T.CandidQuery) : T.Candid {
+    public func fromCandidQuery(value : T.CandidQuery) : T.Candid {
         switch (value) {
             case (#Nat(n)) #Nat(n);
             case (#Nat8(n)) #Nat8(n);
@@ -181,11 +181,11 @@ module {
             case (#Bool(b)) #Bool(b);
             case (#Null) #Null;
             case (#Empty) #Empty;
-            case (_candid_value) Debug.trap("from_candid_query(): Does not support this type: " # debug_show (_candid_value));
+            case (_candid_value) Debug.trap("fromCandidQuery(): Does not support this type: " # debug_show (_candid_value));
         };
     };
 
-    public func to_candid_query(value : T.Candid) : T.CandidQuery {
+    public func toCandidQuery(value : T.Candid) : T.CandidQuery {
         switch (value) {
             case (#Nat(n)) #Nat(n);
             case (#Nat8(n)) #Nat8(n);
@@ -204,20 +204,20 @@ module {
             case (#Bool(b)) #Bool(b);
             case (#Null) #Null;
             case (#Empty) #Empty;
-            case (_candid_value) Debug.trap("to_candid_query(): Does not support this type: " # debug_show (_candid_value));
+            case (_candid_value) Debug.trap("toCandidQuery(): Does not support this type: " # debug_show (_candid_value));
         };
     };
 
-    public func unwrap_option(value : T.Candid) : T.Candid {
+    public func unwrapOption(value : T.Candid) : T.Candid {
         switch (value) {
-            case (#Option(nested_value)) unwrap_option(nested_value);
+            case (#Option(nested_value)) unwrapOption(nested_value);
             case (_) value;
         };
     };
 
-    public func inherit_options_from_type(candid_type : T.CandidType, value : T.Candid) : T.Candid {
+    public func inheritOptionsFromType(candid_type : T.CandidType, value : T.Candid) : T.Candid {
         switch (candid_type) {
-            case (#Option(nested_type)) inherit_options_from_type(nested_type, #Option(value));
+            case (#Option(nested_type)) inheritOptionsFromType(nested_type, #Option(value));
             case (_) value;
         };
     };

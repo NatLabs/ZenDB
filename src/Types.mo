@@ -74,9 +74,9 @@ module T {
 
     public type Schema = Candid.CandidType;
 
-    public type RecordId = Nat;
-    // public type RecordId = Blob;
-    public type CandidRecord = [(Text, Candid)];
+    public type DocumentId = Nat;
+    // public type DocumentId = Blob;
+    public type CandidDocument = [(Text, Candid)];
     public type CandidBlob = Blob;
 
     public type Tuple<A, B> = { _0_ : A; _1_ : B };
@@ -144,9 +144,9 @@ module T {
         name : Text;
         key_details : [(Text, SortDirection)];
 
-        data : BTree<[CandidQuery], RecordId>; // using CandidQuery here for comparison only, the actual data stored here is Candid
+        data : BTree<[CandidQuery], DocumentId>; // using CandidQuery here for comparison only, the actual data stored here is Candid
         used_internally : Bool; // if true, the index cannot be deleted by user if true
-        is_unique : Bool; // if true, the index is unique and the record ids are not concatenated with the index key values to make duplicate values appear unique
+        is_unique : Bool; // if true, the index is unique and the document ids are not concatenated with the index key values to make duplicate values appear unique
     };
 
     public type DocumentStore = BTree<Nat, Document>;
@@ -167,7 +167,7 @@ module T {
         fields_with_unique_constraints : Map<Text, Set<Nat>>; // the value is the index of the unique constraint in the unique_constraints list
 
         // reference to the freed btrees to the same variable in
-        // the ZenDB database record
+        // the ZenDB database document
         freed_btrees : Vector.Vector<MemoryBTree.StableMemoryBTree>;
         logger : Logger;
         memory_type : MemoryType;
@@ -192,7 +192,7 @@ module T {
         memory_type : MemoryType;
 
         // reference to the freed btrees to the same variable in
-        // the ZenDB database record
+        // the ZenDB database document
         freed_btrees : Vector.Vector<MemoryBTree.StableMemoryBTree>;
         logger : Logger;
     };
@@ -221,8 +221,8 @@ module T {
     public type IndexKeyFields = [(Text, Candid)];
 
     public type FieldLimit = (Text, ?State<CandidQuery>);
-    public type RecordLimits = [(Text, ?State<CandidQuery>)];
-    public type Bounds = (RecordLimits, RecordLimits);
+    public type DocumentLimits = [(Text, ?State<CandidQuery>)];
+    public type Bounds = (DocumentLimits, DocumentLimits);
 
     public type ZqlOperators = {
         #eq : Candid;
@@ -271,7 +271,7 @@ module T {
         #Lt;
     };
 
-    public type WrapId<Record> = (Nat, Record);
+    public type WrapId<Document> = (Nat, Document);
 
     public type State<T> = {
         #Inclusive : T;
@@ -325,7 +325,7 @@ module T {
         /// Composite index fields selected for the index
         fields : [(Text, SortDirection)];
 
-        /// The number of records in the index
+        /// The number of documents in the index
         entries : Nat;
 
         /// The memory information for the index
@@ -358,7 +358,7 @@ module T {
         /// The collection's memory type
         memoryType : MemoryType;
 
-        /// The number of records in the collection
+        /// The number of documents in the collection
         entries : Nat;
 
         /// The btree's memory information for the collection
