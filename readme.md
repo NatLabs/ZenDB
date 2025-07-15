@@ -15,7 +15,7 @@ It is designed to work seamlessly with stable memory, allowing developers to sto
 - **Compound Indexes**: Support for compound multi-field indexes to accelerate complex queries
 - **Rich Query Language**: Comprehensive set of operators including equality, range, logical operations
 - **Query Builder API**: Intuitive fluent interface for building complex queries
-- **Query Execution Engine**: Performanced optimized Query planner programmed to search for the path with the smallest result size to filter/traverse.
+- **Query Execution Engine**: Performance optimized Query planner programmed to search for the path with the smallest result size to filter/traverse.
 - **Sorting & Pagination**: Efficient ordered result sets with skip/limit pagination
 - **Schema Validation**: Ensure data integrity with schema-based validation for each entry
 - **Schema Constraints**: Add limits on what can be stored in the db
@@ -38,7 +38,7 @@ This architecture allows ZenDB to handle complex queries efficiently, even with 
 
 ### Installation
 
-- Requires `moc` version `0.14.9"` or higher to run.
+- Requires `moc` version `0.14.9` or higher to run.
 - Install with mops: `mops toolchain use moc 0.14.9`  .
 
 #### Install Directly from Mops (Recommended)
@@ -67,6 +67,7 @@ This measurement is in pages, where each page is 64KiB. For a 200GB limit, the l
     }
   },
 ```
+
 ### Basic Usage
 
 #### 1. Initialize the Database
@@ -262,13 +263,26 @@ let #ok(specialCaseUsers) = users.search(
 The repository includes several examples demonstrating ZenDB's capabilities:
 
 - [**Simple Notes Dapp**](./example/notes/lib.mo#L9): Example Notes app, with simple CRUD operations
-- [**ICP Txs explorer**](./example/react-project/backend/Backend.mo): ZenDB test app to index ICP transactions
+- [**ICP Txs explorer**](./example/react-project/backend/Backend.mo): ZenDB test app that indexes ICP transactions
   - https://2yfll-4qaaa-aaaap-anvaq-cai.icp0.io/
-- [**Flying Ninja**](./example/flying_ninja/backend/app.mo): Dapp from the [dfinity/examples](https://github.com/dfinity/examples/tree/master/motoko) repo migrated to use ZenDB.
+- [**Flying Ninja**](./example/flying_ninja/backend/app.mo): Dapp from the [dfinity/examples](https://github.com/dfinity/examples/tree/master/motoko) repo ported to use ZenDB.
 
 
-For more detailed examples and advanced usage, see the [Documentation](./zendb-doc.md) section below.
+For more detailed examples and advanced usage, see the [**Complete Documentation**](./zendb-doc.md).
 
+## Documentation
+
+**[ZenDB Documentation](./zendb-doc.md)** - Comprehensive guide covering:
+
+- **Getting Started**: ZenDB instances, memory types, configuration
+- **Schema Definition**: Type system, constraints, validation  
+- **Collection Management**: Creating collections, CRUD operations
+- **Advanced Querying**: QueryBuilder API, logical grouping, operators
+- **Indexing**: B-Tree indexes, composite indexes, Orchid encoding
+- **Performance**: Query optimization, index selection strategies
+- **Monitoring**: Collection statistics, memory usage
+
+The documentation includes detailed examples, performance optimization tips, and best practices to help you get the most out of ZenDB.
 
 
 ## Performance Optimization
@@ -282,30 +296,51 @@ To get the best performance from ZenDB, create indexes that:
 2. Include fields used in sorting operations
 3. Support your filtering operations (equality, range conditions)
 
+#### Composite Index Field Ordering
+
+For optimal query performance, order fields in composite indexes by priority:
+1. **Equality filters** - Fields with exact matches (`#eq`) come first
+2. **Sort fields** - Fields used for ordering results come second  
+3. **Range filters** - Fields with range queries (`#gt`, `#lt`, `#between`) come last
+
+This ordering is crucial because ZenDB stores composite indexes as concatenated keys in a B-tree structure. When equality filters come first, the query engine can combine these conditions into a single key prefix for efficient B-tree scanning. This allows the system to quickly narrow down to the smallest possible result set before applying range operations. If range fields were placed first, the index couldn't be fully utilized since range operations break the prefix matching pattern, forcing expensive full index scans.
+
+Example query using ZenDB QueryBuilder:
 ```motoko
-// Great for queries filtering on status and sorting by date
+let #ok(results) = users.search(
+  ZenDB.QueryBuilder()
+    .Where("age", #gt(#Nat(18)))                  // Range filter  
+    .And("status", #eq(#Text("active")))          // Equality filter
+    .Sort("created_at", #Descending)              // Sort operation
+);
+```
+
+Optimal index for this query:
+```motoko
 let #ok(_) = users.createIndex(
-  "status_date_idx", 
+  "status_date_age_idx", 
   [
-    ("status", #Ascending), 
-    ("created_at", #Descending)
+    ("status", #Ascending),       // High selectivity field first
+    ("created_at", #Descending),  // Sort field for efficient ordering
+    ("age", #Ascending)           // Range field with lower selectivity
   ]
 );
 ```
 
 ## Limitations
 
-- Limited array support - Can store arrays in db but cannot create indexes on array fields or perform operations on specific array elements
+- Limited array support - Can store arrays in collections, but cannot create indexes on array fields or perform operations on specific array elements. In addition, indexes cannot be created on fields nested within an `#Array`.
+
 - No support for text-based full-text search or pattern matching within indexes
 
-- Cannot create indexes on fields nested within an `#Array`
-
 - Complex queries with many OR conditions may have suboptimal performance
-- The query planner may not always select the optimal index for complex queries
 
-- Schema updates and migrations not yet supported. As a result, changing the schema of an existing collection requires creating a new collection and migrating data
+- The query planner may not always select the optimal index for complex queries. It is recommended to analyze query performance and adjust indexes accordingly.
 
-- Using Limit/Skip Pagination can be inefficient and may hit the instruction limits if the result set is large enough. It is recommended to created indexes that fully cover your queries where possible, to avoid this limitation.
+- Schema updates and migrations not yet supported. As a result, changing the schema of an existing collection requires creating a new collection and migrating the data manually.
+
+- Using Limit/Skip Pagination can be inefficient and may hit the instruction limits if the result set is too large. It is recommended to create indexes that fully cover your queries where possible, to avoid this limitation. 
+
 
 ## Roadmap
 
@@ -327,7 +362,7 @@ let #ok(_) = users.createIndex(
 
 ## Contributing
 
-Contributions are welcome! Please feel free to create an isssue to report a bug or submit a Pull Request.
+Contributions are welcome! Please feel free to create an issue to report a bug or submit a Pull Request.
 For features, please create an issue first to discuss supporting it in this project.
 
 ## License
