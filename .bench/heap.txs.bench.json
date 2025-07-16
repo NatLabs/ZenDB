@@ -1,0 +1,1090 @@
+{
+  "version": 1,
+  "moc": "0.14.14",
+  "replica": "dfx",
+  "replicaVersion": "0.28.0",
+  "gc": "incremental",
+  "forceGc": true,
+  "results": [
+    [
+      "insert with no index:#heap no index",
+      {
+        "rts_stable_memory_size": 0,
+        "stable_memory_size": 0,
+        "instructions": 372367898,
+        "rts_memory_size": 0,
+        "rts_total_allocation": 19675572,
+        "rts_collector_instructions": 1550020,
+        "rts_mutator_instructions": -13063,
+        "rts_logical_stable_memory_size": 0,
+        "rts_heap_size": 19675572,
+        "rts_reclaimed": 0
+      }
+    ],
+    [
+      "insert with no index:#heap 7 single field indexes",
+      {
+        "rts_stable_memory_size": 0,
+        "stable_memory_size": 0,
+        "instructions": 372368838,
+        "rts_memory_size": 33554432,
+        "rts_total_allocation": 19675572,
+        "rts_collector_instructions": 1249421,
+        "rts_mutator_instructions": -10592,
+        "rts_logical_stable_memory_size": 0,
+        "rts_heap_size": -11048680,
+        "rts_reclaimed": 30724252
+      }
+    ],
+    [
+      "insert with no index:#heap 6 fully covered indexes",
+      {
+        "rts_stable_memory_size": 0,
+        "stable_memory_size": 0,
+        "instructions": 372369312,
+        "rts_memory_size": 0,
+        "rts_total_allocation": 19675572,
+        "rts_collector_instructions": 1805242,
+        "rts_mutator_instructions": -10592,
+        "rts_logical_stable_memory_size": 0,
+        "rts_heap_size": -12767540,
+        "rts_reclaimed": 32443112
+      }
+    ],
+    [
+      "create and populate indexes:#heap no index",
+      {
+        "rts_stable_memory_size": 0,
+        "stable_memory_size": 0,
+        "instructions": 3446,
+        "rts_memory_size": 0,
+        "rts_total_allocation": 10128,
+        "rts_collector_instructions": 6259,
+        "rts_mutator_instructions": -10592,
+        "rts_logical_stable_memory_size": 0,
+        "rts_heap_size": 10128,
+        "rts_reclaimed": 0
+      }
+    ],
+    [
+      "create and populate indexes:#heap 7 single field indexes",
+      {
+        "rts_stable_memory_size": 0,
+        "stable_memory_size": 0,
+        "instructions": 3652804864,
+        "rts_memory_size": 167772160,
+        "rts_total_allocation": 209691844,
+        "rts_collector_instructions": 4725491,
+        "rts_mutator_instructions": -10592,
+        "rts_logical_stable_memory_size": 0,
+        "rts_heap_size": 12100312,
+        "rts_reclaimed": 197591532
+      }
+    ],
+    [
+      "create and populate indexes:#heap 6 fully covered indexes",
+      {
+        "rts_stable_memory_size": 0,
+        "stable_memory_size": 0,
+        "instructions": 4197628607,
+        "rts_memory_size": 33554432,
+        "rts_total_allocation": 243241584,
+        "rts_collector_instructions": 6099682,
+        "rts_mutator_instructions": -10592,
+        "rts_logical_stable_memory_size": 0,
+        "rts_heap_size": 12600916,
+        "rts_reclaimed": 230640668
+      }
+    ],
+    [
+      "clear collection entries and indexes:#heap no index",
+      {
+        "rts_stable_memory_size": 0,
+        "stable_memory_size": 0,
+        "instructions": 8593,
+        "rts_memory_size": 0,
+        "rts_total_allocation": 10448,
+        "rts_collector_instructions": -1526372,
+        "rts_mutator_instructions": -10592,
+        "rts_logical_stable_memory_size": 0,
+        "rts_heap_size": 10448,
+        "rts_reclaimed": 0
+      }
+    ],
+    [
+      "clear collection entries and indexes:#heap 7 single field indexes",
+      {
+        "rts_stable_memory_size": 0,
+        "stable_memory_size": 0,
+        "instructions": 40454,
+        "rts_memory_size": 0,
+        "rts_total_allocation": 10560,
+        "rts_collector_instructions": -6469643,
+        "rts_mutator_instructions": -10592,
+        "rts_logical_stable_memory_size": 0,
+        "rts_heap_size": 10560,
+        "rts_reclaimed": 0
+      }
+    ],
+    [
+      "clear collection entries and indexes:#heap 6 fully covered indexes",
+      {
+        "rts_stable_memory_size": 0,
+        "stable_memory_size": 0,
+        "instructions": 41618,
+        "rts_memory_size": 0,
+        "rts_total_allocation": 10560,
+        "rts_collector_instructions": -4044843,
+        "rts_mutator_instructions": -10592,
+        "rts_logical_stable_memory_size": 0,
+        "rts_heap_size": 10560,
+        "rts_reclaimed": 0
+      }
+    ],
+    [
+      "insert with indexes:#heap no index",
+      {
+        "rts_stable_memory_size": 0,
+        "stable_memory_size": 0,
+        "instructions": 372563204,
+        "rts_memory_size": 0,
+        "rts_total_allocation": 19675572,
+        "rts_collector_instructions": -1716848,
+        "rts_mutator_instructions": -10592,
+        "rts_logical_stable_memory_size": 0,
+        "rts_heap_size": -13505476,
+        "rts_reclaimed": 33181048
+      }
+    ],
+    [
+      "insert with indexes:#heap 7 single field indexes",
+      {
+        "rts_stable_memory_size": 0,
+        "stable_memory_size": 0,
+        "instructions": 2153050863,
+        "rts_memory_size": 0,
+        "rts_total_allocation": 112960496,
+        "rts_collector_instructions": 6216537,
+        "rts_mutator_instructions": -10592,
+        "rts_logical_stable_memory_size": 0,
+        "rts_heap_size": 15603084,
+        "rts_reclaimed": 97357412
+      }
+    ],
+    [
+      "insert with indexes:#heap 6 fully covered indexes",
+      {
+        "rts_stable_memory_size": 0,
+        "stable_memory_size": 0,
+        "instructions": 2682944714,
+        "rts_memory_size": 0,
+        "rts_total_allocation": 145838216,
+        "rts_collector_instructions": 7580088,
+        "rts_mutator_instructions": -10592,
+        "rts_logical_stable_memory_size": 0,
+        "rts_heap_size": -17711140,
+        "rts_reclaimed": 163549356
+      }
+    ],
+    [
+      "query(): no filter (all txs):#heap no index",
+      {
+        "rts_stable_memory_size": 0,
+        "stable_memory_size": 0,
+        "instructions": 28499773,
+        "rts_memory_size": 0,
+        "rts_total_allocation": 598596,
+        "rts_collector_instructions": 6264,
+        "rts_mutator_instructions": -10592,
+        "rts_logical_stable_memory_size": 0,
+        "rts_heap_size": 598596,
+        "rts_reclaimed": 0
+      }
+    ],
+    [
+      "query(): no filter (all txs):#heap 7 single field indexes",
+      {
+        "rts_stable_memory_size": 0,
+        "stable_memory_size": 0,
+        "instructions": 28498536,
+        "rts_memory_size": 0,
+        "rts_total_allocation": 598516,
+        "rts_collector_instructions": 6270,
+        "rts_mutator_instructions": -10592,
+        "rts_logical_stable_memory_size": 0,
+        "rts_heap_size": 598516,
+        "rts_reclaimed": 0
+      }
+    ],
+    [
+      "query(): no filter (all txs):#heap 6 fully covered indexes",
+      {
+        "rts_stable_memory_size": 0,
+        "stable_memory_size": 0,
+        "instructions": 28500578,
+        "rts_memory_size": 0,
+        "rts_total_allocation": 598596,
+        "rts_collector_instructions": 6276,
+        "rts_mutator_instructions": -10592,
+        "rts_logical_stable_memory_size": 0,
+        "rts_heap_size": 598596,
+        "rts_reclaimed": 0
+      }
+    ],
+    [
+      "query(): single field (btype = '1mint'):#heap no index",
+      {
+        "rts_stable_memory_size": 0,
+        "stable_memory_size": 0,
+        "instructions": 368287490,
+        "rts_memory_size": 0,
+        "rts_total_allocation": 23096068,
+        "rts_collector_instructions": 1052059,
+        "rts_mutator_instructions": -10592,
+        "rts_logical_stable_memory_size": 0,
+        "rts_heap_size": -8362540,
+        "rts_reclaimed": 31458608
+      }
+    ],
+    [
+      "query(): single field (btype = '1mint'):#heap 7 single field indexes",
+      {
+        "rts_stable_memory_size": 0,
+        "stable_memory_size": 0,
+        "instructions": 6448476,
+        "rts_memory_size": 0,
+        "rts_total_allocation": 179252,
+        "rts_collector_instructions": 6276,
+        "rts_mutator_instructions": -10592,
+        "rts_logical_stable_memory_size": 0,
+        "rts_heap_size": 179252,
+        "rts_reclaimed": 0
+      }
+    ],
+    [
+      "query(): single field (btype = '1mint'):#heap 6 fully covered indexes",
+      {
+        "rts_stable_memory_size": 0,
+        "stable_memory_size": 0,
+        "instructions": 6960363,
+        "rts_memory_size": 0,
+        "rts_total_allocation": 206076,
+        "rts_collector_instructions": 6264,
+        "rts_mutator_instructions": -10592,
+        "rts_logical_stable_memory_size": 0,
+        "rts_heap_size": 206076,
+        "rts_reclaimed": 0
+      }
+    ],
+    [
+      "query(): number range (250 < tx.amt <= 400):#heap no index",
+      {
+        "rts_stable_memory_size": 0,
+        "stable_memory_size": 0,
+        "instructions": 388310894,
+        "rts_memory_size": 0,
+        "rts_total_allocation": 23958200,
+        "rts_collector_instructions": -878069,
+        "rts_mutator_instructions": -10592,
+        "rts_logical_stable_memory_size": 0,
+        "rts_heap_size": -5305452,
+        "rts_reclaimed": 29263652
+      }
+    ],
+    [
+      "query(): number range (250 < tx.amt <= 400):#heap 7 single field indexes",
+      {
+        "rts_stable_memory_size": 0,
+        "stable_memory_size": 0,
+        "instructions": 4893088,
+        "rts_memory_size": 0,
+        "rts_total_allocation": 149064,
+        "rts_collector_instructions": 6264,
+        "rts_mutator_instructions": -10592,
+        "rts_logical_stable_memory_size": 0,
+        "rts_heap_size": 149064,
+        "rts_reclaimed": 0
+      }
+    ],
+    [
+      "query(): number range (250 < tx.amt <= 400):#heap 6 fully covered indexes",
+      {
+        "rts_stable_memory_size": 0,
+        "stable_memory_size": 0,
+        "instructions": 4893612,
+        "rts_memory_size": 0,
+        "rts_total_allocation": 149064,
+        "rts_collector_instructions": 6276,
+        "rts_mutator_instructions": -10592,
+        "rts_logical_stable_memory_size": 0,
+        "rts_heap_size": 149064,
+        "rts_reclaimed": 0
+      }
+    ],
+    [
+      "query(): #And (btype='1burn' AND tx.amt>=750):#heap no index",
+      {
+        "rts_stable_memory_size": 0,
+        "stable_memory_size": 0,
+        "instructions": 381343377,
+        "rts_memory_size": 0,
+        "rts_total_allocation": 24180444,
+        "rts_collector_instructions": 6264,
+        "rts_mutator_instructions": -10592,
+        "rts_logical_stable_memory_size": 0,
+        "rts_heap_size": 24180444,
+        "rts_reclaimed": 0
+      }
+    ],
+    [
+      "query(): #And (btype='1burn' AND tx.amt>=750):#heap 7 single field indexes",
+      {
+        "rts_stable_memory_size": 0,
+        "stable_memory_size": 0,
+        "instructions": 69905419,
+        "rts_memory_size": 0,
+        "rts_total_allocation": 4302884,
+        "rts_collector_instructions": 6270,
+        "rts_mutator_instructions": -10592,
+        "rts_logical_stable_memory_size": 0,
+        "rts_heap_size": 4302884,
+        "rts_reclaimed": 0
+      }
+    ],
+    [
+      "query(): #And (btype='1burn' AND tx.amt>=750):#heap 6 fully covered indexes",
+      {
+        "rts_stable_memory_size": 0,
+        "stable_memory_size": 0,
+        "instructions": 3794039,
+        "rts_memory_size": 0,
+        "rts_total_allocation": 172640,
+        "rts_collector_instructions": 6270,
+        "rts_mutator_instructions": -10592,
+        "rts_logical_stable_memory_size": 0,
+        "rts_heap_size": 172640,
+        "rts_reclaimed": 0
+      }
+    ],
+    [
+      "query(): #And (500_000<ts<=1_000_000 AND 200<amt<=600):#heap no index",
+      {
+        "rts_stable_memory_size": 0,
+        "stable_memory_size": 0,
+        "instructions": 391114437,
+        "rts_memory_size": 0,
+        "rts_total_allocation": 24499312,
+        "rts_collector_instructions": 3040539,
+        "rts_mutator_instructions": -10592,
+        "rts_logical_stable_memory_size": 0,
+        "rts_heap_size": -6959292,
+        "rts_reclaimed": 31458604
+      }
+    ],
+    [
+      "query(): #And (500_000<ts<=1_000_000 AND 200<amt<=600):#heap 7 single field indexes",
+      {
+        "rts_stable_memory_size": 0,
+        "stable_memory_size": 0,
+        "instructions": 142734521,
+        "rts_memory_size": 0,
+        "rts_total_allocation": 8728088,
+        "rts_collector_instructions": -2833813,
+        "rts_mutator_instructions": -10592,
+        "rts_logical_stable_memory_size": 0,
+        "rts_heap_size": -20535564,
+        "rts_reclaimed": 29263652
+      }
+    ],
+    [
+      "query(): #And (500_000<ts<=1_000_000 AND 200<amt<=600):#heap 6 fully covered indexes",
+      {
+        "rts_stable_memory_size": 0,
+        "stable_memory_size": 0,
+        "instructions": 142734882,
+        "rts_memory_size": 0,
+        "rts_total_allocation": 8728088,
+        "rts_collector_instructions": 6270,
+        "rts_mutator_instructions": -10592,
+        "rts_logical_stable_memory_size": 0,
+        "rts_heap_size": 8728088,
+        "rts_reclaimed": 0
+      }
+    ],
+    [
+      "query(): #Or (btype == '1xfer' OR '2xfer' OR '1mint'):#heap no index",
+      {
+        "rts_stable_memory_size": 0,
+        "stable_memory_size": 0,
+        "instructions": 533326746,
+        "rts_memory_size": 0,
+        "rts_total_allocation": 34376560,
+        "rts_collector_instructions": 1739271,
+        "rts_mutator_instructions": -10592,
+        "rts_logical_stable_memory_size": 0,
+        "rts_heap_size": 2917964,
+        "rts_reclaimed": 31458596
+      }
+    ],
+    [
+      "query(): #Or (btype == '1xfer' OR '2xfer' OR '1mint'):#heap 7 single field indexes",
+      {
+        "rts_stable_memory_size": 0,
+        "stable_memory_size": 0,
+        "instructions": 18933039,
+        "rts_memory_size": 0,
+        "rts_total_allocation": 502104,
+        "rts_collector_instructions": 6270,
+        "rts_mutator_instructions": -10592,
+        "rts_logical_stable_memory_size": 0,
+        "rts_heap_size": 502104,
+        "rts_reclaimed": 0
+      }
+    ],
+    [
+      "query(): #Or (btype == '1xfer' OR '2xfer' OR '1mint'):#heap 6 fully covered indexes",
+      {
+        "rts_stable_memory_size": 0,
+        "stable_memory_size": 0,
+        "instructions": 20271577,
+        "rts_memory_size": 0,
+        "rts_total_allocation": 572320,
+        "rts_collector_instructions": 6264,
+        "rts_mutator_instructions": -10592,
+        "rts_logical_stable_memory_size": 0,
+        "rts_heap_size": 572320,
+        "rts_reclaimed": 0
+      }
+    ],
+    [
+      "query(): #Or (btype == '1xfer' OR tx.amt >= 500):#heap no index",
+      {
+        "rts_stable_memory_size": 0,
+        "stable_memory_size": 0,
+        "instructions": 484666070,
+        "rts_memory_size": 0,
+        "rts_total_allocation": 30347872,
+        "rts_collector_instructions": 7091,
+        "rts_mutator_instructions": -10592,
+        "rts_logical_stable_memory_size": 0,
+        "rts_heap_size": 1084212,
+        "rts_reclaimed": 29263660
+      }
+    ],
+    [
+      "query(): #Or (btype == '1xfer' OR tx.amt >= 500):#heap 7 single field indexes",
+      {
+        "rts_stable_memory_size": 0,
+        "stable_memory_size": 0,
+        "instructions": 20060103,
+        "rts_memory_size": 0,
+        "rts_total_allocation": 526156,
+        "rts_collector_instructions": 6264,
+        "rts_mutator_instructions": -10592,
+        "rts_logical_stable_memory_size": 0,
+        "rts_heap_size": 526156,
+        "rts_reclaimed": 0
+      }
+    ],
+    [
+      "query(): #Or (btype == '1xfer' OR tx.amt >= 500):#heap 6 fully covered indexes",
+      {
+        "rts_stable_memory_size": 0,
+        "stable_memory_size": 0,
+        "instructions": 20506239,
+        "rts_memory_size": 0,
+        "rts_total_allocation": 549616,
+        "rts_collector_instructions": 6276,
+        "rts_mutator_instructions": -10592,
+        "rts_logical_stable_memory_size": 0,
+        "rts_heap_size": 549616,
+        "rts_reclaimed": 0
+      }
+    ],
+    [
+      "query(): #Or (btype == '1xfer' OR tx.amt >= 500 OR ts > 500_000):#heap no index",
+      {
+        "rts_stable_memory_size": 0,
+        "stable_memory_size": 0,
+        "instructions": 521875432,
+        "rts_memory_size": 0,
+        "rts_total_allocation": 32732680,
+        "rts_collector_instructions": 579319,
+        "rts_mutator_instructions": -10592,
+        "rts_logical_stable_memory_size": 0,
+        "rts_heap_size": 1274088,
+        "rts_reclaimed": 31458592
+      }
+    ],
+    [
+      "query(): #Or (btype == '1xfer' OR tx.amt >= 500 OR ts > 500_000):#heap 7 single field indexes",
+      {
+        "rts_stable_memory_size": 0,
+        "stable_memory_size": 0,
+        "instructions": 26868808,
+        "rts_memory_size": 0,
+        "rts_total_allocation": 694956,
+        "rts_collector_instructions": 6270,
+        "rts_mutator_instructions": -10592,
+        "rts_logical_stable_memory_size": 0,
+        "rts_heap_size": 694956,
+        "rts_reclaimed": 0
+      }
+    ],
+    [
+      "query(): #Or (btype == '1xfer' OR tx.amt >= 500 OR ts > 500_000):#heap 6 fully covered indexes",
+      {
+        "rts_stable_memory_size": 0,
+        "stable_memory_size": 0,
+        "instructions": 27316556,
+        "rts_memory_size": 0,
+        "rts_total_allocation": 718496,
+        "rts_collector_instructions": 6264,
+        "rts_mutator_instructions": -10592,
+        "rts_logical_stable_memory_size": 0,
+        "rts_heap_size": 718496,
+        "rts_reclaimed": 0
+      }
+    ],
+    [
+      "query(): #Or (500_000<ts<=1_000_000 OR 200<amt<=600):#heap no index",
+      {
+        "rts_stable_memory_size": 0,
+        "stable_memory_size": 0,
+        "instructions": 740934385,
+        "rts_memory_size": 0,
+        "rts_total_allocation": 45327348,
+        "rts_collector_instructions": -2272577,
+        "rts_mutator_instructions": -10592,
+        "rts_logical_stable_memory_size": 0,
+        "rts_heap_size": -17490728,
+        "rts_reclaimed": 62818076
+      }
+    ],
+    [
+      "query(): #Or (500_000<ts<=1_000_000 OR 200<amt<=600):#heap 7 single field indexes",
+      {
+        "rts_stable_memory_size": 0,
+        "stable_memory_size": 0,
+        "instructions": 23754445,
+        "rts_memory_size": 0,
+        "rts_total_allocation": 610092,
+        "rts_collector_instructions": 6264,
+        "rts_mutator_instructions": -10592,
+        "rts_logical_stable_memory_size": 0,
+        "rts_heap_size": 610092,
+        "rts_reclaimed": 0
+      }
+    ],
+    [
+      "query(): #Or (500_000<ts<=1_000_000 OR 200<amt<=600):#heap 6 fully covered indexes",
+      {
+        "rts_stable_memory_size": 0,
+        "stable_memory_size": 0,
+        "instructions": 23755015,
+        "rts_memory_size": 0,
+        "rts_total_allocation": 610092,
+        "rts_collector_instructions": 6270,
+        "rts_mutator_instructions": -10592,
+        "rts_logical_stable_memory_size": 0,
+        "rts_heap_size": 610092,
+        "rts_reclaimed": 0
+      }
+    ],
+    [
+      "query(): #Or (btype in ['1xfer', '1burn'] OR (tx.amt < 200 OR tx.amt >= 800)):#heap no index",
+      {
+        "rts_stable_memory_size": 0,
+        "stable_memory_size": 0,
+        "instructions": 614049479,
+        "rts_memory_size": 0,
+        "rts_total_allocation": 39429964,
+        "rts_collector_instructions": 1434473,
+        "rts_mutator_instructions": -10592,
+        "rts_logical_stable_memory_size": 0,
+        "rts_heap_size": 7971356,
+        "rts_reclaimed": 31458608
+      }
+    ],
+    [
+      "query(): #Or (btype in ['1xfer', '1burn'] OR (tx.amt < 200 OR tx.amt >= 800)):#heap 7 single field indexes",
+      {
+        "rts_stable_memory_size": 0,
+        "stable_memory_size": 0,
+        "instructions": 22671135,
+        "rts_memory_size": 0,
+        "rts_total_allocation": 669560,
+        "rts_collector_instructions": 6854,
+        "rts_mutator_instructions": -10592,
+        "rts_logical_stable_memory_size": 0,
+        "rts_heap_size": 669560,
+        "rts_reclaimed": 0
+      }
+    ],
+    [
+      "query(): #Or (btype in ['1xfer', '1burn'] OR (tx.amt < 200 OR tx.amt >= 800)):#heap 6 fully covered indexes",
+      {
+        "rts_stable_memory_size": 0,
+        "stable_memory_size": 0,
+        "instructions": 23690891,
+        "rts_memory_size": 0,
+        "rts_total_allocation": 723472,
+        "rts_collector_instructions": 6860,
+        "rts_mutator_instructions": -10592,
+        "rts_logical_stable_memory_size": 0,
+        "rts_heap_size": 723472,
+        "rts_reclaimed": 0
+      }
+    ],
+    [
+      "query() -> principals[0] == tx.to.owner (is recipient):#heap no index",
+      {
+        "rts_stable_memory_size": 0,
+        "stable_memory_size": 0,
+        "instructions": 427529103,
+        "rts_memory_size": 0,
+        "rts_total_allocation": 26881948,
+        "rts_collector_instructions": -385869,
+        "rts_mutator_instructions": -10592,
+        "rts_logical_stable_memory_size": 0,
+        "rts_heap_size": -2381632,
+        "rts_reclaimed": 29263580
+      }
+    ],
+    [
+      "query() -> principals[0] == tx.to.owner (is recipient):#heap 7 single field indexes",
+      {
+        "rts_stable_memory_size": 0,
+        "stable_memory_size": 0,
+        "instructions": 2601207,
+        "rts_memory_size": 0,
+        "rts_total_allocation": 98712,
+        "rts_collector_instructions": 6860,
+        "rts_mutator_instructions": -10592,
+        "rts_logical_stable_memory_size": 0,
+        "rts_heap_size": 98712,
+        "rts_reclaimed": 0
+      }
+    ],
+    [
+      "query() -> principals[0] == tx.to.owner (is recipient):#heap 6 fully covered indexes",
+      {
+        "rts_stable_memory_size": 0,
+        "stable_memory_size": 0,
+        "instructions": 2737741,
+        "rts_memory_size": 0,
+        "rts_total_allocation": 102320,
+        "rts_collector_instructions": 6854,
+        "rts_mutator_instructions": -10592,
+        "rts_logical_stable_memory_size": 0,
+        "rts_heap_size": 102320,
+        "rts_reclaimed": 0
+      }
+    ],
+    [
+      "query() -> principals[0..10] == tx.to.owner (is recipient):#heap no index",
+      {
+        "rts_stable_memory_size": 0,
+        "stable_memory_size": 0,
+        "instructions": 1892478371,
+        "rts_memory_size": 0,
+        "rts_total_allocation": 125707064,
+        "rts_collector_instructions": -490068,
+        "rts_mutator_instructions": -10592,
+        "rts_logical_stable_memory_size": 0,
+        "rts_heap_size": -4219756,
+        "rts_reclaimed": 129926820
+      }
+    ],
+    [
+      "query() -> principals[0..10] == tx.to.owner (is recipient):#heap 7 single field indexes",
+      {
+        "rts_stable_memory_size": 0,
+        "stable_memory_size": 0,
+        "instructions": 28450128,
+        "rts_memory_size": 0,
+        "rts_total_allocation": 841624,
+        "rts_collector_instructions": 6860,
+        "rts_mutator_instructions": -10592,
+        "rts_logical_stable_memory_size": 0,
+        "rts_heap_size": 841624,
+        "rts_reclaimed": 0
+      }
+    ],
+    [
+      "query() -> principals[0..10] == tx.to.owner (is recipient):#heap 6 fully covered indexes",
+      {
+        "rts_stable_memory_size": 0,
+        "stable_memory_size": 0,
+        "instructions": 25227664,
+        "rts_memory_size": 0,
+        "rts_total_allocation": 799840,
+        "rts_collector_instructions": 6854,
+        "rts_mutator_instructions": -10592,
+        "rts_logical_stable_memory_size": 0,
+        "rts_heap_size": 799840,
+        "rts_reclaimed": 0
+      }
+    ],
+    [
+      "query() -> all txs involving principals[0]:#heap no index",
+      {
+        "rts_stable_memory_size": 0,
+        "stable_memory_size": 0,
+        "instructions": 831723976,
+        "rts_memory_size": 0,
+        "rts_total_allocation": 54427480,
+        "rts_collector_instructions": -832241,
+        "rts_mutator_instructions": -10592,
+        "rts_logical_stable_memory_size": 0,
+        "rts_heap_size": -8390496,
+        "rts_reclaimed": 62817976
+      }
+    ],
+    [
+      "query() -> all txs involving principals[0]:#heap 7 single field indexes",
+      {
+        "rts_stable_memory_size": 0,
+        "stable_memory_size": 0,
+        "instructions": 7417879,
+        "rts_memory_size": 0,
+        "rts_total_allocation": 257316,
+        "rts_collector_instructions": 6854,
+        "rts_mutator_instructions": -10592,
+        "rts_logical_stable_memory_size": 0,
+        "rts_heap_size": 257316,
+        "rts_reclaimed": 0
+      }
+    ],
+    [
+      "query() -> all txs involving principals[0]:#heap 6 fully covered indexes",
+      {
+        "rts_stable_memory_size": 0,
+        "stable_memory_size": 0,
+        "instructions": 7540609,
+        "rts_memory_size": 0,
+        "rts_total_allocation": 261108,
+        "rts_collector_instructions": 6854,
+        "rts_mutator_instructions": -10592,
+        "rts_logical_stable_memory_size": 0,
+        "rts_heap_size": 261108,
+        "rts_reclaimed": 0
+      }
+    ],
+    [
+      "query() -> all txs involving principals[0..10]:#heap no index",
+      {
+        "rts_stable_memory_size": 0,
+        "stable_memory_size": 0,
+        "instructions": 4943073616,
+        "rts_memory_size": 100663296,
+        "rts_total_allocation": 333425324,
+        "rts_collector_instructions": 349866,
+        "rts_mutator_instructions": -10592,
+        "rts_logical_stable_memory_size": 0,
+        "rts_heap_size": 2171972,
+        "rts_reclaimed": 331253352
+      }
+    ],
+    [
+      "query() -> all txs involving principals[0..10]:#heap 7 single field indexes",
+      {
+        "rts_stable_memory_size": 0,
+        "stable_memory_size": 0,
+        "instructions": 74596338,
+        "rts_memory_size": 0,
+        "rts_total_allocation": 2350476,
+        "rts_collector_instructions": 6854,
+        "rts_mutator_instructions": -10592,
+        "rts_logical_stable_memory_size": 0,
+        "rts_heap_size": 2350476,
+        "rts_reclaimed": 0
+      }
+    ],
+    [
+      "query() -> all txs involving principals[0..10]:#heap 6 fully covered indexes",
+      {
+        "rts_stable_memory_size": 0,
+        "stable_memory_size": 0,
+        "instructions": 72704016,
+        "rts_memory_size": 0,
+        "rts_total_allocation": 2345716,
+        "rts_collector_instructions": 6854,
+        "rts_mutator_instructions": -10592,
+        "rts_logical_stable_memory_size": 0,
+        "rts_heap_size": 2345716,
+        "rts_reclaimed": 0
+      }
+    ],
+    [
+      "update(): single operation -> #add amt += 100:#heap no index",
+      {
+        "rts_stable_memory_size": 0,
+        "stable_memory_size": 0,
+        "instructions": 1463541256,
+        "rts_memory_size": 0,
+        "rts_total_allocation": 70058140,
+        "rts_collector_instructions": -417743,
+        "rts_mutator_instructions": -10592,
+        "rts_logical_stable_memory_size": 0,
+        "rts_heap_size": 7181364,
+        "rts_reclaimed": 62876776
+      }
+    ],
+    [
+      "update(): single operation -> #add amt += 100:#heap 7 single field indexes",
+      {
+        "rts_stable_memory_size": 0,
+        "stable_memory_size": 0,
+        "instructions": 1897781852,
+        "rts_memory_size": 0,
+        "rts_total_allocation": 93935604,
+        "rts_collector_instructions": 36809,
+        "rts_mutator_instructions": -10592,
+        "rts_logical_stable_memory_size": 0,
+        "rts_heap_size": -2477732,
+        "rts_reclaimed": 96413336
+      }
+    ],
+    [
+      "update(): single operation -> #add amt += 100:#heap 6 fully covered indexes",
+      {
+        "rts_stable_memory_size": 0,
+        "stable_memory_size": 0,
+        "instructions": 2594451084,
+        "rts_memory_size": 0,
+        "rts_total_allocation": 133801380,
+        "rts_collector_instructions": 51478,
+        "rts_mutator_instructions": -10592,
+        "rts_logical_stable_memory_size": 0,
+        "rts_heap_size": 3832240,
+        "rts_reclaimed": 129969140
+      }
+    ],
+    [
+      "update(): multiple independent operations -> #add, #sub, #mul, #div on tx.amt:#heap no index",
+      {
+        "rts_stable_memory_size": 0,
+        "stable_memory_size": 0,
+        "instructions": 2066041541,
+        "rts_memory_size": 0,
+        "rts_total_allocation": 108794652,
+        "rts_collector_instructions": -90,
+        "rts_mutator_instructions": -10592,
+        "rts_logical_stable_memory_size": 0,
+        "rts_heap_size": 12355912,
+        "rts_reclaimed": 96438740
+      }
+    ],
+    [
+      "update(): multiple independent operations -> #add, #sub, #mul, #div on tx.amt:#heap 7 single field indexes",
+      {
+        "rts_stable_memory_size": 0,
+        "stable_memory_size": 0,
+        "instructions": 2500405335,
+        "rts_memory_size": 0,
+        "rts_total_allocation": 132667296,
+        "rts_collector_instructions": 34662054,
+        "rts_mutator_instructions": -10592,
+        "rts_logical_stable_memory_size": 0,
+        "rts_heap_size": -29222576,
+        "rts_reclaimed": 161889872
+      }
+    ],
+    [
+      "update(): multiple independent operations -> #add, #sub, #mul, #div on tx.amt:#heap 6 fully covered indexes",
+      {
+        "rts_stable_memory_size": 0,
+        "stable_memory_size": 0,
+        "instructions": 3196477923,
+        "rts_memory_size": 0,
+        "rts_total_allocation": 172515576,
+        "rts_collector_instructions": 19088,
+        "rts_mutator_instructions": -10592,
+        "rts_logical_stable_memory_size": 0,
+        "rts_heap_size": 9021308,
+        "rts_reclaimed": 163494268
+      }
+    ],
+    [
+      "update(): multiple nested operations -> #add, #sub, #mul, #div on tx.amt:#heap no index",
+      {
+        "rts_stable_memory_size": 0,
+        "stable_memory_size": 0,
+        "instructions": 1534953740,
+        "rts_memory_size": 0,
+        "rts_total_allocation": 72338792,
+        "rts_collector_instructions": 14068,
+        "rts_mutator_instructions": -10592,
+        "rts_logical_stable_memory_size": 0,
+        "rts_heap_size": 9459236,
+        "rts_reclaimed": 62879556
+      }
+    ],
+    [
+      "update(): multiple nested operations -> #add, #sub, #mul, #div on tx.amt:#heap 7 single field indexes",
+      {
+        "rts_stable_memory_size": 0,
+        "stable_memory_size": 0,
+        "instructions": 1972423791,
+        "rts_memory_size": 0,
+        "rts_total_allocation": 96356988,
+        "rts_collector_instructions": 10054,
+        "rts_mutator_instructions": -10592,
+        "rts_logical_stable_memory_size": 0,
+        "rts_heap_size": -69092,
+        "rts_reclaimed": 96426080
+      }
+    ],
+    [
+      "update(): multiple nested operations -> #add, #sub, #mul, #div on tx.amt:#heap 6 fully covered indexes",
+      {
+        "rts_stable_memory_size": 0,
+        "stable_memory_size": 0,
+        "instructions": 2667478479,
+        "rts_memory_size": 0,
+        "rts_total_allocation": 136170576,
+        "rts_collector_instructions": 5743,
+        "rts_mutator_instructions": -10592,
+        "rts_logical_stable_memory_size": 0,
+        "rts_heap_size": 6182184,
+        "rts_reclaimed": 129988392
+      }
+    ],
+    [
+      "update(): multiple operations on multiple fields -> #add, #sub, #mul, #div on (tx.amt, ts, fee):#heap no index",
+      {
+        "rts_stable_memory_size": 0,
+        "stable_memory_size": 0,
+        "instructions": 1956705378,
+        "rts_memory_size": 0,
+        "rts_total_allocation": 101472948,
+        "rts_collector_instructions": 6242,
+        "rts_mutator_instructions": -10592,
+        "rts_logical_stable_memory_size": 0,
+        "rts_heap_size": 5029980,
+        "rts_reclaimed": 96442968
+      }
+    ],
+    [
+      "update(): multiple operations on multiple fields -> #add, #sub, #mul, #div on (tx.amt, ts, fee):#heap 7 single field indexes",
+      {
+        "rts_stable_memory_size": 0,
+        "stable_memory_size": 0,
+        "instructions": 3136689147,
+        "rts_memory_size": 0,
+        "rts_total_allocation": 164811556,
+        "rts_collector_instructions": -8590,
+        "rts_mutator_instructions": -10592,
+        "rts_logical_stable_memory_size": 0,
+        "rts_heap_size": 1258996,
+        "rts_reclaimed": 163552560
+      }
+    ],
+    [
+      "update(): multiple operations on multiple fields -> #add, #sub, #mul, #div on (tx.amt, ts, fee):#heap 6 fully covered indexes",
+      {
+        "rts_stable_memory_size": 0,
+        "stable_memory_size": 0,
+        "instructions": 6580372535,
+        "rts_memory_size": 33554432,
+        "rts_total_allocation": 351711772,
+        "rts_collector_instructions": -9724,
+        "rts_mutator_instructions": -10592,
+        "rts_logical_stable_memory_size": 0,
+        "rts_heap_size": -13119440,
+        "rts_reclaimed": 364831212
+      }
+    ],
+    [
+      "replace() -> replace half the tx with new tx:#heap no index",
+      {
+        "rts_stable_memory_size": 0,
+        "stable_memory_size": 0,
+        "instructions": 834391530,
+        "rts_memory_size": 0,
+        "rts_total_allocation": 45856868,
+        "rts_collector_instructions": -314,
+        "rts_mutator_instructions": -10592,
+        "rts_logical_stable_memory_size": 0,
+        "rts_heap_size": -16955092,
+        "rts_reclaimed": 62811960
+      }
+    ],
+    [
+      "replace() -> replace half the tx with new tx:#heap 7 single field indexes",
+      {
+        "rts_stable_memory_size": 0,
+        "stable_memory_size": 0,
+        "instructions": 4466100212,
+        "rts_memory_size": 0,
+        "rts_total_allocation": 234315968,
+        "rts_collector_instructions": 35951,
+        "rts_mutator_instructions": -10592,
+        "rts_logical_stable_memory_size": 0,
+        "rts_heap_size": 3721624,
+        "rts_reclaimed": 230594344
+      }
+    ],
+    [
+      "replace() -> replace half the tx with new tx:#heap 6 fully covered indexes",
+      {
+        "rts_stable_memory_size": 0,
+        "stable_memory_size": 0,
+        "instructions": 5464140822,
+        "rts_memory_size": 0,
+        "rts_total_allocation": 296997184,
+        "rts_collector_instructions": 106870,
+        "rts_mutator_instructions": -10592,
+        "rts_logical_stable_memory_size": 0,
+        "rts_heap_size": -698768,
+        "rts_reclaimed": 297695952
+      }
+    ],
+    [
+      "delete():#heap no index",
+      {
+        "rts_stable_memory_size": 0,
+        "stable_memory_size": 0,
+        "instructions": 329906759,
+        "rts_memory_size": 0,
+        "rts_total_allocation": 18350436,
+        "rts_collector_instructions": -1539412,
+        "rts_mutator_instructions": -10592,
+        "rts_logical_stable_memory_size": 0,
+        "rts_heap_size": 18350436,
+        "rts_reclaimed": 0
+      }
+    ],
+    [
+      "delete():#heap 7 single field indexes",
+      {
+        "rts_stable_memory_size": 0,
+        "stable_memory_size": 0,
+        "instructions": 1893723549,
+        "rts_memory_size": 0,
+        "rts_total_allocation": 104039192,
+        "rts_collector_instructions": -2762739,
+        "rts_mutator_instructions": -10592,
+        "rts_logical_stable_memory_size": 0,
+        "rts_heap_size": 6706732,
+        "rts_reclaimed": 97332460
+      }
+    ],
+    [
+      "delete():#heap 6 fully covered indexes",
+      {
+        "rts_stable_memory_size": 0,
+        "stable_memory_size": 0,
+        "instructions": 2358599919,
+        "rts_memory_size": 0,
+        "rts_total_allocation": 133365012,
+        "rts_collector_instructions": -7399276,
+        "rts_mutator_instructions": -10592,
+        "rts_logical_stable_memory_size": 0,
+        "rts_heap_size": 1670876,
+        "rts_reclaimed": 131694136
+      }
+    ]
+  ]
+}

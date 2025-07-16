@@ -1,7 +1,0 @@
-[dependencies]
-zendb = "../.."
-base = "0.14.10"
-itertools = "0.2.1"
-
-[toolchain]
-moc = "0.14.9"
