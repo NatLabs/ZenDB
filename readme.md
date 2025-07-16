@@ -4,7 +4,6 @@
 [![License](https://img.shields.io/badge/License-AGPL--3.0-blue)](LICENSE)
 [![Motoko](https://img.shields.io/badge/Language-Motoko-orange)](https://github.com/dfinity/motoko)
 
-> A high-performance document database built specifically for the Internet Computer ecosystem
 
 
 ZenDB is an embedded document database that leverages the Internet Computer's unique features to provide a powerful, scalable, and efficient data storage solution for Motoko applications. With advanced querying capabilities, users can perform complex queries on large datasets efficiently, while also benefiting from the simplicity and safety of Motoko's type system.
@@ -79,7 +78,7 @@ actor {
 
   stable var zendb = ZenDB.newStableStore(null);
   let db = ZenDB.launchDefaultDB(zendb);
-  
+
 }
 ```
 
