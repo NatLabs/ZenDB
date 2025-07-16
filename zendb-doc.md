@@ -53,7 +53,7 @@ let zendb = ZenDB.newStableStore(null);
 ### Memory Types: Heap vs Stable Memory
 ZenDB supports two memory types: `#heap` and `#stableMemory`. As their names suggest, `#heap` stores your database collections and indexes in heap memory, while `#stableMemory` stores data in stable memory.
 
-These memory types have different performance characteristics, as shown in our benchmarks. For read operations, heap memory is typically 20-30% faster, while for write operations with indexes, the performance difference can be even more significant.
+These memory types have different performance characteristics, as shown in these [benchmarks results](). Heap memory requires 20-30% fewer instructions than stable memory in both read and write situations, resulting in heap memory being slightly more efficient.
 
 By default, `#stableMemory` is selected for new ZenDB instances, but you can change this to heap memory:
 

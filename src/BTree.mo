@@ -272,7 +272,7 @@ module BTree {
         let end_rank = switch (end_key) {
             case (?key) {
                 let res = MemoryBTree.getExpectedIndex(btree, btree_utils, key);
-                Debug.print("end_key expected index: " # debug_show (res));
+                // Debug.print("end_key expected index: " # debug_show (res));
 
                 switch (res) {
                     case (#Found(rank)) rank + 1;

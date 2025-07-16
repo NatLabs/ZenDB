@@ -76,7 +76,7 @@ ZenDBSuite.newSuite(
             };
 
             let #ok(id) = users.insert(user) else return assert false;
-            Debug.print("id: " # debug_show (id, user));
+            // Debug.print("id: " # debug_show (id, user));
             inputs.put(id, user);
         };
 
@@ -88,7 +88,7 @@ ZenDBSuite.newSuite(
             };
 
             let #ok(id) = users.insert(user) else return assert false;
-            Debug.print("id: " # debug_show (id, user));
+            // Debug.print("id: " # debug_show (id, user));
             inputs.put(id, user);
         };
 
@@ -128,7 +128,7 @@ ZenDBSuite.newSuite(
                         let db_query = ZenDB.QueryBuilder().Where("age", #gte(#Nat(3))).And("age", #lte(#Nat(7)));
 
                         let #ok(results) = users.search(db_query) else return assert false;
-                        Debug.print("results: " # debug_show (results));
+                        // Debug.print("results: " # debug_show (results));
                         assert results.size() == 10;
                         for ((_, user) in results.vals()) {
                             assert user.age >= 3 and user.age <= 7;
@@ -271,21 +271,21 @@ ZenDBSuite.newSuite(
                         let #ok(before_results) = users.search(db_query) else return assert false;
                         let before_count = before_results.size();
 
-                        Debug.print("results before deletion (" # debug_show (before_count) # ") " # debug_show (before_results));
+                        // Debug.print("results before deletion (" # debug_show (before_count) # ") " # debug_show (before_results));
                         assert before_results.size() == 10;
                         for ((_, user) in before_results.vals()) {
                             assert user.age == 0;
                         };
 
                         let #ok(deleted) = users.delete(db_query) else return assert false;
-                        Debug.print("deleted (" # debug_show (deleted.size()) # ") " # debug_show (deleted));
+                        // Debug.print("deleted (" # debug_show (deleted.size()) # ") " # debug_show (deleted));
                         for ((_, user) in deleted.vals()) {
                             assert user.age == 0;
                         };
 
                         let #ok(after_results) = users.search(db_query) else return assert false;
 
-                        Debug.print("results after deletion (" # debug_show (after_results.size()) # ") " # debug_show (after_results));
+                        // Debug.print("results after deletion (" # debug_show (after_results.size()) # ") " # debug_show (after_results));
 
                         // Assert the right number were deleted
                         assert deleted.size() == before_count;
