@@ -16,22 +16,24 @@ import Decoder "mo:serde/Candid/Blob/Decoder";
 import Candid "mo:serde/Candid";
 import Itertools "mo:itertools/Iter";
 import RevIter "mo:itertools/RevIter";
-import Tag "mo:candid/Tag";
 import BitMap "mo:bit-map";
-
-import MemoryBTree "mo:memory-collection/MemoryBTree/Stable";
-import TypeUtils "mo:memory-collection/TypeUtils";
-import Int8Cmp "mo:memory-collection/TypeUtils/Int8Cmp";
 
 import T "../Types";
 import CandidMap "../CandidMap";
 import Utils "../Utils";
 import C "../Constants";
+import Logger "../Logger";
+import CandidUtils "../CandidUtils";
+
+import { Orchid } "Orchid";
 
 import CollectionUtils "Utils";
 import Schema "Schema";
+import BTree "../BTree";
+import SchemaMap "SchemaMap";
+import DocumentStore "DocumentStore";
 
-module {
+module Index {
 
     type BestIndexResult = T.BestIndexResult;
 
@@ -65,6 +67,272 @@ module {
 
     let { nhash; thash } = Map;
 
+    public func new(
+        collection : StableCollection,
+        name : Text,
+        index_key_details : [(Text, SortDirection)],
+        is_unique : Bool, // if true, the index is unique and the document ids are not concatenated with the index key values to make duplicate values appear unique
+        used_internally : Bool, // cannot be deleted by user if true
+    ) : T.Index {
+
+        let key_details : [(Text, SortDirection)] = if (is_unique) {
+            let contains_option_type = Itertools.any(
+                index_key_details.vals(),
+                func(index_key_detail : (Text, SortDirection)) : Bool {
+                    switch (SchemaMap.get(collection.schema_map, index_key_detail.0)) {
+                        case (?#Option(_)) true;
+                        case (null) Debug.trap("Index key details must be a valid field in the schema map");
+                        case (_) false;
+                    };
+                },
+            );
+
+            if (contains_option_type) {
+                Array.append(
+                    index_key_details,
+                    [(C.UNIQUE_INDEX_NULL_EXEMPT_ID, #Ascending)],
+                );
+            } else {
+                index_key_details;
+            }
+
+        } else {
+            Array.append(
+                index_key_details,
+                [(C.DOCUMENT_ID, #Ascending)],
+            );
+        };
+
+        let index : Index = {
+            name;
+            key_details;
+            data = CollectionUtils.newBtree(collection);
+            used_internally;
+            is_unique;
+        };
+
+        index;
+
+    };
+
+    public func size(index : Index) : Nat {
+        BTree.size(index.data);
+    };
+
+    public func insert(
+        collection : StableCollection,
+        index : Index,
+        id : Nat,
+        candid_map : T.CandidMap,
+    ) : T.Result<(), Text> {
+
+        let index_data_utils = CollectionUtils.getIndexDataUtils(collection);
+
+        let index_key_values = switch (CollectionUtils.getIndexColumns(collection, index.key_details, id, candid_map)) {
+            case (?index_key_values) index_key_values;
+            case (null) {
+                Logger.lazyDebug(
+                    collection.logger,
+                    func() = "Skipping indexing for document with id " # debug_show id # " because it does not have any values in the index",
+                );
+
+                return #ok();
+            };
+        };
+
+        switch (BTree.put(index.data, index_data_utils, index_key_values, id)) {
+            case (null) {};
+            case (?prev_id) {
+                ignore BTree.put(index.data, index_data_utils, index_key_values, prev_id);
+
+                return #err(
+                    "Failed to insert document with id " # debug_show id # " into index " # index.name # ", because a duplicate entry with id " # debug_show prev_id # " already exists"
+                );
+            };
+        };
+
+        Logger.lazyDebug(
+            collection.logger,
+            func() = "Storing document with id " # debug_show id # " in index " # index.name # ", originally "
+            # debug_show (index_key_values) # ", now encoded as " # (
+                switch (index_data_utils) {
+                    case (#stableMemory(utils)) debug_show utils.key.blobify.to_blob(index_key_values);
+                    case (#heap(utils)) debug_show utils.blobify.to_blob(index_key_values);
+                }
+            ),
+        );
+
+        #ok();
+    };
+
+    public func remove(collection : StableCollection, index : Index, id : Nat, prev_candid_map : T.CandidMap) : T.Result<(), Text> {
+        let index_data_utils = CollectionUtils.getIndexDataUtils(collection);
+
+        let index_key_values = switch (CollectionUtils.getIndexColumns(collection, index.key_details, id, prev_candid_map)) {
+            case (?index_key_values) index_key_values;
+            case (null) {
+                Logger.lazyDebug(
+                    collection.logger,
+                    func() = "Skipping indexing for document with id " # debug_show id # " because it does not have any values in the index",
+                );
+
+                return #ok();
+            };
+        };
+
+        switch (BTree.remove(index.data, index_data_utils, index_key_values)) {
+            case (null) return #err(
+                "Failed to remove document with id " # debug_show id # " from index " # index.name # ", because it does not exist"
+            );
+            case (?prev_id) {
+                if (prev_id != id) {
+
+                    ignore BTree.put(index.data, index_data_utils, index_key_values, prev_id);
+
+                    return #err(
+                        "Failed to remove document with id " # debug_show id # " from index " # index.name # ", because it was not found in the index. The document with id " # debug_show prev_id # " was found instead"
+                    );
+                };
+            };
+        };
+
+        #ok();
+    };
+
+    public func clear(collection : StableCollection, index : Index) {
+        BTree.clear(index.data);
+    };
+
+    public func populateIndex(
+        collection : StableCollection,
+        index : Index,
+    ) : T.Result<(), Text> {
+        assert Index.size(index) == 0;
+
+        let doc_store_utils = DocumentStore.getBtreeUtils(collection.documents);
+
+        for ((id, candid_blob) in DocumentStore.entries(collection.documents, doc_store_utils)) {
+            let candid = CollectionUtils.decodeCandidBlob(collection, candid_blob);
+            let candid_map = CandidMap.new(collection.schema_map, id, candid);
+
+            switch (Index.insert(collection, index, id, candid_map)) {
+                case (#err(err)) {
+                    return #err("populate_index() failed on index '" # index.name # "': " # err);
+                };
+                case (#ok(_)) {};
+            };
+
+        };
+
+        #ok();
+
+    };
+
+    /// Clears the index and repopulates it with all documents from the collection.
+    public func repopulateIndex(collection : StableCollection, index : Index) : T.Result<(), Text> {
+        // clear the index first
+        Index.clear(collection, index);
+        populateIndex(collection, index);
+    };
+
+    func populateIndexesFromCandidMapDocumentEntries(
+        collection : StableCollection,
+        indexes : [T.Index],
+        document_entries : T.Iter<(Nat, T.CandidMap)>,
+        on_start : (T.Index) -> (),
+    ) : T.Result<(), Text> {
+
+        for ((id, candid_map) in document_entries) {
+
+            for (index in indexes.vals()) {
+                on_start(index);
+                switch (Index.insert(collection, index, id, candid_map)) {
+                    case (#err(err)) {
+                        return #err("populate_index() failed on index '" # index.name # "': " # err);
+                    };
+                    case (#ok(_)) {};
+                };
+            };
+
+        };
+
+        #ok();
+    };
+
+    public func populateIndexes(
+        collection : StableCollection,
+        indexes : [T.Index],
+    ) : T.Result<(), Text> {
+
+        let candid_map_document_entries = Iter.map<(Nat, Blob), (Nat, T.CandidMap)>(
+            DocumentStore.entries(collection.documents, DocumentStore.getBtreeUtils(collection.documents)),
+            func((id, candid_blob) : (Nat, Blob)) : (Nat, T.CandidMap) {
+                let candid = CollectionUtils.decodeCandidBlob(collection, candid_blob);
+                (id, CandidMap.new(collection.schema_map, id, candid));
+            },
+        );
+
+        populateIndexesFromCandidMapDocumentEntries(
+            collection,
+            indexes,
+            candid_map_document_entries,
+            func(_index : T.Index) {},
+        );
+
+    };
+
+    public func repopulateIndexes(
+        collection : StableCollection,
+        indexes : [T.Index],
+    ) : T.Result<(), Text> {
+
+        let candid_map_document_entries = Iter.map<(Nat, Blob), (Nat, T.CandidMap)>(
+            DocumentStore.entries(collection.documents, DocumentStore.getBtreeUtils(collection.documents)),
+            func((id, candid_blob) : (Nat, Blob)) : (Nat, T.CandidMap) {
+                let candid = CollectionUtils.decodeCandidBlob(collection, candid_blob);
+                (id, CandidMap.new(collection.schema_map, id, candid));
+            },
+        );
+
+        populateIndexesFromCandidMapDocumentEntries(
+            collection,
+            indexes,
+            candid_map_document_entries,
+            func(index : T.Index) {
+                Index.clear(collection, index);
+            },
+        );
+    };
+
+    // public func exists(
+    //     collection : StableCollection,
+    //     index : Index,
+    //     id : Nat,
+    //     candid_map : T.CandidMap,
+    // ) : Bool {
+    //     let index_data_utils = CollectionUtils.getIndexDataUtils(collection);
+
+    //     let index_key_values = switch (CollectionUtils.getIndexColumns(collection, index.key_details, id, candid_map)) {
+    //         case (?index_key_values) index_key_values;
+    //         case (null) {
+    //             Logger.lazyDebug(
+    //                 collection.logger,
+    //                 func() = "Skipping indexing for document with id " # debug_show id # " because it does not have any values in the index",
+    //             );
+
+    //             return false;
+    //         };
+    //     };
+
+    //     switch (BTree.get(index.data, index_data_utils, index_key_values)) {
+    //         case (null) false;
+    //         case (?prev_id) {
+    //             return true;
+
+    //         };
+    //     };
+    // };
+
     let EQUALITY_SCORE = 4;
     let SORT_SCORE = 2;
     let RANGE_SCORE = 1;
@@ -75,81 +343,88 @@ module {
     func operation_eval(
         field : Text,
         op : T.ZqlOperators,
-        lower : Map<Text, T.State<Candid>>,
-        upper : Map<Text, T.State<Candid>>,
+        lower : Map<Text, T.CandidInclusivityQuery>,
+        upper : Map<Text, T.CandidInclusivityQuery>,
     ) {
         switch (op) {
             case (#eq(candid)) {
-                ignore Map.put(lower, thash, field, #True(candid));
-                ignore Map.put(upper, thash, field, #True(candid));
+                ignore Map.put(lower, thash, field, #Inclusive(candid));
+                ignore Map.put(upper, thash, field, #Inclusive(candid));
             };
             case (#gte(candid)) {
                 switch (Map.get(lower, thash, field)) {
-                    case (? #True(val) or ? #False(val)) {
-                        if (Schema.cmp_candid(#Empty, candid, val) == 1) {
-                            ignore Map.put(lower, thash, field, #True(candid));
+                    case (?#Inclusive(val) or ?#Exclusive(val)) {
+                        if (Schema.cmpCandid(#Empty, candid, val) == 1) {
+                            ignore Map.put(lower, thash, field, #Inclusive(candid));
                         };
                     };
-                    case (null) ignore Map.put(lower, thash, field, #True(candid));
+                    case (null) ignore Map.put(lower, thash, field, #Inclusive(candid));
                 };
             };
             case (#lte(candid)) {
                 switch (Map.get(upper, thash, field)) {
-                    case (? #True(val) or ? #False(val)) {
-                        if (Schema.cmp_candid(#Empty, candid, val) == -1) {
-                            ignore Map.put(upper, thash, field, #True(candid));
+                    case (?#Inclusive(val) or ?#Exclusive(val)) {
+                        if (Schema.cmpCandid(#Empty, candid, val) == -1) {
+                            ignore Map.put(upper, thash, field, #Inclusive(candid));
                         };
                     };
-                    case (null) ignore Map.put(upper, thash, field, #True(candid));
+                    case (null) ignore Map.put(upper, thash, field, #Inclusive(candid));
                 };
             };
             case (#lt(candid)) {
                 switch (Map.get(upper, thash, field)) {
-                    case (? #True(val) or ? #False(val)) {
-                        let cmp = Schema.cmp_candid(#Empty, candid, val);
+                    case (?#Inclusive(val) or ?#Exclusive(val)) {
+                        let cmp = Schema.cmpCandid(#Empty, candid, val);
                         if (cmp == -1 or cmp == 0) {
-                            ignore Map.put(upper, thash, field, #False(candid));
+                            ignore Map.put(upper, thash, field, #Exclusive(candid));
                         };
                     };
-                    case (null) ignore Map.put(upper, thash, field, #False(candid));
+                    case (null) ignore Map.put(upper, thash, field, #Exclusive(candid));
                 };
             };
             case (#gt(candid)) {
                 switch (Map.get(lower, thash, field)) {
-                    case (? #True(val) or ? #False(val)) {
-                        let cmp = Schema.cmp_candid(#Empty, candid, val);
+                    case (?#Inclusive(val) or ?#Exclusive(val)) {
+                        let cmp = Schema.cmpCandid(#Empty, candid, val);
                         if (cmp == 1 or cmp == 0) {
-                            ignore Map.put(lower, thash, field, #False(candid));
+                            ignore Map.put(lower, thash, field, #Exclusive(candid));
                         };
                     };
-                    case (null) ignore Map.put(lower, thash, field, #False(candid));
+                    case (null) ignore Map.put(lower, thash, field, #Exclusive(candid));
                 };
             };
-            case (#In(_) or #Not(_)) {
+
+            case (#exists) {
+                ignore Map.put(lower, thash, field, #Inclusive(#Minimum));
+                ignore Map.put(upper, thash, field, #Inclusive(#Maximum));
+            };
+
+            // aliases should be handled by the query builder
+            case (#anyOf(_) or #between(_, _) or #startsWith(_) or #not_(_)) {
                 Debug.trap(debug_show op # " not allowed in this context. Should have been expanded by the query builder");
             };
         };
     };
 
-    public func scan<Record>(
+    public func scan<Document>(
         collection : T.StableCollection,
         index : T.Index,
-        start_query : [(Text, ?T.State<Candid>)],
-        end_query : [(Text, ?T.State<Candid>)],
+        start_query : [(Text, ?T.CandidInclusivityQuery)],
+        end_query : [(Text, ?T.CandidInclusivityQuery)],
         opt_cursor : ?(Nat, Candid.Candid),
     ) : (Nat, Nat) {
         // Debug.print("start_query: " # debug_show start_query);
         // Debug.print("end_query: " # debug_show end_query);
 
-        let index_data_utils = CollectionUtils.get_index_data_utils(collection, index.key_details);
+        let index_data_utils = CollectionUtils.getIndexDataUtils(collection);
 
         func sort_by_key_details(a : (Text, Any), b : (Text, Any)) : Order {
-            let pos_a = switch (Array.indexOf<(Text, SortDirection)>((a.0, #Ascending), index.key_details, Utils.tuple_eq(Text.equal))) {
+            let pos_a = switch (Array.indexOf<(Text, SortDirection)>((a.0, #Ascending), index.key_details, Utils.tupleEq(Text.equal))) {
                 case (?pos) pos;
                 case (null) index.key_details.size();
             };
 
-            let pos_b = switch (Array.indexOf<(Text, SortDirection)>((b.0, #Ascending), index.key_details, Utils.tuple_eq(Text.equal))) {
+            let pos_b = switch (Array.indexOf<(Text, SortDirection)>((b.0, #Ascending), index.key_details, Utils.tupleEq(Text.equal))) {
                 case (?pos) pos;
                 case (null) index.key_details.size();
             };
@@ -159,97 +434,178 @@ module {
             #equal;
         };
 
-        let sorted_start_query = Array.sort(start_query, sort_by_key_details);
-        let sorted_end_query = Array.sort(end_query, sort_by_key_details);
+        func sort_and_fill_query_entries(
+            query_entries : [(Text, ?T.CandidInclusivityQuery)],
+            opt_cursor : ?(Nat, T.PaginationDirection),
+            is_lower_bound : Bool,
+        ) : [(Text, ?T.CandidInclusivityQuery)] {
+            let sorted = Array.sort(query_entries, sort_by_key_details);
 
-        // Debug.print("scan cursor: " # debug_show opt_cursor);
-
-        let full_start_query = switch (opt_cursor) {
-            case (null) do {
-
-                Array.tabulate<(Candid)>(
-                    index.key_details.size(),
-                    func(i : Nat) : (Candid) {
-
-                        if (i >= sorted_start_query.size()) {
-                            return (#Minimum);
-                        };
-
-                        let val = switch (sorted_start_query[i].1) {
-                            case (? #True(val) or ? #False(val)) val;
-                            case (null) #Minimum;
-                        };
-
-                        (val);
-                    },
-                );
-            };
-            case (?(id, cursor)) {
-                let cursor_map = CandidMap.fromCandid(cursor);
-                Array.tabulate<Candid>(
-                    index.key_details.size(),
-                    func(i : Nat) : (Candid) {
-                        if (index.key_details[i].0 == C.RECORD_ID_FIELD) {
-                            // RECORD_ID_FIELD is only added in the query if it is a cursor
-                            return #Nat(id + 1);
-                        };
-
-                        let key = index.key_details[i].0;
-
-                        let val = if (i >= sorted_start_query.size()) {
-                            (#Minimum);
-                        } else switch (sorted_start_query[i].1) {
-                            case (? #True(val) or ? #False(val)) val;
-                            case (null) #Minimum;
-                        };
-
-                        val;
-
-                    },
-                );
-            };
-        };
-
-        // Debug.print("full_scan_query: " # debug_show full_start_query);
-
-        let full_end_query = do {
-            Array.tabulate<Candid>(
+            Array.tabulate<(Text, ?T.CandidInclusivityQuery)>(
                 index.key_details.size(),
-                func(i : Nat) : (Candid) {
-                    if (i >= sorted_end_query.size()) {
-                        return (#Maximum);
+                func(i : Nat) : (Text, ?T.CandidInclusivityQuery) {
+
+                    let index_key_tuple = index.key_details[i];
+
+                    switch (opt_cursor) {
+                        case (?(id, pagination_direction)) if (index.key_details[i].0 == C.DOCUMENT_ID) {
+                            // DOCUMENT_ID is only added in the query if it is a cursor
+                            // todo: update based on pagination_direction and is_lower_bound
+                            return (C.DOCUMENT_ID, ?#Inclusive(#Nat(id + 1)));
+                        };
+                        case (null) {};
                     };
 
-                    let key = sorted_end_query[i].0;
-                    let ?(#True(val)) or ?(#False(val)) = sorted_end_query[i].1 else return (#Maximum);
+                    if (i >= query_entries.size()) {
+                        return (index_key_tuple.0, null);
+                    };
 
-                    (val);
+                    sorted[i];
                 },
             );
+
         };
 
-      // Debug.print("Index_key_details: " # debug_show index.key_details);
-      // Debug.print("full_start_query: " # debug_show full_start_query);
-      // Debug.print("full_end_query: " # debug_show full_end_query);
+        // filter null entries and update the last entry to be inclusive by replacing it with the next or previous value
+        func format_query_entries(query_entries : [(Text, ?T.CandidInclusivityQuery)], is_lower_bound : Bool) : [T.CandidQuery] {
+            if (query_entries.size() == 0) return [];
 
-        let scans = CollectionUtils.memorybtree_scan_interval(index.data, index_data_utils, ?full_start_query, ?full_end_query);
-      // Debug.print("scan_intervals: " # debug_show scans);
-        scans
+            let opt_index_of_first_null = Itertools.findIndex(
+                query_entries.vals(),
+                func(entry : (Text, ?T.CandidInclusivityQuery)) : Bool {
+                    entry.1 == null;
+                },
+            );
 
-        // let records_iter = MemoryBTree.scan(index.data, index_data_utils, ?full_start_query, ?full_end_query);
+            switch (opt_index_of_first_null) {
+                case (?0) {
+                    // the first null value was found at index 0
+                    return [if (is_lower_bound) #Minimum else #Maximum];
+                };
+                case (_) {};
 
-        // let record_ids_iter = Iter.map<([Candid], Nat), Nat>(
-        //     records_iter,
-        //     func((_, id) : ([Candid], Nat)) : (Nat) { id },
-        // );
+            };
 
-        // record_ids_iter;
+            let index_of_first_null = Option.get(opt_index_of_first_null, 0);
 
-        // return id_to_record_iter(collection, blobify,record_ids_iter );
+            func get_new_value_at_index(i : Nat) : T.CandidQuery {
+                switch (query_entries[i]) {
+                    case ((_field, ?#Inclusive(#Minimum) or ?#Exclusive(#Minimum))) #Minimum;
+                    case ((_field, ?#Inclusive(#Maximum) or ?#Exclusive(#Maximum))) #Maximum;
+                    case ((_field, ?#Inclusive(value))) value;
+                    case ((_field, ?#Exclusive(value))) if (is_lower_bound) {
+                        let next = CandidUtils.getNextValue(value);
+                        // Debug.print("Retrieving the next value for " # debug_show value);
+                        // Debug.print("Next value: " # debug_show next);
+                        next;
+                    } else {
+                        CandidUtils.getPrevValue(value);
+                    };
+                    case (_) Debug.trap("filter_null_entries_in_query: received null value, should not happen");
+                };
+            };
 
+            Array.tabulate<T.CandidQuery>(
+                Nat.min(index_of_first_null + 2, query_entries.size()),
+                func(i : Nat) : T.CandidQuery {
+                    let (_field, inclusivity_query) = query_entries[i];
+
+                    return get_new_value_at_index(i);
+
+                },
+            );
+
+        };
+
+        let opt_cursor_with_direction : ?(Nat, T.PaginationDirection) = switch (opt_cursor) {
+            case (null) null;
+            case (?(id, cursor)) {
+                ?(id, #Forward);
+            };
+        };
+
+        let sorted_start_query = sort_and_fill_query_entries(start_query, opt_cursor_with_direction, true);
+        let sorted_end_query = sort_and_fill_query_entries(end_query, opt_cursor_with_direction, false);
+
+        Logger.lazyDebug(
+            collection.logger,
+            func() = "scan after sort and fill: " # debug_show (sorted_start_query, sorted_end_query),
+        );
+
+        let start_query_values = format_query_entries(sorted_start_query, true);
+        let end_query_values = format_query_entries(sorted_end_query, false);
+
+        Logger.lazyDebug(
+            collection.logger,
+            func() = "scan after format: " # debug_show (start_query_values, end_query_values),
+        );
+
+        Logger.lazyDebug(
+            collection.logger,
+            func() = "encoded start_query_values: " # debug_show (Orchid.blobify.to_blob(start_query_values)),
+        );
+        Logger.lazyDebug(
+            collection.logger,
+            func() = "encoded end_query_values: " # debug_show (Orchid.blobify.to_blob(end_query_values)),
+        );
+
+        let scans = BTree.getScanAsInterval(index.data, index_data_utils, ?start_query_values, ?end_query_values);
+
+        Logger.lazyDebug(
+            collection.logger,
+            func() = "scan interval results: " # debug_show scans # "\nindex size: " # debug_show BTree.size(index.data),
+        );
+
+        scans;
     };
 
-    public func extract_scan_and_filter_bounds(lower : Map<Text, T.State<Candid>>, upper : Map<Text, T.State<Candid>>, opt_index_key_details : ?[(Text, T.SortDirection)], opt_fully_covered_equality_and_range_fields : ?Set.Set<Text>) : (Bounds, Bounds) {
+    public func fromInterval(
+        collection : T.StableCollection,
+        index : Index,
+        interval : (Nat, Nat),
+    ) : [([T.CandidQuery], T.DocumentId)] {
+        let index_data_utils = CollectionUtils.getIndexDataUtils(collection);
+
+        let (start, end) = interval;
+
+        Iter.toArray<([T.CandidQuery], T.DocumentId)>(
+            BTree.range<[T.CandidQuery], T.DocumentId>(index.data, index_data_utils, start, end)
+        );
+    };
+
+    public func entries(
+        collection : T.StableCollection,
+        index : Index,
+    ) : T.RevIter<([T.CandidQuery], T.DocumentId)> {
+        let index_data_utils = CollectionUtils.getIndexDataUtils(collection);
+
+        BTree.entries<[T.CandidQuery], T.DocumentId>(index.data, index_data_utils);
+    };
+
+    // func unwrap_candid_option_value(option : T.CandidQuery) : T.CandidQuery {
+    //     switch (option_type) {
+    //         case (#Option(inner)) {
+    //             unwrap_candid_option_value(inner);
+    //         };
+    //         case (unwrapped) { unwrapped };
+    //     };
+    // };
+
+    // func wrap_index_key_with_n_options_from_type(index_key_type : T.CandidType, index_key : T.CandidQuery) : T.CandidQuery {
+    //     func helper(index_key_type : T.CandidType) : T.CandidQuery {
+    //         switch (index_key_type) {
+    //             case (#Option) {
+    //                 #Option(index_key);
+    //             };
+    //             case (other_types) index_key;
+    //         };
+    //     };
+
+    //     helper(unwrap_candid_option_value(index_key));
+
+    // };
+
+    public func extractBounds(lower : Map<Text, T.CandidInclusivityQuery>, upper : Map<Text, T.CandidInclusivityQuery>, opt_index_key_details : ?[(Text, T.SortDirection)], opt_fully_covered_equality_and_range_fields : ?Set.Set<Text>) : (Bounds, Bounds) {
 
         assert Option.isSome(opt_index_key_details) == Option.isSome(opt_fully_covered_equality_and_range_fields);
 
@@ -260,16 +616,24 @@ module {
                 let scan_lower_bound = Array.map(
                     index_key_details,
                     func((field, _) : (Text, SortDirection)) : FieldLimit {
-                        let lower_bound = Map.get(lower, thash, field);
-                        (field, lower_bound);
+                        let lower_bound = switch (Map.get(lower, thash, field)) {
+                            case (?lower_bound) lower_bound;
+                            case (null) #Inclusive(#Minimum);
+                        };
+
+                        (field, ?lower_bound);
                     },
                 );
 
                 let scan_upper_bound = Array.map(
                     index_key_details,
                     func((field, _) : (Text, SortDirection)) : FieldLimit {
-                        let upper_bound = Map.get(upper, thash, field);
-                        (field, upper_bound);
+                        let upper_bound = switch (Map.get(upper, thash, field)) {
+                            case (?upper_bound) upper_bound;
+                            case (null) #Inclusive(#Maximum);
+                        };
+
+                        (field, ?upper_bound);
                     },
                 );
 
@@ -282,8 +646,8 @@ module {
             case (null) (lower, upper);
             case (?fully_covered_equality_and_range_fields) {
 
-                let partially_covered_lower = Map.new<Text, T.State<Candid>>();
-                let partially_covered_upper = Map.new<Text, T.State<Candid>>();
+                let partially_covered_lower = Map.new<Text, T.CandidInclusivityQuery>();
+                let partially_covered_upper = Map.new<Text, T.CandidInclusivityQuery>();
 
                 for ((field, value) in Map.entries(lower)) {
                     if (not Set.has(fully_covered_equality_and_range_fields, thash, field)) {
@@ -315,18 +679,18 @@ module {
         };
 
         let iter = Map.entries(a);
-        let arr1 = Array.tabulate<(Text, ?State<Candid>)>(
+        let arr1 = Array.tabulate<(Text, ?State<T.CandidQuery>)>(
             max_size,
-            func(i : Nat) : (Text, ?State<Candid>) {
+            func(i : Nat) : (Text, ?State<T.CandidQuery>) {
                 let ?(key, value) = iter.next();
                 (key, ?value);
             },
         );
 
         let iter_2 = Map.entries(a);
-        let arr2 = Array.tabulate<(Text, ?State<Candid>)>(
+        let arr2 = Array.tabulate<(Text, ?State<T.CandidQuery>)>(
             max_size,
-            func(i : Nat) : (Text, ?State<Candid>) {
+            func(i : Nat) : (Text, ?State<T.CandidQuery>) {
                 let ?(key, _) = iter_2.next();
                 let value = Map.get(b, thash, key);
                 (key, value);
@@ -339,10 +703,10 @@ module {
 
     };
 
-    public func convert_simple_operations_to_scan_and_filter_bounds(is_and_operation : Bool, simple_operations : [(Text, T.ZqlOperators)], opt_index_key_details : ?[(Text, T.SortDirection)], opt_fully_covered_equality_and_range_fields : ?Set.Set<Text>) : (T.Bounds, T.Bounds) {
+    public func convertSimpleOpsToBounds(is_and_operation : Bool, simple_operations : [(Text, T.ZqlOperators)], opt_index_key_details : ?[(Text, T.SortDirection)], opt_fully_covered_equality_and_range_fields : ?Set.Set<Text>) : (T.Bounds, T.Bounds) {
 
-        let lower_bound = Map.new<Text, T.State<T.Candid>>();
-        let upper_bound = Map.new<Text, T.State<T.Candid>>();
+        let lower_bound = Map.new<Text, T.State<T.CandidQuery>>();
+        let upper_bound = Map.new<Text, T.State<T.CandidQuery>>();
 
         let fields_with_equality_ops = Set.new<Text>();
 
@@ -379,7 +743,7 @@ module {
 
         };
 
-        extract_scan_and_filter_bounds(lower_bound, upper_bound, opt_index_key_details, opt_fully_covered_equality_and_range_fields);
+        extractBounds(lower_bound, upper_bound, opt_index_key_details, opt_fully_covered_equality_and_range_fields);
 
     };
 
@@ -423,7 +787,7 @@ module {
 
     };
 
-    public func fill_field_maps(equal_fields : Set.Set<Text>, sort_fields : Buffer<(Text, T.SortDirection)>, range_fields : Set.Set<Text>, operations : [(Text, T.ZqlOperators)], sort_field : ?(Text, T.SortDirection)) {
+    public func fillFieldMaps(equal_fields : Set.Set<Text>, sort_fields : Buffer<(Text, T.SortDirection)>, range_fields : Set.Set<Text>, operations : [(Text, T.ZqlOperators)], sort_field : ?(Text, T.SortDirection)) {
 
         sort_fields.clear();
 
@@ -442,13 +806,13 @@ module {
         };
     };
 
-    public func get_best_index(collection : StableCollection, operations : [(Text, T.ZqlOperators)], sort_field : ?(Text, T.SortDirection)) : ?BestIndexResult {
+    public func getBestIndex(collection : StableCollection, operations : [(Text, T.ZqlOperators)], sort_field : ?(Text, T.SortDirection)) : ?BestIndexResult {
         let equal_fields = Set.new<Text>();
         let sort_fields = Buffer.Buffer<(Text, T.SortDirection)>(8);
         let range_fields = Set.new<Text>();
         // let partially_covered_fields = Set.new<Text>();
 
-        fill_field_maps(equal_fields, sort_fields, range_fields, operations, sort_field);
+        fillFieldMaps(equal_fields, sort_fields, range_fields, operations, sort_field);
 
         // the sorting direction of the query and the index can either be a direct match
         // or a direct opposite in order to return the results without additional sorting
@@ -471,10 +835,11 @@ module {
 
             var index_key_details_position = 0;
 
+            // Debug.print("scoring indexes");
             label scoring_indexes for ((index_key, direction) in index.key_details.vals()) {
                 index_key_details_position += 1;
 
-                if (index_key == C.RECORD_ID_FIELD) break scoring_indexes;
+                // if (index_key == C.DOCUMENT_ID) break scoring_indexes;
 
                 var matches_at_least_one_column = false;
 
@@ -539,6 +904,7 @@ module {
                 requires_additional_filtering := true;
             };
 
+            // Debug.print("searching_for_holes");
             label searching_for_holes for ((prev, current) in Itertools.slidingTuples(Set.keys(positions_matching_equality_or_range))) {
                 if (current - prev > 1) {
                     requires_additional_filtering := true;
@@ -548,7 +914,7 @@ module {
 
             if (num_of_equal_fields_covered > 0 or num_of_range_fields_covered > 0 or num_of_sort_fields_covered > 0) {
 
-                let (scan_bounds, filter_bounds) = convert_simple_operations_to_scan_and_filter_bounds(false, operations, ?index.key_details, ?fully_covered_equality_and_range_fields);
+                let (scan_bounds, filter_bounds) = convertSimpleOpsToBounds(false, operations, ?index.key_details, ?fully_covered_equality_and_range_fields);
 
                 let interval = scan(collection, index, scan_bounds.0, scan_bounds.1, null);
 
@@ -570,24 +936,24 @@ module {
                     interval;
                 };
 
-              // Debug.print("index matching results:");
-              // Debug.print("index, score: " # debug_show (index.name, calculate_score(index_details, false)));
-              // Debug.print("operations: " # debug_show operations);
+                // Debug.print("index matching results:");
+                // Debug.print("index, score: " # debug_show (index.name, calculate_score(index_details, false)));
+                // Debug.print("operations: " # debug_show operations);
 
-              // Debug.print("index_key_details: " # debug_show index.key_details);
-              // Debug.print("equal_fields: " # debug_show Set.toArray(equal_fields));
-              // Debug.print("  num_of_equal_fields_covered: " # debug_show num_of_equal_fields_covered);
+                // Debug.print("index_key_details: " # debug_show index.key_details);
+                // Debug.print("equal_fields: " # debug_show Set.toArray(equal_fields));
+                // Debug.print("  num_of_equal_fields_covered: " # debug_show num_of_equal_fields_covered);
 
-              // Debug.print("sort_fields: " # debug_show Buffer.toArray(sort_fields));
-              // Debug.print("  num_of_sort_fields_evaluated: " # debug_show num_of_sort_fields_evaluated);
-              // Debug.print("range_fields: " # debug_show Set.toArray(range_fields));
-              // Debug.print("  num_of_range_fields_covered: " # debug_show num_of_range_fields_covered);
+                // Debug.print("sort_fields: " # debug_show Buffer.toArray(sort_fields));
+                // Debug.print("  num_of_sort_fields_evaluated: " # debug_show num_of_sort_fields_evaluated);
+                // Debug.print("range_fields: " # debug_show Set.toArray(range_fields));
+                // Debug.print("  num_of_range_fields_covered: " # debug_show num_of_range_fields_covered);
 
-              // Debug.print("requires_additional_filtering: " # debug_show requires_additional_filtering);
-              // Debug.print("requires_additional_sorting: " # debug_show requires_additional_sorting);
-              // Debug.print("num, range_size: " # debug_show (num_of_range_fields_covered, Set.size(range_fields)));
-              // Debug.print("num, equal_size: " # debug_show (num_of_equal_fields_covered, Set.size(equal_fields)));
-              // Debug.print("fully_covered_equality_and_range_fields: " # debug_show Set.toArray(fully_covered_equality_and_range_fields));
+                // Debug.print("requires_additional_filtering: " # debug_show requires_additional_filtering);
+                // Debug.print("requires_additional_sorting: " # debug_show requires_additional_sorting);
+                // Debug.print("num, range_size: " # debug_show (num_of_range_fields_covered, Set.size(range_fields)));
+                // Debug.print("num, equal_size: " # debug_show (num_of_equal_fields_covered, Set.size(equal_fields)));
+                // Debug.print("fully_covered_equality_and_range_fields: " # debug_show Set.toArray(fully_covered_equality_and_range_fields));
 
                 indexes.add(index_details);
             };
@@ -612,7 +978,10 @@ module {
 
         indexes.sort(sort_indexes_based_on_calculated_features);
 
-        switch (indexes.getOpt(indexes.size() - 1)) {
+        // Debug.print("extracting best index");
+        let last_index = if (indexes.size() == 0) 0 else (indexes.size() - 1 : Nat);
+
+        switch (indexes.getOpt(last_index)) {
             case (null) null;
             case (?best_index_details) {
                 let {
@@ -638,13 +1007,13 @@ module {
 
     };
 
-    // public func get_best_index_v1(collection : StableCollection, operations : [(Text, T.ZqlOperators)], sort_field : ?(Text, T.SortDirection)) : ?BestIndexResult {
+    // public func getIndexDataUtils_v1(collection : StableCollection, operations : [(Text, T.ZqlOperators)], sort_field : ?(Text, T.SortDirection)) : ?BestIndexResult {
     //     let equal_fields = Set.new<Text>();
     //     let sort_fields = Buffer.Buffer<(Text, T.SortDirection)>(8);
     //     let range_fields = Set.new<Text>();
     //     // let partially_covered_fields = Set.new<Text>();
 
-    //     func fill_field_maps(equal_fields : Set.Set<Text>, sort_fields : Buffer<(Text, T.SortDirection)>, range_fields : Set.Set<Text>, operations : [(Text, T.ZqlOperators)], sort_field : ?(Text, T.SortDirection)) {
+    //     func fillFieldMaps(equal_fields : Set.Set<Text>, sort_fields : Buffer<(Text, T.SortDirection)>, range_fields : Set.Set<Text>, operations : [(Text, T.ZqlOperators)], sort_field : ?(Text, T.SortDirection)) {
 
     //         sort_fields.clear();
 
@@ -663,7 +1032,7 @@ module {
     //         };
     //     };
 
-    //     fill_field_maps(equal_fields, sort_fields, range_fields, operations, sort_field);
+    //     fillFieldMaps(equal_fields, sort_fields, range_fields, operations, sort_field);
 
     //     var best_score = 0;
     //     var best_index : ?Index = null;
@@ -698,7 +1067,7 @@ module {
     //         label scoring_indexes for ((index_key, direction) in index.key_details.vals()) {
     //             index_key_details_position += 1;
 
-    //             if (index_key == C.RECORD_ID_FIELD) break scoring_indexes;
+    //             if (index_key == C.DOCUMENT_ID) break scoring_indexes;
 
     //             var matches_at_least_one_column = false;
 

@@ -210,20 +210,20 @@ module BlockUtils {
                     for ((j, block) in Itertools.enumerate(queried_blocks.vals())) {
                         assert (Nat64.toNat(rq.start) + (i * MAX_BATCH_TXS_IN_RESPONSE) + j) == txs.size();
                         let converted_block = convert_ledger_block(block, txs.size());
-                        let record_id = switch (txs.insert(converted_block)) {
-                            case (#ok(record_id)) record_id;
+                        let document_id = switch (txs.insert(converted_block)) {
+                            case (#ok(document_id)) document_id;
                             case (#err(e)) {
                                 Debug.trap("failed to insert archived block into txs db: " # debug_show (converted_block, e));
                             };
                         };
 
                         // let expected = #ok(converted_block);
-                        // let actual = txs.get(record_id);
+                        // let actual = txs.get(document_id);
 
                         // if (actual != expected) {
                         //     Debug.trap(
-                        //         "failed to insert archived block into with record_id "
-                        //         # debug_show (record_id) # " into txs db: " # debug_show (converted_block, actual)
+                        //         "failed to insert archived block into with document_id "
+                        //         # debug_show (document_id) # " into txs db: " # debug_show (converted_block, actual)
                         //     );
                         // };
 
@@ -237,8 +237,8 @@ module BlockUtils {
 
         for (block in query_blocks_response.blocks.vals()) {
             let converted_block = convert_ledger_block(block, txs.size());
-            let #ok(record_id) = txs.insert(converted_block) else Debug.trap("failed to insert block into txs db: " # debug_show (converted_block));
-            assert txs.get(record_id) == #ok(converted_block);
+            let #ok(document_id) = txs.insert(converted_block) else Debug.trap("failed to insert block into txs db: " # debug_show (converted_block));
+            assert txs.get(document_id) == #ok(converted_block);
         };
     };
 

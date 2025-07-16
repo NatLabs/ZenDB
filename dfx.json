@@ -1,10 +1,10 @@
 {
   "version": 1,
   "canisters": {
-    "icp-txs-db": {
+    "stress-test": {
       "type": "motoko",
-      "main": "example/icp-txs-db/main.mo",
-      "args": "--max-stable-pages 300000"
+      "main": "./tests/Stress.Test.mo",
+      "args": "--max-stable-pages 6553600"
     }
   },
   "defaults": {
