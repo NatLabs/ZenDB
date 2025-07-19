@@ -120,6 +120,40 @@ module Index {
     };
 
     public func insert(
+        collection : T.StableCollection,
+        index : T.Index,
+        id : Nat,
+        values : [T.CandidQuery],
+    ) : T.Result<(), Text> {
+        let index_data_utils = CollectionUtils.getIndexDataUtils(collection);
+
+        switch (BTree.put(index.data, index_data_utils, values, id)) {
+            case (null) {};
+            case (?prev_id) {
+                ignore BTree.put(index.data, index_data_utils, values, prev_id);
+
+                return #err(
+                    "Failed to insert document with id " # debug_show id # " into index " # index.name # ", because a duplicate entry with id " # debug_show prev_id # " already exists"
+                );
+            };
+        };
+
+        Logger.lazyDebug(
+            collection.logger,
+            func() = "Storing document with id " # debug_show id # " in index " # index.name # ", originally "
+            # debug_show (values) # ", now encoded as " # (
+                switch (index_data_utils) {
+                    case (#stableMemory(utils)) debug_show utils.key.blobify.to_blob(values);
+                    case (#heap(utils)) debug_show utils.blobify.to_blob(values);
+                }
+            ),
+        );
+
+        #ok()
+
+    };
+
+    public func insertWithCandidMap(
         collection : StableCollection,
         index : Index,
         id : Nat,
@@ -140,32 +174,11 @@ module Index {
             };
         };
 
-        switch (BTree.put(index.data, index_data_utils, index_key_values, id)) {
-            case (null) {};
-            case (?prev_id) {
-                ignore BTree.put(index.data, index_data_utils, index_key_values, prev_id);
+        Index.insert(collection, index, id, index_key_values);
 
-                return #err(
-                    "Failed to insert document with id " # debug_show id # " into index " # index.name # ", because a duplicate entry with id " # debug_show prev_id # " already exists"
-                );
-            };
-        };
-
-        Logger.lazyDebug(
-            collection.logger,
-            func() = "Storing document with id " # debug_show id # " in index " # index.name # ", originally "
-            # debug_show (index_key_values) # ", now encoded as " # (
-                switch (index_data_utils) {
-                    case (#stableMemory(utils)) debug_show utils.key.blobify.to_blob(index_key_values);
-                    case (#heap(utils)) debug_show utils.blobify.to_blob(index_key_values);
-                }
-            ),
-        );
-
-        #ok();
     };
 
-    public func remove(collection : StableCollection, index : Index, id : Nat, prev_candid_map : T.CandidMap) : T.Result<(), Text> {
+    public func removeWithCandidMap(collection : StableCollection, index : Index, id : Nat, prev_candid_map : T.CandidMap) : T.Result<(), Text> {
         let index_data_utils = CollectionUtils.getIndexDataUtils(collection);
 
         let index_key_values = switch (CollectionUtils.getIndexColumns(collection, index.key_details, id, prev_candid_map)) {
@@ -180,14 +193,20 @@ module Index {
             };
         };
 
-        switch (BTree.remove(index.data, index_data_utils, index_key_values)) {
+        Index.remove(collection, index, id, index_key_values);
+    };
+
+    public func remove(collection : StableCollection, index : Index, id : Nat, prev_candid_values : [T.CandidQuery]) : T.Result<(), Text> {
+        let index_data_utils = CollectionUtils.getIndexDataUtils(collection);
+
+        switch (BTree.remove(index.data, index_data_utils, prev_candid_values)) {
             case (null) return #err(
                 "Failed to remove document with id " # debug_show id # " from index " # index.name # ", because it does not exist"
             );
             case (?prev_id) {
                 if (prev_id != id) {
 
-                    ignore BTree.put(index.data, index_data_utils, index_key_values, prev_id);
+                    ignore BTree.put(index.data, index_data_utils, prev_candid_values, prev_id);
 
                     return #err(
                         "Failed to remove document with id " # debug_show id # " from index " # index.name # ", because it was not found in the index. The document with id " # debug_show prev_id # " was found instead"
@@ -215,7 +234,7 @@ module Index {
             let candid = CollectionUtils.decodeCandidBlob(collection, candid_blob);
             let candid_map = CandidMap.new(collection.schema_map, id, candid);
 
-            switch (Index.insert(collection, index, id, candid_map)) {
+            switch (Index.insertWithCandidMap(collection, index, id, candid_map)) {
                 case (#err(err)) {
                     return #err("populate_index() failed on index '" # index.name # "': " # err);
                 };
@@ -246,7 +265,7 @@ module Index {
 
             for (index in indexes.vals()) {
                 on_start(index);
-                switch (Index.insert(collection, index, id, candid_map)) {
+                switch (Index.insertWithCandidMap(collection, index, id, candid_map)) {
                     case (#err(err)) {
                         return #err("populate_index() failed on index '" # index.name # "': " # err);
                     };

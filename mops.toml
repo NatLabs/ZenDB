@@ -17,7 +17,6 @@ xtended-numbers = "0.4.0"
 vector = "0.4.2"
 augmented-btrees = "0.7.0"
 byte-utils = "0.0.1"
-test = "2.1.1"
 
 [dev-dependencies]
 test = "2.1.1"

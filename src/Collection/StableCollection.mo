@@ -286,7 +286,7 @@ module StableCollection {
             let candid_map = CandidMap.new(collection.schema_map, id, candid);
 
             for (index in indexes.vals()) {
-                switch (Index.insert(collection, index, id, candid_map)) {
+                switch (Index.insertWithCandidMap(collection, index, id, candid_map)) {
                     case (#err(err)) {
                         return #err("Failed to insert into index '" # index.name # "': " # err);
                     };
@@ -679,7 +679,7 @@ module StableCollection {
             switch (res) {
                 case (#err(err)) {
                     for (index in updated_indexes.vals()) {
-                        ignore Index.remove(collection, index, id, candid_map);
+                        ignore Index.removeWithCandidMap(collection, index, id, candid_map);
                     };
 
                     ignore DocumentStore.remove(collection.documents, main_btree_utils, id);
@@ -777,7 +777,7 @@ module StableCollection {
         ignore do ? {
             let prev_document_candid_map = opt_prev_document_candid_map!;
 
-            switch (Index.remove(collection, index, id, prev_document_candid_map)) {
+            switch (Index.removeWithCandidMap(collection, index, id, prev_document_candid_map)) {
                 case (#err(err)) {
                     return #err(err);
                 };
@@ -795,7 +795,7 @@ module StableCollection {
             func() = "Index key details: " # debug_show index.key_details,
         );
 
-        switch (Index.insert(collection, index, id, new_document_candid_map)) {
+        switch (Index.insertWithCandidMap(collection, index, id, new_document_candid_map)) {
             case (#err(err)) {
                 return #err("Failed to insert into index '" # index.name # "': " # err);
             };
@@ -1268,7 +1268,7 @@ module StableCollection {
 
         for (index in Map.vals(collection.indexes)) {
 
-            switch (Index.remove(collection, index, id, prev_candid_map)) {
+            switch (Index.removeWithCandidMap(collection, index, id, prev_candid_map)) {
                 case (#err(err)) {
                     return #err("Failed to remove from index '" # index.name # "': " # err);
                 };
