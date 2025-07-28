@@ -14,9 +14,9 @@ import Hash "mo:base@0.16.0/Hash";
 
 import Map "mo:map@9.0.1/Map";
 import Set "mo:map@9.0.1/Set";
-import Serde "mo:serde@3.3.3";
-import Decoder "mo:serde@3.3.3/Candid/Blob/Decoder";
-import Candid "mo:serde@3.3.3/Candid";
+import Serde "mo:serde@3.4.0";
+import Decoder "mo:serde@3.4.0/Candid/Blob/Decoder";
+import Candid "mo:serde@3.4.0/Candid";
 import Itertools "mo:itertools@0.2.2/Iter";
 import RevIter "mo:itertools@0.2.2/RevIter";
 import BitMap "mo:bit-map@0.1.2";
@@ -1246,15 +1246,19 @@ module {
                     };
 
                     if (requires_additional_sorting) {
-
-                        let arr = Iter.toArray(document_ids_with_fields);
+                        let arr = Utils.iter_to_array(document_ids);
                         let sorted = MergeSort.sort(arr, sort_documents_by_field_cmp);
 
-                        document_ids_with_fields := sorted.vals();
-
+                        document_ids := sorted.vals();
                     };
 
-                    iterators.add(document_ids_with_fields);
+                    if (requires_additional_sorting) {
+                        iterators.add(document_ids);
+                    } else if (requires_additional_filtering) {
+                        let bitmap = BitMap.fromIter(Iter.map(document_ids, Utils.convert_last_8_bytes_to_nat));
+                        bitmaps.add(bitmap);
+                    };
+
                 };
 
             };
@@ -1394,31 +1398,31 @@ module {
 
         };
 
-        func deduplicate_document_ids_iter(
-            document_ids_iter : Iter<(T.DocumentId, ?[(Text, T.Candid)])>
-        ) : Iter<(T.DocumentId, ?[(Text, T.Candid)])> {
-            let dedup_bitmap = BitMap.BitMap(1024);
+        if (requires_sorting) {
+            assert bitmaps.size() == 0;
 
-            object {
-                public func next() : ?(T.DocumentId, ?[(Text, T.Candid)]) {
-                    loop switch (document_ids_iter.next()) {
-                        case (null) return null;
-                        case (?(id, fields)) {
-                            let nat_id = Utils.convert_last_8_bytes_to_nat(id);
-                            if (not dedup_bitmap.get(nat_id)) {
-                                dedup_bitmap.set(nat_id, true);
-                                return ?(id, fields);
+            if (iterators.size() == 0) return #Empty;
+
+            func deduplicate_document_ids_iter(
+                document_ids_iter : Iter<T.DocumentId>
+            ) : Iter<T.DocumentId> {
+                let dedup_bitmap = BitMap.BitMap(1024);
+
+                object {
+                    public func next() : ?T.DocumentId {
+                        loop switch (document_ids_iter.next()) {
+                            case (null) return null;
+                            case (?id) {
+                                let nat_id = Utils.convert_last_8_bytes_to_nat(id);
+                                if (not dedup_bitmap.get(nat_id)) {
+                                    dedup_bitmap.set(nat_id, true);
+                                    return ?id;
+                                };
                             };
                         };
                     };
                 };
             };
-        };
-
-        if (requires_sorting) {
-            assert bitmaps.size() == 0;
-
-            if (iterators.size() == 0) return #Empty;
 
             // todo: we can optimize this further by eliminitating duplicates directly during the merge sort kmerge step without creating a separate dedup bitmap
             // todo: another optimization is to check if the sort field is one of the index fields and leverage that to avoid lookups in the document store and deserialization
@@ -1430,6 +1434,7 @@ module {
 
         };
 
+        // !keeps getting triggered: need to investigate why
         assert iterators.size() == 0;
 
         if (bitmaps.size() == 0) {

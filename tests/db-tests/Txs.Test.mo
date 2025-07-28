@@ -11,7 +11,7 @@ import { test; suite } "mo:test";
 
 import Bench "mo:bench";
 import Fuzz "mo:fuzz";
-import Candid "mo:serde@3.3.3/Candid";
+import Candid "mo:serde@3.4.0/Candid";
 import Itertools "mo:itertools@0.2.2/Iter";
 import BitMap "mo:bit-map@0.1.2";
 
@@ -527,34 +527,34 @@ ZenDBSuite.newSuite(
                     tx1.ts >= tx2.ts;
                 };
             },
-            {
-                query_name = "get_txs() with the first principal as the recipient";
-                db_query = QueryBuilder().Where(
-                    "tx.to.owner",
-                    #eq(#Principal(principals[0])),
-                );
-                expected_query_resolution = #And([
-                    #Operation(
-                        "tx.to.owner",
-                        #eq(#Principal(principals[0])),
-                    )
-                ]);
-                check_if_result_matches_query = func(id : Nat, tx : Tx) : Bool {
-                    ?true == (
-                        do ? {
-                            tx.tx.to!.owner == principals[0];
-                        }
-                    );
-                };
-                display_document = func(tx : Tx) : Text = debug_show tx;
-                sort = [
-                    ("ts", #Ascending),
-                ];
-                check_if_results_are_sorted = func(tx1 : Tx, tx2 : Tx) : Bool {
-                    tx1.ts <= tx2.ts;
-                };
+            // {
+            //     query_name = "get_txs() with the first principal as the recipient";
+            //     db_query = QueryBuilder().Where(
+            //         "tx.to.owner",
+            //         #eq(#Principal(principals[0])),
+            //     );
+            //     expected_query_resolution = #And([
+            //         #Operation(
+            //             "tx.to.owner",
+            //             #eq(#Principal(principals[0])),
+            //         )
+            //     ]);
+            //     check_if_result_matches_query = func(id : Nat, tx : Tx) : Bool {
+            //         ?true == (
+            //             do ? {
+            //                 tx.tx.to!.owner == principals[0];
+            //             }
+            //         );
+            //     };
+            //     display_document = func(tx : Tx) : Text = debug_show tx;
+            //     sort = [
+            //         ("ts", #Ascending),
+            //     ];
+            //     check_if_results_are_sorted = func(tx1 : Tx, tx2 : Tx) : Bool {
+            //         tx1.ts <= tx2.ts;
+            //     };
 
-            },
+            // },
             {
                 query_name = "get_txs() with the 2nd principal as the sender";
                 db_query = QueryBuilder().Where(

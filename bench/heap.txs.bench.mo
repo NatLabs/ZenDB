@@ -10,7 +10,7 @@ import Option "mo:base@0.16.0/Option";
 
 import Bench "mo:bench";
 import Fuzz "mo:fuzz";
-import Candid "mo:serde@3.3.3/Candid";
+import Candid "mo:serde@3.4.0/Candid";
 import Itertools "mo:itertools@0.2.2/Iter";
 import BitMap "mo:bit-map@0.1.2";
 

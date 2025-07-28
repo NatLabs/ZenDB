@@ -15,7 +15,7 @@ import Order "mo:base@0.16.0/Order";
 import { test; suite } "mo:test";
 import Bench "mo:bench";
 import Fuzz "mo:fuzz";
-import Candid "mo:serde@3.3.3/Candid";
+import Candid "mo:serde@3.4.0/Candid";
 
 import ZenDB "../../src/EmbeddedInstance";
 import SchemaMap "../../src/EmbeddedInstance/Collection/SchemaMap";
@@ -57,6 +57,8 @@ ZenDBSuite.newSuite(
             ("min_int", #Int),
             ("max_int", #Int),
         ]);
+
+        let EdgeCaseFields : [Text] = ["opt_field", "text_field", "zero_val", "min_int", "max_int"];
 
         type NumericDoc = {
             id : Nat;
@@ -639,7 +641,9 @@ ZenDBSuite.newSuite(
 
                         for (doc in edge_collection.vals()) {
                             let blob = candify_edge.to_blob(doc);
-                            let #ok(candid) = Candid.decode(blob, ["opt_field"], null) else return assert false;
+                            // Debug.print("first attempt: " # debug_show (Candid.decode(blob, ["opt_field"], null)));
+                            // Debug.print("2nd attempt: " # debug_show (Candid.decode(blob, EdgeCaseFields, ?{ Candid.defaultOptions with types = ?[EdgeCaseSchema] })));
+                            let #ok(candid) = Candid.decode(blob, EdgeCaseFields, ?{ Candid.defaultOptions with types = ?[EdgeCaseSchema] }) else return assert false;
                             Debug.print(debug_show { candid = candid });
                             let schema_map = SchemaMap.new(EdgeCaseSchema);
 

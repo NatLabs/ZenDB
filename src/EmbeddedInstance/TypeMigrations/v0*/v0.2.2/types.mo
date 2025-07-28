@@ -162,7 +162,7 @@ module T {
 
     public type DocumentStore = BTree<DocumentId, Document>;
 
-    public type CreateIndexParams = (
+    public type CreateIndexBatchConfig = (
         name : Text,
         key_details : [(field : Text, SortDirection)],
         is_unique : Bool,
@@ -198,6 +198,8 @@ module T {
         indexes : Map<Text, Index>;
         indexes_in_batch_operations : Map<Text, Index>;
         populate_index_batches : Map<Nat, BatchPopulateIndex>;
+
+        candid_serializer : Candid.TypedSerializer;
 
         field_constraints : Map<Text, [SchemaFieldConstraint]>;
         unique_constraints : [([Text], CompositeIndex)];
@@ -346,6 +348,10 @@ module T {
         filter_bounds : Bounds;
         simple_operations : [(Text, T.ZqlOperators)];
     };
+
+    public type IndexIntersectionDetails = {
+
+    };
     public type ScanDetails = {
         #IndexScan : IndexScanDetails;
         #FullScan : FullScanDetails;
@@ -361,8 +367,32 @@ module T {
         is_unique : Bool;
     };
 
+    public type CreateIndexInternalOptions = CreateIndexOptions and {
+        used_internally : Bool;
+    };
+
+    public module CreateIndexOptions {
+        public func default() : CreateIndexOptions {
+            { is_unique = false };
+        };
+
+        public func internal_default() : CreateIndexInternalOptions {
+            { default() with used_internally = false };
+        };
+
+        public func to_internal_default(options : CreateIndexOptions) : CreateIndexInternalOptions {
+            { is_unique = options.is_unique; used_internally = false };
+        };
+    };
+
     public type CreateCollectionOptions = {
         schemaConstraints : [T.SchemaConstraint];
+    };
+
+    public module CreateCollectionOptions {
+        public func default() : CreateCollectionOptions {
+            { schemaConstraints = [] };
+        };
     };
 
     /// MemoryBTree Stats
@@ -549,6 +579,12 @@ module T {
         sorted_in_reverse : Bool;
         fully_covered_equality_and_range_fields : Set.Set<Text>;
         score : Float;
+
+        fully_covered_equal_fields : Set.Set<Text>;
+        fully_covered_sort_fields : Set.Set<Text>;
+        fully_covered_range_fields : Set.Set<Text>;
+
+        interval : T.Interval; // (start, end) range of matching entries in the index
     };
 
     public type FieldUpdateOperations = {
@@ -586,6 +622,12 @@ module T {
         #concatAll : [FieldUpdateOperations];
 
     } or Candid;
+
+    public type CrossCanisterRecordsCursor = {
+        collection_name : Text;
+        collection_query : T.StableQuery;
+        results : T.Result<[(T.DocumentId, T.CandidBlob)], Text>;
+    };
 
     public type SchemaFieldConstraint = {
         #Min : Float;

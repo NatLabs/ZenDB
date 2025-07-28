@@ -23,6 +23,11 @@ import Utils "../../EmbeddedInstance/Utils";
 import TypeMigrations "../../EmbeddedInstance/TypeMigrations";
 import Query "../../EmbeddedInstance/Query";
 
+(
+    with migration = func({}) : ({}) {
+        {}
+    }
+)
 shared ({ caller = owner }) persistent actor class CanisterDB() = this_canister {
 
     transient let Permissions = {

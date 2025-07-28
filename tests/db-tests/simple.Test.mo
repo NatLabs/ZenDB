@@ -6,7 +6,7 @@ import Char "mo:base@0.16.0/Char";
 import Buffer "mo:base@0.16.0/Buffer";
 
 import { test; suite } "mo:test";
-import Candid "mo:serde@3.3.3/Candid";
+import Candid "mo:serde@3.4.0/Candid";
 import Fuzz "mo:fuzz";
 import Itertools "mo:itertools@0.2.2/Iter";
 import Map "mo:map@9.0.1/Map";

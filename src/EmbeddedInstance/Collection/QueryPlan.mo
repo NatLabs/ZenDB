@@ -7,7 +7,7 @@ import Nat "mo:base@0.16.0/Nat";
 import Order "mo:base@0.16.0/Order";
 import Text "mo:base@0.16.0/Text";
 
-import Candid "mo:serde@3.3.3/Candid";
+import Candid "mo:serde@3.4.0/Candid";
 import Map "mo:map@9.0.1/Map";
 import Set "mo:map@9.0.1/Set";
 import BitMap "mo:bit-map@0.1.2";

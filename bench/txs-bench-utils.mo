@@ -10,7 +10,7 @@ import Option "mo:base@0.16.0/Option";
 
 import Bench "mo:bench";
 import Fuzz "mo:fuzz";
-import Candid "mo:serde@3.3.3/Candid";
+import Candid "mo:serde@3.4.0/Candid";
 import Itertools "mo:itertools@0.2.2/Iter";
 import BitMap "mo:bit-map@0.1.2";
 
@@ -25,7 +25,7 @@ module TxsBenchUtils {
         "#stableMemory no index (sorted by ts)",
 
         // partially covered indexes sorted by tx.amt
-        // "#heap 7 single field indexes (sorted by tx.amt)",
+        // "#heap 7 single field indexes (sorted by timestamp)",
         "#stableMemory 7 single field indexes (sorted by tx.amt)",
 
         // multi-field indexes sorted by timestamp
@@ -743,7 +743,7 @@ module TxsBenchUtils {
             Buffer.Buffer<Nat>(iteration_limit),
             principals,
             candid_principals_0_10,
-            new_sorted_query("tx.amt", #Ascending),
+            new_sorted_query("ts", #Ascending),
             fuzz,
             iteration_limit,
         );
@@ -755,7 +755,7 @@ module TxsBenchUtils {
             Buffer.Buffer<Nat>(iteration_limit),
             principals,
             candid_principals_0_10,
-            new_sorted_query("tx.amt", #Ascending),
+            new_sorted_query("ts", #Ascending),
             fuzz,
             iteration_limit,
         );
@@ -814,7 +814,7 @@ module TxsBenchUtils {
                     heap_sorted_no_index_benchmark.run_benchmark(col);
                 };
 
-                case ("#heap 7 single field indexes (sorted by tx.amt)") {
+                case ("#heap 7 single field indexes (sorted by timestamp)") {
                     heap_sorted_single_field_indexes_benchmark.run_benchmark(col);
                 };
 
