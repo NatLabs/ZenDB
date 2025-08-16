@@ -161,6 +161,7 @@ module T {
 
         documents : DocumentStore;
         indexes : Map<Text, Index>;
+        text_indexes : Map<Text, TextIndex>;
 
         field_constraints : Map<Text, [SchemaFieldConstraint]>;
         unique_constraints : [([Text], Index)];
@@ -456,4 +457,16 @@ module T {
     //     #candid_map : { get : () -> () }; // placeholder for map type
 
     // };
+
+    public type Token = (Text, [(start : Nat, end : Nat)]);
+
+    public type Tokenizer = {
+        #basic;
+    };
+
+    public type TextIndex = {
+        index : T.Index;
+        field : Text; // the field this index is on
+        tokenizer : Tokenizer; // the tokenizer used for this index
+    };
 };

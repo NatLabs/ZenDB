@@ -154,6 +154,7 @@ module {
             };
 
             indexes = Map.new<Text, T.Index>();
+            text_indexes = Map.new<Text, T.TextIndex>();
 
             field_constraints;
             unique_constraints = [];

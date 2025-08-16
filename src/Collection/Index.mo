@@ -425,7 +425,7 @@ module Index {
         };
     };
 
-    public func scan<Document>(
+    public func scan(
         collection : T.StableCollection,
         index : T.Index,
         start_query : [(Text, ?T.CandidInclusivityQuery)],
@@ -434,8 +434,6 @@ module Index {
     ) : (Nat, Nat) {
         // Debug.print("start_query: " # debug_show start_query);
         // Debug.print("end_query: " # debug_show end_query);
-
-        let index_data_utils = CollectionUtils.getIndexDataUtils(collection);
 
         func sort_by_key_details(a : (Text, Any), b : (Text, Any)) : Order {
             let pos_a = switch (Array.indexOf<(Text, SortDirection)>((a.0, #Ascending), index.key_details, Utils.tupleEq(Text.equal))) {
@@ -568,7 +566,7 @@ module Index {
             func() = "encoded end_query_values: " # debug_show (Orchid.blobify.to_blob(end_query_values)),
         );
 
-        let scans = BTree.getScanAsInterval(index.data, index_data_utils, ?start_query_values, ?end_query_values);
+        let scans = Index.scan_with_bounds(collection, index, start_query_values, end_query_values);
 
         Logger.lazyDebug(
             collection.logger,
@@ -576,6 +574,23 @@ module Index {
         );
 
         scans;
+    };
+
+    public func scan_with_bounds(
+        collection : T.StableCollection,
+        index : Index,
+        lower : [T.CandidQuery],
+        upper : [T.CandidQuery],
+    ) : (Nat, Nat) {
+
+        let index_data_utils = CollectionUtils.getIndexDataUtils(collection);
+
+        BTree.getScanAsInterval(
+            index.data,
+            index_data_utils,
+            if (lower.size() == 0) null else ?lower,
+            if (upper.size() == 0) null else ?upper,
+        );
     };
 
     public func fromInterval(

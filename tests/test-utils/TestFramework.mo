@@ -48,8 +48,11 @@ module TestFramework {
         options : ?ZenDB.Types.CreateIndexOptions,
     ) -> ZenDB.Types.Result<(), Text>;
 
+    type Function<A, B> = A -> B;
+
     public type SuiteUtils = {
         createIndex : CreateIndexOnCollection;
+        indexOnlyFns : Function<Function<(), ()>, ()>;
     };
 
     public func newSuite(
@@ -67,6 +70,9 @@ module TestFramework {
                     func() {
                         let #ok(zendb) = ZenDB.createDB(zendb_sstore, "no_index");
                         let suite_utils : SuiteUtils = {
+                            indexOnlyFns = func(callback_fns : Function<(), ()>) {
+                                // no-op
+                            };
                             createIndex : CreateIndexOnCollection = func(
                                 collection_name : Text,
                                 index_name : Text,
@@ -91,6 +97,9 @@ module TestFramework {
                         let #ok(zendb) = ZenDB.createDB(zendb_sstore, "with_index");
 
                         let suite_utils : SuiteUtils = {
+                            indexOnlyFns = func(callback_fns : Function<(), ()>) {
+                                callback_fns();
+                            };
                             createIndex : CreateIndexOnCollection = func(
                                 collection_name : Text,
                                 index_name : Text,

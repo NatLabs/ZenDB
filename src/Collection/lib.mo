@@ -477,6 +477,16 @@ module {
             );
         };
 
+        public func createTextIndex(index_name : Text, name : Text, tokenizer : T.Tokenizer) : Result<(), Text> {
+            let res = handleResult(
+                StableCollection.createTextIndex(collection, main_btree_utils, index_name, name, tokenizer),
+                "Failed to create text index: " # name,
+            );
+
+            Result.mapOk<T.TextIndex, (), Text>(res, func(_) : () {});
+
+        };
+
     };
 
 };

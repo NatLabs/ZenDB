@@ -53,6 +53,7 @@ import Logger "../Logger";
 import UpdateOps "UpdateOps";
 import BTree "../BTree";
 import DocumentStore "DocumentStore";
+import TextIndex "TextIndex";
 
 module StableCollection {
 
@@ -253,6 +254,32 @@ module StableCollection {
 
         #ok(index)
 
+    };
+
+    public func createTextIndex(
+        collection : StableCollection,
+        main_btree_utils : T.BTreeUtils<Nat, T.Document>,
+        index_name : Text,
+        field : Text,
+        tokenizer : T.Tokenizer,
+    ) : Result<T.TextIndex, Text> {
+
+        let text_index = TextIndex.new(
+            collection,
+            index_name,
+            field,
+            tokenizer,
+        );
+
+        // todo: wip
+        ignore Map.put<Text, T.TextIndex>(collection.text_indexes, thash, index_name, text_index);
+
+        Logger.lazyInfo(
+            collection.logger,
+            func() = "Successfully created text index: " # index_name,
+        );
+
+        #ok(text_index);
     };
 
     public func clearIndex(

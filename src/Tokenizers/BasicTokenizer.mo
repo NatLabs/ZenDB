@@ -11,6 +11,8 @@ import Map "mo:map/Map";
 import Itertools "mo:itertools/Iter";
 import BufferDeque "mo:buffer-deque/BufferDeque";
 
+import T "../Types";
+
 module BasicTokenizer {
 
     let delimeters = " \t\n\r,;:!?.\"'()[]{}<>/\\|`~@#$%^&*+=-_";
@@ -31,7 +33,7 @@ module BasicTokenizer {
         };
     };
 
-    public type Token = (Text, [(start : Nat, end : Nat)]);
+    public type Token = T.Token;
 
     public func tokenize(raw_text : Text) : [Token] {
         let lowercase_text = Text.toLowercase(raw_text);
