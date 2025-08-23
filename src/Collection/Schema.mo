@@ -22,7 +22,7 @@ import Int8 "mo:base/Int8";
 import Nat16 "mo:base/Nat16";
 import Nat8 "mo:base/Nat8";
 
-import Int8Cmp "mo:memory-collection/TypeUtils/Int8Cmp";
+import Int8Cmp "mo:memory-collection@0.3.0/TypeUtils/Int8Cmp";
 
 import Itertools "mo:itertools/Iter";
 import { sort_candid_type } "mo:serde/Candid/Blob/CandidUtils";

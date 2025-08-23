@@ -20,21 +20,16 @@ import Serde "mo:serde";
 import Candid "mo:serde/Candid";
 import Itertools "mo:itertools/Iter";
 import RevIter "mo:itertools/RevIter";
+
 import BitMap "mo:bit-map";
 import Vector "mo:vector";
-
 import MemoryBTree "mo:memory-collection@0.3.0/MemoryBTree/Stable";
 import TypeUtils "mo:memory-collection@0.3.0/TypeUtils";
 import Int8Cmp "mo:memory-collection@0.3.0/TypeUtils/Int8Cmp";
 import BpTree "mo:augmented-btrees/BpTree";
 import BpTreeTypes "mo:augmented-btrees/BpTree/Types";
 
-import TypeMigrations "TypeMigrations";
-
 module T {
-
-    public type VersionedStableStore = TypeMigrations.VersionedStableStore;
-
     public type BitMap = BitMap.BitMap;
 
     public type Candid = Serde.Candid;
