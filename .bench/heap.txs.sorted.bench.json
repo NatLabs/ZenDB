@@ -1,8 +1,8 @@
 {
   "version": 1,
-  "moc": "0.14.14",
+  "moc": "0.16.1",
   "replica": "dfx",
-  "replicaVersion": "0.28.0",
+  "replicaVersion": "0.29.0",
   "gc": "incremental",
   "forceGc": true,
   "results": [
@@ -11,11 +11,11 @@
       {
         "rts_stable_memory_size": 0,
         "stable_memory_size": 0,
-        "instructions": 372369789,
+        "instructions": 357099149,
         "rts_memory_size": 0,
         "rts_total_allocation": 19675572,
-        "rts_collector_instructions": 1550104,
-        "rts_mutator_instructions": -13063,
+        "rts_collector_instructions": 1545007,
+        "rts_mutator_instructions": -12683,
         "rts_logical_stable_memory_size": 0,
         "rts_heap_size": 19675572,
         "rts_reclaimed": 0
@@ -26,11 +26,11 @@
       {
         "rts_stable_memory_size": 0,
         "stable_memory_size": 0,
-        "instructions": 372370972,
+        "instructions": 357100352,
         "rts_memory_size": 33554432,
         "rts_total_allocation": 19675572,
-        "rts_collector_instructions": 1249055,
-        "rts_mutator_instructions": -10592,
+        "rts_collector_instructions": 1243954,
+        "rts_mutator_instructions": -10215,
         "rts_logical_stable_memory_size": 0,
         "rts_heap_size": -11048684,
         "rts_reclaimed": 30724256
@@ -41,11 +41,11 @@
       {
         "rts_stable_memory_size": 0,
         "stable_memory_size": 0,
-        "instructions": 372371206,
+        "instructions": 357100586,
         "rts_memory_size": 0,
         "rts_total_allocation": 19675572,
-        "rts_collector_instructions": 1805650,
-        "rts_mutator_instructions": -10592,
+        "rts_collector_instructions": 1800557,
+        "rts_mutator_instructions": -10215,
         "rts_logical_stable_memory_size": 0,
         "rts_heap_size": -12767532,
         "rts_reclaimed": 32443104
@@ -56,11 +56,11 @@
       {
         "rts_stable_memory_size": 0,
         "stable_memory_size": 0,
-        "instructions": 5337,
+        "instructions": 5157,
         "rts_memory_size": 0,
         "rts_total_allocation": 10128,
-        "rts_collector_instructions": 6259,
-        "rts_mutator_instructions": -10592,
+        "rts_collector_instructions": 6234,
+        "rts_mutator_instructions": -10215,
         "rts_logical_stable_memory_size": 0,
         "rts_heap_size": 10128,
         "rts_reclaimed": 0
@@ -71,11 +71,11 @@
       {
         "rts_stable_memory_size": 0,
         "stable_memory_size": 0,
-        "instructions": 3652806997,
+        "instructions": 3474513961,
         "rts_memory_size": 167772160,
         "rts_total_allocation": 209691844,
-        "rts_collector_instructions": 4722351,
-        "rts_mutator_instructions": -10592,
+        "rts_collector_instructions": 4709502,
+        "rts_mutator_instructions": -10215,
         "rts_logical_stable_memory_size": 0,
         "rts_heap_size": 12100288,
         "rts_reclaimed": 197591556
@@ -86,11 +86,11 @@
       {
         "rts_stable_memory_size": 0,
         "stable_memory_size": 0,
-        "instructions": 4197630501,
+        "instructions": 3988434181,
         "rts_memory_size": 33554432,
         "rts_total_allocation": 243241584,
-        "rts_collector_instructions": 6102618,
-        "rts_mutator_instructions": -10592,
+        "rts_collector_instructions": 6086123,
+        "rts_mutator_instructions": -10215,
         "rts_logical_stable_memory_size": 0,
         "rts_heap_size": 12600908,
         "rts_reclaimed": 230640676
@@ -101,11 +101,11 @@
       {
         "rts_stable_memory_size": 0,
         "stable_memory_size": 0,
-        "instructions": 10484,
+        "instructions": 10144,
         "rts_memory_size": 0,
         "rts_total_allocation": 10448,
-        "rts_collector_instructions": -1526438,
-        "rts_mutator_instructions": -10592,
+        "rts_collector_instructions": -1521391,
+        "rts_mutator_instructions": -10215,
         "rts_logical_stable_memory_size": 0,
         "rts_heap_size": 10448,
         "rts_reclaimed": 0
@@ -116,11 +116,11 @@
       {
         "rts_stable_memory_size": 0,
         "stable_memory_size": 0,
-        "instructions": 42588,
+        "instructions": 42108,
         "rts_memory_size": 0,
         "rts_total_allocation": 10560,
-        "rts_collector_instructions": -6469427,
-        "rts_mutator_instructions": -10592,
+        "rts_collector_instructions": -6451958,
+        "rts_mutator_instructions": -10215,
         "rts_logical_stable_memory_size": 0,
         "rts_heap_size": 10560,
         "rts_reclaimed": 0
@@ -131,11 +131,11 @@
       {
         "rts_stable_memory_size": 0,
         "stable_memory_size": 0,
-        "instructions": 43512,
+        "instructions": 43032,
         "rts_memory_size": 0,
         "rts_total_allocation": 10560,
-        "rts_collector_instructions": -4044861,
-        "rts_mutator_instructions": -10592,
+        "rts_collector_instructions": -4023734,
+        "rts_mutator_instructions": -10215,
         "rts_logical_stable_memory_size": 0,
         "rts_heap_size": 10560,
         "rts_reclaimed": 0
@@ -146,11 +146,11 @@
       {
         "rts_stable_memory_size": 0,
         "stable_memory_size": 0,
-        "instructions": 372565095,
+        "instructions": 357294474,
         "rts_memory_size": 0,
         "rts_total_allocation": 19675572,
-        "rts_collector_instructions": -1716818,
-        "rts_mutator_instructions": -10592,
+        "rts_collector_instructions": -1721884,
+        "rts_mutator_instructions": -10215,
         "rts_logical_stable_memory_size": 0,
         "rts_heap_size": -13505468,
         "rts_reclaimed": 33181040
@@ -161,13 +161,13 @@
       {
         "rts_stable_memory_size": 0,
         "stable_memory_size": 0,
-        "instructions": 2153052997,
+        "instructions": 2048699014,
         "rts_memory_size": 0,
-        "rts_total_allocation": 112960496,
-        "rts_collector_instructions": 6216595,
-        "rts_mutator_instructions": -10592,
+        "rts_total_allocation": 112960480,
+        "rts_collector_instructions": 6198844,
+        "rts_mutator_instructions": -10215,
         "rts_logical_stable_memory_size": 0,
-        "rts_heap_size": 15603096,
+        "rts_heap_size": 15603080,
         "rts_reclaimed": 97357400
       }
     ],
@@ -176,14 +176,14 @@
       {
         "rts_stable_memory_size": 0,
         "stable_memory_size": 0,
-        "instructions": 2682946610,
+        "instructions": 2548170863,
         "rts_memory_size": 0,
         "rts_total_allocation": 145838216,
-        "rts_collector_instructions": 7579896,
-        "rts_mutator_instructions": -10592,
+        "rts_collector_instructions": 7558926,
+        "rts_mutator_instructions": -10215,
         "rts_logical_stable_memory_size": 0,
-        "rts_heap_size": -17711060,
-        "rts_reclaimed": 163549276
+        "rts_heap_size": -17711044,
+        "rts_reclaimed": 163549260
       }
     ],
     [
@@ -191,11 +191,11 @@
       {
         "rts_stable_memory_size": 0,
         "stable_memory_size": 0,
-        "instructions": 6028370401,
+        "instructions": 5729502194,
         "rts_memory_size": 134217728,
         "rts_total_allocation": 375421052,
-        "rts_collector_instructions": 2921009,
-        "rts_mutator_instructions": -10592,
+        "rts_collector_instructions": 2920959,
+        "rts_mutator_instructions": -10215,
         "rts_logical_stable_memory_size": 0,
         "rts_heap_size": 10614684,
         "rts_reclaimed": 364806368
@@ -206,11 +206,11 @@
       {
         "rts_stable_memory_size": 0,
         "stable_memory_size": 0,
-        "instructions": 26611289,
+        "instructions": 26377235,
         "rts_memory_size": 0,
         "rts_total_allocation": 561880,
-        "rts_collector_instructions": 6854,
-        "rts_mutator_instructions": -10592,
+        "rts_collector_instructions": 6825,
+        "rts_mutator_instructions": -10215,
         "rts_logical_stable_memory_size": 0,
         "rts_heap_size": 561880,
         "rts_reclaimed": 0
@@ -221,11 +221,11 @@
       {
         "rts_stable_memory_size": 0,
         "stable_memory_size": 0,
-        "instructions": 26618439,
+        "instructions": 26383869,
         "rts_memory_size": 0,
         "rts_total_allocation": 562448,
-        "rts_collector_instructions": 6860,
-        "rts_mutator_instructions": -10592,
+        "rts_collector_instructions": 6831,
+        "rts_mutator_instructions": -10215,
         "rts_logical_stable_memory_size": 0,
         "rts_heap_size": 562448,
         "rts_reclaimed": 0
@@ -236,11 +236,11 @@
       {
         "rts_stable_memory_size": 0,
         "stable_memory_size": 0,
-        "instructions": 1239278778,
+        "instructions": 1176764768,
         "rts_memory_size": 0,
         "rts_total_allocation": 77611228,
-        "rts_collector_instructions": -2193427,
-        "rts_mutator_instructions": -10592,
+        "rts_collector_instructions": -2193418,
+        "rts_mutator_instructions": -10215,
         "rts_logical_stable_memory_size": 0,
         "rts_heap_size": -18761192,
         "rts_reclaimed": 96372420
@@ -251,11 +251,11 @@
       {
         "rts_stable_memory_size": 0,
         "stable_memory_size": 0,
-        "instructions": 366580336,
+        "instructions": 347821076,
         "rts_memory_size": 0,
         "rts_total_allocation": 23070972,
-        "rts_collector_instructions": 6860,
-        "rts_mutator_instructions": -10592,
+        "rts_collector_instructions": 6831,
+        "rts_mutator_instructions": -10215,
         "rts_logical_stable_memory_size": 0,
         "rts_heap_size": 23070972,
         "rts_reclaimed": 0
@@ -266,11 +266,11 @@
       {
         "rts_stable_memory_size": 0,
         "stable_memory_size": 0,
-        "instructions": 7216991,
+        "instructions": 7073384,
         "rts_memory_size": 0,
         "rts_total_allocation": 224528,
-        "rts_collector_instructions": 6860,
-        "rts_mutator_instructions": -10592,
+        "rts_collector_instructions": 6831,
+        "rts_mutator_instructions": -10215,
         "rts_logical_stable_memory_size": 0,
         "rts_heap_size": 224528,
         "rts_reclaimed": 0
@@ -281,11 +281,11 @@
       {
         "rts_stable_memory_size": 0,
         "stable_memory_size": 0,
-        "instructions": 989261721,
+        "instructions": 939921269,
         "rts_memory_size": 0,
         "rts_total_allocation": 61542332,
-        "rts_collector_instructions": 2764658,
-        "rts_mutator_instructions": -10592,
+        "rts_collector_instructions": 2764633,
+        "rts_mutator_instructions": -10215,
         "rts_logical_stable_memory_size": 0,
         "rts_heap_size": -1275652,
         "rts_reclaimed": 62817984
@@ -296,11 +296,11 @@
       {
         "rts_stable_memory_size": 0,
         "stable_memory_size": 0,
-        "instructions": 4907253,
+        "instructions": 4819808,
         "rts_memory_size": 0,
         "rts_total_allocation": 149476,
-        "rts_collector_instructions": 6854,
-        "rts_mutator_instructions": -10592,
+        "rts_collector_instructions": 6825,
+        "rts_mutator_instructions": -10215,
         "rts_logical_stable_memory_size": 0,
         "rts_heap_size": 149476,
         "rts_reclaimed": 0
@@ -311,11 +311,11 @@
       {
         "rts_stable_memory_size": 0,
         "stable_memory_size": 0,
-        "instructions": 386582847,
+        "instructions": 367244080,
         "rts_memory_size": 0,
         "rts_total_allocation": 23928100,
-        "rts_collector_instructions": -638349,
-        "rts_mutator_instructions": -10592,
+        "rts_collector_instructions": -638374,
+        "rts_mutator_instructions": -10215,
         "rts_logical_stable_memory_size": 0,
         "rts_heap_size": -7530428,
         "rts_reclaimed": 31458528
@@ -326,11 +326,11 @@
       {
         "rts_stable_memory_size": 0,
         "stable_memory_size": 0,
-        "instructions": 532519044,
+        "instructions": 505120703,
         "rts_memory_size": 0,
         "rts_total_allocation": 33643928,
-        "rts_collector_instructions": 281373,
-        "rts_mutator_instructions": -10592,
+        "rts_collector_instructions": 281340,
+        "rts_mutator_instructions": -10215,
         "rts_logical_stable_memory_size": 0,
         "rts_heap_size": 4380348,
         "rts_reclaimed": 29263580
@@ -341,11 +341,11 @@
       {
         "rts_stable_memory_size": 0,
         "stable_memory_size": 0,
-        "instructions": 92243636,
+        "instructions": 87527001,
         "rts_memory_size": 0,
         "rts_total_allocation": 5803844,
-        "rts_collector_instructions": 6854,
-        "rts_mutator_instructions": -10592,
+        "rts_collector_instructions": 6825,
+        "rts_mutator_instructions": -10215,
         "rts_logical_stable_memory_size": 0,
         "rts_heap_size": 5803844,
         "rts_reclaimed": 0
@@ -356,11 +356,11 @@
       {
         "rts_stable_memory_size": 0,
         "stable_memory_size": 0,
-        "instructions": 70728405,
+        "instructions": 67188950,
         "rts_memory_size": 0,
         "rts_total_allocation": 4349208,
-        "rts_collector_instructions": -2378697,
-        "rts_mutator_instructions": -10592,
+        "rts_collector_instructions": -2378722,
+        "rts_mutator_instructions": -10215,
         "rts_logical_stable_memory_size": 0,
         "rts_heap_size": -27109300,
         "rts_reclaimed": 31458508
@@ -371,11 +371,11 @@
       {
         "rts_stable_memory_size": 0,
         "stable_memory_size": 0,
-        "instructions": 1268174910,
+        "instructions": 1204520397,
         "rts_memory_size": 0,
         "rts_total_allocation": 79371236,
-        "rts_collector_instructions": 1803182,
-        "rts_mutator_instructions": -10592,
+        "rts_collector_instructions": 1803144,
+        "rts_mutator_instructions": -10215,
         "rts_logical_stable_memory_size": 0,
         "rts_heap_size": 16553240,
         "rts_reclaimed": 62817996
@@ -386,11 +386,11 @@
       {
         "rts_stable_memory_size": 0,
         "stable_memory_size": 0,
-        "instructions": 142748542,
+        "instructions": 135805579,
         "rts_memory_size": 0,
         "rts_total_allocation": 8728500,
-        "rts_collector_instructions": 6860,
-        "rts_mutator_instructions": -10592,
+        "rts_collector_instructions": 6831,
+        "rts_mutator_instructions": -10215,
         "rts_logical_stable_memory_size": 0,
         "rts_heap_size": 8728500,
         "rts_reclaimed": 0
@@ -401,11 +401,11 @@
       {
         "rts_stable_memory_size": 0,
         "stable_memory_size": 0,
-        "instructions": 204391719,
+        "instructions": 194315746,
         "rts_memory_size": 0,
         "rts_total_allocation": 12502612,
-        "rts_collector_instructions": -993975,
-        "rts_mutator_instructions": -10592,
+        "rts_collector_instructions": -993996,
+        "rts_mutator_instructions": -10215,
         "rts_logical_stable_memory_size": 0,
         "rts_heap_size": -18955908,
         "rts_reclaimed": 31458520
@@ -416,11 +416,11 @@
       {
         "rts_stable_memory_size": 0,
         "stable_memory_size": 0,
-        "instructions": 3863375921,
+        "instructions": 3668141879,
         "rts_memory_size": 0,
         "rts_total_allocation": 242827016,
-        "rts_collector_instructions": 1264152,
-        "rts_mutator_instructions": -10592,
+        "rts_collector_instructions": 1264091,
+        "rts_mutator_instructions": -10215,
         "rts_logical_stable_memory_size": 0,
         "rts_heap_size": 12237200,
         "rts_reclaimed": 230589816
@@ -431,11 +431,11 @@
       {
         "rts_stable_memory_size": 0,
         "stable_memory_size": 0,
-        "instructions": 1811928151,
+        "instructions": 1719910990,
         "rts_memory_size": 0,
         "rts_total_allocation": 113447004,
-        "rts_collector_instructions": -2051750,
-        "rts_mutator_instructions": -10592,
+        "rts_collector_instructions": -2051764,
+        "rts_mutator_instructions": -10215,
         "rts_logical_stable_memory_size": 0,
         "rts_heap_size": -16479852,
         "rts_reclaimed": 129926856
@@ -446,11 +446,11 @@
       {
         "rts_stable_memory_size": 0,
         "stable_memory_size": 0,
-        "instructions": 680855066,
+        "instructions": 647499251,
         "rts_memory_size": 0,
         "rts_total_allocation": 41935868,
-        "rts_collector_instructions": 1592210,
-        "rts_mutator_instructions": -10592,
+        "rts_collector_instructions": 1592196,
+        "rts_mutator_instructions": -10215,
         "rts_logical_stable_memory_size": 0,
         "rts_heap_size": 10477348,
         "rts_reclaimed": 31458520
@@ -461,11 +461,11 @@
       {
         "rts_stable_memory_size": 0,
         "stable_memory_size": 0,
-        "instructions": 3819288523,
+        "instructions": 3627957215,
         "rts_memory_size": 0,
         "rts_total_allocation": 238991692,
-        "rts_collector_instructions": 784042,
-        "rts_mutator_instructions": -10592,
+        "rts_collector_instructions": 783981,
+        "rts_mutator_instructions": -10215,
         "rts_logical_stable_memory_size": 0,
         "rts_heap_size": 8401584,
         "rts_reclaimed": 230590108
@@ -476,11 +476,11 @@
       {
         "rts_stable_memory_size": 0,
         "stable_memory_size": 0,
-        "instructions": 911542515,
+        "instructions": 865915405,
         "rts_memory_size": 0,
         "rts_total_allocation": 56477224,
-        "rts_collector_instructions": -784838,
-        "rts_mutator_instructions": -10592,
+        "rts_collector_instructions": -784840,
+        "rts_mutator_instructions": -10215,
         "rts_logical_stable_memory_size": 0,
         "rts_heap_size": -6340752,
         "rts_reclaimed": 62817976
@@ -491,11 +491,11 @@
       {
         "rts_stable_memory_size": 0,
         "stable_memory_size": 0,
-        "instructions": 865739734,
+        "instructions": 823009783,
         "rts_memory_size": 0,
         "rts_total_allocation": 53399452,
-        "rts_collector_instructions": -1168868,
-        "rts_mutator_instructions": -10592,
+        "rts_collector_instructions": -1168901,
+        "rts_mutator_instructions": -10215,
         "rts_logical_stable_memory_size": 0,
         "rts_heap_size": -9418520,
         "rts_reclaimed": 62817972
@@ -506,11 +506,11 @@
       {
         "rts_stable_memory_size": 0,
         "stable_memory_size": 0,
-        "instructions": 5075294659,
+        "instructions": 4821041111,
         "rts_memory_size": 0,
         "rts_total_allocation": 317636568,
-        "rts_collector_instructions": 2501243,
-        "rts_mutator_instructions": -10592,
+        "rts_collector_instructions": 2501182,
+        "rts_mutator_instructions": -10215,
         "rts_logical_stable_memory_size": 0,
         "rts_heap_size": 19937704,
         "rts_reclaimed": 297698864
@@ -521,11 +521,11 @@
       {
         "rts_stable_memory_size": 0,
         "stable_memory_size": 0,
-        "instructions": 2012884796,
+        "instructions": 1912221185,
         "rts_memory_size": 0,
         "rts_total_allocation": 124911888,
-        "rts_collector_instructions": -619180,
-        "rts_mutator_instructions": -10592,
+        "rts_collector_instructions": -619186,
+        "rts_mutator_instructions": -10215,
         "rts_logical_stable_memory_size": 0,
         "rts_heap_size": -5014896,
         "rts_reclaimed": 129926784
@@ -536,11 +536,11 @@
       {
         "rts_stable_memory_size": 0,
         "stable_memory_size": 0,
-        "instructions": 1645999455,
+        "instructions": 1564556232,
         "rts_memory_size": 0,
         "rts_total_allocation": 102015516,
-        "rts_collector_instructions": 713682,
-        "rts_mutator_instructions": -10592,
+        "rts_collector_instructions": 713659,
+        "rts_mutator_instructions": -10215,
         "rts_logical_stable_memory_size": 0,
         "rts_heap_size": 5643100,
         "rts_reclaimed": 96372416
@@ -551,11 +551,11 @@
       {
         "rts_stable_memory_size": 0,
         "stable_memory_size": 0,
-        "instructions": 6264116976,
+        "instructions": 5952134683,
         "rts_memory_size": 33554432,
         "rts_total_allocation": 390922188,
-        "rts_collector_instructions": -920309,
-        "rts_mutator_instructions": -10592,
+        "rts_collector_instructions": -920379,
+        "rts_mutator_instructions": -10215,
         "rts_logical_stable_memory_size": 0,
         "rts_heap_size": -7439656,
         "rts_reclaimed": 398361844
@@ -566,11 +566,11 @@
       {
         "rts_stable_memory_size": 0,
         "stable_memory_size": 0,
-        "instructions": 889760242,
+        "instructions": 845915602,
         "rts_memory_size": 0,
         "rts_total_allocation": 54674020,
-        "rts_collector_instructions": -1011380,
-        "rts_mutator_instructions": -10592,
+        "rts_collector_instructions": -1011365,
+        "rts_mutator_instructions": -10215,
         "rts_logical_stable_memory_size": 0,
         "rts_heap_size": -8143956,
         "rts_reclaimed": 62817976
@@ -581,11 +581,11 @@
       {
         "rts_stable_memory_size": 0,
         "stable_memory_size": 0,
-        "instructions": 1012584736,
+        "instructions": 962617864,
         "rts_memory_size": 0,
         "rts_total_allocation": 62447836,
-        "rts_collector_instructions": -37672,
-        "rts_mutator_instructions": -10592,
+        "rts_collector_instructions": -37705,
+        "rts_mutator_instructions": -10215,
         "rts_logical_stable_memory_size": 0,
         "rts_heap_size": -370160,
         "rts_reclaimed": 62817996
@@ -596,11 +596,11 @@
       {
         "rts_stable_memory_size": 0,
         "stable_memory_size": 0,
-        "instructions": 3981568169,
+        "instructions": 3780049252,
         "rts_memory_size": 0,
         "rts_total_allocation": 250221812,
-        "rts_collector_instructions": 19682038,
-        "rts_mutator_instructions": -10592,
+        "rts_collector_instructions": 19780597,
+        "rts_mutator_instructions": -10215,
         "rts_logical_stable_memory_size": 0,
         "rts_heap_size": -13688516,
         "rts_reclaimed": 263910328
@@ -611,11 +611,11 @@
       {
         "rts_stable_memory_size": 0,
         "stable_memory_size": 0,
-        "instructions": 1602151790,
+        "instructions": 1521146409,
         "rts_memory_size": 0,
         "rts_total_allocation": 99919052,
-        "rts_collector_instructions": 451327,
-        "rts_mutator_instructions": -10592,
+        "rts_collector_instructions": 451328,
+        "rts_mutator_instructions": -10215,
         "rts_logical_stable_memory_size": 0,
         "rts_heap_size": 3546620,
         "rts_reclaimed": 96372432
@@ -626,11 +626,11 @@
       {
         "rts_stable_memory_size": 0,
         "stable_memory_size": 0,
-        "instructions": 1915708610,
+        "instructions": 1820260100,
         "rts_memory_size": 0,
         "rts_total_allocation": 119014724,
-        "rts_collector_instructions": 2838348,
-        "rts_mutator_instructions": -10592,
+        "rts_collector_instructions": 2838311,
+        "rts_mutator_instructions": -10215,
         "rts_logical_stable_memory_size": 0,
         "rts_heap_size": 22642292,
         "rts_reclaimed": 96372432
@@ -641,11 +641,11 @@
       {
         "rts_stable_memory_size": 0,
         "stable_memory_size": 0,
-        "instructions": 438786640,
+        "instructions": 416105539,
         "rts_memory_size": 0,
         "rts_total_allocation": 27587104,
-        "rts_collector_instructions": -201138,
-        "rts_mutator_instructions": -10592,
+        "rts_collector_instructions": -201152,
+        "rts_mutator_instructions": -10215,
         "rts_logical_stable_memory_size": 0,
         "rts_heap_size": -3871412,
         "rts_reclaimed": 31458516
@@ -656,11 +656,11 @@
       {
         "rts_stable_memory_size": 0,
         "stable_memory_size": 0,
-        "instructions": 15089553,
+        "instructions": 14372041,
         "rts_memory_size": 0,
         "rts_total_allocation": 878500,
-        "rts_collector_instructions": 6854,
-        "rts_mutator_instructions": -10592,
+        "rts_collector_instructions": 6825,
+        "rts_mutator_instructions": -10215,
         "rts_logical_stable_memory_size": 0,
         "rts_heap_size": 878500,
         "rts_reclaimed": 0
@@ -671,11 +671,11 @@
       {
         "rts_stable_memory_size": 0,
         "stable_memory_size": 0,
-        "instructions": 2993490,
+        "instructions": 2887168,
         "rts_memory_size": 0,
         "rts_total_allocation": 120636,
-        "rts_collector_instructions": 6860,
-        "rts_mutator_instructions": -10592,
+        "rts_collector_instructions": 6831,
+        "rts_mutator_instructions": -10215,
         "rts_logical_stable_memory_size": 0,
         "rts_heap_size": 120636,
         "rts_reclaimed": 0
@@ -686,11 +686,11 @@
       {
         "rts_stable_memory_size": 0,
         "stable_memory_size": 0,
-        "instructions": 2364279991,
+        "instructions": 2230475225,
         "rts_memory_size": 0,
         "rts_total_allocation": 155215924,
-        "rts_collector_instructions": -1170504,
-        "rts_mutator_instructions": -10592,
+        "rts_collector_instructions": -1170557,
+        "rts_mutator_instructions": -10215,
         "rts_logical_stable_memory_size": 0,
         "rts_heap_size": -8265356,
         "rts_reclaimed": 163481280
@@ -701,11 +701,11 @@
       {
         "rts_stable_memory_size": 0,
         "stable_memory_size": 0,
-        "instructions": 656807110,
+        "instructions": 624445295,
         "rts_memory_size": 0,
         "rts_total_allocation": 39893244,
-        "rts_collector_instructions": 1336127,
-        "rts_mutator_instructions": -10592,
+        "rts_collector_instructions": 1336121,
+        "rts_mutator_instructions": -10215,
         "rts_logical_stable_memory_size": 0,
         "rts_heap_size": 8434724,
         "rts_reclaimed": 31458520
@@ -716,11 +716,11 @@
       {
         "rts_stable_memory_size": 0,
         "stable_memory_size": 0,
-        "instructions": 336348600,
+        "instructions": 320026157,
         "rts_memory_size": 0,
         "rts_total_allocation": 20302608,
-        "rts_collector_instructions": -1385943,
-        "rts_mutator_instructions": -10592,
+        "rts_collector_instructions": -1385976,
+        "rts_mutator_instructions": -10215,
         "rts_logical_stable_memory_size": 0,
         "rts_heap_size": -8960972,
         "rts_reclaimed": 29263580
@@ -731,11 +731,11 @@
       {
         "rts_stable_memory_size": 0,
         "stable_memory_size": 0,
-        "instructions": 895947063,
+        "instructions": 845707771,
         "rts_memory_size": 0,
         "rts_total_allocation": 58447900,
-        "rts_collector_instructions": -537830,
-        "rts_mutator_instructions": -10592,
+        "rts_collector_instructions": -537863,
+        "rts_mutator_instructions": -10215,
         "rts_logical_stable_memory_size": 0,
         "rts_heap_size": -4370096,
         "rts_reclaimed": 62817996
@@ -746,11 +746,11 @@
       {
         "rts_stable_memory_size": 0,
         "stable_memory_size": 0,
-        "instructions": 79450884,
+        "instructions": 75588546,
         "rts_memory_size": 0,
         "rts_total_allocation": 4745108,
-        "rts_collector_instructions": 6854,
-        "rts_mutator_instructions": -10592,
+        "rts_collector_instructions": 6825,
+        "rts_mutator_instructions": -10215,
         "rts_logical_stable_memory_size": 0,
         "rts_heap_size": 4745108,
         "rts_reclaimed": 0
@@ -761,11 +761,11 @@
       {
         "rts_stable_memory_size": 0,
         "stable_memory_size": 0,
-        "instructions": 35254838,
+        "instructions": 33619688,
         "rts_memory_size": 0,
         "rts_total_allocation": 2008384,
-        "rts_collector_instructions": 6860,
-        "rts_mutator_instructions": -10592,
+        "rts_collector_instructions": 6831,
+        "rts_mutator_instructions": -10215,
         "rts_logical_stable_memory_size": 0,
         "rts_heap_size": 2008384,
         "rts_reclaimed": 0
@@ -776,11 +776,11 @@
       {
         "rts_stable_memory_size": 0,
         "stable_memory_size": 0,
-        "instructions": 6489109350,
+        "instructions": 6113998324,
         "rts_memory_size": 33554432,
         "rts_total_allocation": 430123536,
-        "rts_collector_instructions": 632270,
-        "rts_mutator_instructions": -10592,
+        "rts_collector_instructions": 632193,
+        "rts_mutator_instructions": -10215,
         "rts_logical_stable_memory_size": 0,
         "rts_heap_size": -1793136,
         "rts_reclaimed": 431916672
@@ -791,11 +791,11 @@
       {
         "rts_stable_memory_size": 0,
         "stable_memory_size": 0,
-        "instructions": 2529919191,
+        "instructions": 2404511605,
         "rts_memory_size": 0,
         "rts_total_allocation": 154996096,
-        "rts_collector_instructions": -1052395,
-        "rts_mutator_instructions": -10592,
+        "rts_collector_instructions": -1052386,
+        "rts_mutator_instructions": -10215,
         "rts_logical_stable_memory_size": 0,
         "rts_heap_size": -8484880,
         "rts_reclaimed": 163480976
@@ -806,11 +806,11 @@
       {
         "rts_stable_memory_size": 0,
         "stable_memory_size": 0,
-        "instructions": 1566301352,
+        "instructions": 1489556594,
         "rts_memory_size": 0,
         "rts_total_allocation": 95937568,
-        "rts_collector_instructions": -45718,
-        "rts_mutator_instructions": -10592,
+        "rts_collector_instructions": -45740,
+        "rts_mutator_instructions": -10215,
         "rts_logical_stable_memory_size": 0,
         "rts_heap_size": -434816,
         "rts_reclaimed": 96372384
@@ -821,11 +821,11 @@
       {
         "rts_stable_memory_size": 0,
         "stable_memory_size": 0,
-        "instructions": 1463543146,
+        "instructions": 1412121782,
         "rts_memory_size": 0,
         "rts_total_allocation": 70058140,
-        "rts_collector_instructions": -771448,
-        "rts_mutator_instructions": -10592,
+        "rts_collector_instructions": -772386,
+        "rts_mutator_instructions": -10215,
         "rts_logical_stable_memory_size": 0,
         "rts_heap_size": 7188588,
         "rts_reclaimed": 62869552
@@ -836,11 +836,11 @@
       {
         "rts_stable_memory_size": 0,
         "stable_memory_size": 0,
-        "instructions": 1897783984,
+        "instructions": 1824609719,
         "rts_memory_size": 0,
         "rts_total_allocation": 93935604,
-        "rts_collector_instructions": 35907,
-        "rts_mutator_instructions": -10592,
+        "rts_collector_instructions": 35034,
+        "rts_mutator_instructions": -10215,
         "rts_logical_stable_memory_size": 0,
         "rts_heap_size": -2471964,
         "rts_reclaimed": 96407568
@@ -851,11 +851,11 @@
       {
         "rts_stable_memory_size": 0,
         "stable_memory_size": 0,
-        "instructions": 2594452980,
+        "instructions": 2483345386,
         "rts_memory_size": 0,
         "rts_total_allocation": 133801380,
-        "rts_collector_instructions": 43172,
-        "rts_mutator_instructions": -10592,
+        "rts_collector_instructions": 42389,
+        "rts_mutator_instructions": -10215,
         "rts_logical_stable_memory_size": 0,
         "rts_heap_size": 3837628,
         "rts_reclaimed": 129963752
@@ -866,11 +866,11 @@
       {
         "rts_stable_memory_size": 0,
         "stable_memory_size": 0,
-        "instructions": 2066043432,
+        "instructions": 1977653086,
         "rts_memory_size": 0,
         "rts_total_allocation": 108794652,
-        "rts_collector_instructions": 5418,
-        "rts_mutator_instructions": -10592,
+        "rts_collector_instructions": 5396,
+        "rts_mutator_instructions": -10215,
         "rts_logical_stable_memory_size": 0,
         "rts_heap_size": 12360376,
         "rts_reclaimed": 96434276
@@ -881,11 +881,11 @@
       {
         "rts_stable_memory_size": 0,
         "stable_memory_size": 0,
-        "instructions": 2500407471,
+        "instructions": 2390264654,
         "rts_memory_size": 0,
         "rts_total_allocation": 132667296,
-        "rts_collector_instructions": 15042,
-        "rts_mutator_instructions": -10592,
+        "rts_collector_instructions": 15044,
+        "rts_mutator_instructions": -10215,
         "rts_logical_stable_memory_size": 0,
         "rts_heap_size": 2673992,
         "rts_reclaimed": 129993304
@@ -896,11 +896,11 @@
       {
         "rts_stable_memory_size": 0,
         "stable_memory_size": 0,
-        "instructions": 3196480043,
+        "instructions": 3048417469,
         "rts_memory_size": 0,
         "rts_total_allocation": 172515576,
-        "rts_collector_instructions": 13858,
-        "rts_mutator_instructions": -10592,
+        "rts_collector_instructions": 13880,
+        "rts_mutator_instructions": -10215,
         "rts_logical_stable_memory_size": 0,
         "rts_heap_size": -24525184,
         "rts_reclaimed": 197040760
@@ -911,11 +911,11 @@
       {
         "rts_stable_memory_size": 0,
         "stable_memory_size": 0,
-        "instructions": 1534955631,
+        "instructions": 1480534266,
         "rts_memory_size": 0,
         "rts_total_allocation": 72338792,
-        "rts_collector_instructions": 10412,
-        "rts_mutator_instructions": -10592,
+        "rts_collector_instructions": 10402,
+        "rts_mutator_instructions": -10215,
         "rts_logical_stable_memory_size": 0,
         "rts_heap_size": 9472040,
         "rts_reclaimed": 62866752
@@ -926,11 +926,11 @@
       {
         "rts_stable_memory_size": 0,
         "stable_memory_size": 0,
-        "instructions": 1972425924,
+        "instructions": 1896103017,
         "rts_memory_size": 0,
         "rts_total_allocation": 96356988,
-        "rts_collector_instructions": 11092,
-        "rts_mutator_instructions": -10592,
+        "rts_collector_instructions": 10979,
+        "rts_mutator_instructions": -10215,
         "rts_logical_stable_memory_size": 0,
         "rts_heap_size": -58128,
         "rts_reclaimed": 96415116
@@ -941,11 +941,11 @@
       {
         "rts_stable_memory_size": 0,
         "stable_memory_size": 0,
-        "instructions": 2667480374,
+        "instructions": 2553276344,
         "rts_memory_size": 0,
         "rts_total_allocation": 136170576,
-        "rts_collector_instructions": 8583,
-        "rts_mutator_instructions": -10592,
+        "rts_collector_instructions": 8480,
+        "rts_mutator_instructions": -10215,
         "rts_logical_stable_memory_size": 0,
         "rts_heap_size": 6191616,
         "rts_reclaimed": 129978960
@@ -956,11 +956,11 @@
       {
         "rts_stable_memory_size": 0,
         "stable_memory_size": 0,
-        "instructions": 1956707268,
+        "instructions": 1875081996,
         "rts_memory_size": 0,
         "rts_total_allocation": 101472948,
-        "rts_collector_instructions": 4310,
-        "rts_mutator_instructions": -10592,
+        "rts_collector_instructions": 4288,
+        "rts_mutator_instructions": -10215,
         "rts_logical_stable_memory_size": 0,
         "rts_heap_size": 5039040,
         "rts_reclaimed": 96433908
@@ -971,11 +971,11 @@
       {
         "rts_stable_memory_size": 0,
         "stable_memory_size": 0,
-        "instructions": 3136691282,
+        "instructions": 2996637739,
         "rts_memory_size": 0,
         "rts_total_allocation": 164811556,
-        "rts_collector_instructions": -8804,
-        "rts_mutator_instructions": -10592,
+        "rts_collector_instructions": -8877,
+        "rts_mutator_instructions": -10215,
         "rts_logical_stable_memory_size": 0,
         "rts_heap_size": 1268160,
         "rts_reclaimed": 163543396
@@ -986,11 +986,11 @@
       {
         "rts_stable_memory_size": 0,
         "stable_memory_size": 0,
-        "instructions": 6580374428,
+        "instructions": 6261344235,
         "rts_memory_size": 0,
         "rts_total_allocation": 351711772,
-        "rts_collector_instructions": -11792,
-        "rts_mutator_instructions": -10592,
+        "rts_collector_instructions": -11874,
+        "rts_mutator_instructions": -10215,
         "rts_logical_stable_memory_size": 0,
         "rts_heap_size": -13112108,
         "rts_reclaimed": 364823880
@@ -1001,11 +1001,11 @@
       {
         "rts_stable_memory_size": 0,
         "stable_memory_size": 0,
-        "instructions": 834393259,
+        "instructions": 799765759,
         "rts_memory_size": 0,
         "rts_total_allocation": 45856868,
-        "rts_collector_instructions": 281045,
-        "rts_mutator_instructions": -10592,
+        "rts_collector_instructions": 281063,
+        "rts_mutator_instructions": -10215,
         "rts_logical_stable_memory_size": 0,
         "rts_heap_size": 14240308,
         "rts_reclaimed": 31616560
@@ -1016,11 +1016,11 @@
       {
         "rts_stable_memory_size": 0,
         "stable_memory_size": 0,
-        "instructions": 4466102350,
+        "instructions": 4250754846,
         "rts_memory_size": 0,
         "rts_total_allocation": 234315968,
-        "rts_collector_instructions": 28585044,
-        "rts_mutator_instructions": -10592,
+        "rts_collector_instructions": 28417628,
+        "rts_mutator_instructions": -10215,
         "rts_logical_stable_memory_size": 0,
         "rts_heap_size": -28723316,
         "rts_reclaimed": 263039284
@@ -1031,11 +1031,11 @@
       {
         "rts_stable_memory_size": 0,
         "stable_memory_size": 0,
-        "instructions": 5464142451,
+        "instructions": 5191355900,
         "rts_memory_size": 0,
         "rts_total_allocation": 296997184,
-        "rts_collector_instructions": 23928989,
-        "rts_mutator_instructions": -10592,
+        "rts_collector_instructions": 23878108,
+        "rts_mutator_instructions": -10215,
         "rts_logical_stable_memory_size": 0,
         "rts_heap_size": -10920,
         "rts_reclaimed": 297008104
@@ -1046,11 +1046,11 @@
       {
         "rts_stable_memory_size": 0,
         "stable_memory_size": 0,
-        "instructions": 329908650,
+        "instructions": 315381151,
         "rts_memory_size": 0,
         "rts_total_allocation": 18350436,
-        "rts_collector_instructions": -1539802,
-        "rts_mutator_instructions": -10592,
+        "rts_collector_instructions": -1533847,
+        "rts_mutator_instructions": -10215,
         "rts_logical_stable_memory_size": 0,
         "rts_heap_size": 18350436,
         "rts_reclaimed": 0
@@ -1061,11 +1061,11 @@
       {
         "rts_stable_memory_size": 0,
         "stable_memory_size": 0,
-        "instructions": 1893724531,
+        "instructions": 1799067165,
         "rts_memory_size": 0,
         "rts_total_allocation": 104039112,
-        "rts_collector_instructions": -3259534,
-        "rts_mutator_instructions": -10592,
+        "rts_collector_instructions": -3241358,
+        "rts_mutator_instructions": -10215,
         "rts_logical_stable_memory_size": 0,
         "rts_heap_size": 6707008,
         "rts_reclaimed": 97332104
@@ -1076,11 +1076,11 @@
       {
         "rts_stable_memory_size": 0,
         "stable_memory_size": 0,
-        "instructions": 2358603375,
+        "instructions": 2237251344,
         "rts_memory_size": 0,
         "rts_total_allocation": 133365092,
-        "rts_collector_instructions": -7399140,
-        "rts_mutator_instructions": -10592,
+        "rts_collector_instructions": -7377854,
+        "rts_mutator_instructions": -10215,
         "rts_logical_stable_memory_size": 0,
         "rts_heap_size": 1670644,
         "rts_reclaimed": 131694448
