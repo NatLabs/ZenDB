@@ -93,7 +93,7 @@ module {
 
         ]);
 
-        let limit = 1_000;
+        let limit = 1_0;
         let fuzz = Fuzz.fromSeed(0x7eadbeef);
 
         let principals = Array.tabulate(

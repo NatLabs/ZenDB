@@ -7,7 +7,4 @@ module {
         id;
     };
 
-    public func undoNext(ids : [var Nat]) {
-        ids[0] -= 1;
-    };
 };

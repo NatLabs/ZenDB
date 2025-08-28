@@ -188,6 +188,7 @@ module T {
     };
 
     public type StableDatabase = {
+        ids : Ids;
         collections : Map<Text, StableCollection>;
         memory_type : MemoryType;
 
@@ -198,6 +199,7 @@ module T {
     };
 
     public type StableStore = {
+        ids : Ids;
         databases : Map<Text, StableDatabase>;
         memory_type : MemoryType;
         freed_btrees : Vector.Vector<MemoryBTree.StableMemoryBTree>;

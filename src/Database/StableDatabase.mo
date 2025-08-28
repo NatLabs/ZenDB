@@ -1,3 +1,5 @@
+import Prim "mo:prim";
+
 import Principal "mo:base/Principal";
 import Array "mo:base/Array";
 import Debug "mo:base/Debug";
@@ -133,7 +135,7 @@ module {
         let schema_keys = Utils.getSchemaKeys(processed_schema);
 
         var stable_collection : T.StableCollection = {
-            ids = Ids.new();
+            ids = db.ids;
             name;
             schema = processed_schema;
             schema_map = SchemaMap.new(processed_schema);

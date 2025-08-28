@@ -12,4 +12,8 @@ module {
 
     public let CURRENT_DOCUMENT_VERSION = 0;
 
+    public let MAX_DATABASES_PER_INSTANCE = 256; // 2^8
+    public let MAX_COLLECTIONS_PER_DATABASE = 65536; // 2^16
+    public let MAX_RECORDS_PER_COLLECTION = 1_099_511_627_776; // 2^40
+
 };
