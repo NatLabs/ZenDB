@@ -32,9 +32,9 @@ import Itertools "mo:itertools/Iter";
 import RevIter "mo:itertools/RevIter";
 import BitMap "mo:bit-map";
 
-import MemoryBTree "mo:memory-collection@0.3.0/MemoryBTree/Stable";
-import TypeUtils "mo:memory-collection@0.3.0/TypeUtils";
-import Int8Cmp "mo:memory-collection@0.3.0/TypeUtils/Int8Cmp";
+import MemoryBTree "mo:memory-collection@0.3.2/MemoryBTree/Stable";
+import TypeUtils "mo:memory-collection@0.3.2/TypeUtils";
+import Int8Cmp "mo:memory-collection@0.3.2/TypeUtils/Int8Cmp";
 import Cmp "mo:augmented-btrees/Cmp";
 import Vector "mo:vector";
 

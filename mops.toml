@@ -1,23 +1,21 @@
 [package]
 name = "zendb"
-version = "0.0.1"
+version = "0.1.0"
 description = "A high-performance document database built for the Internet Computer ecosystem."
 keywords = ["database", "candid", "stable-memory"]
 license = "AGPL-3.0-or-later"
 repository = "https://github.com/NatLabs/ZenDB"
 
 [dependencies]
-base = "0.14.14"
+base = "0.16.0"
 map = "9.0.1"
-serde = "3.3.1"
+serde = "3.3.2"
 itertools = "0.2.2"
-"memory-collection@0.3.0" = "0.3.0"
+'memory-collection@0.3.2' = "0.3.2"
 bit-map = "0.1.2"
-xtended-numbers = "0.4.0"
 vector = "0.4.2"
-augmented-btrees = "0.7.0"
-byte-utils = "0.0.1"
-test = "2.1.1"
+augmented-btrees = "0.7.1"
+byte-utils = "0.1.1"
 
 [dev-dependencies]
 test = "2.1.1"
@@ -27,4 +25,4 @@ fuzz = "1.0.0"
 
 [toolchain]
 wasmtime = "30.0.2"
-moc = "0.14.14"
+moc = "0.16.0"

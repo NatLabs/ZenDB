@@ -292,6 +292,19 @@ ZenDBSuite.newSuite(
                         assert after_results.size() == 0;
                     },
                 );
+
+                test(
+                    "clear entire collection",
+                    func() {
+
+                        assert users.size() > 0;
+
+                        users.clear();
+
+                        assert users.size() == 0;
+
+                    },
+                );
             },
         );
     },

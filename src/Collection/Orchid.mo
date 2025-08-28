@@ -18,7 +18,7 @@ import Nat8 "mo:base/Nat8";
 import Option "mo:base/Option";
 import Iter "mo:base/Iter";
 
-import TypeUtils "mo:memory-collection@0.3.0/TypeUtils";
+import TypeUtils "mo:memory-collection@0.3.2/TypeUtils";
 import ByteUtils "mo:byte-utils";
 import Itertools "mo:itertools/Iter";
 import Cmp "mo:augmented-btrees/Cmp";

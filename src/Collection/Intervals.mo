@@ -18,8 +18,8 @@ import RevIter "mo:itertools/RevIter";
 import BitMap "mo:bit-map";
 import Vector "mo:vector";
 
-import TypeUtils "mo:memory-collection@0.3.0/TypeUtils";
-import Int8Cmp "mo:memory-collection@0.3.0/TypeUtils/Int8Cmp";
+import TypeUtils "mo:memory-collection@0.3.2/TypeUtils";
+import Int8Cmp "mo:memory-collection@0.3.2/TypeUtils/Int8Cmp";
 
 import T "../Types";
 import Query "../Query";

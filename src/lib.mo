@@ -24,8 +24,8 @@ import RevIter "mo:itertools/RevIter";
 import Vector "mo:vector";
 import Ids "Ids";
 
-import TypeUtils "mo:memory-collection@0.3.0/TypeUtils";
-import Int8Cmp "mo:memory-collection@0.3.0/TypeUtils/Int8Cmp";
+import TypeUtils "mo:memory-collection@0.3.2/TypeUtils";
+import Int8Cmp "mo:memory-collection@0.3.2/TypeUtils/Int8Cmp";
 
 import Collection "Collection";
 import Database "Database";

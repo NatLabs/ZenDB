@@ -31,7 +31,7 @@ import Itertools "mo:itertools/Iter";
 import RevIter "mo:itertools/RevIter";
 import BitMap "mo:bit-map";
 import Vector "mo:vector";
-import MemoryBTree "mo:memory-collection@0.3.0/MemoryBTree/Stable";
+import MemoryBTree "mo:memory-collection@0.3.2/MemoryBTree/Stable";
 import Ids "../Ids";
 
 import T "../Types";

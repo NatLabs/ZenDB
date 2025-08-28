@@ -5,7 +5,7 @@ import BpTree "mo:augmented-btrees/BpTree";
 import Cmp "mo:augmented-btrees/Cmp";
 import BpTreeTypes "mo:augmented-btrees/BpTree/Types";
 import BpTreeMethods "mo:augmented-btrees/BpTree/Methods";
-import MemoryBTree "mo:memory-collection@0.3.0/MemoryBTree/Stable";
+import MemoryBTree "mo:memory-collection@0.3.2/MemoryBTree/Stable";
 import RevIter "mo:itertools/RevIter";
 
 import T "../Types";

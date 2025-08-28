@@ -1,7 +1,7 @@
 import Debug "mo:base/Debug";
 import Buffer "mo:base/Buffer";
 
-import MemoryBTree "mo:memory-collection@0.3.0/MemoryBTree/Stable";
+import MemoryBTree "mo:memory-collection@0.3.2/MemoryBTree/Stable";
 import BitMap "mo:bit-map";
 
 import T "../../src/Types";

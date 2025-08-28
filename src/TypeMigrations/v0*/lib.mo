@@ -1,28 +1,28 @@
 import Blob "mo:base/Blob";
 import Debug "mo:base/Debug";
 
-import V1_0_0_types "v1.0.0/types";
+import V0_0_1_types "v0.0.1/types";
 
 // the versions are seperated into the types and methods directories to prevent circular dependencies
 module {
 
-    public let V1_0_0 = { Types = V1_0_0_types };
+    public let V0_0_1 = { Types = V0_0_1_types };
 
-    public type StableStore = V1_0_0_types.StableStore;
+    public type StableStore = V0_0_1_types.StableStore;
 
     public type VersionedStableStore = {
-        #v1_0_0 : V1_0_0_types.StableStore;
+        #v0_0_1 : V0_0_1_types.StableStore;
     };
 
     public func upgrade(versions : VersionedStableStore) : VersionedStableStore {
         switch (versions) {
-            case (#v1_0_0(v1_0_0)) { #v1_0_0(v1_0_0) };
+            case (#v0_0_1(v0_0_1)) { #v0_0_1(v0_0_1) };
         };
     };
 
-    public func get_current_state(asset_versions : VersionedStableStore) : V1_0_0_types.StableStore {
+    public func get_current_state(asset_versions : VersionedStableStore) : V0_0_1_types.StableStore {
         switch (asset_versions) {
-            case (#v1_0_0(stable_store)) { stable_store };
+            case (#v0_0_1(stable_store)) { stable_store };
             case (_) Debug.trap(
                 "
                 Invalid version of stable store. Please call upgrade() on the stable store.
@@ -31,8 +31,8 @@ module {
         };
     };
 
-    public func share_version(sstore : V1_0_0_types.StableStore) : VersionedStableStore {
-        #v1_0_0(sstore);
+    public func share_version(sstore : V0_0_1_types.StableStore) : VersionedStableStore {
+        #v0_0_1(sstore);
     };
 
 };
