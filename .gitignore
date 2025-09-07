@@ -12,9 +12,9 @@
 .vessel/
 .mops/
 .wasm/
+.tmp/
+.bench/
 
 # frontend code
 node_modules/
 dist/
-
-record.mo

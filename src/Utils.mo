@@ -13,6 +13,7 @@ import Nat "mo:base/Nat";
 import Option "mo:base/Option";
 import Hash "mo:base/Hash";
 import Float "mo:base/Float";
+import Blob "mo:base/Blob";
 
 import Int "mo:base/Int";
 
@@ -23,22 +24,76 @@ import Decoder "mo:serde/Candid/Blob/Decoder";
 import Candid "mo:serde/Candid";
 import Itertools "mo:itertools/Iter";
 import RevIter "mo:itertools/RevIter";
-import Tag "mo:candid/Tag";
+import Logger "Logger";
 
-import MemoryBTree "mo:memory-collection/MemoryBTree/Stable";
-import TypeUtils "mo:memory-collection/TypeUtils";
+import _TypeUtils "mo:memory-collection/TypeUtils";
 import Int8Cmp "mo:memory-collection/TypeUtils/Int8Cmp";
 
 import T "Types";
+import ByteUtils "mo:byte-utils";
 
 module {
     type Order = Order.Order;
+
+    public let TypeUtils = _TypeUtils;
+
+    public func ignoreThis() : None {
+        Debug.trap("trap caused by ignoreThis()");
+    };
+
+    public func concatBlob(blob1 : Blob, blob2 : Blob) : Blob {
+        let size = blob1.size() + blob2.size();
+        let res = Blob.fromArray(
+            Array.tabulate(
+                size,
+                func(i : Nat) : Nat8 {
+                    if (i < blob1.size()) {
+                        blob1.get(i);
+                    } else {
+                        blob2.get(i - blob1.size());
+                    };
+                },
+            )
+        );
+        res;
+    };
+
+    public func sliceBlob(blob : Blob, start : Nat, end : Nat) : Blob {
+        let size = end - start;
+
+        Blob.fromArray(
+            Array.tabulate(
+                size,
+                func(i : Nat) : Nat8 {
+                    blob.get(start + i);
+                },
+            )
+        );
+    };
+
+    /// Generic helper function to handle Result types with consistent error logging
+    public func handleResult<T>(logger : T.Logger, res : T.Result<T, Text>, context : Text) : T.Result<T, Text> {
+        switch (res) {
+            case (#ok(success)) #ok(success);
+            case (#err(errorMsg)) {
+                Logger.lazyError(logger, func() = context # ": " # errorMsg);
+                #err(errorMsg);
+            };
+        };
+    };
 
     public func log2(n : Float) : Float {
         Float.log(n) / Float.log(2);
     };
 
-    public func buffer_concat_freeze<A>(buffers : [Buffer.Buffer<A>]) : [A] {
+    public func stripStart(text : Text, prefix : Text) : Text {
+        switch (Text.stripStart(text, #text(prefix))) {
+            case (?stripped) stripped;
+            case (null) text;
+        };
+    };
+
+    public func concatFreeze<A>(buffers : [Buffer.Buffer<A>]) : [A] {
         var i = 0;
         var total_size = 0;
         while (i < buffers.size()) {
@@ -64,12 +119,12 @@ module {
 
     };
 
-    public func extract_schema_keys(schema : T.Schema) : [Text] {
+    public func getSchemaKeys(schema : T.Schema) : [Text] {
         let buffer = Buffer.Buffer<Text>(8);
 
         func extract(schema : T.Schema) {
             switch (schema) {
-                case (#Record(fields)) {
+                case (#Record(fields) or #Map(fields)) {
                     for ((name, value) in fields.vals()) {
                         buffer.add(name);
                         extract(value);
@@ -97,27 +152,58 @@ module {
         Buffer.toArray(buffer);
     };
 
-    public func unwrap_or_err<A>(res : T.Result<A, Text>) : A {
+    public func reverseOrder(order : T.Order) : T.Order {
+        switch (order) {
+            case (#less) #greater;
+            case (#greater) #less;
+            case (#equal) #equal;
+        };
+    };
+
+    public func unwrapOrErr<A>(res : T.Result<A, Text>) : A {
         switch (res) {
             case (#ok(success)) success;
-            case (#err(err)) Debug.trap("unwrap_or_err: " # err);
+            case (#err(err)) Debug.trap("unwrapOrErr: " # err);
         };
     };
 
-    public func assert_result<A>(res : T.Result<A, Text>) {
+    public func assertResult<A>(res : T.Result<A, Text>) {
         switch (res) {
             case (#ok(_)) ();
-            case (#err(err)) Debug.trap("assert_result: " # err);
+            case (#err(err)) Debug.trap("assertResult: " # err);
         };
     };
 
-    public func tuple_cmp<A, B>(cmp : (A, A) -> T.Order) : ((A, B), (A, B)) -> Order {
+    public func logErrorMsg<A>(logger : T.Logger, err_msg : Text) : T.Result<A, Text> {
+        Logger.error(logger, err_msg);
+        #err(err_msg);
+    };
+
+    public func logError<A>(logger : T.Logger, res : T.Result<A, Text>, opt_prefix_msg : ?Text) : T.Result<A, Text> {
+        switch (res) {
+            case (#ok(success)) #ok(success);
+            case (#err(errorMsg)) {
+                Logger.lazyError(
+                    logger,
+                    func() {
+                        switch (opt_prefix_msg) {
+                            case (?prefix) prefix # ": " # errorMsg;
+                            case (null) errorMsg;
+                        };
+                    },
+                );
+                #err(errorMsg);
+            };
+        };
+    };
+
+    public func tupleCmp<A, B>(cmp : (A, A) -> T.Order) : ((A, B), (A, B)) -> Order {
         func(a : (A, B), b : (A, B)) : T.Order {
             cmp(a.0, b.0);
         };
     };
 
-    public func tuple_eq<A, B>(eq : (A, A) -> Bool) : ((A, B), (A, B)) -> Bool {
+    public func tupleEq<A, B>(eq : (A, A) -> Bool) : ((A, B), (A, B)) -> Bool {
         func(a : (A, B), b : (A, B)) : Bool {
             eq(a.0, b.0);
         };
@@ -127,12 +213,21 @@ module {
         // converts to Nat64 because pointers are 64-bit
         blobify = {
             from_blob = func(blob : Blob) : Nat {
-                TypeUtils.BigEndian.Nat64.blobify.from_blob(blob) |> Nat64.toNat(_);
+                assert blob.size() == 8;
+
+                // must be big-endian, because these keys are sorted in the BTree
+                // and we need to be able to compare them correctly in their byte form
+                let n64 = ByteUtils.BigEndian.toNat64(blob.vals());
+                Nat64.toNat(n64);
             };
 
             to_blob = func(nat : Nat) : Blob {
                 let n64 = Nat64.fromNat(nat);
-                TypeUtils.BigEndian.Nat64.blobify.to_blob(n64);
+                let bytes = ByteUtils.BigEndian.fromNat64(n64);
+                let blob = Blob.fromArray(bytes);
+
+                assert blob.size() == 8;
+                blob;
             };
         };
 
@@ -140,12 +235,12 @@ module {
 
     };
 
-    public func buffer_add_all<A>(buffer : Buffer.Buffer<A>, iter : Iter.Iter<A>) {
+    public func addAll<A>(buffer : Buffer.Buffer<A>, iter : Iter.Iter<A>) {
         for (elem in iter) { buffer.add(elem) };
     };
 
     // add all elements from an iterator to a bufferlike object that has the add method
-    public func buffer_like_add_all<A>(buffer : { add : (A) -> () }, iter : Iter.Iter<A>) {
+    public func addAllLike<A>(buffer : { add : (A) -> () }, iter : Iter.Iter<A>) {
         for (elem in iter) { buffer.add(elem) };
     };
 

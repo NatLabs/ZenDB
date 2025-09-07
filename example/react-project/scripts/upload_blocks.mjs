@@ -11,9 +11,7 @@ await $`rm -rvf ./${TXS_DIR}/*k.plain`;
 const total_batches = fs.readdirSync(`./${TXS_DIR}`).length;
 
 const get_db_size = async () => {
-    let raw_db_size = (
-        await $`dfx canister --playground call backend get_db_size`
-    ).stdout
+    let raw_db_size = (await $`dfx canister call backend get_db_size`).stdout
         .replace('\n', '')
         .replace(' ', '')
         .replace('_', '')
@@ -34,7 +32,7 @@ const get_db_size = async () => {
 
 let num_stored_batches = start_batch
     ? start_batch - 1
-    : await get_num_stored_batches();
+    : (await get_db_size()) / STORED_BATCH_SIZE;
 
 console.log(`num_stored_batches: ${num_stored_batches}`);
 
@@ -45,7 +43,7 @@ const upload_batch = async (batch) => {
     }k.plain`;
 
     // upload decompressed file (same file name without .gz)
-    await $`dfx canister --playground call backend upload_blocks --argument-file ./${TXS_DIR}/${
+    await $`dfx canister call backend upload_blocks --argument-file ./${TXS_DIR}/${
         batch * 10
     }k.plain`;
 

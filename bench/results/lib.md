@@ -10,7 +10,7 @@ Instructions
 | :-------------------- | ------------: |
 | put() no index        | 1_899_187_839 |
 | updateById() 1        | 3_647_231_474 |
-| create_index()        | 2_063_325_128 |
+| createIndex()        | 2_063_325_128 |
 | clear collection data |       119_818 |
 | put() with 1 index    | 2_270_448_590 |
 | updateById() 2        | 4_424_335_620 |
@@ -30,7 +30,7 @@ Heap
 | :-------------------- | ----------: |
 | put() no index        |  23_291_128 |
 | updateById() 1        | -25_904_696 |
-| create_index()        |  28_717_080 |
+| createIndex()        |  28_717_080 |
 | clear collection data |      18_316 |
 | put() with 1 index    |     748_656 |
 | updateById() 2        |  -5_707_884 |
@@ -52,7 +52,7 @@ Instructions
 | :-------------------- | ------------: |
 | put() no index        |   551_368_371 |
 | updateById() 1        |   950_699_496 |
-| create_index()        |   724_322_792 |
+| createIndex()        |   724_322_792 |
 | clear collection data |       118_392 |
 | put() with 1 index    |   932_321_785 |
 | updateById() 2        | 1_747_222_449 |
@@ -72,7 +72,7 @@ Heap
 | :-------------------- | ----------: |
 | put() no index        |  24_272_784 |
 | updateById() 1        | -18_899_252 |
-| create_index()        |  -3_415_400 |
+| createIndex()        |  -3_415_400 |
 | clear collection data |      18_256 |
 | put() with 1 index    |   4_347_784 |
 | updateById() 2        |   1_222_128 |

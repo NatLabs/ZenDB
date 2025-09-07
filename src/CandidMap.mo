@@ -1,546 +1,702 @@
-import Principal "mo:base/Principal";
-import Order "mo:base/Order";
-import Iter "mo:base/Iter";
+import Array "mo:base/Array";
 import Debug "mo:base/Debug";
-import Nat16 "mo:base/Nat16";
+import Option "mo:base/Option";
+import Iter "mo:base/Iter";
 import Text "mo:base/Text";
-import Blob "mo:base/Blob";
-import Nat8 "mo:base/Nat8";
-import Nat32 "mo:base/Nat32";
-import Buffer "mo:base/Buffer";
+import Result "mo:base/Result";
+import Nat "mo:base/Nat";
 
 import Map "mo:map/Map";
 import Set "mo:map/Set";
 import Candid "mo:serde/Candid";
-import { TypeCode } "mo:serde/Candid/Types";
 import Itertools "mo:itertools/Iter";
 
 import T "Types";
-import ByteUtils "ByteUtils";
+import C "Constants";
+import Schema "Collection/Schema";
+import SchemaMap "Collection/SchemaMap";
+import CandidUtils "CandidUtils";
 
-module {
+module CandidMap {
+
     let { nhash; thash } = Map;
-    type Candid = Candid.Candid;
-    type Iter<A> = Iter.Iter<A>;
+
+    type Schema = T.Schema;
+    type Candid = T.Candid;
+    type Result<A, B> = Result.Result<A, B>;
 
     type NestedCandid = {
-        #Candid : Candid.Candid;
-        #CandidMap : Map.Map<Text, NestedCandid>;
+        #Candid : (T.Schema, Candid);
+        #CandidMap : (Map.Map<Text, NestedCandid>);
     };
 
-    /// Access nested fields faster than the default Candid datatype
-    ///
-    /// It converts the Candid record into a flat map where the keys are the paths to the nested fields
-    public class CandidMap(candid_bytes : [Nat8]) {
-        var candid_map_bytes = candid_bytes;
-        let cache = Map.new<Text, Candid.Candid>();
+    let IS_COMPOUND_TYPE = ":compound_type";
+    let IS_OPTIONAL = ":is_optional";
 
-        public func encode() : Blob {
-            Blob.fromArray(candid_map_bytes);
+    let compound_types = {
+        variant = func(variant_tag : Text) : (T.Schema, Candid) {
+            (#Variant([]), #Text(variant_tag));
         };
 
-        public func encoded_bytes() : [Nat8] {
-            candid_map_bytes;
+        tuple = func(tuple_size : Nat) : (T.Schema, Candid) {
+            (#Tuple([]), #Nat(tuple_size));
         };
 
-        public func reload(new_candid_map_bytes : [Nat8]) {
-            Map.clear(cache);
-            candid_map_bytes := new_candid_map_bytes;
+        array = func(array_type : T.Schema, array_size : Nat) : (T.Schema, Candid) {
+            (#Array(array_type), #Nat(array_size));
         };
-
-        public func get(key : Text) : ?Candid.Candid {
-
-            func read_nat_16(i : Nat) : Nat16 {
-                (
-                    Nat16.fromNat8(candid_map_bytes[i]) << 8
-                ) | (
-                    Nat16.fromNat8(candid_map_bytes[i + 1])
-                );
-            };
-
-            func read_nat_32(i : Nat) : Nat32 {
-                (
-                    Nat32.fromNat(Nat8.toNat(candid_map_bytes[i])) << 24
-                ) | (
-                    Nat32.fromNat(Nat8.toNat(candid_map_bytes[i + 1])) << 16
-                ) | (
-                    Nat32.fromNat(Nat8.toNat(candid_map_bytes[i + 2])) << 8
-                ) | (
-                    Nat32.fromNat(Nat8.toNat(candid_map_bytes[i + 3]))
-                );
-            };
-
-            let num_fields = Nat16.toNat(read_nat_16(0));
-            // Debug.print("num_fields: " # debug_show num_fields);
-
-            if (num_fields == 0) return null;
-
-            let start = 2;
-
-            let KEY_POINTER = 4;
-            let VALUE_POINTER = 4;
-
-            func read_key_pointer(nth_record : Nat) : Nat {
-                let key_pointer_index = start + (nth_record * (KEY_POINTER + VALUE_POINTER));
-                let key_pointer = read_nat_32(key_pointer_index) |> Nat32.toNat(_);
-                key_pointer;
-            };
-
-            func read_value_pointer(nth_record : Nat) : Nat {
-                let value_pointer_index = start + (nth_record * (KEY_POINTER + VALUE_POINTER)) + KEY_POINTER;
-                let value_pointer = read_nat_32(value_pointer_index) |> Nat32.toNat(_);
-                value_pointer;
-            };
-
-            func read_key_iter(i : Nat) : Iter.Iter<Nat8> {
-                let key_pointer = read_key_pointer(i);
-                let next_key_pointer = if (i + 1 < num_fields) read_key_pointer(i + 1) else read_value_pointer(0);
-
-                Itertools.fromArraySlice(candid_map_bytes, key_pointer, next_key_pointer);
-            };
-
-            func read_value_iter(i : Nat) : Iter.Iter<Nat8> {
-                let value_pointer = read_value_pointer(i);
-                let next_value_pointer = if (i + 1 < num_fields) read_value_pointer(i + 1) else candid_map_bytes.size();
-
-                Itertools.fromArraySlice(candid_map_bytes, value_pointer, next_value_pointer);
-            };
-
-            let LESS : Int8 = -1;
-            let EQUAL : Int8 = 0;
-            let GREATER : Int8 = 1;
-            let IS_PREFIX : Int8 = 2;
-            let IS_BASE_KEY : Int8 = 3; // means that the other key is a prefix of this key
-
-            func lexicographical_comparison(a : Iter.Iter<Nat8>, b : Iter.Iter<Nat8>) : Int8 {
-                loop switch (a.next(), b.next()) {
-                    case (?a_byte, ?b_byte) {
-                        if (a_byte < b_byte) {
-                            return LESS;
-                        } else if (a_byte > b_byte) {
-                            return GREATER;
-                        };
-                    };
-                    case (null, null) return EQUAL;
-                    case (null, ?_) return IS_PREFIX;
-                    case (?_, null) return IS_BASE_KEY;
-                };
-            };
-
-            let search_key_bytes = Text.encodeUtf8(key);
-
-            var l = 0;
-            var r = num_fields;
-
-            while (l < r) {
-                let mid = (l + r) / 2;
-                // Debug.print("mid: " # debug_show mid);
-
-                // Debug.print(
-                //     "comparing (key, search_key): " # debug_show (
-                //         Text.decodeUtf8(
-                //             Blob.fromArray(Iter.toArray(read_key_iter(mid)))
-                //         ),
-                //         Text.decodeUtf8(
-                //             Blob.fromArray(Iter.toArray(search_key_bytes.vals()))
-                //         ),
-                //     )
-                // );
-
-                let cmp = lexicographical_comparison(read_key_iter(mid), search_key_bytes.vals());
-                // Debug.print("cmp: " # debug_show cmp);
-
-                if (cmp == LESS) {
-                    l := mid + 1;
-                } else if (cmp == GREATER) {
-                    r := mid;
-                } else if (cmp == EQUAL) {
-                    let candid = decode_candid_value(read_value_iter(mid));
-                    // Debug.print("found candid: " # debug_show candid);
-                    return ?candid;
-                } else if (cmp == IS_PREFIX) {
-                    // Debug.print("key is a prefix of the search key");
-                    let candid = decode_candid_value(read_value_iter(mid));
-                    assert candid == #Null or candid == #Option(#Null);
-                    return ?candid;
-                } else if (cmp == IS_BASE_KEY) {
-                    Debug.trap(
-                        "search key is a prefix of the mid key (mid key, search key): " # debug_show (
-                            Text.decodeUtf8(
-                                Blob.fromArray(Iter.toArray(read_key_iter(mid)))
-                            ),
-                            Text.decodeUtf8(
-                                Blob.fromArray(Iter.toArray(search_key_bytes.vals()))
-                            ),
-                        )
-                    );
-                };
-            };
-
-            // Debug.print("could not find key: " # debug_show key);
-
-            null;
-        };
-
     };
 
-    public func fromBlob(blob : Blob) : CandidMap {
-        CandidMap(Blob.toArray(blob));
-    };
-
-    public func fromCandid(candid : Candid.Candid) : CandidMap {
-        // Debug.print("fromCandid: " # debug_show candid);
-        let flattened_records = flatten_nested_records(candid);
-        // Debug.print("flatten_nested_records: " # debug_show Buffer.toArray(flattened_records));
-        let candid_map_bytes = encode_flattened_records(flattened_records);
-        CandidMap(candid_map_bytes);
-    };
-
-    func flatten_nested_records(candid : Candid.Candid) : Buffer.Buffer<(Text, Candid)> {
-        let #Record(fields) = candid else return Debug.trap("CandidMap: Expected #Record type");
-        let flattened_records = Buffer.Buffer<(Text, Candid)>(fields.size() * 2);
-
-        func flatten(flattened_records : Buffer.Buffer<(Text, Candid)>, prefix : Text, fields : [(Text, Candid)]) {
-
-            var i = 0;
-
-            while (i < fields.size()) {
-                let field = fields[i].0;
-                let value = fields[i].1;
-
-                let field_path = if (prefix == "") field else prefix # "." # field;
-
-                switch (value) {
-                    case (#Record(records) or #Map(records)) {
-                        flatten(flattened_records, field_path, records);
-                    };
-                    case (#Option(#Record(records)) or #Option(#Map(records))) {
-                        flatten(flattened_records, field_path, records);
-                    };
-                    case (_) {
-                        flattened_records.add(field_path, value);
-                    };
-                };
-
-                i += 1;
-            };
-
-        };
-
-        flatten(flattened_records, "", fields);
-
-        flattened_records;
-
-    };
-
-    func encode_flattened_records(flattened_records : Buffer.Buffer<(Text, Candid)>) : [Nat8] {
-        flattened_records.sort(
-            func((key, _) : (Text, Candid), (key2, _) : (Text, Candid)) : Order.Order {
-                Text.compare(key, key2);
-            }
+    func add_to_map(map : Map.Map<Text, NestedCandid>, field_key : Text, candid_type : T.Schema, candid_value : Candid) {
+        ignore Map.put<Text, NestedCandid>(
+            map,
+            thash,
+            field_key,
+            #Candid(candid_type, candid_value),
         );
+    };
 
-        // Debug.print("Sorted flattened records: " # debug_show Buffer.toArray(flattened_records));
-
-        let key_sizes = Buffer.Buffer<Nat>(flattened_records.size());
-        let value_sizes = Buffer.Buffer<Nat>(flattened_records.size());
-        let keys = Buffer.Buffer<Nat8>(flattened_records.size() * 8);
-        let values = Buffer.Buffer<Nat8>(flattened_records.size() * 8);
-
-        func buffer_add_all<A>(buffer : Buffer.Buffer<A>, iter : Iter.Iter<A>) {
-            label adding_item_to_buffer loop switch (iter.next()) {
-                case (?val) buffer.add(val);
-                case (null) break adding_item_to_buffer;
-            };
-        };
+    // this loads the first level of a candid document into the map
+    // it stores information about the nested documents as is and only caches the nested fields when they are accessed in the get method
+    func load_record_into_map(types : [(Text, T.Schema)], fields : [(Text, Candid)]) : Map.Map<Text, NestedCandid> {
+        let map = Map.new<Text, NestedCandid>();
 
         var i = 0;
-
-        while (i < flattened_records.size()) {
-            let record = flattened_records.get(i);
-            let key = record.0;
-            let value = record.1;
-
-            let key_bytes = Blob.toArray(Text.encodeUtf8(key));
-            let value_bytes = encode_candid_value(value);
-
-            key_sizes.add(key_bytes.size());
-            value_sizes.add(value_bytes.1);
-
-            buffer_add_all(keys, key_bytes.vals());
-            buffer_add_all(values, value_bytes.0);
+        while (i < fields.size()) {
+            add_to_map(
+                map,
+                fields[i].0,
+                types[i].1,
+                fields[i].1,
+            );
 
             i += 1;
+
         };
 
-        let pointers = Buffer.Buffer<Nat8>(flattened_records.size() * 2 * 4);
+        // Debug.print("map: " # debug_show (Map.toArray(map)));
 
-        i := 0;
-        var pointer_offset = 2; // 2 bytes for the number of fields
-        let key_pointer_offset = pointer_offset;
-        let keys_offset = pointer_offset + (flattened_records.size() * 2 * 4);
-        let values_offset = keys_offset + keys.size();
+        map;
+    };
 
-        var acc_key_size = 0;
-        var acc_value_size = 0;
+    public type CandidMap = {
+        candid_map : Map.Map<Text, NestedCandid>;
+    };
 
-        while (i < flattened_records.size()) {
-            let key_size = key_sizes.get(i);
-            let value_size = value_sizes.get(i);
+    public func new(schema_map : T.SchemaMap, id : Nat, candid : T.Candid) : CandidMap {
 
-            let key_pointer = keys_offset + acc_key_size;
-            let value_pointer = values_offset + acc_value_size;
+        let ?types = SchemaMap.get(schema_map, "") else Debug.trap("CandidMap only accepts #Record types");
+        let map = Map.new<Text, NestedCandid>();
 
-            acc_key_size += key_size;
-            acc_value_size += value_size;
+        // Debug.print("CandidMap.new(): " # debug_show (types, candid));
 
-            let key_pointer_bytes = ByteUtils.from_nat32_be(Nat32.fromNat(key_pointer));
-            let value_pointer_bytes = ByteUtils.from_nat32_be(Nat32.fromNat(value_pointer));
+        ignore Map.put(map, T.thash, "", #Candid(types, candid));
+        ignore Map.put(map, T.thash, C.DOCUMENT_ID, #Candid(#Nat, #Nat(id)));
 
-            buffer_add_all(pointers, key_pointer_bytes.vals());
-            buffer_add_all(pointers, value_pointer_bytes.vals());
+        let candid_map = { candid_map = map };
 
-            i += 1;
-        };
+        ignore get_and_cache_map_for_field(candid_map, schema_map, "");
 
-        let encoded = Buffer.Buffer<Nat8>(2 + pointers.size() + keys.size() + values.size());
-
-        let num_fields_bytes = ByteUtils.from_nat16_be(Nat16.fromNat(flattened_records.size()));
-        buffer_add_all(encoded, num_fields_bytes.vals());
-
-        buffer_add_all(encoded, pointers.vals());
-        buffer_add_all(encoded, keys.vals());
-        buffer_add_all(encoded, values.vals());
-
-        Buffer.toArray(encoded)
+        candid_map;
 
     };
 
-    func decode_candid_value(value_iter : Iter.Iter<Nat8>) : Candid.Candid {
+    func get_and_cache_map_for_field({ candid_map } : CandidMap, schema_map : T.SchemaMap, key : Text) : ?Map.Map<Text, NestedCandid> {
 
-        let ?type_code = value_iter.next() else return Debug.trap("CandidMap: Expected type code");
+        let fields = Itertools.peekable(Text.split("." # key, #text(".")));
+        var map = candid_map;
+        var prev_map = map;
 
-        let candid_value : Candid.Candid = if (type_code == TypeCode.Null) {
-            #Null;
-        } else if (type_code == TypeCode.Bool) {
-            let ?bool = value_iter.next() else return Debug.trap("CandidMap: Expected bool value");
-            #Bool(bool == 1);
-        } else if (type_code == TypeCode.Empty) {
-            #Empty;
-        } else if (type_code == TypeCode.Int) {
-            #Int(ByteUtils.to_int(value_iter));
-        } else if (type_code == TypeCode.Int8) {
-            #Int8(ByteUtils.to_int8(value_iter));
-        } else if (type_code == TypeCode.Int16) {
-            #Int16(ByteUtils.to_int16(value_iter));
-        } else if (type_code == TypeCode.Int32) {
-            #Int32(ByteUtils.to_int32(value_iter));
-        } else if (type_code == TypeCode.Int64) {
-            #Int64(ByteUtils.to_int64(value_iter));
-        } else if (type_code == TypeCode.Nat) {
-            #Nat(ByteUtils.to_nat(value_iter));
-        } else if (type_code == TypeCode.Nat8) {
-            #Nat8(ByteUtils.to_nat8(value_iter));
-        } else if (type_code == TypeCode.Nat16) {
-            #Nat16(ByteUtils.to_nat16(value_iter));
-        } else if (type_code == TypeCode.Nat32) {
-            #Nat32(ByteUtils.to_nat32(value_iter));
-        } else if (type_code == TypeCode.Nat64) {
-            #Nat64(ByteUtils.to_nat64(value_iter));
-        } else if (type_code == TypeCode.Float) {
-            #Float(ByteUtils.to_float64(value_iter));
-        } else if (type_code == TypeCode.Text) {
-            let text_bytes = Blob.fromArray(Iter.toArray(value_iter));
-            let ?text = Text.decodeUtf8(text_bytes) else Debug.trap("CandidMap: Invalid utf8 text");
-            #Text(text);
-        } else if (type_code == TypeCode.Array) {
-            let ?nested_type_code = value_iter.next() else return Debug.trap("CandidMap: Expected nested type code");
+        var prefix_path = "";
 
-            if (nested_type_code != TypeCode.Nat8) {
-                Debug.trap("CandidMap: Expected nested type code to be Nat8");
+        // Debug.print("starting get_and_cache_map_for_field: " # debug_show (key));
+
+        label extracting_candid_value loop {
+            let ?field = fields.next() else break extracting_candid_value;
+            // Debug.print("searching field: " # debug_show (field));
+
+            prev_map := map;
+            prefix_path := if (prefix_path == "") field else prefix_path # "." # field;
+
+            // Debug.print("prefix_path: " # debug_show (prefix_path));
+
+            let ?candid = Map.get(map, thash, field) else break extracting_candid_value;
+
+            // Debug.print("candid: " # debug_show (candid));
+
+            func handle_candid(chained_candid_type : T.Schema, candid_value : Candid, is_parent_optional : Bool) : Bool {
+                let ?candid_type = if (is_parent_optional) {
+                    ?chained_candid_type;
+                } else SchemaMap.get(schema_map, prefix_path) else return false;
+
+                // Debug.print("candid_type: " # debug_show (candid_type));
+
+                let nested_map = switch (candid_type, candid_value) {
+                    case (#Option(inner_type), #Option(inner_value)) {
+                        return handle_candid(inner_type, inner_value, true);
+                    };
+                    case (#Option(inner_type), #Null) {
+                        return false;
+                    };
+                    case (#Null, #Null) {
+                        return false;
+                    };
+                    case (candid_type, #Null) {
+                        //    Debug.print("candid_type: " # debug_show (candid_type));
+                        // return_empty_map := true;
+                        return false;
+                    };
+                    case (#Option(inner_type), candid_value) {
+                        return handle_candid(inner_type, candid_value, true);
+                    };
+                    case ((#Record(record_types) or #Map(record_types), #Record(documents) or #Map(documents))) {
+                        let nested_map = load_record_into_map(record_types, documents);
+                        ignore Map.put(map, thash, field, #CandidMap(nested_map));
+                        nested_map;
+                    };
+                    case (#Variant(variant_types), #Variant(variant)) {
+
+                        let ?variant_type = Array.find<(Text, T.CandidType)>(
+                            variant_types,
+                            func(variant_type : (Text, T.CandidType)) : Bool {
+                                variant.0 == variant_type.0;
+                            },
+                        ) else Debug.trap("CandidMap: Could not find variant type for tag '" # variant.0 # "' in " # debug_show (variant_types));
+
+                        // Debug.print(debug_show ({ variant; variant_types }));
+
+                        let nested_map = load_record_into_map([variant_type], [variant]);
+
+                        // Debug.print("nested_map: " #debug_show (Map.toArray(nested_map)));
+                        ignore Map.put<Text, NestedCandid>(nested_map, thash, IS_COMPOUND_TYPE, #Candid(compound_types.variant(variant.0)));
+
+                        ignore Map.put(map, thash, field, #CandidMap(nested_map));
+                        // Debug.print("variant next field: " # debug_show (fields.peek()));
+
+                        switch (fields.peek()) {
+                            case (null or ?"") {
+                                prev_map := nested_map;
+                                return false;
+                            };
+                            case (_) {};
+                        };
+
+                        nested_map;
+
+                    };
+                    case (#Tuple(tuple_types), #Tuple(tuple_values)) {
+                        if (tuple_types.size() != tuple_values.size()) {
+                            Debug.trap("CandidMap: Tuple types and values should have the same size");
+                        };
+
+                        let nested_map = Map.new<Text, NestedCandid>();
+
+                        for ((i, (tuple_type, tuple_value)) in Itertools.enumerate(Itertools.zip(tuple_types.vals(), tuple_values.vals()))) {
+                            ignore Map.put(nested_map, thash, Nat.toText(i), #Candid(tuple_type, tuple_value));
+                        };
+
+                        ignore Map.put(nested_map, thash, IS_COMPOUND_TYPE, #Candid(compound_types.tuple(tuple_values.size())));
+
+                        ignore Map.put(map, thash, field, #CandidMap(nested_map));
+                        nested_map;
+
+                    };
+                    case (#Tuple(tuple_types), #Record(documents)) {
+                        let tuples = Array.tabulate(
+                            tuple_types.size(),
+                            func(i : Nat) : Candid {
+                                let (field, record_value) = documents[i];
+                                assert field == Nat.toText(i);
+                                record_value;
+                            },
+                        );
+
+                        return handle_candid(#Tuple(tuple_types), #Tuple(tuples), false);
+                    };
+                    case (#Array(array_type), #Array(array_values)) {
+                        let nested_map = Map.new<Text, NestedCandid>();
+
+                        for ((i, array_value) in Itertools.enumerate(array_values.vals())) {
+                            ignore Map.put(nested_map, thash, Nat.toText(i), #Candid(array_type, array_value));
+                        };
+
+                        ignore Map.put(nested_map, thash, IS_COMPOUND_TYPE, #Candid(compound_types.array(array_type, array_values.size())));
+
+                        ignore Map.put(map, thash, field, #CandidMap(nested_map));
+                        nested_map;
+
+                    };
+                    // case (#Null, #Null) {
+                    //     let nested_map = Map.new<Text, NestedCandid>();
+                    //     ignore Map.put(map, thash, field, #CandidMap(nested_map));
+                    //     nested_map;
+                    // };
+                    // case (_, #Null){
+
+                    // };
+                    case (_) {
+                        // terminate the loop
+                        return false;
+                    };
+                };
+
+                // Debug.print("map before switch: " # debug_show (Map.toArray(map)));
+                map := nested_map;
+                // Debug.print("current field: " # debug_show (field));
+                // Debug.print("map after switch: " # debug_show (Map.toArray(map)));
+
+                // continue looping
+                true;
             };
 
-            let blob = Blob.fromArray(Iter.toArray(value_iter));
-            #Blob(blob);
-        } else if (type_code == TypeCode.Principal) {
-            let principal = Principal.fromBlob(Blob.fromArray(Iter.toArray(value_iter)));
-            #Principal(principal);
-        } else if (type_code == TypeCode.Option) {
-            let nested_candid = decode_candid_value(value_iter);
-            #Option(nested_candid);
-        } else {
-            Debug.trap("CandidMap: Unsupported type code");
+            // Debug.print("candid[0]: " # debug_show (candid));
+            // Debug.print("map[0]: " # debug_show (Map.toArray(map)));
+            switch (candid) {
+                case (#CandidMap(nested_map)) {
+                    // Debug.print("nested_map: " # debug_show (Map.toArray(nested_map)));
+                    // Debug.print("field: " # debug_show (field));
+
+                    map := nested_map;
+
+                };
+                case (#Candid((candid_type, candid))) {
+                    if (not handle_candid(candid_type, candid, false)) {
+                        break extracting_candid_value;
+                    };
+                };
+            };
+
+            // Debug.print("candid[+1]: " # debug_show (candid));
+            // Debug.print("map[+1]: " # debug_show (Map.toArray(map)));
         };
 
-        candid_value
+        // Debug.print("prev_map: " # debug_show (Map.toArray(prev_map)));
+
+        //    Debug.print("map: " # debug_show (Map.toArray(map)));
+        //    Debug.print("set: " # debug_show (Set.toArray(paths_with_optional_fields)));
+
+        ?prev_map;
 
     };
 
-    func encode_candid_value(candid_value : Candid) : (Iter<Nat8>, Nat) {
-        switch (candid_value) {
-            case (#Null) {
-                ([TypeCode.Null].vals(), 1);
+    // Helper function to wrap a Candid value in #Option if is_option_type is true
+    func wrap_option(candid_type : T.CandidType, value : Candid) : Candid {
+        // CandidUtils.inheritOptionsFromType(
+        //     candid_type,
+        //     CandidUtils.unwrapOption(value),
+        // );
+        value;
+    };
+
+    public func get(candid_map_state : CandidMap, schema_map : T.SchemaMap, key : Text) : ?Candid {
+        let { candid_map } = candid_map_state;
+
+        if (key == C.DOCUMENT_ID) {
+            let ?#Candid(#Nat, #Nat(id)) = Map.get(candid_map, thash, C.DOCUMENT_ID) else Debug.trap("CandidMap: Could not find candid id");
+            return ?#Nat(id); // exclude wrap_option for id
+        };
+
+        let fields = Iter.toArray(Text.split(key, #text(".")));
+        let ?types = SchemaMap.get(schema_map, key) else return null;
+        var result : ?Candid = null;
+        var prefix_path = "";
+        var current_field = "";
+        var is_compound_type = true;
+        let is_option_type = switch (types) {
+            case (#Option(_)) true;
+            case (_) false;
+        };
+
+        let map = switch (get_and_cache_map_for_field(candid_map_state, schema_map, key)) {
+            case (?map) map;
+            case (_) return null;
+        };
+
+        let field = if (fields.size() == 0) "" else fields[fields.size() - 1];
+        current_field := field;
+        prefix_path := if (prefix_path == "") field else prefix_path # "." # field;
+
+        let candid : NestedCandid = switch (Map.get(map, thash, field)) {
+            case (?nested_candid) nested_candid;
+            case (null) {
+                switch (SchemaMap.unwrapOptionType(types), Map.get(map, thash, IS_COMPOUND_TYPE)) {
+                    case (#Variant(schema_map_types), ?#Candid(#Variant(candid_map_nested_types), #Text(tag))) {
+                        for ((variant_tag, _) in schema_map_types.vals()) {
+                            if (variant_tag == tag) {
+                                return ?wrap_option(types, #Text(tag));
+                            };
+                        };
+                        return null;
+                    };
+                    case (_) return null;
+                };
             };
-            case (#Bool(b)) {
-                let arr = [TypeCode.Bool, if (b) 1 else 0] : [Nat8];
-                (arr.vals(), arr.size());
+        };
+
+        switch (candid) {
+            case (#CandidMap(nested_map)) {
+                switch (Map.get(nested_map, thash, IS_COMPOUND_TYPE)) {
+                    case (?#Candid(#Variant(_), #Text(tag))) {
+                        return ?wrap_option(types, #Text(tag));
+                    };
+                    case (_) Debug.trap("CandidMap.get(): Recieved unexpected #CandidMap");
+                };
             };
-            case (#Empty) {
-                let arr = [TypeCode.Empty];
-                (arr.vals(), arr.size());
+            case (#Candid((candid_type, candid))) {
+                switch (candid_type, candid) {
+                    case ((#Record(_) or #Map(_) or #Variant(_) or #Option(#Record(_)) or #Option(#Map(_)) or #Option(#Variant(_)) or #Tuple(_) or #Array(_), #Record(_) or #Map(_) or #Variant(_) or #Option(#Record(_)) or #Option(#Map(_)) or #Option(#Variant(_)))) {
+                        Debug.trap("CandidMap.get(): Should have cached the nested map");
+                    };
+                    case (_, #Null) return ?wrap_option(types, #Null);
+                    case (_) {
+                        is_compound_type := false;
+                        result := ?wrap_option(types, candid);
+                    };
+                };
             };
-            case (#Int(i)) {
-                let bytes = ByteUtils.from_int(i);
+        };
 
-                let iter = Itertools.prepend(
-                    TypeCode.Int,
-                    bytes.vals(),
-                );
+        let opt_compound_tag = Map.get(map, thash, IS_COMPOUND_TYPE);
 
-                (iter, bytes.size() + 1);
+        if (is_compound_type) switch (SchemaMap.unwrapOptionType(types), opt_compound_tag) {
+            case (#Variant(_), ?#Candid(#Variant(_), #Text(tag))) return ?wrap_option(types, #Text(tag));
+            case (_) {};
+        };
+
+        return result;
+
+    };
+
+    public func set(
+        state : CandidMap,
+        schema_map : T.SchemaMap,
+        key : Text,
+        new_value : Candid,
+    ) : Result<(), Text> {
+        // Debug.print("set(): " # debug_show (key, new_value));
+        let { candid_map } = state;
+
+        let fields = Iter.toArray(Text.split(key, #text(".")));
+        let field = fields[fields.size() - 1];
+
+        // Debug.print("updating field: " # debug_show (field));
+
+        let ?types = SchemaMap.get(schema_map, key) else return #err("set(): Could not retrieve candid type for key '" # key # "'");
+        // Debug.print("types: " # debug_show (types));
+
+        let map = switch (get_and_cache_map_for_field(state, schema_map, key)) {
+            case (?map) map;
+            case (_) return #err("set(): Could not retrieve map with key '" # key # "'");
+
+            // !todo - need to debug code for appending element to array
+            // if (Mo.Text.isNumber(field)) {
+
+            //     let fields_excluding_last = Text.join("", Array.take(fields, fields.size() - 1).vals());
+
+            //     let ?(parent_map, is_optional) = get_and_cache_map_for_field(fields_excluding_last) else return #err("set(): Could not retrieve map with key '" # fields_excluding_last # "'");
+
+            //     let ?#CandidMap(nested_map) = Map.get(parent_map, thash, field) else return #err("set(): Could not retrieve map with key '" # field # "'");
+
+            //     let ?#Candid(#Array(_), #Array(array_size_wrapper)) = Map.get(nested_map, thash, IS_COMPOUND_TYPE) else return #err("set(): Expected map to be an array type");
+
+            //     let array_size = array_size_wrapper[0];
+
+            //     let index = Mo.Text.toNat(field);
+
+            //     if (index != array_size) {
+            //         return #err("set(): Array index out of bounds, expected to add element at index " # debug_show array_size # " but got " # debug_show index);
+            //     };
+
+            //     (nested_map, is_optional);
+
+            // } else return #err("set(): Could not retrieve map with key '" # key # "'");
+        };
+
+        // Debug.print("field: " # debug_show (field));
+        // Debug.print("map returned for set: " # debug_show (Map.toArray(map)));
+
+        switch (Map.get(map, thash, field)) {
+            case (?#Candid((candid_type, prev_candid))) {
+                let value : Candid = switch (candid_type) {
+                    case (#Option(opt_type)) {
+                        // Debug.print(debug_show (opt_type, new_value));
+                        let opt_value : Candid = switch (new_value) {
+                            case (#Null or #Option(_)) { new_value };
+                            case (unwrapped) {
+                                #Option(unwrapped);
+                            };
+                        };
+
+                    };
+
+                    case (_) new_value;
+                };
+
+                ignore Map.put<Text, NestedCandid>(map, thash, field, #Candid(candid_type, value));
             };
-            case (#Int8(i)) {
+            case (?#CandidMap(nested_map)) {
+                switch (Map.get(nested_map, thash, IS_COMPOUND_TYPE)) {
+                    case (?#Candid(#Variant(_), #Text(prev_tag))) {
 
-                let bytes = ByteUtils.from_int8(i);
+                        // Debug.print("updating variant from " # prev_tag # " to " # debug_show (new_value));
 
-                let iter = Itertools.prepend(
-                    TypeCode.Int8,
-                    bytes.vals(),
-                );
+                        let #Variant(curr_tag, new_candid) = new_value else Debug.trap("Expected a variant type");
+                        let #Variant(variant_types) = types else Debug.trap("Expected a variant type");
 
-                (iter, bytes.size() + 1);
-            };
-            case (#Int16(i)) {
-                let bytes = ByteUtils.from_int16(i);
+                        let ?(_, variant_type) = Itertools.find(
+                            variant_types.vals(),
+                            func(variant_type : (Text, T.Schema)) : Bool {
+                                variant_type.0 == curr_tag;
+                            },
+                        ) else Debug.trap("Expected a variant type");
 
-                let iter = Itertools.prepend(
-                    TypeCode.Int16,
-                    bytes.vals(),
-                );
+                        ignore Map.remove(nested_map, thash, prev_tag);
+                        ignore Map.put(nested_map, thash, curr_tag, #Candid(variant_type, new_candid));
+                        ignore Map.put(nested_map, thash, IS_COMPOUND_TYPE, #Candid(compound_types.variant(curr_tag)));
 
-                (iter, bytes.size() + 1);
-            };
-            case (#Int32(i)) {
-                let bytes = ByteUtils.from_int32(i);
+                        // Debug.print("map after update: " # debug_show (Map.toArray(nested_map)));
 
-                let iter = Itertools.prepend(
-                    TypeCode.Int32,
-                    bytes.vals(),
-                );
+                        // switch (Map.get(nested_map, thash, prev_tag), Map.get(nested_map, thash, curr_tag)) {
+                        //     case (?#Candid(prev_type, prev_value), ?#Candid(curr_type, curr_value)) {
+                        //         if (prev_tag != curr_tag) {
+                        //             ignore Map.put(nested_map, thash, prev_tag, #Candid(prev_type, #Null));
+                        //         };
 
-                (iter, bytes.size() + 1);
-            };
-            case (#Int64(i)) {
-                let bytes = ByteUtils.from_int64(i);
+                        //         ignore Map.put(nested_map, thash, curr_tag, #Candid(curr_type, new_candid));
+                        //         ignore Map.put(nested_map, thash, IS_COMPOUND_TYPE, #Candid(compound_types.variant(curr_tag)));
+                        //     };
+                        //     case (_) {};
+                        // };
 
-                let iter = Itertools.prepend(
-                    TypeCode.Int64,
-                    bytes.vals(),
-                );
+                    };
+                    case (?#Candid(#Tuple(_), #Nat(tuple_size))) {
 
-                (iter, bytes.size() + 1);
-            };
-            case (#Nat(i)) {
-                let bytes = ByteUtils.from_nat(i);
+                        let #Tuple(new_values) = new_value else Debug.trap("Expected a tuple type");
 
-                let iter = Itertools.prepend(
-                    TypeCode.Nat,
-                    bytes.vals(),
-                );
+                        if (new_values.size() != tuple_size) {
+                            Debug.trap("set(): Tuple size mismatch");
+                        };
 
-                (iter, bytes.size() + 1);
-            };
-            case (#Nat8(i)) {
-                let bytes = ByteUtils.from_nat8(i);
+                        for ((i, new_value) in Itertools.enumerate(new_values.vals())) {
+                            let key = Nat.toText(i);
 
-                let iter = Itertools.prepend(
-                    TypeCode.Nat8,
-                    bytes.vals(),
-                );
+                            switch (Map.get(nested_map, thash, key)) {
+                                case (?#Candid((candid_type, prev_candid))) {
+                                    // Debug.print("(candid_type, prev_candid, new_candid): " # debug_show ((candid_type, prev_candid, new_value)));
 
-                (iter, bytes.size() + 1);
-            };
-            case (#Nat16(i)) {
-                let bytes = ByteUtils.from_nat16_be(i);
+                                    if (Schema.validate(candid_type, new_value) != #ok()) {
+                                        return #err("set(): Invalid candid type for array index '" # key # "' -> " # debug_show (new_value) # ". Expected " # debug_show (candid_type));
+                                    };
 
-                let iter = Itertools.prepend(
-                    TypeCode.Nat16,
-                    bytes.vals(),
-                );
+                                    ignore Map.put(nested_map, thash, key, #Candid(candid_type, new_value));
+                                };
+                                case (_) return #err("set(): Could not find tuple index '" # key # "' in map");
+                            };
 
-                (iter, bytes.size() + 1);
-            };
-            case (#Nat32(i)) {
-                let bytes = ByteUtils.from_nat32_be(i);
+                        };
 
-                let iter = Itertools.prepend(
-                    TypeCode.Nat32,
-                    bytes.vals(),
-                );
+                    };
+                    case (?#Candid(#Array(array_type), #Nat(prev_size))) {
 
-                (iter, bytes.size() + 1);
-            };
-            case (#Nat64(i)) {
-                let bytes = ByteUtils.from_nat64_be(i);
+                        let #Array(new_values) = new_value else Debug.trap("Expected an array type");
 
-                let iter = Itertools.prepend(
-                    TypeCode.Nat64,
-                    bytes.vals(),
-                );
+                        for ((i, new_value) in Itertools.enumerate(new_values.vals())) {
+                            let key = Nat.toText(i);
 
-                (iter, bytes.size() + 1);
-            };
-            case (#Float(f)) {
-                let bytes = ByteUtils.from_float64(f);
+                            ignore Map.put(nested_map, thash, key, #Candid(array_type, new_value));
 
-                let iter = Itertools.prepend(
-                    TypeCode.Float,
-                    bytes.vals(),
-                );
+                        };
 
-                (iter, bytes.size() + 1);
-            };
-            case (#Text(t)) {
+                        if (prev_size > new_values.size()) {
+                            for (i in Itertools.range(new_values.size(), prev_size)) {
+                                let key = Nat.toText(i);
 
-                let text_bytes = Text.encodeUtf8(t);
-                let iter = Itertools.prepend(
-                    TypeCode.Text,
-                    text_bytes.vals(),
-                );
+                                ignore Map.remove(nested_map, thash, key);
+                            };
+                        };
 
-                (iter, text_bytes.size() + 1);
-            };
-            case (#Blob(b)) {
-                let iter = Itertools.chain(
-                    [TypeCode.Array, TypeCode.Nat8].vals(),
-                    Blob.toArray(b).vals(),
-                );
+                        ignore Map.put(nested_map, thash, IS_COMPOUND_TYPE, #Candid(compound_types.array(array_type, new_values.size())));
 
-                (iter, 2 + b.size());
+                    };
+
+                    case (_) {
+                        let ?candid_type = SchemaMap.get(schema_map, key) else return #err("set(): Could not retrieve candid type for key '" # key # "'");
+
+                        ignore Map.put(map, thash, field, #Candid(candid_type, new_value));
+                    };
+                };
 
             };
-            case (#Principal(p)) {
-                let p_bytes = Principal.toBlob(p);
+            case (_) return #err("set(): Could not find field '" # field # "' in map");
+        };
 
-                let iter = Itertools.prepend(
-                    TypeCode.Principal,
-                    Blob.toArray(Principal.toBlob(p)).vals(),
-                );
+        //    Debug.print("updated candid: " # debug_show extractCandid());
 
-                (iter, 1 + p_bytes.size());
-            };
-            case (#Option(candid_value)) {
-                let (nested_iter, size) = encode_candid_value(candid_value);
-                let iter = Itertools.prepend(
-                    TypeCode.Option,
-                    nested_iter,
-                );
+        #ok()
 
-                (iter, size + 1);
+    };
+
+    /// Assumes the new candid has the same schema as the original candid
+    public func reload({ candid_map } : CandidMap, schema_map : T.SchemaMap, new_id : Nat, new_candid : Candid) {
+        let ?(types) = SchemaMap.get(schema_map, "") else Debug.trap("CandidMap only accepts #Record types");
+
+        Map.clear(candid_map);
+        ignore Map.put(candid_map, thash, "", #Candid(types, new_candid));
+        ignore Map.put(candid_map, thash, C.DOCUMENT_ID, #Candid(#Nat, #Nat(new_id)));
+
+        // // unlike the `load()` method, we already have a map that might have cached nested documents
+        // // these cached documents are indicative of the fields that have been accessed and would most likely be accessed again
+        // // so we replace the values in the cached document fields with the new values
+        // func reload_record_into_map(map : Map.Map<Text, NestedCandid>, types : [(Text, T.Schema)], fields : [(Text, Candid)]) {
+        //     var var_fields = fields;
+
+        //     var i = 0;
+        //     while (i < var_fields.size()) {
+        //         let field = var_fields[i].0;
+        //         let candid_type = types[i].1;
+        //         let candid_value = var_fields[i].1;
+
+        //         let ?nested_candid = Map.get(map, thash, field) else return Debug.trap("CandidMap: Extra field not present in the original candid during reload");
+
+        //         switch (nested_candid) {
+        //             case (#CandidMap(nested_map)) {
+        //                 switch (candid_type, candid_value) {
+        //                     case (#Record(record_types) or #Map(record_types), #Record(nested_records) or #Map(nested_records)) {
+        //                         reload_record_into_map(nested_map, record_types, nested_records);
+        //                     };
+        //                     case (#Variant(variant_types), #Variant(variant)) {
+        //                         for ((variant_tag, variant_type) in variant_types.vals()) {
+        //                             ignore Map.put(nested_map, thash, variant_tag, #Candid(variant_type, #Null));
+        //                         };
+
+        //                         reload_record_into_map(nested_map, variant_types, [variant]);
+        //                     };
+        //                     case (_) {
+        //                         Debug.trap("CandidMap: Expected #Record, #Map or #Variant type in reload");
+        //                     };
+        //                 };
+        //             };
+        //             case (#Candid((candid_type, prev_candid_value))) {
+        //                 add_to_map(map, field, candid_type, candid_value);
+        //             };
+        //         };
+
+        //         i += 1;
+        //     };
+
+        //     // Debug.print("map: " # debug_show (Map.toArray(map)));
+
+        // };
+
+        // reload_record_into_map(candid_map, types, fields);
+    };
+
+    public func clone(candid_map : CandidMap, schema_map : T.SchemaMap) : CandidMap {
+        let extracted_candid = extractCandid(candid_map);
+        let ?(#Candid(#Nat, #Nat(id))) = Map.get(candid_map.candid_map, thash, C.DOCUMENT_ID) else Debug.trap("CandidMap.clone(): Could not find candid id");
+        let cloned = CandidMap.new(schema_map, id, extracted_candid);
+
+        cloned;
+    };
+
+    public func extractCandid(state : CandidMap) : Candid {
+        let { candid_map = map } = state;
+
+        func extract_candid_helper(map : Map.Map<Text, NestedCandid>) : Candid {
+
+            switch (Map.get(map, thash, IS_COMPOUND_TYPE)) {
+                case (?#Candid(#Variant(_), #Text(tag))) switch (Map.get(map, thash, tag)) {
+                    case (?#Candid(#Text, candid)) {
+                        return #Variant(tag, candid);
+                    };
+
+                    case (_) {};
+                };
+                case (?#Candid(#Tuple(_), #Nat(tuple_size))) {
+
+                    let tuples = Array.tabulate(
+                        tuple_size,
+                        func(i : Nat) : Candid {
+                            let index = Nat.toText(i);
+
+                            let ?candid = Map.get(map, thash, index) else Debug.trap("extract_candid_helper: Could not find value for tuple index '" # index # "'");
+
+                            switch (candid) {
+                                case (#Candid((candid_type, candid))) {
+                                    candid;
+                                };
+                                case (#CandidMap(nested_map)) {
+                                    extract_candid_helper(nested_map);
+                                };
+                            };
+
+                        },
+                    );
+
+                    return #Tuple(tuples);
+                };
+                case (?#Candid(#Array(_), #Nat(array_size))) {
+
+                    let array = Array.tabulate(
+                        array_size,
+                        func(i : Nat) : Candid {
+                            let index = Nat.toText(i);
+
+                            let ?candid = Map.get(map, thash, index) else Debug.trap("extract_candid_helper: Could not find value for array index '" # index # "'");
+
+                            switch (candid) {
+                                case (#Candid((candid_type, candid))) {
+                                    candid;
+                                };
+                                case (#CandidMap(nested_map)) {
+                                    extract_candid_helper(nested_map);
+                                };
+                            };
+
+                        },
+                    );
+
+                    return #Array(array);
+                };
+                case (_) {};
             };
-            case (_) {
-                Debug.trap("CandidMap: Does not support encoding of collection types : " # debug_show candid_value);
+
+            let fields = Array.map<(Text, NestedCandid), (Text, Candid)>(
+                Map.toArray<Text, NestedCandid>(map),
+                func((field, nested_candid) : (Text, NestedCandid)) : (Text, Candid) {
+                    switch (nested_candid) {
+                        case (#CandidMap(nested_map)) {
+                            switch (Map.get(nested_map, thash, IS_COMPOUND_TYPE)) {
+                                case (?#Candid(#Variant(_), #Text(tag))) {
+                                    let ?variant = Map.get(nested_map, thash, tag) else Debug.trap("extract_candid_helper: Could not find value for variant tag '" # tag # "'");
+
+                                    switch (variant) {
+                                        case (#Candid((candid_type, candid))) {
+                                            return (field, #Variant(tag, candid));
+                                        };
+                                        case (#CandidMap(deeper_nested_map)) (field, #Variant(tag, extract_candid_helper(deeper_nested_map)));
+                                    };
+
+                                };
+                                case (_) (field, extract_candid_helper(nested_map));
+                            };
+                        };
+                        case (#Candid((_candid_type, candid))) {
+                            (field, candid);
+                        };
+                    };
+                },
+            );
+
+            #Record(fields);
+        };
+
+        switch (Map.get(map, thash, "")) {
+            case (?#Candid((types, candid))) {
+                return candid;
             };
+            case (?#CandidMap(candid_map)) extract_candid_helper(candid_map);
+            case (null) extract_candid_helper(map);
         };
 
     };

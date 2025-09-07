@@ -79,7 +79,7 @@ const render_address = (from: Uint8Array | number[]) => {
     );
 };
 
-const format_with_icp_decimals = (amt: bigint) => Number(amt / 10n ** 8n);
+const format_with_icp_decimals = (amt: bigint) => Number(amt) / 10 ** 8;
 
 const render_icp = (amt: bigint) =>
     number_with_comma(
@@ -295,7 +295,7 @@ export const TxsTable = () => {
                 expected_allowance: block.tx.expected_allowance[0],
                 expires_at: block.tx.expires_at[0],
                 spender: block.tx.spender[0],
-                fee: block.fee,
+                fee: block.fee[0],
                 ts: block.ts,
                 btype: block.btype,
                 phash: block.phash[0],
@@ -488,7 +488,7 @@ export const TxsTable = () => {
 
     let heap_size = format_bytes(stats?.heap_size || 0);
     let stable_memory_size = format_bytes(stats?.stable_memory_size || 0);
-    let total_records = number_formatter.format(stats?.db_stats.records || 0);
+    let total_records = number_formatter.format(stats?.db_stats.documents || 0);
 
     return (
         <Space size="large" direction="vertical">
@@ -547,12 +547,12 @@ export const TxsTable = () => {
                                         and memory usage of each index in the
                                         collection. The indexes use a stable
                                         memory B-tree to store their index
-                                        fields and pointers to the records. The
+                                        fields and pointers to the documents. The
                                         B-tree has some memory overhead for
                                         storing metadata (internal nodes, leaf
                                         nodes, and pointers), while the rest is
                                         index data. The main index stores the
-                                        records and a default ':id' created by
+                                        documents and a default ':id' created by
                                         the system. The other B-trees are
                                         user-created indexes to speed up
                                         queries. Each index is created on a
@@ -566,7 +566,7 @@ export const TxsTable = () => {
                                         collection. The ':id' field is
                                         automatically added by the system to all
                                         indexes to support indexing duplicate
-                                        values (records with the same value for
+                                        values (documents with the same value for
                                         the indexed field). The fields 'ts' and
                                         'tx.amt' are included in most indexes to
                                         minimize the need for in-memory sorting,
@@ -834,8 +834,8 @@ export const TxsTable = () => {
                                 <Typography.Paragraph>
                                     We perform two database queries: one for the
                                     paginated data and another for the total
-                                    record count matching the query. Counting
-                                    all records can be resource-intensive if the
+                                    document count matching the query. Counting
+                                    all documents can be resource-intensive if the
                                     query isn't fully covered by a single index,
                                     as it may require additional in-memory
                                     operations like sorting, filtering, or
@@ -956,7 +956,7 @@ export const TxsTable = () => {
                     showQuickJumper
                     current={pagination.current}
                     total={Number(
-                        pagination.total || stats?.db_stats.records || 0,
+                        pagination.total || stats?.db_stats.documents || 0,
                     )}
                     pageSize={pagination.page_size}
                     onChange={handle_pagination_change}

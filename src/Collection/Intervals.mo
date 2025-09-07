@@ -15,20 +15,15 @@ import Decoder "mo:serde/Candid/Blob/Decoder";
 import Candid "mo:serde/Candid";
 import Itertools "mo:itertools/Iter";
 import RevIter "mo:itertools/RevIter";
-import Tag "mo:candid/Tag";
 import BitMap "mo:bit-map";
 import Vector "mo:vector";
 
-import MemoryBTree "mo:memory-collection/MemoryBTree/Stable";
 import TypeUtils "mo:memory-collection/TypeUtils";
 import Int8Cmp "mo:memory-collection/TypeUtils/Int8Cmp";
 
 import T "../Types";
 import Query "../Query";
 import Utils "../Utils";
-import CandidMap "../CandidMap";
-import ByteUtils "../ByteUtils";
-import LegacyCandidMap "../LegacyCandidMap";
 
 import Index "Index";
 import Orchid "Orchid";
@@ -49,8 +44,6 @@ module {
     public type RevIter<A> = RevIter.RevIter<A>;
     type QueryBuilder = Query.QueryBuilder;
 
-    // public type MemoryBTree = MemoryBTree.VersionedMemoryBTree;
-    public type BTreeUtils<K, V> = MemoryBTree.BTreeUtils<K, V>;
     public type TypeUtils<A> = TypeUtils.TypeUtils<A>;
 
     public type Order = Order.Order;
@@ -64,14 +57,14 @@ module {
     public type State<R> = T.State<R>;
     public type ZenQueryLang = T.ZenQueryLang;
 
-    public type Candify<A> = T.Candify<A>;
+    public type InternalCandify<A> = T.Candify<A>;
 
     public type StableCollection = T.StableCollection;
 
     public type IndexKeyFields = T.IndexKeyFields;
 
     // Returns the range that is common to all intervals
-    public func intervals_intersect(intervals : Buffer.Buffer<(Nat, Nat)>) : ?(Nat, Nat) {
+    public func intersect(intervals : Buffer.Buffer<(Nat, Nat)>) : ?(Nat, Nat) {
 
         var start = intervals.get(0).0;
         var end = intervals.get(0).1;
@@ -90,7 +83,7 @@ module {
 
     // merges adjacent or overlapping intervals
     // - done in place
-    public func intervals_union(intervals : Buffer.Buffer<(Nat, Nat)>) {
+    public func union(intervals : Buffer.Buffer<(Nat, Nat)>) {
 
         func tuple_sort(a : (Nat, Nat), b : (Nat, Nat)) : Order {
             Nat.compare(a.0, b.0);
@@ -139,9 +132,9 @@ module {
         count;
     };
 
-    // tries to skip the number of records requested within the instruction limit
-    // returns the number of records skipped
-    public func extract_intervals_in_pagination_range(collection : StableCollection, skip : Nat, opt_limit : ?Nat, index_name : Text, intervals : [(Nat, Nat)], sorted_in_reverse : Bool) : Iter<Nat> {
+    // tries to skip the number of documents requested within the instruction limit
+    // returns the number of documents skipped
+    public func extractIntervalsInPaginationRange(collection : StableCollection, skip : Nat, opt_limit : ?Nat, index_name : Text, intervals : [(Nat, Nat)], sorted_in_reverse : Bool) : Iter<Nat> {
         // Debug.print("skip, opt_limit: " # debug_show (skip, opt_limit));
 
         var skipped = 0;
@@ -192,7 +185,7 @@ module {
 
         let limit = switch (opt_limit) {
             case (null) {
-                return CollectionUtils.record_ids_from_index_intervals(collection, index_name, new_intervals, sorted_in_reverse);
+                return CollectionUtils.documentIdsFromIndexIntervals(collection, index_name, new_intervals, sorted_in_reverse);
             };
             case (?limit) limit;
         };
@@ -221,7 +214,7 @@ module {
         // Debug.print("i: " # debug_show i);
 
         if (i == intervals.size()) {
-            return CollectionUtils.record_ids_from_index_intervals(collection, index_name, new_intervals, sorted_in_reverse);
+            return CollectionUtils.documentIdsFromIndexIntervals(collection, index_name, new_intervals, sorted_in_reverse);
         };
 
         let even_newer_intervals = Array.tabulate<(Nat, Nat)>(
@@ -240,11 +233,11 @@ module {
 
         // Debug.print("even_newer_intervals: " # debug_show even_newer_intervals);
 
-        return CollectionUtils.record_ids_from_index_intervals(collection, index_name, even_newer_intervals, sorted_in_reverse);
+        return CollectionUtils.documentIdsFromIndexIntervals(collection, index_name, even_newer_intervals, sorted_in_reverse);
 
     };
 
-    public func extract_intervals_in_pagination_range_for_reversed_intervals(
+    public func extractIntervalsInPaginationRangeForReversedIntervals(
         collection : StableCollection,
         skip : Nat,
         opt_limit : ?Nat,
@@ -306,7 +299,7 @@ module {
 
         let limit = switch (opt_limit) {
             case (null) {
-                return CollectionUtils.record_ids_from_index_intervals(collection, index_name, new_intervals, sorted_in_reverse);
+                return CollectionUtils.documentIdsFromIndexIntervals(collection, index_name, new_intervals, sorted_in_reverse);
             };
             case (?limit) limit;
         };
@@ -334,7 +327,7 @@ module {
         // Debug.print("i: " # debug_show i);
 
         if (i == 0) {
-            return CollectionUtils.record_ids_from_index_intervals(collection, index_name, new_intervals, sorted_in_reverse);
+            return CollectionUtils.documentIdsFromIndexIntervals(collection, index_name, new_intervals, sorted_in_reverse);
         };
 
         let remaining_limit = limit - prev;
@@ -365,7 +358,7 @@ module {
 
         // Debug.print("even_newer_intervals: " # debug_show even_newer_intervals);
 
-        return CollectionUtils.record_ids_from_index_intervals(collection, index_name, even_newer_intervals, sorted_in_reverse);
+        return CollectionUtils.documentIdsFromIndexIntervals(collection, index_name, even_newer_intervals, sorted_in_reverse);
 
     };
 
