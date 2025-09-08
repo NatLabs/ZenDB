@@ -109,6 +109,7 @@ module {
 
         /// Returns the collection name.
         public func name() : Text = collection_name;
+        public func get_schema() : T.Schema { collection.schema };
 
         /// Returns the total number of documents in the collection.
         public func size() : Nat = StableCollection.size(collection);
@@ -209,7 +210,7 @@ module {
         public func searchIter(query_builder : QueryBuilder) : Result<Iter<T.WrapId<Record>>, Text> {
             switch (
                 handleResult(
-                    StableCollection.internalSearch(collection, query_builder),
+                    StableCollection.internalSearch(collection, query_builder.build()),
                     "Failed to execute search",
                 )
             ) {
@@ -278,7 +279,7 @@ module {
         public func search(query_builder : QueryBuilder) : Result<[T.WrapId<Record>], Text> {
             switch (
                 handleResult(
-                    StableCollection.internalSearch(collection, query_builder),
+                    StableCollection.internalSearch(collection, query_builder.build()),
                     "Failed to execute search",
                 )
             ) {
@@ -333,7 +334,7 @@ module {
         public func update(query_builder : QueryBuilder, update_operations : [(Text, T.FieldUpdateOperations)]) : Result<Nat, Text> {
             let documents_iter = switch (
                 handleResult(
-                    StableCollection.internalSearch(collection, query_builder),
+                    StableCollection.internalSearch(collection, query_builder.build()),
                     "Failed to find documents to update",
                 )
             ) {
@@ -373,7 +374,7 @@ module {
 
         public func delete(query_builder : QueryBuilder) : Result<[(T.DocumentId, Record)], Text> {
             let internal_search_res = handleResult(
-                StableCollection.internalSearch(collection, query_builder),
+                StableCollection.internalSearch(collection, query_builder.build()),
                 "Failed to find documents to delete",
             );
 

@@ -189,6 +189,7 @@ module T {
 
     public type StableDatabase = {
         ids : Ids;
+        name : Text;
         collections : Map<Text, StableCollection>;
         memory_type : MemoryType;
 
@@ -318,6 +319,42 @@ module T {
         schemaConstraints : [T.SchemaConstraint];
     };
 
+    /// MemoryBTree Stats
+    ///
+    /// ## Memory BTree Statistics
+    ///
+    /// ### Memory Allocation
+    /// - **allocatedPages**: Total pages allocated across all regions
+    ///   - Data region pages
+    ///   - Values region pages
+    ///   - Leaves region pages
+    ///   - Branches region pages
+    /// - **bytesPerPage**: Size of each memory page
+    /// - **allocatedBytes**: Total bytes available from allocated pages
+    ///   - Sum of capacity across all regions (data + values + leaves + branches)
+    /// - **usedBytes**: Bytes currently in use across all regions
+    ///   - Sum of allocated bytes across all regions (data + values + leaves + branches)
+    /// - **freeBytes**: Unused bytes (allocatedBytes - usedBytes)
+    ///
+    /// ### Data Storage
+    /// - **dataBytes**: Bytes used for storing keys and values
+    ///   - Data region (keys)
+    ///   - Values region (values)
+    /// - **keyBytes**: Bytes used specifically for storing keys (data region)
+    /// - **valueBytes**: Bytes used specifically for storing values (values region)
+    ///
+    /// ### Metadata Storage
+    /// - **metadataBytes**: Bytes used for internal nodes
+    ///   - Leaves region
+    ///   - Branches region
+    /// - **leafBytes**: Bytes used specifically for leaf nodes
+    /// - **branchBytes**: Bytes used specifically for branch nodes
+    ///
+    /// ### Node Counts
+    /// - **leafCount**: Number of leaf nodes in the BTree
+    /// - **branchCount**: Number of branch nodes in the BTree
+    /// - **totalNodeCount**: Total number of nodes (leafCount + branchCount)
+
     public type MemoryBTreeStats = MemoryBTree.MemoryBTreeStats;
 
     public type IndexStats = {
@@ -345,8 +382,7 @@ module T {
         /// The total size in bytes of all index keys
         totalIndexKeySize : Nat;
 
-        avgDocumentIdSize : Nat;
-        totalDocumentIdSize : Nat;
+        totalIndexDataSize : Nat;
 
     };
 
@@ -369,18 +405,81 @@ module T {
         /// The index information for the collection
         indexes : [IndexStats];
 
-        avgDocumentIdSize : Nat;
-        totalDocumentIdSize : Nat;
-
         /// The average size in bytes of a document in the collection
         avgDocumentSize : Nat;
 
         /// The total size in bytes of all documents in the collection
         totalDocumentSize : Nat;
 
+        /// The total size in bytes of all indexes in the collection
+        totalIndexDataSize : Nat;
+
+        totalAllocatedBytes : Nat;
+
+        totalUsedBytes : Nat;
+
+        totalFreeBytes : Nat;
+
+        totalDataBytes : Nat;
+
+        totalMetadataBytes : Nat;
+
         // replicated_query_instructions : Nat;
 
         // schema_versions : [Schema]
+
+    };
+
+    public type DatabaseStats = {
+        /// The name of the database
+        name : Text;
+
+        /// The database's memory type
+        memoryType : MemoryType;
+
+        /// The number of collections in the database
+        collections : Nat;
+
+        /// The collection statistics for each collection in the database
+        collectionStats : [CollectionStats];
+
+        /// The total memory allocation across all collections in the database
+        totalAllocatedBytes : Nat;
+
+        /// The total memory currently used across all collections in the database
+        totalUsedBytes : Nat;
+
+        /// The total memory available across all collections in the database
+        totalFreeBytes : Nat;
+
+        totalDataBytes : Nat;
+        totalMetadataBytes : Nat;
+        totalIndexDataBytes : Nat;
+
+    };
+
+    public type InstanceStats = {
+        /// The memory type of the instance
+        memory_type : MemoryType;
+
+        /// The number of databases in the instance
+        databases : Nat;
+
+        /// The database statistics for each database in the instance
+        databaseStats : [DatabaseStats];
+
+        /// The total memory allocation across all databases in the instance
+        totalAllocatedBytes : Nat;
+
+        /// The total memory currently used across all databases in the instance
+        totalUsedBytes : Nat;
+
+        /// The total memory available across all databases in the instance
+        totalFreeBytes : Nat;
+
+        totalDataBytes : Nat;
+        totalMetadataBytes : Nat;
+        totalIndexDataBytes : Nat;
 
     };
 

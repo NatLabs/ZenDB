@@ -264,4 +264,44 @@ module {
         #ok(stable_collection);
     };
 
+    public func stats(db : T.StableDatabase) : T.DatabaseStats {
+        let collections = Map.toArray<Text, T.StableCollection>(db.collections);
+
+        let collection_stats = Array.map(
+            collections,
+            func((collection_name, stable_collection) : (Text, T.StableCollection)) : T.CollectionStats {
+                StableCollection.stats(stable_collection);
+            },
+        );
+
+        var total_allocated_bytes : Nat = 0;
+        var total_free_bytes : Nat = 0;
+        var total_used_bytes : Nat = 0;
+        var total_data_bytes : Nat = 0;
+        var total_metadata_bytes : Nat = 0;
+        var total_index_data_bytes : Nat = 0;
+
+        for (stats in collection_stats.vals()) {
+            total_allocated_bytes += stats.totalAllocatedBytes;
+            total_free_bytes += stats.totalFreeBytes;
+            total_used_bytes += stats.totalUsedBytes;
+            total_data_bytes += stats.totalDocumentSize;
+            total_metadata_bytes += stats.totalMetadataBytes;
+            total_index_data_bytes += stats.totalIndexDataSize;
+        };
+
+        {
+            name = db.name;
+            memoryType = db.memory_type;
+            collections = collections.size();
+            collectionStats = collection_stats;
+            totalAllocatedBytes = total_allocated_bytes;
+            totalUsedBytes = total_used_bytes;
+            totalFreeBytes = total_free_bytes;
+            totalDataBytes = total_data_bytes;
+            totalMetadataBytes = total_metadata_bytes;
+            totalIndexDataBytes = total_index_data_bytes;
+        };
+    };
+
 };

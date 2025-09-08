@@ -9,6 +9,11 @@
         "canister-db": {
             "type": "motoko",
             "main": "src/CanisterDB/CanisterDB.mo"
+        },
+        "cluster-tests": {
+            "type": "motoko",
+            "main": "./tests/cluster-tests/ClusterManager.Test.mo",
+            "args": "--max-stable-pages 6553600"
         }
     },
     "defaults": {

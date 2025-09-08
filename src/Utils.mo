@@ -14,6 +14,7 @@ import Option "mo:base/Option";
 import Hash "mo:base/Hash";
 import Float "mo:base/Float";
 import Blob "mo:base/Blob";
+import Prelude "mo:base/Prelude";
 
 import Int "mo:base/Int";
 
@@ -36,6 +37,28 @@ module {
     type Order = Order.Order;
 
     public let TypeUtils = _TypeUtils;
+
+    public func convert_to_internal_candify<A>(collection_name : Text, external_candify : T.Candify<A>) : T.InternalCandify<A> {
+        {
+            from_blob = func(blob : Blob) : A {
+                switch (external_candify.from_blob(blob)) {
+                    case (?document) document;
+                    case (null) Debug.trap("
+                        Could not convert candid blob (" # debug_show blob # ") to motoko using the '" # collection_name # "' collection's schema.
+                        If the schema and the candify encoding function are correct, then the blob might be corrupted or not a valid candid blob.
+                        Please report this issue to the developers by creating a new issue on the GitHub repository.  ");
+                };
+            };
+            to_blob = external_candify.to_blob;
+        };
+    };
+
+    public func send_error<OldOk, NewOk, Error>(res : T.Result<OldOk, Error>) : T.Result<NewOk, Error> {
+        switch (res) {
+            case (#ok(_)) Prelude.unreachable();
+            case (#err(errorMsg)) #err(errorMsg);
+        };
+    };
 
     public func ignoreThis() : None {
         Debug.trap("trap caused by ignoreThis()");

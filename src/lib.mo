@@ -33,6 +33,7 @@ import Collection "Collection";
 import Database "Database";
 import Query "Query";
 import Logger "Logger";
+import StableDatabase "Database/StableDatabase";
 
 import T "Types";
 import C "Constants";
@@ -132,6 +133,7 @@ module {
         };
 
         let default_db : T.StableDatabase = {
+            name = "default";
             ids = zendb.ids;
             collections = Map.new<Text, T.StableCollection>();
             freed_btrees = zendb.freed_btrees;
@@ -164,6 +166,7 @@ module {
         };
 
         let db : T.StableDatabase = {
+            name = db_name;
             ids = sstore.ids;
             collections = Map.new<Text, T.StableCollection>();
             freed_btrees = sstore.freed_btrees;
@@ -193,5 +196,39 @@ module {
 
     public let QueryBuilder = Query.QueryBuilder;
     public type QueryBuilder = Query.QueryBuilder;
+
+    public func stats(sstore : T.StableStore) : T.InstanceStats {
+        let dbStats = Buffer.Buffer<T.DatabaseStats>(0);
+        var totalAllocated : Nat = 0;
+        var totalUsed : Nat = 0;
+        var totalFree : Nat = 0;
+        var totalData : Nat = 0;
+        var totalMetadata : Nat = 0;
+        var totalIndexData : Nat = 0;
+
+        for ((name, db) in Map.entries(sstore.databases)) {
+            let dbStat = StableDatabase.stats(db);
+            dbStats.add(dbStat);
+
+            totalAllocated += dbStat.totalAllocatedBytes;
+            totalUsed += dbStat.totalUsedBytes;
+            totalFree += dbStat.totalFreeBytes;
+            totalData += dbStat.totalDataBytes;
+            totalMetadata += dbStat.totalMetadataBytes;
+            totalIndexData += dbStat.totalIndexDataBytes;
+        };
+
+        {
+            memory_type = sstore.memory_type;
+            databases = Map.size(sstore.databases);
+            databaseStats = Buffer.toArray(dbStats);
+            totalAllocatedBytes = totalAllocated;
+            totalUsedBytes = totalUsed;
+            totalFreeBytes = totalFree;
+            totalDataBytes = totalData;
+            totalMetadataBytes = totalMetadata;
+            totalIndexDataBytes = totalIndexData;
+        };
+    };
 
 };

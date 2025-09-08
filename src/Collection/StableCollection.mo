@@ -917,14 +917,14 @@ module StableCollection {
     public func search(
         collection : StableCollection,
         main_btree_utils : T.BTreeUtils<Nat, T.Document>,
-        query_builder : QueryBuilder,
+        stable_query : T.StableQuery,
     ) : Result<[(T.WrapId<T.CandidBlob>)], Text> {
         Logger.lazyDebug(
             collection.logger,
-            func() = "Executing search with query: " # debug_show (query_builder.build()),
+            func() = "Executing search with query: " # debug_show (stable_query),
         );
 
-        switch (internalSearch(collection, query_builder)) {
+        switch (internalSearch(collection, stable_query)) {
             case (#err(err)) {
                 return #err("Search failed: " # err);
             };
@@ -1006,8 +1006,8 @@ module StableCollection {
         return #ok((iter));
     };
 
-    public func internalSearch(collection : StableCollection, query_builder : QueryBuilder) : Result<Iter<Nat>, Text> {
-        let stable_query = query_builder.build();
+    public func internalSearch(collection : StableCollection, stable_query : T.StableQuery) : Result<Iter<Nat>, Text> {
+        // let stable_query = query_builder.build();
         switch (evaluateQuery(collection, stable_query)) {
             case (#err(err)) return #err(err);
             case (#ok(eval_result)) #ok(eval_result);
@@ -1039,7 +1039,7 @@ module StableCollection {
         main_btree_utils : T.BTreeUtils<Nat, T.Document>,
         query_builder : QueryBuilder,
     ) : Result<Iter<T.WrapId<T.CandidBlob>>, Text> {
-        switch (internalSearch(collection, query_builder)) {
+        switch (internalSearch(collection, query_builder.build())) {
             case (#err(err)) return #err(err);
             case (#ok(document_ids_iter)) {
                 let document_iter = idsToCandidBlobs(collection, document_ids_iter);
@@ -1159,16 +1159,34 @@ module StableCollection {
                         usedInternally = index.used_internally;
 
                         // the index fields values are stored as the keys
-                        avgIndexKeySize = memory.keyBytes / entries;
+                        avgIndexKeySize = if (entries == 0) 0 else (memory.keyBytes / entries);
                         totalIndexKeySize = memory.keyBytes;
 
-                        // document ids are stored as the values
-                        avgDocumentIdSize = memory.valueBytes / entries;
-                        totalDocumentIdSize = memory.valueBytes;
+                        // includes the key and the document id as the value
+                        totalIndexDataSize = memory.dataBytes;
+
                     };
                 },
             )
         );
+
+        var total_allocated_bytes : Nat = main_collection_memory.allocatedBytes;
+        var total_free_bytes : Nat = main_collection_memory.freeBytes;
+        var total_used_bytes : Nat = main_collection_memory.usedBytes;
+        var total_data_bytes : Nat = main_collection_memory.dataBytes;
+        var total_metadata_bytes : Nat = main_collection_memory.metadataBytes;
+
+        var total_index_data_bytes : Nat = 0;
+
+        for (index_stats in indexes.vals()) {
+            total_allocated_bytes += index_stats.memory.allocatedBytes;
+            total_free_bytes += index_stats.memory.freeBytes;
+            total_used_bytes += index_stats.memory.usedBytes;
+            total_data_bytes += index_stats.memory.dataBytes;
+            total_metadata_bytes += index_stats.memory.metadataBytes;
+
+            total_index_data_bytes += index_stats.totalIndexDataSize;
+        };
 
         let collection_stats : T.CollectionStats = {
             name = collection.name;
@@ -1177,14 +1195,18 @@ module StableCollection {
             memory = main_collection_memory;
             memoryType = collection.memory_type;
 
-            // ids are stored as the keys in the collection
-            avgDocumentIdSize = main_collection_memory.keyBytes / total_documents;
-            totalDocumentIdSize = main_collection_memory.keyBytes;
-
-            // documents are stored as the values in the collection
-            avgDocumentSize = main_collection_memory.valueBytes / total_documents;
-            totalDocumentSize = main_collection_memory.valueBytes;
+            // Each entry is a document stored as an 8 byte key and the candid blob as the value
+            avgDocumentSize = if (total_documents == 0) 0 else (main_collection_memory.dataBytes / total_documents);
+            totalDocumentSize = main_collection_memory.dataBytes;
             indexes;
+
+            totalAllocatedBytes = total_allocated_bytes;
+            totalFreeBytes = total_free_bytes;
+            totalUsedBytes = total_used_bytes;
+            totalDataBytes = total_data_bytes;
+            totalMetadataBytes = total_metadata_bytes;
+
+            totalIndexDataSize = total_index_data_bytes;
         };
 
         collection_stats;

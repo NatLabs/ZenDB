@@ -82,7 +82,7 @@ export interface CanisterDB {
     [string, StableQuery],
     Result_3
   >,
-  'zendb_collection_create_index' : ActorMethod<
+  'zendb_create_collection_index' : ActorMethod<
     [string, Array<string>],
     Result
   >,
@@ -91,21 +91,21 @@ export interface CanisterDB {
     Result
   >,
   'zendb_collection_delete_record_by_id' : ActorMethod<
-    [string, RecordId],
+    [string, DocumentId],
     Result
   >,
   'zendb_collection_find_records' : ActorMethod<
     [string, StableQuery],
     Result_7
   >,
-  'zendb_collection_get_record' : ActorMethod<[string, RecordId], Result_6>,
+  'zendb_collection_get_record' : ActorMethod<[string, DocumentId], Result_6>,
   'zendb_collection_insert_all_records' : ActorMethod<
     [string, Array<Candid>],
     Result_5
   >,
   'zendb_collection_insert_record' : ActorMethod<[string, Candid], Result_5>,
   'zendb_collection_insert_record_with_id' : ActorMethod<
-    [string, RecordId, Candid],
+    [string, DocumentId, Candid],
     Result
   >,
   'zendb_collection_schema' : ActorMethod<[string], Result_4>,
@@ -136,7 +136,7 @@ export interface MemoryStats {
 }
 export type PaginationDirection = { 'Backward' : null } |
   { 'Forward' : null };
-export type RecordId = bigint;
+export type DocumentId = bigint;
 export type Result = { 'ok' : null } |
   { 'err' : string };
 export type Result_1 = { 'ok' : string } |
@@ -147,13 +147,13 @@ export type Result_3 = { 'ok' : bigint } |
   { 'err' : string };
 export type Result_4 = { 'ok' : Schema } |
   { 'err' : string };
-export type Result_5 = { 'ok' : RecordId } |
+export type Result_5 = { 'ok' : DocumentId } |
   { 'err' : string };
 export type Result_6 = { 'ok' : CandidBlob } |
   { 'err' : string };
 export type Result_7 = { 'ok' : CrossCanisterRecordsCursor } |
   { 'err' : string };
-export type Result_8 = { 'ok' : Array<[RecordId, CandidBlob]> } |
+export type Result_8 = { 'ok' : Array<[DocumentId, CandidBlob]> } |
   { 'err' : string };
 export type Schema = { 'Int' : null } |
   { 'Map' : Array<[string, CandidType]> } |
