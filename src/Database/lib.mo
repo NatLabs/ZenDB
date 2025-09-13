@@ -148,7 +148,7 @@ module {
                 case (#err(msg)) return Utils.logErrorMsg(stable_db.logger, msg);
             };
 
-            switch (StableDatabase.createCollection(stable_db, name, schema, options)) {
+            switch (StableDatabase.create_collection(stable_db, name, schema, options)) {
                 case (#ok(stable_collection)) {
                     #ok(
                         Collection.Collection<Record>(
@@ -169,7 +169,7 @@ module {
             external_candify : T.Candify<Record>,
         ) : Result<Collection<Record>, Text> {
 
-            switch (StableDatabase.getCollection(stable_db, name)) {
+            switch (StableDatabase.get_collection(stable_db, name)) {
                 case (#ok(stable_collection)) {
                     #ok(
                         Collection.Collection<Record>(
@@ -189,7 +189,7 @@ module {
             index_fields : [(Text, T.SortDirection)],
             is_unique : Bool,
         ) : T.Result<(), Text> {
-            let stable_collection = switch (StableDatabase.getCollection(stable_db, collection_name)) {
+            let stable_collection = switch (StableDatabase.get_collection(stable_db, collection_name)) {
                 case (#ok(stable_collection)) stable_collection;
                 case (#err(msg)) return #err(msg);
             };

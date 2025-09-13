@@ -194,6 +194,7 @@ module T {
 
     public type StableDatabase = {
         ids : Ids;
+        name : Text;
         collections : Map<Text, StableCollection>;
         memory_type : MemoryType;
 
@@ -308,7 +309,6 @@ module T {
         #IndexScan : IndexScanDetails;
         #FullScan : FullScanDetails;
     };
-
     public type QueryPlan = {
         is_and_operation : Bool;
         subplans : [QueryPlan]; // result of nested #And/#Or operations
@@ -317,12 +317,48 @@ module T {
     };
 
     public type CreateIndexOptions = {
-        isUnique : Bool;
+        is_unique : Bool;
     };
 
     public type CreateCollectionOptions = {
         schemaConstraints : [T.SchemaConstraint];
     };
+
+    /// MemoryBTree Stats
+    ///
+    /// ## Memory BTree Statistics
+    ///
+    /// ### Memory Allocation
+    /// - **allocatedPages**: Total pages allocated across all regions
+    ///   - Data region pages
+    ///   - Values region pages
+    ///   - Leaves region pages
+    ///   - Branches region pages
+    /// - **bytesPerPage**: Size of each memory page
+    /// - **allocatedBytes**: Total bytes available from allocated pages
+    ///   - Sum of capacity across all regions (data + values + leaves + branches)
+    /// - **usedBytes**: Bytes currently in use across all regions
+    ///   - Sum of allocated bytes across all regions (data + values + leaves + branches)
+    /// - **freeBytes**: Unused bytes (allocatedBytes - usedBytes)
+    ///
+    /// ### Data Storage
+    /// - **dataBytes**: Bytes used for storing keys and values
+    ///   - Data region (keys)
+    ///   - Values region (values)
+    /// - **keyBytes**: Bytes used specifically for storing keys (data region)
+    /// - **valueBytes**: Bytes used specifically for storing values (values region)
+    ///
+    /// ### Metadata Storage
+    /// - **metadataBytes**: Bytes used for internal nodes
+    ///   - Leaves region
+    ///   - Branches region
+    /// - **leafBytes**: Bytes used specifically for leaf nodes
+    /// - **branchBytes**: Bytes used specifically for branch nodes
+    ///
+    /// ### Node Counts
+    /// - **leafCount**: Number of leaf nodes in the BTree
+    /// - **branchCount**: Number of branch nodes in the BTree
+    /// - **totalNodeCount**: Total number of nodes (leafCount + branchCount)
 
     public type MemoryBTreeStats = MemoryBTree.MemoryBTreeStats;
 
@@ -340,19 +376,18 @@ module T {
         memory : MemoryBTreeStats;
 
         /// Flag indicating if the index is unique
-        isUnique : Bool;
+        is_unique : Bool;
 
         /// Flag indicating if the index is used internally (these indexes cannot be deleted by user)
-        usedInternally : Bool;
+        used_internally : Bool;
 
         /// The average size in bytes of an index key
-        avgIndexKeySize : Nat;
+        avg_index_key_size : Nat;
 
         /// The total size in bytes of all index keys
-        totalIndexKeySize : Nat;
+        total_index_key_size : Nat;
 
-        avgDocumentIdSize : Nat;
-        totalDocumentIdSize : Nat;
+        total_index_data_bytes : Nat;
 
     };
 
@@ -375,18 +410,87 @@ module T {
         /// The index information for the collection
         indexes : [IndexStats];
 
-        avgDocumentIdSize : Nat;
-        totalDocumentIdSize : Nat;
-
         /// The average size in bytes of a document in the collection
-        avgDocumentSize : Nat;
+        avg_document_size : Nat;
 
         /// The total size in bytes of all documents in the collection
-        totalDocumentSize : Nat;
+        total_document_size : Nat;
+
+        total_allocated_bytes : Nat;
+
+        total_used_bytes : Nat;
+
+        total_free_bytes : Nat;
+
+        total_data_bytes : Nat;
+
+        total_metadata_bytes : Nat;
+
+        total_document_store_bytes : Nat;
+
+        /// The total size in bytes of all indexes in the collection
+        total_index_store_bytes : Nat;
 
         // replicated_query_instructions : Nat;
 
         // schema_versions : [Schema]
+
+    };
+
+    public type DatabaseStats = {
+        /// The name of the database
+        name : Text;
+
+        /// The database's memory type
+        memoryType : MemoryType;
+
+        /// The number of collections in the database
+        collections : Nat;
+
+        /// The collection statistics for each collection in the database
+        collection_stats : [CollectionStats];
+
+        /// The total memory allocation across all collections in the database
+        total_allocated_bytes : Nat;
+
+        /// The total memory currently used across all collections in the database
+        total_used_bytes : Nat;
+
+        /// The total memory available across all collections in the database
+        total_free_bytes : Nat;
+
+        total_data_bytes : Nat;
+        total_metadata_bytes : Nat;
+
+        total_document_store_bytes : Nat;
+        total_index_store_bytes : Nat;
+
+    };
+
+    public type InstanceStats = {
+        /// The memory type of the instance
+        memory_type : MemoryType;
+
+        /// The number of databases in the instance
+        databases : Nat;
+
+        /// The database statistics for each database in the instance
+        database_stats : [DatabaseStats];
+
+        /// The total memory allocation across all databases in the instance
+        total_allocated_bytes : Nat;
+
+        /// The total memory currently used across all databases in the instance
+        total_used_bytes : Nat;
+
+        /// The total memory available across all databases in the instance
+        total_free_bytes : Nat;
+
+        total_data_bytes : Nat;
+        total_metadata_bytes : Nat;
+
+        total_document_store_bytes : Nat;
+        total_index_store_bytes : Nat;
 
     };
 

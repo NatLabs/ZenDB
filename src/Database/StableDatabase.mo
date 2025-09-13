@@ -65,22 +65,22 @@ module {
         schemaConstraints : [T.SchemaConstraint];
     };
 
-    public func createCollection(db : T.StableDatabase, name : Text, schema : T.Schema, options : ?T.CreateCollectionOptions) : Result<StableCollection, Text> {
+    public func create_collection(db : T.StableDatabase, name : Text, schema : T.Schema, options : ?T.CreateCollectionOptions) : Result<StableCollection, Text> {
 
         Logger.lazyInfo(
             db.logger,
-            func() = "StableDatabase.createCollection(): Creating collection '" # name # "'",
+            func() = "StableDatabase.create_collection(): Creating collection '" # name # "'",
         );
 
         switch (Schema.validateSchema(schema)) {
             case (#ok(_)) {
                 Logger.lazyInfo(
                     db.logger,
-                    func() = "StableDatabase.createCollection(): Schema validation passed for collection '" # name # "'",
+                    func() = "StableDatabase.create_collection(): Schema validation passed for collection '" # name # "'",
                 );
             };
             case (#err(msg)) {
-                let error_msg = "StableDatabase.createCollection(): Schema validation failed: " # msg;
+                let error_msg = "StableDatabase.create_collection(): Schema validation failed: " # msg;
                 return logErrorMsg(db.logger, error_msg);
             };
         };
@@ -91,27 +91,27 @@ module {
             case (?stable_collection) {
                 Logger.lazyDebug(
                     db.logger,
-                    func() = "StableDatabase.createCollection(): Collection '" # name # "' already exists, checking schema compatibility",
+                    func() = "StableDatabase.create_collection(): Collection '" # name # "' already exists, checking schema compatibility",
                 );
 
                 if (stable_collection.schema != processed_schema) {
                     Logger.lazyError(
                         db.logger,
-                        func() = "StableDatabase.createCollection(): Schema mismatch for existing collection '" # name # "'",
+                        func() = "StableDatabase.create_collection(): Schema mismatch for existing collection '" # name # "'",
                     );
                     return logErrorMsg(db.logger, "Schema error: collection already exists with different schema");
                 };
 
                 Logger.lazyInfo(
                     db.logger,
-                    func() = "StableDatabase.createCollection(): Returning existing collection '" # name # "'",
+                    func() = "StableDatabase.create_collection(): Returning existing collection '" # name # "'",
                 );
                 return #ok(stable_collection);
             };
             case (null) {
                 Logger.lazyDebug(
                     db.logger,
-                    func() = "StableDatabase.createCollection(): Collection '" # name # "' does not exist, creating new one",
+                    func() = "StableDatabase.create_collection(): Collection '" # name # "' does not exist, creating new one",
                 );
             };
         };
@@ -127,7 +127,7 @@ module {
         let { field_constraints; unique_constraints } = switch (SchemaMap.validateSchemaConstraints(schema_map, schema_constraints)) {
             case (#ok(res)) res;
             case (#err(msg)) {
-                let error_msg = "StableDatabase.createCollection(): Schema constraints validation failed: " # msg;
+                let error_msg = "StableDatabase.create_collection(): Schema constraints validation failed: " # msg;
                 return logErrorMsg(db.logger, error_msg);
             };
         };
@@ -188,13 +188,13 @@ module {
                 case (#ok(index)) {
                     Logger.lazyInfo(
                         db.logger,
-                        func() = "StableDatabase.createCollection(): Created index for unique constraint on fields: " # debug_show unique_field_names,
+                        func() = "StableDatabase.create_collection(): Created index for unique constraint on fields: " # debug_show unique_field_names,
                     );
 
                     index;
                 };
                 case (#err(msg)) {
-                    let error_msg = "StableDatabase.createCollection(): Failed to create index for unique constraint on fields: " # debug_show unique_field_names # ", error: " # msg;
+                    let error_msg = "StableDatabase.create_collection(): Failed to create index for unique constraint on fields: " # debug_show unique_field_names # ", error: " # msg;
                     return logErrorMsg(db.logger, error_msg);
                 };
             };
@@ -227,41 +227,91 @@ module {
 
         Logger.lazyInfo(
             db.logger,
-            func() = "StableDatabase.createCollection(): Created collection '" # name # "' successfully",
+            func() = "StableDatabase.create_collection(): Created collection '" # name # "' successfully",
         );
         Logger.lazyDebug(
             db.logger,
-            func() = "StableDatabase.createCollection(): Schema for collection '" # name # "': " # debug_show schema,
+            func() = "StableDatabase.create_collection(): Schema for collection '" # name # "': " # debug_show schema,
         );
 
         #ok(stable_collection);
 
     };
 
-    public func getCollection(db : T.StableDatabase, name : Text) : Result<StableCollection, Text> {
+    public func get_collection(db : T.StableDatabase, name : Text) : Result<StableCollection, Text> {
         Logger.lazyDebug(
             db.logger,
-            func() = "StableDatabase.getCollection(): Getting collection '" # name # "'",
+            func() = "StableDatabase.get_collection(): Getting collection '" # name # "'",
         );
 
         let stable_collection = switch (Map.get<Text, StableCollection>(db.collections, thash, name)) {
             case (?collection) {
                 Logger.lazyDebug(
                     db.logger,
-                    func() = "StableDatabase.getCollection(): Found collection '" # name # "'",
+                    func() = "StableDatabase.get_collection(): Found collection '" # name # "'",
                 );
                 collection;
             };
             case (null) {
                 Logger.lazyWarn(
                     db.logger,
-                    func() = "StableDatabase.getCollection(): Collection '" # name # "' not found",
+                    func() = "StableDatabase.get_collection(): Collection '" # name # "' not found",
                 );
-                return logErrorMsg(db.logger, "ZenDB Database.getCollection(): Collection " # debug_show name # " not found");
+                return logErrorMsg(db.logger, "ZenDB Database.get_collection(): Collection " # debug_show name # " not found");
             };
         };
 
         #ok(stable_collection);
+    };
+
+    public func stats(db : T.StableDatabase) : T.DatabaseStats {
+        let collections = Map.toArray<Text, T.StableCollection>(db.collections);
+
+        let collection_stats = Array.map(
+            collections,
+            func((collection_name, stable_collection) : (Text, T.StableCollection)) : T.CollectionStats {
+                StableCollection.stats(stable_collection);
+            },
+        );
+
+        var total_allocated_bytes : Nat = 0;
+        var total_free_bytes : Nat = 0;
+        var total_used_bytes : Nat = 0;
+        var total_data_bytes : Nat = 0;
+        var total_metadata_bytes : Nat = 0;
+        var total_document_store_bytes : Nat = 0;
+        var total_index_store_bytes : Nat = 0;
+
+        for (stats in collection_stats.vals()) {
+            total_allocated_bytes += stats.total_allocated_bytes;
+            total_free_bytes += stats.total_free_bytes;
+            total_used_bytes += stats.total_used_bytes;
+            total_data_bytes += stats.total_document_size;
+            total_metadata_bytes += stats.total_metadata_bytes;
+
+            total_document_store_bytes += stats.total_document_store_bytes;
+            total_index_store_bytes += stats.total_index_store_bytes;
+        };
+
+        {
+            name = db.name;
+            memoryType = db.memory_type;
+            collections = collections.size();
+            collection_stats = collection_stats;
+
+            total_allocated_bytes = total_allocated_bytes;
+            total_used_bytes = total_used_bytes;
+            total_free_bytes = total_free_bytes;
+            total_data_bytes = total_data_bytes;
+            total_metadata_bytes = total_metadata_bytes;
+
+            total_document_store_bytes = total_document_store_bytes;
+            total_index_store_bytes = total_index_store_bytes;
+        };
+    };
+
+    public func list_collections(db : T.StableDatabase) : [Text] {
+        Iter.toArray(Map.keys(db.collections));
     };
 
 };

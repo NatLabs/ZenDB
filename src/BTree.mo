@@ -335,4 +335,30 @@ module BTree {
         };
     };
 
+    public func get_memory_stats<K, V>(btree : T.BTree<K, V>) : T.MemoryBTreeStats {
+        switch (btree) {
+            case (#stableMemory(btree)) { MemoryBTree.stats(btree) };
+            case (#heap(_)) {
+                // This data is not available for the heap-based B-Tree
+                {
+                    allocatedPages = 0;
+                    bytesPerPage = 0;
+                    allocatedBytes = 0;
+                    usedBytes = 0;
+                    freeBytes = 0;
+                    dataBytes = 0;
+                    metadataBytes = 0;
+                    leafBytes = 0;
+                    branchBytes = 0;
+                    keyBytes = 0;
+                    valueBytes = 0;
+                    leafCount = 0;
+                    branchCount = 0;
+                    totalNodeCount = 0;
+                };
+            };
+        };
+
+    };
+
 };

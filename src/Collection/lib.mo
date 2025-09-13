@@ -109,6 +109,27 @@ module {
 
         /// Returns the collection name.
         public func name() : Text = collection_name;
+        public func getSchema() : T.Schema { collection.schema };
+
+        public func listIndexes() : [Text] {
+            Iter.toArray(Map.keys(collection.indexes));
+        };
+
+        public func getIndexes() : [(Text, T.IndexStats)] {
+            Array.map<(Text, T.Index), (Text, T.IndexStats)>(
+                Map.toArray(collection.indexes),
+                func((key, index) : (Text, T.Index)) : (Text, T.IndexStats) {
+                    (key, Index.stats(index, StableCollection.size(collection)));
+                },
+            );
+        };
+
+        public func getIndex(name : Text) : ?T.IndexStats {
+            switch (Map.get(collection.indexes, T.thash, name)) {
+                case (?index) ?Index.stats(index, StableCollection.size(collection));
+                case (null) null;
+            };
+        };
 
         /// Returns the total number of documents in the collection.
         public func size() : Nat = StableCollection.size(collection);
@@ -209,7 +230,7 @@ module {
         public func searchIter(query_builder : QueryBuilder) : Result<Iter<T.WrapId<Record>>, Text> {
             switch (
                 handleResult(
-                    StableCollection.internalSearch(collection, query_builder),
+                    StableCollection.internalSearch(collection, query_builder.build()),
                     "Failed to execute search",
                 )
             ) {
@@ -278,7 +299,7 @@ module {
         public func search(query_builder : QueryBuilder) : Result<[T.WrapId<Record>], Text> {
             switch (
                 handleResult(
-                    StableCollection.internalSearch(collection, query_builder),
+                    StableCollection.internalSearch(collection, query_builder.build()),
                     "Failed to execute search",
                 )
             ) {
@@ -333,7 +354,7 @@ module {
         public func update(query_builder : QueryBuilder, update_operations : [(Text, T.FieldUpdateOperations)]) : Result<Nat, Text> {
             let documents_iter = switch (
                 handleResult(
-                    StableCollection.internalSearch(collection, query_builder),
+                    StableCollection.internalSearch(collection, query_builder.build()),
                     "Failed to find documents to update",
                 )
             ) {
@@ -373,7 +394,7 @@ module {
 
         public func delete(query_builder : QueryBuilder) : Result<[(T.DocumentId, Record)], Text> {
             let internal_search_res = handleResult(
-                StableCollection.internalSearch(collection, query_builder),
+                StableCollection.internalSearch(collection, query_builder.build()),
                 "Failed to find documents to delete",
             );
 
@@ -426,19 +447,19 @@ module {
         // };
 
         type CreateIndexOptions = {
-            isUnique : Bool;
+            is_unique : Bool;
         };
 
         /// Creates a new index with the given index keys.
-        /// If `isUnique` is true, the index will be unique on the index keys and documents with duplicate index keys will be rejected.
+        /// If `is_unique` is true, the index will be unique on the index keys and documents with duplicate index keys will be rejected.
         public func createIndex(name : Text, index_key_details : [(Text, SortDirection)], options : ?CreateIndexOptions) : Result<(), Text> {
 
-            let isUnique = switch (options) {
-                case (?options) options.isUnique;
+            let is_unique = switch (options) {
+                case (?options) options.is_unique;
                 case (null) false;
             };
 
-            switch (StableCollection.createIndex(collection, main_btree_utils, name, index_key_details, isUnique)) {
+            switch (StableCollection.createIndex(collection, main_btree_utils, name, index_key_details, is_unique)) {
                 case (#ok(success)) #ok();
                 case (#err(errorMsg)) {
                     return Utils.logErrorMsg(collection.logger, "Failed to create index (" # name # "): " # errorMsg);

@@ -33,6 +33,7 @@ import Collection "Collection";
 import Database "Database";
 import Query "Query";
 import Logger "Logger";
+import StableDatabase "Database/StableDatabase";
 
 import T "Types";
 import C "Constants";
@@ -134,6 +135,7 @@ module {
         };
 
         let default_db : T.StableDatabase = {
+            name = "default";
             ids = zendb.ids;
             collections = Map.new<Text, T.StableCollection>();
             freed_btrees = zendb.freed_btrees;
@@ -169,6 +171,7 @@ module {
         };
 
         let db : T.StableDatabase = {
+            name = db_name;
             ids = sstore.ids;
             collections = Map.new<Text, T.StableCollection>();
             freed_btrees = sstore.freed_btrees;
@@ -203,5 +206,45 @@ module {
 
     public let QueryBuilder = Query.QueryBuilder;
     public type QueryBuilder = Query.QueryBuilder;
+
+    public func stats(versioned_sstore : T.VersionedStableStore) : T.InstanceStats {
+        let sstore = TypeMigrations.get_current_state(versioned_sstore);
+
+        let dbStats = Buffer.Buffer<T.DatabaseStats>(0);
+        var totalAllocated : Nat = 0;
+        var totalUsed : Nat = 0;
+        var totalFree : Nat = 0;
+        var totalData : Nat = 0;
+        var totalMetadata : Nat = 0;
+
+        var totalDocumentStoreBytes : Nat = 0;
+        var totalIndexData : Nat = 0;
+
+        for ((name, db) in Map.entries(sstore.databases)) {
+            let dbStat = StableDatabase.stats(db);
+            dbStats.add(dbStat);
+
+            totalAllocated += dbStat.total_allocated_bytes;
+            totalUsed += dbStat.total_used_bytes;
+            totalFree += dbStat.total_free_bytes;
+            totalData += dbStat.total_data_bytes;
+            totalMetadata += dbStat.total_metadata_bytes;
+            totalDocumentStoreBytes += dbStat.total_document_store_bytes;
+            totalIndexData += dbStat.total_index_store_bytes;
+        };
+
+        {
+            memory_type = sstore.memory_type;
+            databases = Map.size(sstore.databases);
+            database_stats = Buffer.toArray(dbStats);
+            total_allocated_bytes = totalAllocated;
+            total_used_bytes = totalUsed;
+            total_free_bytes = totalFree;
+            total_data_bytes = totalData;
+            total_metadata_bytes = totalMetadata;
+            total_document_store_bytes = totalDocumentStoreBytes;
+            total_index_store_bytes = totalIndexData;
+        };
+    };
 
 };

@@ -1007,187 +1007,26 @@ module Index {
 
     };
 
-    // public func getIndexDataUtils_v1(collection : StableCollection, operations : [(Text, T.ZqlOperators)], sort_field : ?(Text, T.SortDirection)) : ?BestIndexResult {
-    //     let equal_fields = Set.new<Text>();
-    //     let sort_fields = Buffer.Buffer<(Text, T.SortDirection)>(8);
-    //     let range_fields = Set.new<Text>();
-    //     // let partially_covered_fields = Set.new<Text>();
+    public func stats(index : Index, collection_entries : Nat) : T.IndexStats {
 
-    //     func fillFieldMaps(equal_fields : Set.Set<Text>, sort_fields : Buffer<(Text, T.SortDirection)>, range_fields : Set.Set<Text>, operations : [(Text, T.ZqlOperators)], sort_field : ?(Text, T.SortDirection)) {
+        let memory = BTree.get_memory_stats(index.data);
+        let index_entries = Index.size(index); // could be less or more than collection entries depending on the index type and if there are duplicate values
 
-    //         sort_fields.clear();
+        {
+            name = index.name;
+            fields = index.key_details;
+            entries = index_entries;
+            memory;
+            is_unique = index.is_unique;
+            used_internally = index.used_internally;
 
-    //         switch (sort_field) {
-    //             case (?(field, direction)) sort_fields.add(field, direction);
-    //             case (null) {};
-    //         };
+            // the index fields values are stored as the keys
+            avg_index_key_size = if (collection_entries == 0) 0 else (memory.keyBytes / collection_entries);
+            total_index_key_size = memory.keyBytes;
 
-    //         // sort_fields.reverse(); or add in reverse order
+            // includes the key and the document id as the value
+            total_index_data_bytes = memory.dataBytes;
+        };
+    };
 
-    //         for ((field, op) in operations.vals()) {
-    //             switch (op) {
-    //                 case (#eq(_)) ignore Set.put(equal_fields, thash, field);
-    //                 case (_) ignore Set.put(range_fields, thash, field);
-    //             };
-    //         };
-    //     };
-
-    //     fillFieldMaps(equal_fields, sort_fields, range_fields, operations, sort_field);
-
-    //     var best_score = 0;
-    //     var best_index : ?Index = null;
-    //     var best_requires_additional_sorting = false;
-    //     var best_requires_additional_filtering = false;
-    //     var best_fully_covered_equality_and_range_fields = Set.new<Text>();
-
-    //     // the sorting direction of the query and the index can either be a direct match
-    //     // or a direct opposite in order to return the results without additional sorting
-    //     var is_query_and_index_direction_a_match : ?Bool = null;
-
-    //     let EQUALITY_SCORE = 4;
-    //     let SORT_SCORE = 2;
-    //     let RANGE_SCORE = 1;
-
-    //     // let indexes = Buffer.Buffer<BestIndexResult>(indexes.size());
-
-    //     for (index in Map.vals(collection.indexes)) {
-
-    //         var num_of_equal_fields_evaluated = 0;
-    //         var num_of_sort_fields_evaluated = 0;
-    //         var num_of_range_fields_evaluated = 0;
-
-    //         var index_score = 0;
-    //         var requires_additional_filtering = false;
-    //         var requires_additional_sorting = false;
-    //         var positions_matching_equality_or_range = Set.new<Nat>();
-    //         let fully_covered_equality_and_range_fields = Set.new<Text>();
-
-    //         var index_key_details_position = 0;
-
-    //         label scoring_indexes for ((index_key, direction) in index.key_details.vals()) {
-    //             index_key_details_position += 1;
-
-    //             if (index_key == C.DOCUMENT_ID) break scoring_indexes;
-
-    //             var matches_at_least_one_column = false;
-
-    //             switch (Set.has(equal_fields, thash, index_key)) {
-    //                 case (true) {
-    //                     index_score += EQUALITY_SCORE;
-    //                     num_of_equal_fields_evaluated += 1;
-    //                     matches_at_least_one_column := true;
-    //                     Set.add(positions_matching_equality_or_range, nhash, index_key_details_position);
-    //                     Set.add(fully_covered_equality_and_range_fields, thash, index_key);
-    //                 };
-    //                 case (false) {};
-    //             };
-
-    //             if (num_of_sort_fields_evaluated < sort_fields.size()) {
-    //                 let i = sort_fields.size() - 1 - num_of_sort_fields_evaluated;
-    //                 let sort_field = sort_fields.get(i);
-
-    //                 if (index_key == sort_field.0) {
-
-    //                     matches_at_least_one_column := true;
-
-    //                     num_of_sort_fields_evaluated += 1;
-    //                     switch (is_query_and_index_direction_a_match) {
-    //                         case (null) {
-    //                             is_query_and_index_direction_a_match := ?(direction == sort_field.1);
-    //                             index_score += SORT_SCORE;
-    //                         };
-    //                         case (?is_a_match) {
-    //                             if (is_a_match == (direction == sort_field.1)) {
-    //                                 index_score += SORT_SCORE;
-    //                             } else {
-    //                                 requires_additional_sorting := true;
-    //                             };
-    //                         };
-    //                     };
-    //                 };
-    //             };
-
-    //             if (Set.has(range_fields, thash, index_key)) {
-    //                 index_score += RANGE_SCORE;
-    //                 num_of_range_fields_evaluated += 1;
-    //                 matches_at_least_one_column := true;
-
-    //                 Set.add(positions_matching_equality_or_range, nhash, index_key_details_position);
-    //                 Set.add(fully_covered_equality_and_range_fields, thash, index_key);
-
-    //                 break scoring_indexes;
-    //             };
-
-    //             // Debug.print("index_key, index_score: " # debug_show (index_key, index_score));
-
-    //             if (not matches_at_least_one_column) break scoring_indexes;
-
-    //         };
-
-    //         if (
-    //             num_of_range_fields_evaluated < Set.size(range_fields) or num_of_equal_fields_evaluated < Set.size(equal_fields)
-    //         ) {
-    //             requires_additional_filtering := true;
-    //         };
-
-    //         if ((Set.size(positions_matching_equality_or_range) == 0 and operations.size() > 0)) {
-    //             requires_additional_filtering := true;
-    //         };
-
-    //         label searching_for_holes for ((prev, current) in Itertools.slidingTuples(Set.keys(positions_matching_equality_or_range))) {
-    //             if (current - prev > 1) {
-    //                 requires_additional_filtering := true;
-    //                 break searching_for_holes;
-    //             };
-    //         };
-
-    //       // Debug.print("index matching results:");
-    //       // Debug.print("index, score: " # debug_show (index.name, index_score));
-    //       // Debug.print("operations: " # debug_show operations);
-
-    //       // Debug.print("index_key_details: " # debug_show index.key_details);
-    //       // Debug.print("equal_fields: " # debug_show Set.toArray(equal_fields));
-    //       // Debug.print("  num_of_equal_fields_evaluated: " # debug_show num_of_equal_fields_evaluated);
-
-    //       // Debug.print("sort_fields: " # debug_show Buffer.toArray(sort_fields));
-    //       // Debug.print("  num_of_sort_fields_evaluated: " # debug_show num_of_sort_fields_evaluated);
-    //       // Debug.print("range_fields: " # debug_show Set.toArray(range_fields));
-    //       // Debug.print("  num_of_range_fields_evaluated: " # debug_show num_of_range_fields_evaluated);
-
-    //       // Debug.print("requires_additional_filtering: " # debug_show requires_additional_filtering);
-    //       // Debug.print("requires_additional_sorting: " # debug_show requires_additional_sorting);
-    //       // Debug.print("num, range_size: " # debug_show (num_of_range_fields_evaluated, Set.size(range_fields)));
-    //       // Debug.print("num, equal_size: " # debug_show (num_of_equal_fields_evaluated, Set.size(equal_fields)));
-    //       // Debug.print("fully_covered_equality_and_range_fields: " # debug_show Set.toArray(fully_covered_equality_and_range_fields));
-
-    //         if (index_score > best_score) {
-    //             best_score := index_score;
-    //             best_index := ?index;
-    //             best_requires_additional_filtering := requires_additional_filtering;
-    //             best_requires_additional_sorting := requires_additional_sorting or num_of_sort_fields_evaluated < sort_fields.size();
-    //             best_fully_covered_equality_and_range_fields := fully_covered_equality_and_range_fields;
-    //         };
-
-    //     };
-
-    //     let index = switch (best_index) {
-    //         case (null) return null;
-    //         case (?index) index;
-    //     };
-
-    //     let index_response = {
-    //         index;
-    //         requires_additional_sorting = best_requires_additional_sorting;
-    //         requires_additional_filtering = best_requires_additional_filtering;
-    //         sorted_in_reverse = switch (is_query_and_index_direction_a_match) {
-    //             case (null) false;
-    //             case (?is_a_match) not is_a_match;
-    //         };
-    //         fully_covered_equality_and_range_fields = best_fully_covered_equality_and_range_fields;
-    //         score = best_score;
-    //     };
-
-    //     ?index_response;
-
-    // };
 };

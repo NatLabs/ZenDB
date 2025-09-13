@@ -103,7 +103,7 @@ module TestFramework {
                                     index_name,
                                     index_key_details,
                                     switch (options) {
-                                        case (?{ isUnique }) isUnique;
+                                        case (?{ is_unique }) is_unique;
                                         case (_) false;
                                     },
                                 );

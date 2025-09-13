@@ -713,7 +713,7 @@ ZenDBSuite.newSuite(
 
                 let #ok(test) = zendb.createCollection("unique_index_test", OptNatSchema, candify_test, null) else return assert false;
 
-                let #ok(_) = suite_utils.createIndex(test.name(), "opt_nat_idx", [("opt_nat", #Ascending)], ?{ isUnique = true }) else return assert false;
+                let #ok(_) = suite_utils.createIndex(test.name(), "opt_nat_idx", [("opt_nat", #Ascending)], ?{ is_unique = true }) else return assert false;
 
                 let #ok(id1) = test.insert({ opt_nat = ?1 }) else return assert false;
                 let #ok(id2) = test.insert({ opt_nat = ?2 }) else return assert false;

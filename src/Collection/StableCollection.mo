@@ -917,14 +917,14 @@ module StableCollection {
     public func search(
         collection : StableCollection,
         main_btree_utils : T.BTreeUtils<Nat, T.Document>,
-        query_builder : QueryBuilder,
+        stable_query : T.StableQuery,
     ) : Result<[(T.WrapId<T.CandidBlob>)], Text> {
         Logger.lazyDebug(
             collection.logger,
-            func() = "Executing search with query: " # debug_show (query_builder.build()),
+            func() = "Executing search with query: " # debug_show (stable_query),
         );
 
-        switch (internalSearch(collection, query_builder)) {
+        switch (internalSearch(collection, stable_query)) {
             case (#err(err)) {
                 return #err("Search failed: " # err);
             };
@@ -1006,8 +1006,8 @@ module StableCollection {
         return #ok((iter));
     };
 
-    public func internalSearch(collection : StableCollection, query_builder : QueryBuilder) : Result<Iter<Nat>, Text> {
-        let stable_query = query_builder.build();
+    public func internalSearch(collection : StableCollection, stable_query : T.StableQuery) : Result<Iter<Nat>, Text> {
+        // let stable_query = query_builder.build();
         switch (evaluateQuery(collection, stable_query)) {
             case (#err(err)) return #err(err);
             case (#ok(eval_result)) #ok(eval_result);
@@ -1039,7 +1039,7 @@ module StableCollection {
         main_btree_utils : T.BTreeUtils<Nat, T.Document>,
         query_builder : QueryBuilder,
     ) : Result<Iter<T.WrapId<T.CandidBlob>>, Text> {
-        switch (internalSearch(collection, query_builder)) {
+        switch (internalSearch(collection, query_builder.build())) {
             case (#err(err)) return #err(err);
             case (#ok(document_ids_iter)) {
                 let document_iter = idsToCandidBlobs(collection, document_ids_iter);
@@ -1111,35 +1111,9 @@ module StableCollection {
         sort_documents_by_field_cmp;
     };
 
-    func get_memory_stats<K, V>(btree : T.BTree<K, V>) : T.MemoryBTreeStats {
-        switch (btree) {
-            case (#stableMemory(btree)) { MemoryBTree.stats(btree) };
-            case (#heap(_)) {
-                // This data is not available for the heap-based B-Tree
-                {
-                    allocatedPages = 0;
-                    bytesPerPage = 0;
-                    allocatedBytes = 0;
-                    usedBytes = 0;
-                    freeBytes = 0;
-                    dataBytes = 0;
-                    metadataBytes = 0;
-                    leafBytes = 0;
-                    branchBytes = 0;
-                    keyBytes = 0;
-                    valueBytes = 0;
-                    leafCount = 0;
-                    branchCount = 0;
-                    totalNodeCount = 0;
-                };
-            };
-        };
-
-    };
-
     public func stats(collection : StableCollection) : T.CollectionStats {
 
-        let main_collection_memory : T.MemoryBTreeStats = get_memory_stats(collection.documents);
+        let main_collection_memory : T.MemoryBTreeStats = BTree.get_memory_stats(collection.documents);
 
         let total_documents = StableCollection.size(collection);
 
@@ -1147,28 +1121,28 @@ module StableCollection {
             Iter.map<(Text, Index), T.IndexStats>(
                 Map.entries(collection.indexes),
                 func((index_name, index) : (Text, Index)) : T.IndexStats {
-                    let memory = get_memory_stats(index.data);
-                    let entries = Index.size(index);
-
-                    {
-                        name = index_name;
-                        fields = index.key_details;
-                        entries;
-                        memory;
-                        isUnique = index.is_unique;
-                        usedInternally = index.used_internally;
-
-                        // the index fields values are stored as the keys
-                        avgIndexKeySize = memory.keyBytes / entries;
-                        totalIndexKeySize = memory.keyBytes;
-
-                        // document ids are stored as the values
-                        avgDocumentIdSize = memory.valueBytes / entries;
-                        totalDocumentIdSize = memory.valueBytes;
-                    };
+                    Index.stats(index, total_documents);
                 },
             )
         );
+
+        var total_allocated_bytes : Nat = main_collection_memory.allocatedBytes;
+        var total_free_bytes : Nat = main_collection_memory.freeBytes;
+        var total_used_bytes : Nat = main_collection_memory.usedBytes;
+        var total_data_bytes : Nat = main_collection_memory.dataBytes;
+        var total_metadata_bytes : Nat = main_collection_memory.metadataBytes;
+
+        var total_index_store_bytes : Nat = 0;
+
+        for (index_stats in indexes.vals()) {
+            total_allocated_bytes += index_stats.memory.allocatedBytes;
+            total_free_bytes += index_stats.memory.freeBytes;
+            total_used_bytes += index_stats.memory.usedBytes;
+            total_data_bytes += index_stats.memory.dataBytes;
+            total_metadata_bytes += index_stats.memory.metadataBytes;
+
+            total_index_store_bytes += index_stats.memory.allocatedBytes;
+        };
 
         let collection_stats : T.CollectionStats = {
             name = collection.name;
@@ -1177,14 +1151,19 @@ module StableCollection {
             memory = main_collection_memory;
             memoryType = collection.memory_type;
 
-            // ids are stored as the keys in the collection
-            avgDocumentIdSize = main_collection_memory.keyBytes / total_documents;
-            totalDocumentIdSize = main_collection_memory.keyBytes;
-
-            // documents are stored as the values in the collection
-            avgDocumentSize = main_collection_memory.valueBytes / total_documents;
-            totalDocumentSize = main_collection_memory.valueBytes;
+            // Each entry is a document stored as an 8 byte key and the candid blob as the value
+            avg_document_size = if (total_documents == 0) 0 else (main_collection_memory.dataBytes / total_documents);
+            total_document_size = main_collection_memory.dataBytes;
             indexes;
+
+            total_allocated_bytes = total_allocated_bytes;
+            total_free_bytes = total_free_bytes;
+            total_used_bytes = total_used_bytes;
+            total_data_bytes = total_data_bytes;
+            total_metadata_bytes = total_metadata_bytes;
+
+            total_document_store_bytes = main_collection_memory.allocatedBytes;
+            total_index_store_bytes = total_index_store_bytes;
         };
 
         collection_stats;
