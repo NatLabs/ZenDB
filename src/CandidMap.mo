@@ -1,15 +1,15 @@
-import Array "mo:base/Array";
-import Debug "mo:base/Debug";
-import Option "mo:base/Option";
-import Iter "mo:base/Iter";
-import Text "mo:base/Text";
-import Result "mo:base/Result";
-import Nat "mo:base/Nat";
+import Array "mo:base@0.16.0/Array";
+import Debug "mo:base@0.16.0/Debug";
+import Option "mo:base@0.16.0/Option";
+import Iter "mo:base@0.16.0/Iter";
+import Text "mo:base@0.16.0/Text";
+import Result "mo:base@0.16.0/Result";
+import Nat "mo:base@0.16.0/Nat";
 
-import Map "mo:map/Map";
-import Set "mo:map/Set";
-import Candid "mo:serde/Candid";
-import Itertools "mo:itertools/Iter";
+import Map "mo:map@9.0.1/Map";
+import Set "mo:map@9.0.1/Set";
+import Candid "mo:serde@3.3.2/Candid";
+import Itertools "mo:itertools@0.2.2/Iter";
 
 import T "Types";
 import C "Constants";

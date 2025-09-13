@@ -1,27 +1,27 @@
-import Principal "mo:base/Principal";
-import Array "mo:base/Array";
-import Debug "mo:base/Debug";
-import Text "mo:base/Text";
-import Char "mo:base/Char";
-import Nat32 "mo:base/Nat32";
-import Result "mo:base/Result";
-import Order "mo:base/Order";
-import Iter "mo:base/Iter";
-import Buffer "mo:base/Buffer";
-import Nat "mo:base/Nat";
-import Option "mo:base/Option";
-import Hash "mo:base/Hash";
-import Float "mo:base/Float";
-import Int "mo:base/Int";
+import Principal "mo:base@0.16.0/Principal";
+import Array "mo:base@0.16.0/Array";
+import Debug "mo:base@0.16.0/Debug";
+import Text "mo:base@0.16.0/Text";
+import Char "mo:base@0.16.0/Char";
+import Nat32 "mo:base@0.16.0/Nat32";
+import Result "mo:base@0.16.0/Result";
+import Order "mo:base@0.16.0/Order";
+import Iter "mo:base@0.16.0/Iter";
+import Buffer "mo:base@0.16.0/Buffer";
+import Nat "mo:base@0.16.0/Nat";
+import Option "mo:base@0.16.0/Option";
+import Hash "mo:base@0.16.0/Hash";
+import Float "mo:base@0.16.0/Float";
+import Int "mo:base@0.16.0/Int";
 
-import Map "mo:map/Map";
-import Set "mo:map/Set";
-import Serde "mo:serde";
-import Decoder "mo:serde/Candid/Blob/Decoder";
-import Candid "mo:serde/Candid";
-import Itertools "mo:itertools/Iter";
-import RevIter "mo:itertools/RevIter";
-import Vector "mo:vector";
+import Map "mo:map@9.0.1/Map";
+import Set "mo:map@9.0.1/Set";
+import Serde "mo:serde@3.3.2";
+import Decoder "mo:serde@3.3.2/Candid/Blob/Decoder";
+import Candid "mo:serde@3.3.2/Candid";
+import Itertools "mo:itertools@0.2.2/Iter";
+import RevIter "mo:itertools@0.2.2/RevIter";
+import Vector "mo:vector@0.4.2";
 import Ids "Ids";
 
 import TypeUtils "mo:memory-collection@0.3.2/TypeUtils";
@@ -34,6 +34,8 @@ import Logger "Logger";
 
 import T "Types";
 import C "Constants";
+
+import TypeMigrations "TypeMigrations";
 
 module {
 
@@ -118,7 +120,7 @@ module {
         memory_type = ?(#stableMemory);
     };
 
-    public func newStableStore(opt_settings : ?Settings) : T.StableStore {
+    public func newStableStore(opt_settings : ?Settings) : T.VersionedStableStore {
         let settings = Option.get(opt_settings, defaultSettings);
 
         let zendb : T.StableStore = {
@@ -145,15 +147,18 @@ module {
             Logger.setIsRunLocally(zendb.logger, log_settings.is_running_locally);
         };
 
-        zendb;
+        TypeMigrations.share_version(zendb);
     };
 
-    public func launchDefaultDB(sstore : T.StableStore) : Database.Database {
+    public func launchDefaultDB(versioned_sstore : T.VersionedStableStore) : Database.Database {
+        let sstore = TypeMigrations.get_current_state(versioned_sstore);
         let ?default_db = Map.get<Text, T.StableDatabase>(sstore.databases, T.thash, "default") else Debug.trap("Default database not found");
         Database.Database(default_db);
     };
 
-    public func createDB(sstore : T.StableStore, db_name : Text) : T.Result<Database.Database, Text> {
+    public func createDB(versioned_sstore : T.VersionedStableStore, db_name : Text) : T.Result<Database.Database, Text> {
+
+        let sstore = TypeMigrations.get_current_state(versioned_sstore);
 
         switch (Map.get<Text, T.StableDatabase>(sstore.databases, T.thash, db_name)) {
             case (?db) return #err("Database with name '" # db_name # "' already exists");
@@ -172,18 +177,23 @@ module {
         #ok(Database.Database(db));
     };
 
-    public func getDB(sstore : T.StableStore, db_name : Text) : ?Database.Database {
+    public func getDB(versioned_sstore : T.VersionedStableStore, db_name : Text) : ?Database.Database {
+
+        let sstore = TypeMigrations.get_current_state(versioned_sstore);
+
         switch (Map.get<Text, T.StableDatabase>(sstore.databases, T.thash, db_name)) {
             case (?db) return ?Database.Database(db);
             case (null) return null;
         };
     };
 
-    public func setIsRunLocally(sstore : T.StableStore, is_running_locally : Bool) {
+    public func setIsRunLocally(versioned_sstore : T.VersionedStableStore, is_running_locally : Bool) {
+        let sstore = TypeMigrations.get_current_state(versioned_sstore);
         Logger.setIsRunLocally(sstore.logger, is_running_locally);
     };
 
-    public func setLogLevel(sstore : T.StableStore, log_level : Logger.LogLevel) {
+    public func setLogLevel(versioned_sstore : T.VersionedStableStore, log_level : Logger.LogLevel) {
+        let sstore = TypeMigrations.get_current_state(versioned_sstore);
         Logger.setLogLevel(sstore.logger, log_level);
     };
 

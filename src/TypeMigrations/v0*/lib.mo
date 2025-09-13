@@ -1,5 +1,5 @@
-import Blob "mo:base/Blob";
-import Debug "mo:base/Debug";
+import Blob "mo:base@0.16.0/Blob";
+import Debug "mo:base@0.16.0/Debug";
 
 import V0_0_1_types "v0.0.1/types";
 

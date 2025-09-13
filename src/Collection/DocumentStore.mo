@@ -1,12 +1,12 @@
-import Debug "mo:base/Debug";
-import Option "mo:base/Option";
+import Debug "mo:base@0.16.0/Debug";
+import Option "mo:base@0.16.0/Option";
 
-import BpTree "mo:augmented-btrees/BpTree";
-import Cmp "mo:augmented-btrees/Cmp";
-import BpTreeTypes "mo:augmented-btrees/BpTree/Types";
-import BpTreeMethods "mo:augmented-btrees/BpTree/Methods";
+import BpTree "mo:augmented-btrees@0.7.1/BpTree";
+import Cmp "mo:augmented-btrees@0.7.1/Cmp";
+import BpTreeTypes "mo:augmented-btrees@0.7.1/BpTree/Types";
+import BpTreeMethods "mo:augmented-btrees@0.7.1/BpTree/Methods";
 import MemoryBTree "mo:memory-collection@0.3.2/MemoryBTree/Stable";
-import RevIter "mo:itertools/RevIter";
+import RevIter "mo:itertools@0.2.2/RevIter";
 
 import T "../Types";
 import C "../Constants";

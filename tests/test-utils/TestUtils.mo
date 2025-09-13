@@ -1,8 +1,8 @@
-import Debug "mo:base/Debug";
-import Buffer "mo:base/Buffer";
+import Debug "mo:base@0.16.0/Debug";
+import Buffer "mo:base@0.16.0/Buffer";
 
 import MemoryBTree "mo:memory-collection@0.3.2/MemoryBTree/Stable";
-import BitMap "mo:bit-map";
+import BitMap "mo:bit-map@0.1.2";
 
 import T "../../src/Types";
 

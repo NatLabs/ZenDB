@@ -1,7 +1,7 @@
-import Option "mo:base/Option";
-import Array "mo:base/Array";
+import Option "mo:base@0.16.0/Option";
+import Array "mo:base@0.16.0/Array";
 
-import Itertools "mo:itertools/Iter";
+import Itertools "mo:itertools@0.2.2/Iter";
 
 import ZenDB "../../src";
 

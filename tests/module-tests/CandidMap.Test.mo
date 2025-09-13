@@ -1,11 +1,11 @@
-import Debug "mo:base/Debug";
-import Iter "mo:base/Iter";
-import Text "mo:base/Text";
-import Char "mo:base/Char";
+import Debug "mo:base@0.16.0/Debug";
+import Iter "mo:base@0.16.0/Iter";
+import Text "mo:base@0.16.0/Text";
+import Char "mo:base@0.16.0/Char";
 
 import { test; suite } "mo:test";
-import Candid "mo:serde/Candid";
-import Map "mo:map/Map";
+import Candid "mo:serde@3.3.2/Candid";
+import Map "mo:map@9.0.1/Map";
 
 import SchemaMap "../../src/Collection/SchemaMap";
 import CandidMap "../../src/CandidMap";

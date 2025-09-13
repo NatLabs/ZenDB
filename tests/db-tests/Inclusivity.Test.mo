@@ -1,21 +1,21 @@
 // @testmode wasi
 // crafted by claude-3-sonnet-20240229
 
-import Blob "mo:base/Blob";
-import Debug "mo:base/Debug";
-import Array "mo:base/Array";
-import Iter "mo:base/Iter";
-import Text "mo:base/Text";
-import Nat "mo:base/Nat";
-import Buffer "mo:base/Buffer";
-import Option "mo:base/Option";
-import Result "mo:base/Result";
-import Order "mo:base/Order";
+import Blob "mo:base@0.16.0/Blob";
+import Debug "mo:base@0.16.0/Debug";
+import Array "mo:base@0.16.0/Array";
+import Iter "mo:base@0.16.0/Iter";
+import Text "mo:base@0.16.0/Text";
+import Nat "mo:base@0.16.0/Nat";
+import Buffer "mo:base@0.16.0/Buffer";
+import Option "mo:base@0.16.0/Option";
+import Result "mo:base@0.16.0/Result";
+import Order "mo:base@0.16.0/Order";
 
 import { test; suite } "mo:test";
 import Bench "mo:bench";
 import Fuzz "mo:fuzz";
-import Candid "mo:serde/Candid";
+import Candid "mo:serde@3.3.2/Candid";
 
 import ZenDB "../../src";
 import SchemaMap "../../src/Collection/SchemaMap";

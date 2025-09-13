@@ -1,14 +1,14 @@
-import Array "mo:base/Array";
-import Debug "mo:base/Debug";
-import Buffer "mo:base/Buffer";
-import Option "mo:base/Option";
-import Iter "mo:base/Iter";
-import Nat "mo:base/Nat";
-import Order "mo:base/Order";
-import Text "mo:base/Text";
+import Array "mo:base@0.16.0/Array";
+import Debug "mo:base@0.16.0/Debug";
+import Buffer "mo:base@0.16.0/Buffer";
+import Option "mo:base@0.16.0/Option";
+import Iter "mo:base@0.16.0/Iter";
+import Nat "mo:base@0.16.0/Nat";
+import Order "mo:base@0.16.0/Order";
+import Text "mo:base@0.16.0/Text";
 
-import Candid "mo:serde/Candid";
-import Map "mo:map/Map";
+import Candid "mo:serde@3.3.2/Candid";
+import Map "mo:map@9.0.1/Map";
 
 import T "../Types";
 import CandidMap "../CandidMap";

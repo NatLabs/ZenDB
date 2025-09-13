@@ -1,11 +1,11 @@
-import Debug "mo:base/Debug";
-import Iter "mo:base/Iter";
-import Text "mo:base/Text";
-import Nat "mo:base/Nat";
-import Map "mo:map/Map";
+import Debug "mo:base@0.16.0/Debug";
+import Iter "mo:base@0.16.0/Iter";
+import Text "mo:base@0.16.0/Text";
+import Nat "mo:base@0.16.0/Nat";
+import Map "mo:map@9.0.1/Map";
 
 import { test; suite } "mo:test";
-import Candid "mo:serde/Candid";
+import Candid "mo:serde@3.3.2/Candid";
 import T "../../src/TypeMigrations";
 import ZenDB "../../src";
 

@@ -1,8 +1,8 @@
-import Debug "mo:base/Debug";
-import Array "mo:base/Array";
-import Nat "mo:base/Nat";
+import Debug "mo:base@0.16.0/Debug";
+import Array "mo:base@0.16.0/Array";
+import Nat "mo:base@0.16.0/Nat";
 
-import Itertools "mo:itertools/Iter";
+import Itertools "mo:itertools@0.2.2/Iter";
 
 import T "../Types";
 import CandidUtils "../CandidUtils";

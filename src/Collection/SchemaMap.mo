@@ -1,15 +1,15 @@
-import Array "mo:base/Array";
-import Debug "mo:base/Debug";
-import Nat "mo:base/Nat";
-import Buffer "mo:base/Buffer";
-import Text "mo:base/Text";
-import Iter "mo:base/Iter";
+import Array "mo:base@0.16.0/Array";
+import Debug "mo:base@0.16.0/Debug";
+import Nat "mo:base@0.16.0/Nat";
+import Buffer "mo:base@0.16.0/Buffer";
+import Text "mo:base@0.16.0/Text";
+import Iter "mo:base@0.16.0/Iter";
 
-import Map "mo:map/Map";
+import Map "mo:map@9.0.1/Map";
 import T "../Types";
 import C "../Constants";
 
-import Itertools "mo:itertools/Iter";
+import Itertools "mo:itertools@0.2.2/Iter";
 
 module {
 

@@ -1,10 +1,10 @@
 import Prim "mo:prim";
-import Debug "mo:base/Debug";
-import Nat "mo:base/Nat";
-import Array "mo:base/Array";
-import Order "mo:base/Order";
-import Option "mo:base/Option";
-import ExperimentalInternetComputer "mo:base/ExperimentalInternetComputer";
+import Debug "mo:base@0.16.0/Debug";
+import Nat "mo:base@0.16.0/Nat";
+import Array "mo:base@0.16.0/Array";
+import Order "mo:base@0.16.0/Order";
+import Option "mo:base@0.16.0/Option";
+import ExperimentalInternetComputer "mo:base@0.16.0/ExperimentalInternetComputer";
 
 import T "Types";
 
