@@ -20,9 +20,9 @@ import Serde "mo:serde@3.3.2";
 import Candid "mo:serde@3.3.2/Candid";
 import Itertools "mo:itertools@0.2.2/Iter";
 import RevIter "mo:itertools@0.2.2/RevIter";
-
 import BitMap "mo:bit-map@0.1.2";
 import Vector "mo:vector@0.4.2";
+
 import MemoryBTree "mo:memory-collection@0.3.2/MemoryBTree/Stable";
 import TypeUtils "mo:memory-collection@0.3.2/TypeUtils";
 import Int8Cmp "mo:memory-collection@0.3.2/TypeUtils/Int8Cmp";
@@ -30,6 +30,7 @@ import BpTree "mo:augmented-btrees@0.7.1/BpTree";
 import BpTreeTypes "mo:augmented-btrees@0.7.1/BpTree/Types";
 
 module T {
+
     public type BitMap = BitMap.BitMap;
 
     public type Candid = Serde.Candid;
@@ -188,6 +189,7 @@ module T {
     };
 
     public type StableDatabase = {
+        ids : Ids;
         collections : Map<Text, StableCollection>;
         memory_type : MemoryType;
 
@@ -198,6 +200,7 @@ module T {
     };
 
     public type StableStore = {
+        ids : Ids;
         databases : Map<Text, StableDatabase>;
         memory_type : MemoryType;
         freed_btrees : Vector.Vector<MemoryBTree.StableMemoryBTree>;

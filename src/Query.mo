@@ -275,9 +275,9 @@ module {
     };
 
     // validate that all the query fields are defined in the schema
-    public func validateQuery(collection : T.StableCollection, hydra_query : T.ZenQueryLang) : T.Result<(), Text> {
+    public func validateQuery(collection : T.StableCollection, zendb_query : T.ZenQueryLang) : T.Result<(), Text> {
 
-        switch (hydra_query) {
+        switch (zendb_query) {
             case (#Operation(field, op)) {
                 // Debug.print(debug_show (Set.toArray(collection.schema_keys_set)));
 

@@ -59,14 +59,7 @@ ZenDBSuite.newSuite(
         let #ok(_) = suite_utils.createIndex(users.name(), "age_idx", [("age", #Ascending)], null) else return assert false;
         let #ok(_) = suite_utils.createIndex(users.name(), "email_idx", [("email", #Ascending)], null) else return assert false;
 
-        let inputs = Buffer.Buffer<User>(20);
-        for (i in Iter.range(1, 20)) {
-            inputs.add({
-                name = "dummy";
-                age = 0;
-                email = "values";
-            });
-        };
+        let inputs = Map.new<Nat, User>();
 
         for (i in Iter.range(1, 10)) {
             let user = {
@@ -77,7 +70,7 @@ ZenDBSuite.newSuite(
 
             let #ok(id) = users.insert(user) else return assert false;
             // Debug.print("id: " # debug_show (id, user));
-            inputs.put(id, user);
+            ignore Map.put(inputs, Map.nhash, id, user);
         };
 
         for (i in Iter.range(1, 10)) {
@@ -89,7 +82,7 @@ ZenDBSuite.newSuite(
 
             let #ok(id) = users.insert(user) else return assert false;
             // Debug.print("id: " # debug_show (id, user));
-            inputs.put(id, user);
+            ignore Map.put(inputs, Map.nhash, id, user);
         };
 
         let total_documents = 20;
@@ -101,10 +94,10 @@ ZenDBSuite.newSuite(
                     "retrieve all documents",
                     func() {
                         let #ok(results) = users.search(ZenDB.QueryBuilder()) else return assert false;
-                        assert results.size() == inputs.size();
+                        assert results.size() == Map.size(inputs);
 
                         for ((id, user) in results.vals()) {
-                            assert user == inputs.get(id);
+                            assert ?user == Map.get(inputs, Map.nhash, id);
                         };
                     },
                 );

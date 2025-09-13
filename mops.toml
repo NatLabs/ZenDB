@@ -21,7 +21,6 @@ repository = "https://github.com/NatLabs/ZenDB"
 test = "2.1.1"
 bench = "1.0.0"
 fuzz = "1.0.0"
-'zendb@0.0.1' = "0.0.1"
 
 [toolchain]
 wasmtime = "30.0.2"

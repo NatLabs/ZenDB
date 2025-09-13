@@ -35,4 +35,10 @@ module {
         #v0(V0.share_version(sstore));
     };
 
+    public func to_text(versions : VersionedStableStore) : Text {
+        switch (versions) {
+            case (#v0(v)) { V0.to_text(v) };
+        };
+    };
+
 };

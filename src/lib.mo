@@ -1,3 +1,5 @@
+import Prim "mo:prim";
+
 import Principal "mo:base@0.16.0/Principal";
 import Array "mo:base@0.16.0/Array";
 import Debug "mo:base@0.16.0/Debug";
@@ -124,14 +126,15 @@ module {
         let settings = Option.get(opt_settings, defaultSettings);
 
         let zendb : T.StableStore = {
+            ids = Ids.new();
             databases = Map.new<Text, T.StableDatabase>();
             memory_type = Option.get(settings.memory_type, #heap);
-
             freed_btrees = Vector.new<T.MemoryBTree>();
             logger = Logger.init(#Error, false);
         };
 
         let default_db : T.StableDatabase = {
+            ids = zendb.ids;
             collections = Map.new<Text, T.StableCollection>();
             freed_btrees = zendb.freed_btrees;
             logger = zendb.logger;
@@ -166,6 +169,7 @@ module {
         };
 
         let db : T.StableDatabase = {
+            ids = sstore.ids;
             collections = Map.new<Text, T.StableCollection>();
             freed_btrees = sstore.freed_btrees;
             logger = sstore.logger;

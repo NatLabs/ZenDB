@@ -715,14 +715,14 @@ ZenDBSuite.newSuite(
 
                 let #ok(_) = suite_utils.createIndex(test.name(), "opt_nat_idx", [("opt_nat", #Ascending)], ?{ isUnique = true }) else return assert false;
 
-                let #ok(_) = test.insert({ opt_nat = ?1 }) else return assert false;
-                let #ok(_) = test.insert({ opt_nat = ?2 }) else return assert false;
-                let #ok(_) = test.insert({ opt_nat = null }) else return assert false;
-                let #ok(_) = test.insert({ opt_nat = null }) else return assert false; // should succeed
+                let #ok(id1) = test.insert({ opt_nat = ?1 }) else return assert false;
+                let #ok(id2) = test.insert({ opt_nat = ?2 }) else return assert false;
+                let #ok(id3) = test.insert({ opt_nat = null }) else return assert false;
+                let #ok(id4) = test.insert({ opt_nat = null }) else return assert false; // should succeed
 
                 assert test.search(
                     QueryBuilder().Where("opt_nat", #eq(#Null))
-                ) == #ok([(2, { opt_nat = null }), (3, { opt_nat = null })]);
+                ) == #ok([(id3, { opt_nat = null }), (id4, { opt_nat = null })]);
 
                 assert test.size() == 4;
 
@@ -732,7 +732,7 @@ ZenDBSuite.newSuite(
 
                 assert test.search(
                     QueryBuilder().Where("opt_nat", #not_(#eq(#Null)))
-                ) == #ok([(0, { opt_nat = ?1 }), (1, { opt_nat = ?2 })]);
+                ) == #ok([(id1, { opt_nat = ?1 }), (id2, { opt_nat = ?2 })]);
 
             },
         );

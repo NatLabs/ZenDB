@@ -94,8 +94,8 @@ ZenDBSuite.newSuite(
                         let #ok(id_false) = bools.insert(false) else return assert false;
 
                         assert bools.size() == 2;
-                        assert bools.search(ZenDB.QueryBuilder().Where("", #eq(#Bool(true)))) == #ok([(0, true)]);
-                        assert bools.search(ZenDB.QueryBuilder().Where("", #eq(#Bool(false)))) == #ok([(1, false)]);
+                        assert bools.search(ZenDB.QueryBuilder().Where("", #eq(#Bool(true)))) == #ok([(id_true, true)]);
+                        assert bools.search(ZenDB.QueryBuilder().Where("", #eq(#Bool(false)))) == #ok([(id_false, false)]);
                     },
                 );
 
@@ -116,7 +116,7 @@ ZenDBSuite.newSuite(
 
                         let #ok(id) = ints.insert(-42) else return assert false;
                         assert ints.size() == 1;
-                        assert ints.search(ZenDB.QueryBuilder().Where("", #eq(#Int(-42)))) == #ok([(0, -42)]);
+                        assert ints.search(ZenDB.QueryBuilder().Where("", #eq(#Int(-42)))) == #ok([(id, -42)]);
                         assert ints.get(id) == ?(-42);
                     },
                 );
@@ -139,7 +139,7 @@ ZenDBSuite.newSuite(
 
                         let #ok(id) = principals.insert(testPrincipal) else return assert false;
                         assert principals.size() == 1;
-                        assert principals.search(ZenDB.QueryBuilder().Where("", #eq(#Principal(testPrincipal)))) == #ok([(0, testPrincipal)]);
+                        assert principals.search(ZenDB.QueryBuilder().Where("", #eq(#Principal(testPrincipal)))) == #ok([(id, testPrincipal)]);
                         assert principals.get(id) == ?(testPrincipal);
                     },
                 );
@@ -161,7 +161,7 @@ ZenDBSuite.newSuite(
 
                         let #ok(id) = nats.insert(42) else return assert false;
                         assert nats.size() == 1;
-                        assert nats.search(ZenDB.QueryBuilder().Where("", #eq(#Nat(42)))) == #ok([(0, 42)]);
+                        assert nats.search(ZenDB.QueryBuilder().Where("", #eq(#Nat(42)))) == #ok([(id, 42)]);
                         assert nats.get(id) == ?(42);
 
                     },
@@ -184,7 +184,7 @@ ZenDBSuite.newSuite(
 
                         let #ok(id) = floats.insert(42.0) else return assert false;
                         assert floats.size() == 1;
-                        assert floats.search(ZenDB.QueryBuilder().Where("", #eq(#Float(42.0)))) == #ok([(0, 42.0)]);
+                        assert floats.search(ZenDB.QueryBuilder().Where("", #eq(#Float(42.0)))) == #ok([(id, 42.0)]);
                         assert floats.get(id) == ?(42.0);
 
                     }
@@ -208,7 +208,7 @@ ZenDBSuite.newSuite(
 
                         let #ok(id) = texts.insert("hello") else return assert false;
                         assert texts.size() == 1;
-                        assert texts.search(ZenDB.QueryBuilder().Where("", #eq(#Text("hello")))) == #ok([(0, "hello")]);
+                        assert texts.search(ZenDB.QueryBuilder().Where("", #eq(#Text("hello")))) == #ok([(id, "hello")]);
                         assert texts.get(id) == ?("hello");
 
                     },
@@ -231,7 +231,7 @@ ZenDBSuite.newSuite(
 
                         let #ok(id) = blobs.insert(Blob.fromArray([0, 1, 2, 3])) else return assert false;
                         assert blobs.size() == 1;
-                        assert blobs.search(ZenDB.QueryBuilder().Where("", #eq(#Blob(Blob.fromArray([0, 1, 2, 3]))))) == #ok([(0, Blob.fromArray([0, 1, 2, 3]))]);
+                        assert blobs.search(ZenDB.QueryBuilder().Where("", #eq(#Blob(Blob.fromArray([0, 1, 2, 3]))))) == #ok([(id, Blob.fromArray([0, 1, 2, 3]))]);
                         assert blobs.get(id) == ?(Blob.fromArray([0, 1, 2, 3]));
 
                     },
@@ -254,7 +254,7 @@ ZenDBSuite.newSuite(
 
                         let #ok(id) = options.insert(?("hello")) else return assert false;
                         assert options.size() == 1;
-                        assert options.search(ZenDB.QueryBuilder().Where("", #eq(#Option(#Text("hello"))))) == #ok([(0, ?("hello"))]);
+                        assert options.search(ZenDB.QueryBuilder().Where("", #eq(#Option(#Text("hello"))))) == #ok([(id, ?("hello"))]);
                         assert options.get(id) == ?(?("hello"));
 
                     },
@@ -289,28 +289,28 @@ ZenDBSuite.newSuite(
                                 "",
                                 #eq(#Option(#Option(#Option(#Nat(42))))),
                             )
-                        ) == #ok([(0, ???42)]);
+                        ) == #ok([(id1, ???42)]);
 
                         assert nested_options.search(
                             ZenDB.QueryBuilder().Where(
                                 "",
                                 #eq(#Null),
                             )
-                        ) == #ok([(1, null)]);
+                        ) == #ok([(id2, null)]);
 
                         assert nested_options.search(
                             ZenDB.QueryBuilder().Where(
                                 "",
                                 #eq(#Option(#Null)),
                             )
-                        ) == #ok([(2, ?null)]);
+                        ) == #ok([(id3, ?null)]);
 
                         assert nested_options.search(
                             ZenDB.QueryBuilder().Where(
                                 "",
                                 #eq(#Option(#Option(#Null))),
                             )
-                        ) == #ok([(3, ??null)]);
+                        ) == #ok([(id4, ??null)]);
 
                     },
                 );
@@ -339,8 +339,8 @@ ZenDBSuite.newSuite(
 
                         let #ok(id) = documents.insert({ a = 42; b = "hello" }) else return assert false;
                         assert documents.size() == 1;
-                        assert documents.search(ZenDB.QueryBuilder().Where("a", #eq(#Nat(42)))) == #ok([(0, { a = 42; b = "hello" })]);
-                        assert documents.search(ZenDB.QueryBuilder().Where("b", #eq(#Text("hello"))).And("a", #eq(#Nat(42)))) == #ok([(0, { a = 42; b = "hello" })]);
+                        assert documents.search(ZenDB.QueryBuilder().Where("a", #eq(#Nat(42)))) == #ok([(id, { a = 42; b = "hello" })]);
+                        assert documents.search(ZenDB.QueryBuilder().Where("b", #eq(#Text("hello"))).And("a", #eq(#Nat(42)))) == #ok([(id, { a = 42; b = "hello" })]);
                         assert documents.get(id) == ?({ a = 42; b = "hello" });
 
                     },
@@ -403,7 +403,7 @@ ZenDBSuite.newSuite(
                                 "title",
                                 #eq(#Text("hello.mo")),
                             )
-                        ) == #ok([(0, { user_id = Principal.fromText("2vxsx-fae"); title = "hello.mo"; content = "This is a test note" })]);
+                        ) == #ok([(id, { user_id = Principal.fromText("2vxsx-fae"); title = "hello.mo"; content = "This is a test note" })]);
 
                         let #ok(total_updated) = notes.update(
                             ZenDB.QueryBuilder().Where(
@@ -426,7 +426,7 @@ ZenDBSuite.newSuite(
                                 "title",
                                 #eq(#Text("hello.mo")),
                             )
-                        ) == #ok([(0, { user_id = Principal.fromText("2vxsx-fae"); title = "hello.mo"; content = "This is version 2 of the note" })]);
+                        ) == #ok([(id, { user_id = Principal.fromText("2vxsx-fae"); title = "hello.mo"; content = "This is version 2 of the note" })]);
 
                     },
                 );
@@ -467,12 +467,12 @@ ZenDBSuite.newSuite(
                         Debug.print(debug_show (variants.search(ZenDB.QueryBuilder().Where("", #eq(#Text("inactive"))))));
                         Debug.print(debug_show (variants.search(ZenDB.QueryBuilder().Where("", #eq(#Text("unknown"))))));
 
-                        assert variants.search(ZenDB.QueryBuilder().Where("", #eq(#Text("active")))) == #ok([(0, #active)]);
-                        assert variants.search(ZenDB.QueryBuilder().Where("", #eq(#Text("inactive")))) == #ok([(1, #inactive)]);
+                        assert variants.search(ZenDB.QueryBuilder().Where("", #eq(#Text("active")))) == #ok([(id, #active)]);
+                        assert variants.search(ZenDB.QueryBuilder().Where("", #eq(#Text("inactive")))) == #ok([(id2, #inactive)]);
                         assert variants.search(ZenDB.QueryBuilder().Where("", #eq(#Text("unknown")))) == #ok([]);
 
-                        assert variants.search(ZenDB.QueryBuilder().Where("active", #exists)) == #ok([(0, #active)]);
-                        assert variants.search(ZenDB.QueryBuilder().Where("inactive", #exists)) == #ok([(1, #inactive)]);
+                        assert variants.search(ZenDB.QueryBuilder().Where("active", #exists)) == #ok([(id, #active)]);
+                        assert variants.search(ZenDB.QueryBuilder().Where("inactive", #exists)) == #ok([(id2, #inactive)]);
 
                         assert variants.get(id) == ?(#active);
 
@@ -505,14 +505,14 @@ ZenDBSuite.newSuite(
                         let #ok(id2) = variants.insert(#id(42)) else return assert false;
 
                         assert variants.size() == 2;
-                        assert variants.search(ZenDB.QueryBuilder().Where("name", #eq(#Text("hello")))) == #ok([(0, #name("hello"))]);
-                        assert variants.search(ZenDB.QueryBuilder().Where("id", #eq(#Nat(42)))) == #ok([(1, #id(42))]);
+                        assert variants.search(ZenDB.QueryBuilder().Where("name", #eq(#Text("hello")))) == #ok([(id, #name("hello"))]);
+                        assert variants.search(ZenDB.QueryBuilder().Where("id", #eq(#Nat(42)))) == #ok([(id2, #id(42))]);
 
-                        assert variants.search(ZenDB.QueryBuilder().Where("", #eq(#Text("name")))) == #ok([(0, #name("hello"))]);
-                        assert variants.search(ZenDB.QueryBuilder().Where("", #eq(#Text("id")))) == #ok([(1, #id(42))]);
+                        assert variants.search(ZenDB.QueryBuilder().Where("", #eq(#Text("name")))) == #ok([(id, #name("hello"))]);
+                        assert variants.search(ZenDB.QueryBuilder().Where("", #eq(#Text("id")))) == #ok([(id2, #id(42))]);
 
-                        assert variants.search(ZenDB.QueryBuilder().Where("name", #exists)) == #ok([(0, #name("hello"))]);
-                        assert variants.search(ZenDB.QueryBuilder().Where("id", #exists)) == #ok([(1, #id(42))]);
+                        assert variants.search(ZenDB.QueryBuilder().Where("name", #exists)) == #ok([(id, #name("hello"))]);
+                        assert variants.search(ZenDB.QueryBuilder().Where("id", #exists)) == #ok([(id2, #id(42))]);
 
                         assert variants.get(id) == ?(#name("hello"));
 
@@ -548,7 +548,7 @@ ZenDBSuite.newSuite(
 
                         let #ok(id) = tuples.insert(ZenDB.Tuple(42, "hello")) else return assert false;
                         assert tuples.size() == 1;
-                        assert tuples.search(ZenDB.QueryBuilder().Where("0", #eq(#Nat(42)))) == #ok([(0, ZenDB.Tuple(42, "hello"))]);
+                        assert tuples.search(ZenDB.QueryBuilder().Where("0", #eq(#Nat(42)))) == #ok([(id, ZenDB.Tuple(42, "hello"))]);
                         assert tuples.get(id) == ?(ZenDB.Tuple(42, "hello"));
                         assert tuples.get(id) == ?({ _0_ = 42; _1_ = "hello" });
                         assert switch (tuples.get(id)) {
@@ -580,9 +580,9 @@ ZenDBSuite.newSuite(
 
                         let #ok(id) = triples.insert(ZenDB.Triple(42, "hello", 100)) else return assert false;
                         assert triples.size() == 1;
-                        assert triples.search(ZenDB.QueryBuilder().Where("0", #eq(#Nat(42)))) == #ok([(0, ZenDB.Triple(42, "hello", 100))]);
-                        assert triples.search(ZenDB.QueryBuilder().Where("1", #eq(#Text("hello")))) == #ok([(0, ZenDB.Triple(42, "hello", 100))]);
-                        assert triples.search(ZenDB.QueryBuilder().Where("2", #eq(#Nat(100)))) == #ok([(0, ZenDB.Triple(42, "hello", 100))]);
+                        assert triples.search(ZenDB.QueryBuilder().Where("0", #eq(#Nat(42)))) == #ok([(id, ZenDB.Triple(42, "hello", 100))]);
+                        assert triples.search(ZenDB.QueryBuilder().Where("1", #eq(#Text("hello")))) == #ok([(id, ZenDB.Triple(42, "hello", 100))]);
+                        assert triples.search(ZenDB.QueryBuilder().Where("2", #eq(#Nat(100)))) == #ok([(id, ZenDB.Triple(42, "hello", 100))]);
 
                         assert triples.get(id) == ?(ZenDB.Triple(42, "hello", 100));
                         assert triples.get(id) == ?({
@@ -622,7 +622,7 @@ ZenDBSuite.newSuite(
 
                         let #ok(id) = quadruples.insert(ZenDB.Quadruple(42, "hello", 100, Blob.fromArray([0, 1, 2]))) else return assert false;
                         assert quadruples.size() == 1;
-                        assert quadruples.search(ZenDB.QueryBuilder().Where("0", #eq(#Nat(42)))) == #ok([(0, ZenDB.Quadruple(42, "hello", 100, Blob.fromArray([0, 1, 2])))]);
+                        assert quadruples.search(ZenDB.QueryBuilder().Where("0", #eq(#Nat(42)))) == #ok([(id, ZenDB.Quadruple(42, "hello", 100, Blob.fromArray([0, 1, 2])))]);
                         assert quadruples.get(id) == ?(ZenDB.Quadruple(42, "hello", 100, Blob.fromArray([0, 1, 2])));
                         assert quadruples.get(id) == ?({
                             _0_ = 42;
@@ -667,7 +667,7 @@ ZenDBSuite.newSuite(
                             d = 100;
                         }) else return assert false;
                         assert nested_records.size() == 1;
-                        assert nested_records.search(ZenDB.QueryBuilder().Where("a.b", #eq(#Nat(42)))) == #ok([(0, { a = { b = 42; c = "hello" }; d = 100 })]);
+                        assert nested_records.search(ZenDB.QueryBuilder().Where("a.b", #eq(#Nat(42)))) == #ok([(id, { a = { b = 42; c = "hello" }; d = 100 })]);
                         assert nested_records.get(id) == ?({
                             a = { b = 42; c = "hello" };
                             d = 100;
@@ -703,21 +703,21 @@ ZenDBSuite.newSuite(
                         let #ok(id3) = nested_variants.insert(#id(#inactive)) else return assert false;
 
                         assert nested_variants.size() == 3;
-                        assert nested_variants.search(ZenDB.QueryBuilder().Where("name", #eq(#Text("hello")))) == #ok([(0, #name("hello"))]);
-                        assert nested_variants.search(ZenDB.QueryBuilder().Where("id.active", #eq(#Nat(42)))) == #ok([(1, #id(#active(42)))]);
-                        assert nested_variants.search(ZenDB.QueryBuilder().Where("id.inactive", #eq(#Null))) == #ok([(2, #id(#inactive))]);
+                        assert nested_variants.search(ZenDB.QueryBuilder().Where("name", #eq(#Text("hello")))) == #ok([(id, #name("hello"))]);
+                        assert nested_variants.search(ZenDB.QueryBuilder().Where("id.active", #eq(#Nat(42)))) == #ok([(id2, #id(#active(42)))]);
+                        assert nested_variants.search(ZenDB.QueryBuilder().Where("id.inactive", #eq(#Null))) == #ok([(id3, #id(#inactive))]);
 
-                        assert nested_variants.search(ZenDB.QueryBuilder().Where("", #eq(#Text("name")))) == #ok([(0, #name("hello"))]);
-                        assert nested_variants.search(ZenDB.QueryBuilder().Where("", #eq(#Text("id")))) == #ok([(1, #id(#active(42))), (2, #id(#inactive))]);
-                        assert nested_variants.search(ZenDB.QueryBuilder().Where("id", #eq(#Text("active")))) == #ok([(1, #id(#active(42)))]);
-                        assert nested_variants.search(ZenDB.QueryBuilder().Where("id", #eq(#Text("inactive")))) == #ok([(2, #id(#inactive))]);
+                        assert nested_variants.search(ZenDB.QueryBuilder().Where("", #eq(#Text("name")))) == #ok([(id, #name("hello"))]);
+                        assert nested_variants.search(ZenDB.QueryBuilder().Where("", #eq(#Text("id")))) == #ok([(id2, #id(#active(42))), (id3, #id(#inactive))]);
+                        assert nested_variants.search(ZenDB.QueryBuilder().Where("id", #eq(#Text("active")))) == #ok([(id2, #id(#active(42)))]);
+                        assert nested_variants.search(ZenDB.QueryBuilder().Where("id", #eq(#Text("inactive")))) == #ok([(id3, #id(#inactive))]);
                         assert nested_variants.search(ZenDB.QueryBuilder().Where("id", #eq(#Text("unknown")))) == #ok([]);
 
-                        assert nested_variants.search(ZenDB.QueryBuilder().Where("name", #exists)) == #ok([(0, #name("hello"))]);
+                        assert nested_variants.search(ZenDB.QueryBuilder().Where("name", #exists)) == #ok([(id, #name("hello"))]);
                         Debug.print(debug_show (nested_variants.search(ZenDB.QueryBuilder().Where("id", #exists))));
-                        assert nested_variants.search(ZenDB.QueryBuilder().Where("id", #exists)) == #ok([(1, #id(#active(42))), (2, #id(#inactive))]);
-                        assert nested_variants.search(ZenDB.QueryBuilder().Where("id.active", #exists)) == #ok([(1, #id(#active(42)))]);
-                        assert nested_variants.search(ZenDB.QueryBuilder().Where("id.inactive", #exists)) == #ok([(2, #id(#inactive))]);
+                        assert nested_variants.search(ZenDB.QueryBuilder().Where("id", #exists)) == #ok([(id2, #id(#active(42))), (id3, #id(#inactive))]);
+                        assert nested_variants.search(ZenDB.QueryBuilder().Where("id.active", #exists)) == #ok([(id2, #id(#active(42)))]);
+                        assert nested_variants.search(ZenDB.QueryBuilder().Where("id.inactive", #exists)) == #ok([(id3, #id(#inactive))]);
 
                         assert nested_variants.get(id) == ?(#name("hello"));
                         assert nested_variants.get(id2) == ?(#id(#active(42)));
@@ -747,7 +747,7 @@ ZenDBSuite.newSuite(
 
                         let #ok(id) = nested_tuples.insert(ZenDB.Tuple(42, ZenDB.Tuple("hello", 100))) else return assert false;
                         assert nested_tuples.size() == 1;
-                        assert nested_tuples.search(ZenDB.QueryBuilder().Where("0", #eq(#Nat(42)))) == #ok([(0, ZenDB.Tuple(42, ZenDB.Tuple("hello", 100)))]);
+                        assert nested_tuples.search(ZenDB.QueryBuilder().Where("0", #eq(#Nat(42)))) == #ok([(id, ZenDB.Tuple(42, ZenDB.Tuple("hello", 100)))]);
                         assert nested_tuples.get(id) == ?(ZenDB.Tuple(42, ZenDB.Tuple("hello", 100)));
 
                     },
@@ -776,12 +776,12 @@ ZenDBSuite.newSuite(
                         let #ok(id2) = optional_records.insert(null) else return assert false;
 
                         assert optional_records.size() == 2;
-                        assert optional_records.search(ZenDB.QueryBuilder().Where("a", #eq(#Nat(42)))) == #ok([(0, ?({ a = 42; b = "hello" }))]);
-                        assert optional_records.search(ZenDB.QueryBuilder().Where("b", #eq(#Text("hello")))) == #ok([(0, ?({ a = 42; b = "hello" }))]);
-                        assert optional_records.search(ZenDB.QueryBuilder().Where("", #eq(#Null))) == #ok([(1, null)]);
+                        assert optional_records.search(ZenDB.QueryBuilder().Where("a", #eq(#Nat(42)))) == #ok([(id, ?({ a = 42; b = "hello" }))]);
+                        assert optional_records.search(ZenDB.QueryBuilder().Where("b", #eq(#Text("hello")))) == #ok([(id, ?({ a = 42; b = "hello" }))]);
+                        assert optional_records.search(ZenDB.QueryBuilder().Where("", #eq(#Null))) == #ok([(id2, null)]);
 
-                        assert optional_records.search(ZenDB.QueryBuilder().Where("a", #exists)) == #ok([(0, ?({ a = 42; b = "hello" }))]);
-                        assert optional_records.search(ZenDB.QueryBuilder().Where("b", #exists)) == #ok([(0, ?({ a = 42; b = "hello" }))]);
+                        assert optional_records.search(ZenDB.QueryBuilder().Where("a", #exists)) == #ok([(id, ?({ a = 42; b = "hello" }))]);
+                        assert optional_records.search(ZenDB.QueryBuilder().Where("b", #exists)) == #ok([(id, ?({ a = 42; b = "hello" }))]);
 
                         assert optional_records.get(id) == ?(?({ a = 42; b = "hello" }));
                         assert optional_records.get(id2) == ?(null);
@@ -816,16 +816,16 @@ ZenDBSuite.newSuite(
                         let #ok(id3) = optional_variants.insert(null) else return assert false;
 
                         assert optional_variants.size() == 3;
-                        assert optional_variants.search(ZenDB.QueryBuilder().Where("", #eq(#Text("name")))) == #ok([(0, ?(#name("hello")))]);
-                        assert optional_variants.search(ZenDB.QueryBuilder().Where("", #eq(#Text("id")))) == #ok([(1, ?(#id(42)))]);
+                        assert optional_variants.search(ZenDB.QueryBuilder().Where("", #eq(#Text("name")))) == #ok([(id, ?(#name("hello")))]);
+                        assert optional_variants.search(ZenDB.QueryBuilder().Where("", #eq(#Text("id")))) == #ok([(id2, ?(#id(42)))]);
                         assert optional_variants.search(ZenDB.QueryBuilder().Where("", #eq(#Text("unknown")))) == #ok([]);
 
-                        assert optional_variants.search(ZenDB.QueryBuilder().Where("name", #exists)) == #ok([(0, ?(#name("hello")))]);
-                        assert optional_variants.search(ZenDB.QueryBuilder().Where("id", #exists)) == #ok([(1, ?(#id(42)))]);
+                        assert optional_variants.search(ZenDB.QueryBuilder().Where("name", #exists)) == #ok([(id, ?(#name("hello")))]);
+                        assert optional_variants.search(ZenDB.QueryBuilder().Where("id", #exists)) == #ok([(id2, ?(#id(42)))]);
 
-                        assert optional_variants.search(ZenDB.QueryBuilder().Where("name", #eq(#Text("hello")))) == #ok([(0, ?(#name("hello")))]);
-                        assert optional_variants.search(ZenDB.QueryBuilder().Where("id", #eq(#Nat(42)))) == #ok([(1, ?(#id(42)))]);
-                        assert optional_variants.search(ZenDB.QueryBuilder().Where("", #eq(#Null))) == #ok([(2, null)]);
+                        assert optional_variants.search(ZenDB.QueryBuilder().Where("name", #eq(#Text("hello")))) == #ok([(id, ?(#name("hello")))]);
+                        assert optional_variants.search(ZenDB.QueryBuilder().Where("id", #eq(#Nat(42)))) == #ok([(id2, ?(#id(42)))]);
+                        assert optional_variants.search(ZenDB.QueryBuilder().Where("", #eq(#Null))) == #ok([(id3, null)]);
 
                         assert optional_variants.get(id) == ?(?(#name("hello")));
                         assert optional_variants.get(id2) == ?(?(#id(42)));
@@ -857,9 +857,9 @@ ZenDBSuite.newSuite(
                         let #ok(id2) = optional_tuples.insert(null) else return assert false;
 
                         assert optional_tuples.size() == 2;
-                        assert optional_tuples.search(ZenDB.QueryBuilder().Where("0", #eq(#Nat(42)))) == #ok([(0, ?((42, "hello")))]);
-                        assert optional_tuples.search(ZenDB.QueryBuilder().Where("1", #eq(#Text("hello")))) == #ok([(0, ?((42, "hello")))]);
-                        assert optional_tuples.search(ZenDB.QueryBuilder().Where("", #eq(#Null))) == #ok([(1, null)]);
+                        assert optional_tuples.search(ZenDB.QueryBuilder().Where("0", #eq(#Nat(42)))) == #ok([(id, ?((42, "hello")))]);
+                        assert optional_tuples.search(ZenDB.QueryBuilder().Where("1", #eq(#Text("hello")))) == #ok([(id, ?((42, "hello")))]);
+                        assert optional_tuples.search(ZenDB.QueryBuilder().Where("", #eq(#Null))) == #ok([(id2, null)]);
 
                         assert optional_tuples.get(id) == ?(?((42, "hello")));
                         assert optional_tuples.get(id2) == ?(null);
@@ -943,12 +943,12 @@ ZenDBSuite.newSuite(
                         assert deep_optionals.size() == 5;
 
                         // Test nested field queries
-                        assert deep_optionals.search(ZenDB.QueryBuilder().Where("name", #eq(#Text("complete")))) == #ok([(0, complete)]);
-                        assert deep_optionals.search(ZenDB.QueryBuilder().Where("details.id", #eq(#Nat(1)))) == #ok([(0, complete)]);
-                        assert deep_optionals.search(ZenDB.QueryBuilder().Where("details.metadata.active", #eq(#Bool(true)))) == #ok([(0, complete)]);
+                        assert deep_optionals.search(ZenDB.QueryBuilder().Where("name", #eq(#Text("complete")))) == #ok([(id1, complete)]);
+                        assert deep_optionals.search(ZenDB.QueryBuilder().Where("details.id", #eq(#Nat(1)))) == #ok([(id1, complete)]);
+                        assert deep_optionals.search(ZenDB.QueryBuilder().Where("details.metadata.active", #eq(#Bool(true)))) == #ok([(id1, complete)]);
 
                         // Test null field handling
-                        assert deep_optionals.search(ZenDB.QueryBuilder().Where("", #eq(#Null))) == #ok([(4, completelyNull)]);
+                        assert deep_optionals.search(ZenDB.QueryBuilder().Where("", #eq(#Null))) == #ok([(id5, completelyNull)]);
 
                         // Retrieving documents
                         assert deep_optionals.get(id1) == ?(complete);
@@ -1013,10 +1013,10 @@ ZenDBSuite.newSuite(
                         assert numeric_records.size() == 1;
 
                         // Test searching for different numeric types
-                        assert numeric_records.search(ZenDB.QueryBuilder().Where("int_val", #eq(#Int(-100)))) == #ok([(0, testNumericRecord)]);
-                        assert numeric_records.search(ZenDB.QueryBuilder().Where("nat8_val", #eq(#Nat8(8)))) == #ok([(0, testNumericRecord)]);
-                        assert numeric_records.search(ZenDB.QueryBuilder().Where("int16_val", #eq(#Int16(-16)))) == #ok([(0, testNumericRecord)]);
-                        assert numeric_records.search(ZenDB.QueryBuilder().Where("nat64_val", #eq(#Nat64(64)))) == #ok([(0, testNumericRecord)]);
+                        assert numeric_records.search(ZenDB.QueryBuilder().Where("int_val", #eq(#Int(-100)))) == #ok([(id, testNumericRecord)]);
+                        assert numeric_records.search(ZenDB.QueryBuilder().Where("nat8_val", #eq(#Nat8(8)))) == #ok([(id, testNumericRecord)]);
+                        assert numeric_records.search(ZenDB.QueryBuilder().Where("int16_val", #eq(#Int16(-16)))) == #ok([(id, testNumericRecord)]);
+                        assert numeric_records.search(ZenDB.QueryBuilder().Where("nat64_val", #eq(#Nat64(64)))) == #ok([(id, testNumericRecord)]);
 
                         assert numeric_records.get(id) == ?(testNumericRecord);
                     },
@@ -1057,7 +1057,7 @@ ZenDBSuite.newSuite(
                         }) else return assert false;
 
                         assert records_with_arrays.size() == 1;
-                        assert records_with_arrays.search(ZenDB.QueryBuilder().Where("id", #eq(#Nat(1)))) == #ok([(0, { id = 1; numbers = [1, 2, 3]; texts = ["a", "b", "c"] })]);
+                        assert records_with_arrays.search(ZenDB.QueryBuilder().Where("id", #eq(#Nat(1)))) == #ok([(id, { id = 1; numbers = [1, 2, 3]; texts = ["a", "b", "c"] })]);
                         assert records_with_arrays.get(id) == ?({
                             id = 1;
                             numbers = [1, 2, 3];
@@ -1099,9 +1099,9 @@ ZenDBSuite.newSuite(
                         let #ok(id3) = variants_with_arrays.insert(#matrix([[1, 2], [3, 4]])) else return assert false;
 
                         assert variants_with_arrays.size() == 3;
-                        assert variants_with_arrays.search(ZenDB.QueryBuilder().Where("single", #eq(#Nat(42)))) == #ok([(0, #single(42))]);
-                        assert variants_with_arrays.search(ZenDB.QueryBuilder().Where("", #eq(#Text("list")))) == #ok([(1, #list(["a", "b", "c"]))]);
-                        assert variants_with_arrays.search(ZenDB.QueryBuilder().Where("", #eq(#Text("matrix")))) == #ok([(2, #matrix([[1, 2], [3, 4]]))]);
+                        assert variants_with_arrays.search(ZenDB.QueryBuilder().Where("single", #eq(#Nat(42)))) == #ok([(id1, #single(42))]);
+                        assert variants_with_arrays.search(ZenDB.QueryBuilder().Where("", #eq(#Text("list")))) == #ok([(id2, #list(["a", "b", "c"]))]);
+                        assert variants_with_arrays.search(ZenDB.QueryBuilder().Where("", #eq(#Text("matrix")))) == #ok([(id3, #matrix([[1, 2], [3, 4]]))]);
                     },
                 );
 
@@ -1327,11 +1327,11 @@ ZenDBSuite.newSuite(
                         // Deep path queries to test indexing and search capabilities
                         assert extreme_nesting.search(
                             ZenDB.QueryBuilder().Where("metadata.name", #eq(#Text("Extreme Test")))
-                        ) == #ok([(0, testInstance)]);
+                        ) == #ok([(id, testInstance)]);
 
                         assert extreme_nesting.search(
                             ZenDB.QueryBuilder().Where("status", #eq(#Text("active")))
-                        ) == #ok([(0, testInstance)]);
+                        ) == #ok([(id, testInstance)]);
 
                         //! accessing elements nested in arrays not supported yet
                         // assert extreme_nesting.search(

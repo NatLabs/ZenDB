@@ -1,3 +1,5 @@
+import Prim "mo:prim";
+
 import Principal "mo:base@0.16.0/Principal";
 import Array "mo:base@0.16.0/Array";
 import Debug "mo:base@0.16.0/Debug";
@@ -95,7 +97,7 @@ module StableCollection {
     //     let schema_keys = Utils.getSchemaKeys(processed_schema);
 
     //     var stable_collection : T.StableCollection = {
-    //         ids = Ids.new();
+    //         ids = db.ids;
     //         name;
     //         schema = processed_schema;
     //         schema_map = SchemaMap.new(processed_schema);
@@ -627,7 +629,10 @@ module StableCollection {
         candid_blob : T.CandidBlob,
     ) : Result<Nat, Text> {
 
-        let id = Ids.next(collection.ids);
+        let id = Ids.next(
+            collection.ids
+        );
+
         Logger.lazyInfo(
             collection.logger,
             func() = "ZenDB Collection.put(): Inserting document with id " # debug_show id,
@@ -643,7 +648,6 @@ module StableCollection {
         switch (Schema.validate(collection.schema, candid)) {
             case (#ok(_)) {};
             case (#err(msg)) {
-                Ids.undoNext(collection.ids);
                 let err_msg = "Schema validation failed: " # msg;
                 return #err(err_msg);
             };
@@ -654,7 +658,6 @@ module StableCollection {
         switch (validateSchemaConstraintsOnUpdatedFields(collection, id, candid_map, null)) {
             case (#ok(_)) {};
             case (#err(msg)) {
-                Ids.undoNext(collection.ids);
                 let err_msg = "Schema Constraint validation failed: " # msg;
                 return #err(err_msg);
             };
