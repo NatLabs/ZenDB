@@ -529,7 +529,7 @@ module T {
         #trim : (FieldUpdateOperations, Text);
         #lowercase : (FieldUpdateOperations);
         #uppercase : (FieldUpdateOperations);
-        #replaceSubText : (FieldUpdateOperations, Text, Text);
+        #replace_sub_text : (FieldUpdateOperations, Text, Text);
         #slice : (FieldUpdateOperations, Nat, Nat);
         #concat : (FieldUpdateOperations, FieldUpdateOperations);
         #concatAll : [FieldUpdateOperations];

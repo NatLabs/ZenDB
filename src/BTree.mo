@@ -205,7 +205,7 @@ module BTree {
         };
     };
 
-    public func rangeKeys<K, V>(btree : T.BTree<K, V>, cmp : T.BTreeUtils<K, V>, start : Nat, end : Nat) : T.RevIter<K> {
+    public func range_keys<K, V>(btree : T.BTree<K, V>, cmp : T.BTreeUtils<K, V>, start : Nat, end : Nat) : T.RevIter<K> {
         switch (btree, cmp) {
             case (#stableMemory(memory_btree), #stableMemory(memory_btree_utils)) {
                 return MemoryBTree.rangeKeys(memory_btree, memory_btree_utils, start, end);
@@ -226,7 +226,7 @@ module BTree {
         };
     };
 
-    public func rangeVals<K, V>(btree : T.BTree<K, V>, cmp : T.BTreeUtils<K, V>, start : Nat, end : Nat) : T.RevIter<V> {
+    public func range_vals<K, V>(btree : T.BTree<K, V>, cmp : T.BTreeUtils<K, V>, start : Nat, end : Nat) : T.RevIter<V> {
         switch (btree, cmp) {
             case (#stableMemory(memory_btree), #stableMemory(memory_btree_utils)) {
                 return MemoryBTree.rangeVals(memory_btree, memory_btree_utils, start, end);
@@ -335,7 +335,7 @@ module BTree {
         };
     };
 
-    public func get_memory_stats<K, V>(btree : T.BTree<K, V>) : T.MemoryBTreeStats {
+    public func getMemoryStats<K, V>(btree : T.BTree<K, V>) : T.MemoryBTreeStats {
         switch (btree) {
             case (#stableMemory(btree)) { MemoryBTree.stats(btree) };
             case (#heap(_)) {

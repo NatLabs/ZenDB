@@ -106,7 +106,7 @@ module Index {
         let index : Index = {
             name;
             key_details;
-            data = CollectionUtils.newBtree(collection);
+            data = CollectionUtils.new_btree(collection);
             used_internally;
             is_unique;
         };
@@ -126,7 +126,7 @@ module Index {
         candid_map : T.CandidMap,
     ) : T.Result<(), Text> {
 
-        let index_data_utils = CollectionUtils.getIndexDataUtils(collection);
+        let index_data_utils = CollectionUtils.get_index_data_utils(collection);
 
         let index_key_values = switch (CollectionUtils.getIndexColumns(collection, index.key_details, id, candid_map)) {
             case (?index_key_values) index_key_values;
@@ -166,7 +166,7 @@ module Index {
     };
 
     public func remove(collection : StableCollection, index : Index, id : Nat, prev_candid_map : T.CandidMap) : T.Result<(), Text> {
-        let index_data_utils = CollectionUtils.getIndexDataUtils(collection);
+        let index_data_utils = CollectionUtils.get_index_data_utils(collection);
 
         let index_key_values = switch (CollectionUtils.getIndexColumns(collection, index.key_details, id, prev_candid_map)) {
             case (?index_key_values) index_key_values;
@@ -203,7 +203,7 @@ module Index {
         BTree.clear(index.data);
     };
 
-    public func populateIndex(
+    public func populate_index(
         collection : StableCollection,
         index : Index,
     ) : T.Result<(), Text> {
@@ -229,10 +229,10 @@ module Index {
     };
 
     /// Clears the index and repopulates it with all documents from the collection.
-    public func repopulateIndex(collection : StableCollection, index : Index) : T.Result<(), Text> {
+    public func repopulate_index(collection : StableCollection, index : Index) : T.Result<(), Text> {
         // clear the index first
         Index.clear(collection, index);
-        populateIndex(collection, index);
+        populate_index(collection, index);
     };
 
     func populateIndexesFromCandidMapDocumentEntries(
@@ -259,7 +259,7 @@ module Index {
         #ok();
     };
 
-    public func populateIndexes(
+    public func populate_indexes(
         collection : StableCollection,
         indexes : [T.Index],
     ) : T.Result<(), Text> {
@@ -281,7 +281,7 @@ module Index {
 
     };
 
-    public func repopulateIndexes(
+    public func repopulate_indexes(
         collection : StableCollection,
         indexes : [T.Index],
     ) : T.Result<(), Text> {
@@ -310,7 +310,7 @@ module Index {
     //     id : Nat,
     //     candid_map : T.CandidMap,
     // ) : Bool {
-    //     let index_data_utils = CollectionUtils.getIndexDataUtils(collection);
+    //     let index_data_utils = CollectionUtils.get_index_data_utils(collection);
 
     //     let index_key_values = switch (CollectionUtils.getIndexColumns(collection, index.key_details, id, candid_map)) {
     //         case (?index_key_values) index_key_values;
@@ -354,7 +354,7 @@ module Index {
             case (#gte(candid)) {
                 switch (Map.get(lower, thash, field)) {
                     case (?#Inclusive(val) or ?#Exclusive(val)) {
-                        if (Schema.cmpCandid(#Empty, candid, val) == 1) {
+                        if (Schema.cmp_candid(#Empty, candid, val) == 1) {
                             ignore Map.put(lower, thash, field, #Inclusive(candid));
                         };
                     };
@@ -364,7 +364,7 @@ module Index {
             case (#lte(candid)) {
                 switch (Map.get(upper, thash, field)) {
                     case (?#Inclusive(val) or ?#Exclusive(val)) {
-                        if (Schema.cmpCandid(#Empty, candid, val) == -1) {
+                        if (Schema.cmp_candid(#Empty, candid, val) == -1) {
                             ignore Map.put(upper, thash, field, #Inclusive(candid));
                         };
                     };
@@ -374,7 +374,7 @@ module Index {
             case (#lt(candid)) {
                 switch (Map.get(upper, thash, field)) {
                     case (?#Inclusive(val) or ?#Exclusive(val)) {
-                        let cmp = Schema.cmpCandid(#Empty, candid, val);
+                        let cmp = Schema.cmp_candid(#Empty, candid, val);
                         if (cmp == -1 or cmp == 0) {
                             ignore Map.put(upper, thash, field, #Exclusive(candid));
                         };
@@ -385,7 +385,7 @@ module Index {
             case (#gt(candid)) {
                 switch (Map.get(lower, thash, field)) {
                     case (?#Inclusive(val) or ?#Exclusive(val)) {
-                        let cmp = Schema.cmpCandid(#Empty, candid, val);
+                        let cmp = Schema.cmp_candid(#Empty, candid, val);
                         if (cmp == 1 or cmp == 0) {
                             ignore Map.put(lower, thash, field, #Exclusive(candid));
                         };
@@ -416,15 +416,15 @@ module Index {
         // Debug.print("start_query: " # debug_show start_query);
         // Debug.print("end_query: " # debug_show end_query);
 
-        let index_data_utils = CollectionUtils.getIndexDataUtils(collection);
+        let index_data_utils = CollectionUtils.get_index_data_utils(collection);
 
         func sort_by_key_details(a : (Text, Any), b : (Text, Any)) : Order {
-            let pos_a = switch (Array.indexOf<(Text, SortDirection)>((a.0, #Ascending), index.key_details, Utils.tupleEq(Text.equal))) {
+            let pos_a = switch (Array.indexOf<(Text, SortDirection)>((a.0, #Ascending), index.key_details, Utils.tuple_eq(Text.equal))) {
                 case (?pos) pos;
                 case (null) index.key_details.size();
             };
 
-            let pos_b = switch (Array.indexOf<(Text, SortDirection)>((b.0, #Ascending), index.key_details, Utils.tupleEq(Text.equal))) {
+            let pos_b = switch (Array.indexOf<(Text, SortDirection)>((b.0, #Ascending), index.key_details, Utils.tuple_eq(Text.equal))) {
                 case (?pos) pos;
                 case (null) index.key_details.size();
             };
@@ -559,12 +559,12 @@ module Index {
         scans;
     };
 
-    public func fromInterval(
+    public func from_interval(
         collection : T.StableCollection,
         index : Index,
         interval : (Nat, Nat),
     ) : [([T.CandidQuery], T.DocumentId)] {
-        let index_data_utils = CollectionUtils.getIndexDataUtils(collection);
+        let index_data_utils = CollectionUtils.get_index_data_utils(collection);
 
         let (start, end) = interval;
 
@@ -577,7 +577,7 @@ module Index {
         collection : T.StableCollection,
         index : Index,
     ) : T.RevIter<([T.CandidQuery], T.DocumentId)> {
-        let index_data_utils = CollectionUtils.getIndexDataUtils(collection);
+        let index_data_utils = CollectionUtils.get_index_data_utils(collection);
 
         BTree.entries<[T.CandidQuery], T.DocumentId>(index.data, index_data_utils);
     };
@@ -605,7 +605,7 @@ module Index {
 
     // };
 
-    public func extractBounds(lower : Map<Text, T.CandidInclusivityQuery>, upper : Map<Text, T.CandidInclusivityQuery>, opt_index_key_details : ?[(Text, T.SortDirection)], opt_fully_covered_equality_and_range_fields : ?Set.Set<Text>) : (Bounds, Bounds) {
+    public func extract_bounds(lower : Map<Text, T.CandidInclusivityQuery>, upper : Map<Text, T.CandidInclusivityQuery>, opt_index_key_details : ?[(Text, T.SortDirection)], opt_fully_covered_equality_and_range_fields : ?Set.Set<Text>) : (Bounds, Bounds) {
 
         assert Option.isSome(opt_index_key_details) == Option.isSome(opt_fully_covered_equality_and_range_fields);
 
@@ -703,7 +703,7 @@ module Index {
 
     };
 
-    public func convertSimpleOpsToBounds(is_and_operation : Bool, simple_operations : [(Text, T.ZqlOperators)], opt_index_key_details : ?[(Text, T.SortDirection)], opt_fully_covered_equality_and_range_fields : ?Set.Set<Text>) : (T.Bounds, T.Bounds) {
+    public func convert_simple_ops_to_bounds(is_and_operation : Bool, simple_operations : [(Text, T.ZqlOperators)], opt_index_key_details : ?[(Text, T.SortDirection)], opt_fully_covered_equality_and_range_fields : ?Set.Set<Text>) : (T.Bounds, T.Bounds) {
 
         let lower_bound = Map.new<Text, T.State<T.CandidQuery>>();
         let upper_bound = Map.new<Text, T.State<T.CandidQuery>>();
@@ -743,7 +743,7 @@ module Index {
 
         };
 
-        extractBounds(lower_bound, upper_bound, opt_index_key_details, opt_fully_covered_equality_and_range_fields);
+        extract_bounds(lower_bound, upper_bound, opt_index_key_details, opt_fully_covered_equality_and_range_fields);
 
     };
 
@@ -787,7 +787,7 @@ module Index {
 
     };
 
-    public func fillFieldMaps(equal_fields : Set.Set<Text>, sort_fields : Buffer<(Text, T.SortDirection)>, range_fields : Set.Set<Text>, operations : [(Text, T.ZqlOperators)], sort_field : ?(Text, T.SortDirection)) {
+    public func fill_field_maps(equal_fields : Set.Set<Text>, sort_fields : Buffer<(Text, T.SortDirection)>, range_fields : Set.Set<Text>, operations : [(Text, T.ZqlOperators)], sort_field : ?(Text, T.SortDirection)) {
 
         sort_fields.clear();
 
@@ -806,13 +806,13 @@ module Index {
         };
     };
 
-    public func getBestIndex(collection : StableCollection, operations : [(Text, T.ZqlOperators)], sort_field : ?(Text, T.SortDirection)) : ?BestIndexResult {
+    public func get_best_index(collection : StableCollection, operations : [(Text, T.ZqlOperators)], sort_field : ?(Text, T.SortDirection)) : ?BestIndexResult {
         let equal_fields = Set.new<Text>();
         let sort_fields = Buffer.Buffer<(Text, T.SortDirection)>(8);
         let range_fields = Set.new<Text>();
         // let partially_covered_fields = Set.new<Text>();
 
-        fillFieldMaps(equal_fields, sort_fields, range_fields, operations, sort_field);
+        fill_field_maps(equal_fields, sort_fields, range_fields, operations, sort_field);
 
         // the sorting direction of the query and the index can either be a direct match
         // or a direct opposite in order to return the results without additional sorting
@@ -914,7 +914,7 @@ module Index {
 
             if (num_of_equal_fields_covered > 0 or num_of_range_fields_covered > 0 or num_of_sort_fields_covered > 0) {
 
-                let (scan_bounds, filter_bounds) = convertSimpleOpsToBounds(false, operations, ?index.key_details, ?fully_covered_equality_and_range_fields);
+                let (scan_bounds, filter_bounds) = convert_simple_ops_to_bounds(false, operations, ?index.key_details, ?fully_covered_equality_and_range_fields);
 
                 let interval = scan(collection, index, scan_bounds.0, scan_bounds.1, null);
 
@@ -1009,7 +1009,7 @@ module Index {
 
     public func stats(index : Index, collection_entries : Nat) : T.IndexStats {
 
-        let memory = BTree.get_memory_stats(index.data);
+        let memory = BTree.getMemoryStats(index.data);
         let index_entries = Index.size(index); // could be less or more than collection entries depending on the index type and if there are duplicate values
 
         {

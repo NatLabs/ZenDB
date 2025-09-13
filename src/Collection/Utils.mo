@@ -79,7 +79,7 @@ module CollectionUtils {
 
     public let { thash; bhash } = Map;
 
-    public func newBtree<K, V>(collection : StableCollection) : T.BTree<K, V> {
+    public func new_btree<K, V>(collection : StableCollection) : T.BTree<K, V> {
         switch (collection.memory_type) {
             case (#heap) { BTree.newHeap() };
             case (#stableMemory) {
@@ -95,11 +95,11 @@ module CollectionUtils {
         };
     };
 
-    public func getIndexKeyUtils() : TypeUtils.TypeUtils<[T.CandidQuery]> {
+    public func get_index_key_utils() : TypeUtils.TypeUtils<[T.CandidQuery]> {
         Orchid.Orchid;
     };
 
-    public func getIndexDataUtils(collection : StableCollection) : T.BTreeUtils<[T.CandidQuery], T.DocumentId> {
+    public func get_index_data_utils(collection : StableCollection) : T.BTreeUtils<[T.CandidQuery], T.DocumentId> {
         switch (collection.memory_type) {
             case (#stableMemory(_)) {
                 #stableMemory(MemoryBTree.createUtils<[T.CandidQuery], T.DocumentId>(Orchid.Orchid, TypeUtils.Nat));
@@ -227,7 +227,7 @@ module CollectionUtils {
         for (((key, opt_lower_val), (upper_key, opt_upper_val)) in Itertools.zip(lower.vals(), upper.vals())) {
             assert key == upper_key;
 
-            //    Debug.print("candid_map: " # debug_show candid_map.extractCandid());
+            //    Debug.print("candid_map: " # debug_show candid_map.extract_candid());
 
             let field_value = switch (CandidMap.get(candid_map, collection.schema_map, key)) {
                 case (?val) val;
@@ -238,20 +238,20 @@ module CollectionUtils {
 
             switch (opt_lower_val) {
                 case (?(#Inclusive(lower_val))) {
-                    if (Schema.cmpCandidIgnoreOption(collection.schema, field_value, lower_val) == -1) res := false;
+                    if (Schema.cmp_candid_ignore_option(collection.schema, field_value, lower_val) == -1) res := false;
                 };
                 case (?(#Exclusive(lower_val))) {
-                    if (Schema.cmpCandidIgnoreOption(collection.schema, field_value, lower_val) < 1) res := false;
+                    if (Schema.cmp_candid_ignore_option(collection.schema, field_value, lower_val) < 1) res := false;
                 };
                 case (null) {};
             };
 
             switch (opt_upper_val) {
                 case (?(#Inclusive(upper_val))) {
-                    if (Schema.cmpCandidIgnoreOption(collection.schema, field_value, upper_val) == 1) res := false;
+                    if (Schema.cmp_candid_ignore_option(collection.schema, field_value, upper_val) == 1) res := false;
                 };
                 case (?(#Exclusive(upper_val))) {
-                    if (Schema.cmpCandidIgnoreOption(collection.schema, field_value, upper_val) > -1) res := false;
+                    if (Schema.cmp_candid_ignore_option(collection.schema, field_value, upper_val) > -1) res := false;
                 };
                 case (null) {};
             };
@@ -283,7 +283,7 @@ module CollectionUtils {
                 Iter.map(
                     intervals.vals(),
                     func(interval : (Nat, Nat)) : Iter<(Nat)> {
-                        let document_ids = DocumentStore.rangeKeys(collection.documents, main_btree_utils, interval.0, interval.1);
+                        let document_ids = DocumentStore.range_keys(collection.documents, main_btree_utils, interval.0, interval.1);
 
                         if (sorted_in_reverse) {
                             return document_ids.rev();
@@ -299,13 +299,13 @@ module CollectionUtils {
 
         let ?index = Map.get(collection.indexes, thash, index_name) else Debug.trap("Unreachable: IndexMap not found for index: " # index_name);
 
-        let index_data_utils = CollectionUtils.getIndexDataUtils(collection);
+        let index_data_utils = CollectionUtils.get_index_data_utils(collection);
 
         Itertools.flatten(
             Iter.map(
                 intervals.vals(),
                 func(interval : (Nat, Nat)) : Iter<(Nat)> {
-                    let document_ids = BTree.rangeVals(index.data, index_data_utils, interval.0, interval.1);
+                    let document_ids = BTree.range_vals(index.data, index_data_utils, interval.0, interval.1);
 
                     if (sorted_in_reverse) {
                         return document_ids.rev();

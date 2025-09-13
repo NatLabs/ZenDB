@@ -319,7 +319,7 @@ module CandidMap {
         let candid : NestedCandid = switch (Map.get(map, thash, field)) {
             case (?nested_candid) nested_candid;
             case (null) {
-                switch (SchemaMap.unwrapOptionType(types), Map.get(map, thash, IS_COMPOUND_TYPE)) {
+                switch (SchemaMap.unwrap_option_type(types), Map.get(map, thash, IS_COMPOUND_TYPE)) {
                     case (#Variant(schema_map_types), ?#Candid(#Variant(candid_map_nested_types), #Text(tag))) {
                         for ((variant_tag, _) in schema_map_types.vals()) {
                             if (variant_tag == tag) {
@@ -358,7 +358,7 @@ module CandidMap {
 
         let opt_compound_tag = Map.get(map, thash, IS_COMPOUND_TYPE);
 
-        if (is_compound_type) switch (SchemaMap.unwrapOptionType(types), opt_compound_tag) {
+        if (is_compound_type) switch (SchemaMap.unwrap_option_type(types), opt_compound_tag) {
             case (#Variant(_), ?#Candid(#Variant(_), #Text(tag))) return ?wrap_option(types, #Text(tag));
             case (_) {};
         };
@@ -592,14 +592,14 @@ module CandidMap {
     };
 
     public func clone(candid_map : CandidMap, schema_map : T.SchemaMap) : CandidMap {
-        let extracted_candid = extractCandid(candid_map);
+        let extracted_candid = extract_candid(candid_map);
         let ?(#Candid(#Nat, #Nat(id))) = Map.get(candid_map.candid_map, thash, C.DOCUMENT_ID) else Debug.trap("CandidMap.clone(): Could not find candid id");
         let cloned = CandidMap.new(schema_map, id, extracted_candid);
 
         cloned;
     };
 
-    public func extractCandid(state : CandidMap) : Candid {
+    public func extract_candid(state : CandidMap) : Candid {
         let { candid_map = map } = state;
 
         func extract_candid_helper(map : Map.Map<Text, NestedCandid>) : Candid {

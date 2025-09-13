@@ -39,7 +39,7 @@ import BTree "../BTree";
 
 module {
 
-    let { logErrorMsg } = Utils;
+    let { log_error_msg } = Utils;
 
     public type InternalCandify<T> = T.InternalCandify<T>;
     public type Map<K, V> = Map.Map<K, V>;
@@ -72,7 +72,7 @@ module {
             func() = "StableDatabase.create_collection(): Creating collection '" # name # "'",
         );
 
-        switch (Schema.validateSchema(schema)) {
+        switch (Schema.validate_schema(schema)) {
             case (#ok(_)) {
                 Logger.lazyInfo(
                     db.logger,
@@ -81,11 +81,11 @@ module {
             };
             case (#err(msg)) {
                 let error_msg = "StableDatabase.create_collection(): Schema validation failed: " # msg;
-                return logErrorMsg(db.logger, error_msg);
+                return log_error_msg(db.logger, error_msg);
             };
         };
 
-        let processed_schema = Schema.processSchema(schema);
+        let processed_schema = Schema.process_schema(schema);
 
         switch (Map.get<Text, StableCollection>(db.collections, thash, name)) {
             case (?stable_collection) {
@@ -99,7 +99,7 @@ module {
                         db.logger,
                         func() = "StableDatabase.create_collection(): Schema mismatch for existing collection '" # name # "'",
                     );
-                    return logErrorMsg(db.logger, "Schema error: collection already exists with different schema");
+                    return log_error_msg(db.logger, "Schema error: collection already exists with different schema");
                 };
 
                 Logger.lazyInfo(
@@ -124,15 +124,15 @@ module {
         };
 
         // Validate schema constraints
-        let { field_constraints; unique_constraints } = switch (SchemaMap.validateSchemaConstraints(schema_map, schema_constraints)) {
+        let { field_constraints; unique_constraints } = switch (SchemaMap.validate_schema_constraints(schema_map, schema_constraints)) {
             case (#ok(res)) res;
             case (#err(msg)) {
                 let error_msg = "StableDatabase.create_collection(): Schema constraints validation failed: " # msg;
-                return logErrorMsg(db.logger, error_msg);
+                return log_error_msg(db.logger, error_msg);
             };
         };
 
-        let schema_keys = Utils.getSchemaKeys(processed_schema);
+        let schema_keys = Utils.get_schema_keys(processed_schema);
 
         var stable_collection : T.StableCollection = {
             ids = db.ids;
@@ -176,7 +176,7 @@ module {
                 func(field_name : Text) : (Text, T.SortDirection) = (field_name, #Ascending),
             );
 
-            let index_res = StableCollection.createIndexInternal(
+            let index_res = StableCollection.create_index_internal(
                 stable_collection,
                 "internal_index_" # debug_show (Map.size(stable_collection.indexes)) # "_unique",
                 unique_field_names_with_direction,
@@ -195,7 +195,7 @@ module {
                 };
                 case (#err(msg)) {
                     let error_msg = "StableDatabase.create_collection(): Failed to create index for unique constraint on fields: " # debug_show unique_field_names # ", error: " # msg;
-                    return logErrorMsg(db.logger, error_msg);
+                    return log_error_msg(db.logger, error_msg);
                 };
             };
 
@@ -257,11 +257,15 @@ module {
                     db.logger,
                     func() = "StableDatabase.get_collection(): Collection '" # name # "' not found",
                 );
-                return logErrorMsg(db.logger, "ZenDB Database.get_collection(): Collection " # debug_show name # " not found");
+                return log_error_msg(db.logger, "ZenDB Database.get_collection(): Collection " # debug_show name # " not found");
             };
         };
 
         #ok(stable_collection);
+    };
+
+    public func list_collections(db : T.StableDatabase) : [Text] {
+        Iter.toArray(Map.keys(db.collections));
     };
 
     public func stats(db : T.StableDatabase) : T.DatabaseStats {
@@ -308,10 +312,6 @@ module {
             total_document_store_bytes = total_document_store_bytes;
             total_index_store_bytes = total_index_store_bytes;
         };
-    };
-
-    public func list_collections(db : T.StableDatabase) : [Text] {
-        Iter.toArray(Map.keys(db.collections));
     };
 
 };

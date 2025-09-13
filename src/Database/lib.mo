@@ -66,7 +66,7 @@ module {
 
         func validate_candify<A>(collection_name : Text, schema : T.Schema, external_candify : T.Candify<A>) : Result<T.InternalCandify<A>, Text> {
 
-            let default_candid_value : T.Candid = switch (Schema.generateDefaultValue(schema)) {
+            let default_candid_value : T.Candid = switch (Schema.generate_default_value(schema)) {
                 case (#ok(default_candid)) default_candid;
                 case (#err(msg)) return #err("Failed to generate default value for schema for candify validation: " # msg);
             };
@@ -137,7 +137,7 @@ module {
         /// ```
 
         public func createCollection<Record>(name : Text, schema : T.Schema, external_candify : T.Candify<Record>, options : ?T.CreateCollectionOptions) : Result<Collection<Record>, Text> {
-            let validate_candify_result = Utils.handleResult(
+            let validate_candify_result = Utils.handle_result(
                 stable_db.logger,
                 validate_candify(name, schema, external_candify),
                 "Failed to validate candify function: ",
@@ -145,7 +145,7 @@ module {
 
             let internal_candify : T.InternalCandify<Record> = switch (validate_candify_result) {
                 case (#ok(internal_candify)) internal_candify;
-                case (#err(msg)) return Utils.logErrorMsg(stable_db.logger, msg);
+                case (#err(msg)) return Utils.log_error_msg(stable_db.logger, msg);
             };
 
             switch (StableDatabase.create_collection(stable_db, name, schema, options)) {
@@ -158,7 +158,7 @@ module {
                         )
                     );
                 };
-                case (#err(msg)) Utils.logErrorMsg(stable_db.logger, msg);
+                case (#err(msg)) Utils.log_error_msg(stable_db.logger, msg);
             };
         };
 
@@ -183,6 +183,10 @@ module {
             };
         };
 
+        public func getStableState() : T.StableDatabase {
+            stable_db;
+        };
+
         public func _create_index_on_collection(
             collection_name : Text,
             index_name : Text,
@@ -195,7 +199,7 @@ module {
             };
 
             switch (
-                StableCollection.createIndex(
+                StableCollection.create_index(
                     stable_collection,
                     CollectionUtils.getMainBtreeUtils(stable_collection),
                     index_name,

@@ -42,12 +42,12 @@ module CandidOps {
     type Result<A, B> = T.Result<A, B>;
     type Iter<A> = T.Iter<A>;
 
-    public func toFloat(candid : Candid) : Float {
+    public func to_float(candid : Candid) : Float {
         switch (candid) {
             case (#Nat(nat)) Float.fromInt(nat);
             case (#Int(int)) Float.fromInt(int);
             case (#Float(float)) float;
-            case (#Option(opt)) toFloat(opt);
+            case (#Option(opt)) to_float(opt);
             case (#Null) 0.0;
             case (#Nat8(nat8)) Float.fromInt(Nat8.toNat(nat8));
             case (#Nat16(nat16)) Float.fromInt(Nat16.toNat(nat16));
@@ -63,13 +63,13 @@ module CandidOps {
         };
     };
 
-    public func fromFloat(self : Candid, float : Float) : Candid {
+    public func from_float(self : Candid, float : Float) : Candid {
 
         switch (self) {
             case (#Nat(_)) #Nat(Int.abs(Float.toInt(float)));
             case (#Int(_)) #Int(Float.toInt(float));
             case (#Float(_)) #Float(float);
-            case (#Option(opt)) #Option(fromFloat(opt, float));
+            case (#Option(opt)) #Option(from_float(opt, float));
             case (#Null) Debug.trap("Can't convert null to float. Need to pass in the candid type as well");
             case (#Nat8(nat8)) #Nat8(Nat8.fromNat(Int.abs(Float.toInt(float))));
             case (#Nat16(nat16)) #Nat16(Nat16.fromNat(Int.abs(Float.toInt(float))));
@@ -88,20 +88,20 @@ module CandidOps {
 
     public func add(self : Candid, other : Candid) : Result<Candid, Text> {
 
-        let a = toFloat(self);
-        let b = toFloat(other);
+        let a = to_float(self);
+        let b = to_float(other);
 
         let c = a + b;
 
-        // let candid = fromFloat(self, c);
+        // let candid = from_float(self, c);
         #ok(#Float(c));
 
     };
 
     public func sub(self : Candid, other : Candid) : Result<Candid, Text> {
 
-        let a = toFloat(self);
-        let b = toFloat(other);
+        let a = to_float(self);
+        let b = to_float(other);
 
         if (a < b) {
             return #err("Cannot complete #sub operation because " # debug_show (self) # " < " # debug_show (other));
@@ -109,27 +109,27 @@ module CandidOps {
 
         let c = a - b;
 
-        // let candid = fromFloat(self, c);
+        // let candid = from_float(self, c);
         #ok(#Float(c));
 
     };
 
     public func mul(self : Candid, other : Candid) : Result<Candid, Text> {
 
-        let a = toFloat(self);
-        let b = toFloat(other);
+        let a = to_float(self);
+        let b = to_float(other);
 
         let c = a * b;
 
-        // let candid = fromFloat(self, c);
+        // let candid = from_float(self, c);
         #ok(#Float(c));
 
     };
 
     public func div(self : Candid, other : Candid) : Result<Candid, Text> {
 
-        let a = toFloat(self);
-        let b = toFloat(other);
+        let a = to_float(self);
+        let b = to_float(other);
 
         if (b == 0) {
             return #err("Cannot complete #div operation because " # debug_show (self) # " cannot be divided by zero - " # debug_show (other));
@@ -137,15 +137,15 @@ module CandidOps {
 
         let c = a / b;
 
-        // let candid = fromFloat(self, c);
+        // let candid = from_float(self, c);
         #ok(#Float(c));
 
     };
 
     public func mod(self : Candid, other : Candid) : Result<Candid, Text> {
 
-        let a = toFloat(self);
-        let b = toFloat(other);
+        let a = to_float(self);
+        let b = to_float(other);
 
         if (b == 0) {
             return #err("Cannot complete #mod operation because " # debug_show (self) # " cannot be divided by zero - " # debug_show (other));
@@ -153,26 +153,26 @@ module CandidOps {
 
         let c = a % b;
 
-        // let candid = fromFloat(self, c);
+        // let candid = from_float(self, c);
         #ok(#Float(c));
 
     };
 
     public func pow(self : Candid, other : Candid) : Result<Candid, Text> {
 
-        let a = toFloat(self);
-        let b = toFloat(other);
+        let a = to_float(self);
+        let b = to_float(other);
 
         let c = a ** b;
 
-        // let candid = fromFloat(self, c);
+        // let candid = from_float(self, c);
         #ok(#Float(c));
 
     };
 
     public func sqrt(self : Candid) : Result<Candid, Text> {
 
-        let a = toFloat(self);
+        let a = to_float(self);
 
         if (a < 0) {
             return #err("Cannot complete #sqrt operation because " # debug_show (self) # " is negative");
@@ -180,75 +180,75 @@ module CandidOps {
 
         let c = Float.sqrt(a);
 
-        // let candid = fromFloat(self, c);
+        // let candid = from_float(self, c);
         #ok(#Float(c));
 
     };
 
     public func abs(self : Candid) : Result<Candid, Text> {
 
-        let a = toFloat(self);
+        let a = to_float(self);
 
         let c = Float.abs(a);
 
-        let res = fromFloat(self, c);
+        let res = from_float(self, c);
         #ok(res);
 
     };
 
     public func neg(self : Candid) : Result<Candid, Text> {
 
-        let a = toFloat(self);
+        let a = to_float(self);
 
         let c = Float.neg(a);
 
-        // let candid = fromFloat(self, c);
+        // let candid = from_float(self, c);
         #ok(#Float(c));
 
     };
 
     public func floor(self : Candid) : Result<Candid, Text> {
 
-        let a = toFloat(self);
+        let a = to_float(self);
 
         let c = Float.floor(a);
 
-        let res = fromFloat(self, c);
+        let res = from_float(self, c);
         #ok(res);
 
     };
 
     public func ceil(self : Candid) : Result<Candid, Text> {
 
-        let a = toFloat(self);
+        let a = to_float(self);
 
         let c = Float.ceil(a);
 
-        // let candid = fromFloat(self, c);
+        // let candid = from_float(self, c);
         #ok(#Float(c));
 
     };
 
     public func min(self : Candid, other : Candid) : Result<Candid, Text> {
 
-        let a = toFloat(self);
-        let b = toFloat(other);
+        let a = to_float(self);
+        let b = to_float(other);
 
         let c = Float.min(a, b);
 
-        // let candid = fromFloat(self, c);
+        // let candid = from_float(self, c);
         #ok(#Float(c));
 
     };
 
     public func max(self : Candid, other : Candid) : Result<Candid, Text> {
 
-        let a = toFloat(self);
-        let b = toFloat(other);
+        let a = to_float(self);
+        let b = to_float(other);
 
         let c = Float.max(a, b);
 
-        // let candid = fromFloat(self, c);
+        // let candid = from_float(self, c);
         #ok(#Float(c));
 
     };
@@ -292,7 +292,7 @@ module CandidOps {
 
     };
 
-    public func trimStart(self : Candid, toTrim : Text) : Result<Candid, Text> {
+    public func trim_start(self : Candid, toTrim : Text) : Result<Candid, Text> {
         switch (self) {
             case (#Text(text)) {
                 let trimmed = Text.trimStart(text, #text(toTrim));
@@ -305,7 +305,7 @@ module CandidOps {
 
     };
 
-    public func trimEnd(self : Candid, toTrim : Text) : Result<Candid, Text> {
+    public func trim_end(self : Candid, toTrim : Text) : Result<Candid, Text> {
         switch (self) {
             case (#Text(text)) {
                 let trimmed = Text.trimEnd(text, #text(toTrim));
@@ -318,7 +318,7 @@ module CandidOps {
 
     };
 
-    public func replaceSubText(self : Candid, toReplace : Text, replacement : Text) : Result<Candid, Text> {
+    public func replace_sub_text(self : Candid, toReplace : Text, replacement : Text) : Result<Candid, Text> {
         switch (self) {
             case (#Text(text)) {
                 let replaced = Text.replace(text, #text(toReplace), replacement);
@@ -380,7 +380,7 @@ module CandidOps {
     public func concatBytes(self : Candid, bytes : Blob) : Result<Candid, Text> {
         switch (self) {
             case (#Blob(blob)) {
-                let concatenated = Utils.concatBlob(blob, bytes);
+                let concatenated = Utils.concat_blob(blob, bytes);
                 #ok(#Blob(concatenated));
             };
             case (#Text(text)) {
@@ -401,8 +401,8 @@ module CandidOps {
     };
 
     public func compare(self : Candid, other : Candid) : T.Order {
-        let a = toFloat(self);
-        let b = toFloat(other);
+        let a = to_float(self);
+        let b = to_float(other);
 
         Float.compare(a, b);
     };
@@ -421,7 +421,7 @@ module CandidOps {
     public module Multi {
         public func add(values : Iter<Candid>) : Result<Candid, Text> {
 
-            let floats = Iter.toArray(Iter.map(values, toFloat));
+            let floats = Iter.toArray(Iter.map(values, to_float));
             //    Debug.print("floats: " # debug_show floats);
             let res = Itertools.fold(floats.vals(), 0.0, Float.add);
 
@@ -431,7 +431,7 @@ module CandidOps {
 
         public func sub(values : Iter<Candid>) : Result<Candid, Text> {
 
-            let floats = Iter.map(values, toFloat);
+            let floats = Iter.map(values, to_float);
             let ?first = floats.next() else return #err("expected at least one value in #sub");
             let res = Itertools.fold(floats, first, Float.sub);
 
@@ -441,7 +441,7 @@ module CandidOps {
 
         public func mul(values : Iter<Candid>) : Result<Candid, Text> {
 
-            let floats = Iter.map(values, toFloat);
+            let floats = Iter.map(values, to_float);
             let res = Itertools.fold(floats, 1.0, Float.mul);
 
             #ok(#Float(res))
@@ -450,7 +450,7 @@ module CandidOps {
 
         public func div(values : Iter<Candid>) : Result<Candid, Text> {
 
-            let floats = Iter.map(values, toFloat);
+            let floats = Iter.map(values, to_float);
             let ?first = floats.next() else return #err("expected at least one value in #div");
             let res = Itertools.fold(floats, first, Float.div);
 

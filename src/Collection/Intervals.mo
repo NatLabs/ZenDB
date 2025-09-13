@@ -134,7 +134,7 @@ module {
 
     // tries to skip the number of documents requested within the instruction limit
     // returns the number of documents skipped
-    public func extractIntervalsInPaginationRange(collection : StableCollection, skip : Nat, opt_limit : ?Nat, index_name : Text, intervals : [(Nat, Nat)], sorted_in_reverse : Bool) : Iter<Nat> {
+    public func extract_intervals_in_pagination_range(collection : StableCollection, skip : Nat, opt_limit : ?Nat, index_name : Text, intervals : [(Nat, Nat)], sorted_in_reverse : Bool) : Iter<Nat> {
         // Debug.print("skip, opt_limit: " # debug_show (skip, opt_limit));
 
         var skipped = 0;
@@ -237,7 +237,7 @@ module {
 
     };
 
-    public func extractIntervalsInPaginationRangeForReversedIntervals(
+    public func extract_intervals_in_pagination_range_for_reversed_intervals(
         collection : StableCollection,
         skip : Nat,
         opt_limit : ?Nat,
