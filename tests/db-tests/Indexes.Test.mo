@@ -24,6 +24,7 @@ import Result "mo:base@0.16.0/Result";
 
 import ZenDB "../../src";
 import Index "../../src/Collection/Index";
+import Utils "../../src/Utils";
 
 import { test; suite } "mo:test";
 import Itertools "mo:itertools@0.2.2/Iter";
@@ -89,18 +90,18 @@ ZenDBSuite.newSuite(
         };
 
         let #ok(sorted_index_types) = zendb.createCollection("sorted_index_types", SupportedIndexTypes, candify_data, null) else return assert false;
-        let inputs = Map.new<Nat, SupportedIndexTypes>();
+        let inputs = Map.new<ZenDB.Types.DocumentId, SupportedIndexTypes>();
 
-        func get_field_and_sort_document_ids<A>(getter : (document : SupportedIndexTypes) -> A, cmp : (A, A) -> Order.Order) : ((Nat, Nat) -> Order.Order) {
-            func(id1 : Nat, id2 : Nat) : Order.Order {
-                let ?r1 = Map.get(inputs, Map.nhash, id1);
-                let ?r2 = Map.get(inputs, Map.nhash, id2);
+        func get_field_and_sort_document_ids<A>(getter : (document : SupportedIndexTypes) -> A, cmp : (A, A) -> Order.Order) : ((ZenDB.Types.DocumentId, ZenDB.Types.DocumentId) -> Order.Order) {
+            func(id1 : ZenDB.Types.DocumentId, id2 : ZenDB.Types.DocumentId) : Order.Order {
+                let ?r1 = Map.get(inputs, Map.bhash, id1);
+                let ?r2 = Map.get(inputs, Map.bhash, id2);
 
                 let v1 = getter(r1);
                 let v2 = getter(r2);
 
                 switch (cmp(v1, v2)) {
-                    case (#equal) Nat.compare(id1, id2);
+                    case (#equal) Nat.compare(Utils.nat_from_12_byte_blob(id1), Utils.nat_from_12_byte_blob(id2));
                     case (rest) rest;
                 };
             };
@@ -136,7 +137,7 @@ ZenDBSuite.newSuite(
 
             let #ok(id) = sorted_index_types.insert(document) else return assert false;
 
-            ignore Map.put(inputs, Map.nhash, id, document);
+            ignore Map.put(inputs, Map.bhash, id, document);
 
         };
 
@@ -206,21 +207,21 @@ ZenDBSuite.newSuite(
                 let #ok(_) = suite_utils.createIndex(sorted_index_types.name(), "blob", [("blob", #Ascending)], null) else return assert false;
                 let #ok(_) = suite_utils.createIndex(sorted_index_types.name(), "bool", [("bool", #Ascending)], null) else return assert false;
 
-                let sorted_texts = Buffer.Buffer<Nat>(inputs.size());
-                let sorted_nats = Buffer.Buffer<Nat>(inputs.size());
-                let sorted_nat8s = Buffer.Buffer<Nat>(inputs.size());
-                let sorted_nat16s = Buffer.Buffer<Nat>(inputs.size());
-                let sorted_nat32s = Buffer.Buffer<Nat>(inputs.size());
-                let sorted_nat64s = Buffer.Buffer<Nat>(inputs.size());
-                let sorted_ints = Buffer.Buffer<Nat>(inputs.size());
-                let sorted_int8s = Buffer.Buffer<Nat>(inputs.size());
-                let sorted_int16s = Buffer.Buffer<Nat>(inputs.size());
-                let sorted_int32s = Buffer.Buffer<Nat>(inputs.size());
-                let sorted_int64s = Buffer.Buffer<Nat>(inputs.size());
-                let sorted_floats = Buffer.Buffer<Nat>(inputs.size());
-                let sorted_principals = Buffer.Buffer<Nat>(inputs.size());
-                let sorted_blobs = Buffer.Buffer<Nat>(inputs.size());
-                let sorted_bools = Buffer.Buffer<Nat>(inputs.size());
+                let sorted_texts = Buffer.Buffer<ZenDB.Types.DocumentId>(inputs.size());
+                let sorted_nats = Buffer.Buffer<ZenDB.Types.DocumentId>(inputs.size());
+                let sorted_nat8s = Buffer.Buffer<ZenDB.Types.DocumentId>(inputs.size());
+                let sorted_nat16s = Buffer.Buffer<ZenDB.Types.DocumentId>(inputs.size());
+                let sorted_nat32s = Buffer.Buffer<ZenDB.Types.DocumentId>(inputs.size());
+                let sorted_nat64s = Buffer.Buffer<ZenDB.Types.DocumentId>(inputs.size());
+                let sorted_ints = Buffer.Buffer<ZenDB.Types.DocumentId>(inputs.size());
+                let sorted_int8s = Buffer.Buffer<ZenDB.Types.DocumentId>(inputs.size());
+                let sorted_int16s = Buffer.Buffer<ZenDB.Types.DocumentId>(inputs.size());
+                let sorted_int32s = Buffer.Buffer<ZenDB.Types.DocumentId>(inputs.size());
+                let sorted_int64s = Buffer.Buffer<ZenDB.Types.DocumentId>(inputs.size());
+                let sorted_floats = Buffer.Buffer<ZenDB.Types.DocumentId>(inputs.size());
+                let sorted_principals = Buffer.Buffer<ZenDB.Types.DocumentId>(inputs.size());
+                let sorted_blobs = Buffer.Buffer<ZenDB.Types.DocumentId>(inputs.size());
+                let sorted_bools = Buffer.Buffer<ZenDB.Types.DocumentId>(inputs.size());
 
                 for (id in Map.keys(inputs)) {
                     sorted_texts.add(id);
@@ -258,7 +259,7 @@ ZenDBSuite.newSuite(
 
                 func verify_sorted_data(
                     field : Text,
-                    sorted_ids : Buffer.Buffer<Nat>,
+                    sorted_ids : Buffer.Buffer<ZenDB.Types.DocumentId>,
                 ) : Bool {
                     let #ok(results) = sorted_index_types.search(
                         ZenDB.QueryBuilder().Sort(field, #Ascending)
@@ -268,13 +269,15 @@ ZenDBSuite.newSuite(
                         Itertools.zip(
                             Iter.map(
                                 results.vals(),
-                                func((id, _) : (Nat, SupportedIndexTypes)) : Nat {
+                                func((id, _) : (ZenDB.Types.DocumentId, SupportedIndexTypes)) : ZenDB.Types.DocumentId {
                                     return id;
                                 },
                             ),
                             sorted_ids.vals(),
                         ),
-                        func((id1, id2) : (Nat, Nat)) : Bool { id1 == id2 },
+                        func((id1, id2) : (ZenDB.Types.DocumentId, ZenDB.Types.DocumentId)) : Bool { 
+                            Blob.compare(id1, id2) == #equal 
+                        },
                     );
 
                 };
@@ -297,7 +300,7 @@ ZenDBSuite.newSuite(
 
                 func verify_entries<A>(
                     field : Text,
-                    sorted_ids : Buffer.Buffer<Nat>,
+                    sorted_ids : Buffer.Buffer<ZenDB.Types.DocumentId>,
                     getter : (document : SupportedIndexTypes, field : Text) -> ZenDB.Types.Candid,
                 ) : Bool {
 
@@ -781,7 +784,7 @@ ZenDBSuite.newSuite(
                     { first = 20; second = "a"; third = Blob.fromArray([0x01]) },
                 ];
 
-                var document_ids = Buffer.Buffer<Nat>(4);
+                var document_ids = Buffer.Buffer<ZenDB.Types.DocumentId>(4);
 
                 for (document in documents.vals()) {
                     let #ok(id) = composite_collection.insert(document) else return assert false;

@@ -75,8 +75,7 @@ module T {
 
     public type Schema = Candid.CandidType;
 
-    public type DocumentId = Nat;
-    // public type DocumentId = Blob;
+    public type DocumentId = Blob;
     public type CandidDocument = [(Text, Candid)];
     public type CandidBlob = Blob;
 
@@ -150,10 +149,11 @@ module T {
         is_unique : Bool; // if true, the index is unique and the document ids are not concatenated with the index key values to make duplicate values appear unique
     };
 
-    public type DocumentStore = BTree<Nat, Document>;
+    public type DocumentStore = BTree<DocumentId, Document>;
 
     public type StableCollection = {
         ids : Ids;
+        instance_id : Blob;
         name : Text;
         schema : Schema;
         schema_map : SchemaMap;
@@ -190,6 +190,7 @@ module T {
 
     public type StableDatabase = {
         ids : Ids;
+        instance_id : Blob;
         name : Text;
         collections : Map<Text, StableCollection>;
         memory_type : MemoryType;
@@ -202,6 +203,11 @@ module T {
 
     public type StableStore = {
         ids : Ids;
+        canister_id : Principal;
+
+        /// First 4 bytes of the canister id
+        /// This id is concatenated with each document id to ensure uniqueness across canisters
+        instance_id : Blob;
         databases : Map<Text, StableDatabase>;
         memory_type : MemoryType;
         freed_btrees : Vector.Vector<MemoryBTree.StableMemoryBTree>;
@@ -252,7 +258,7 @@ module T {
 
     };
 
-    public type Cursor = Nat;
+    public type Cursor = DocumentId;
 
     public type PaginationDirection = {
         #Forward;
@@ -260,7 +266,7 @@ module T {
     };
 
     public type StableQueryPagination = {
-        cursor : ?(Nat, PaginationDirection);
+        cursor : ?(DocumentId, PaginationDirection);
         limit : ?Nat;
         skip : ?Nat;
     };
@@ -275,7 +281,7 @@ module T {
         #Lt;
     };
 
-    public type WrapId<Document> = (Nat, Document);
+    public type WrapId<Document> = (DocumentId, Document);
 
     public type State<T> = {
         #Inclusive : T;
@@ -296,7 +302,7 @@ module T {
         requires_additional_sorting : Bool;
         requires_additional_filtering : Bool;
         sorted_in_reverse : Bool;
-        interval : (Nat, Nat);
+        interval : Interval;
         scan_bounds : Bounds;
         filter_bounds : Bounds;
         simple_operations : [(Text, T.ZqlOperators)];
@@ -412,9 +418,6 @@ module T {
         /// The total size in bytes of all documents in the collection
         total_document_size : Nat;
 
-        /// The total size in bytes of all indexes in the collection
-        total_index_data_bytes : Nat;
-
         total_allocated_bytes : Nat;
 
         total_used_bytes : Nat;
@@ -424,6 +427,11 @@ module T {
         total_data_bytes : Nat;
 
         total_metadata_bytes : Nat;
+
+        total_document_store_bytes : Nat;
+
+        /// The total size in bytes of all indexes in the collection
+        total_index_store_bytes : Nat;
 
         // replicated_query_instructions : Nat;
 
@@ -455,7 +463,9 @@ module T {
 
         total_data_bytes : Nat;
         total_metadata_bytes : Nat;
-        total_index_data_bytes : Nat;
+
+        total_document_store_bytes : Nat;
+        total_index_store_bytes : Nat;
 
     };
 
@@ -480,15 +490,17 @@ module T {
 
         total_data_bytes : Nat;
         total_metadata_bytes : Nat;
-        total_index_data_bytes : Nat;
+
+        total_document_store_bytes : Nat;
+        total_index_store_bytes : Nat;
 
     };
 
     public type EvalResult = {
         #Empty;
-        #Ids : Iter<Nat>;
+        #Ids : Iter<DocumentId>;
         #BitMap : T.BitMap;
-        #Interval : (index : Text, interval : [(Nat, Nat)], is_reversed : Bool);
+        #Interval : (index : Text, interval : [Interval], is_reversed : Bool);
     };
 
     public type BestIndexResult = {
@@ -529,7 +541,7 @@ module T {
         #trim : (FieldUpdateOperations, Text);
         #lowercase : (FieldUpdateOperations);
         #uppercase : (FieldUpdateOperations);
-        #replace_sub_text : (FieldUpdateOperations, Text, Text);
+        #replaceSubText : (FieldUpdateOperations, Text, Text);
         #slice : (FieldUpdateOperations, Nat, Nat);
         #concat : (FieldUpdateOperations, FieldUpdateOperations);
         #concatAll : [FieldUpdateOperations];

@@ -17,6 +17,8 @@ import Candid "mo:serde@3.3.2/Candid";
 import Itertools "mo:itertools@0.2.2/Iter";
 import RevIter "mo:itertools@0.2.2/RevIter";
 import BitMap "mo:bit-map@0.1.2";
+import MemoryBTree "mo:memory-collection@0.3.2/MemoryBTree/Stable";
+import TypeUtils "mo:memory-collection@0.3.2/TypeUtils";
 
 import T "../Types";
 import CandidMap "../CandidMap";
@@ -50,7 +52,7 @@ module Index {
 
         fully_covered_equality_and_range_fields : Set.Set<Text>;
 
-        interval : (Nat, Nat);
+        interval : T.Interval;
     };
 
     type StableCollection = T.StableCollection;
@@ -119,14 +121,33 @@ module Index {
         BTree.size(index.data);
     };
 
+    public func get_index_key_utils() : TypeUtils.TypeUtils<[T.CandidQuery]> {
+        Orchid;
+    };
+
+    public func get_index_data_utils(collection : StableCollection) : T.BTreeUtils<[T.CandidQuery], T.DocumentId> {
+        switch (collection.memory_type) {
+            case (#stableMemory(_)) {
+                #stableMemory(MemoryBTree.createUtils<[T.CandidQuery], T.DocumentId>(Orchid, TypeUtils.Blob));
+            };
+            case (#heap(_)) {
+                #heap({
+                    blobify = Orchid.blobify;
+                    cmp = Orchid.btree_cmp;
+                });
+            };
+        };
+
+    };
+
     public func insert(
         collection : StableCollection,
         index : Index,
-        id : Nat,
+        id : Blob,
         candid_map : T.CandidMap,
     ) : T.Result<(), Text> {
 
-        let index_data_utils = CollectionUtils.get_index_data_utils(collection);
+        let index_data_utils = get_index_data_utils(collection);
 
         let index_key_values = switch (CollectionUtils.getIndexColumns(collection, index.key_details, id, candid_map)) {
             case (?index_key_values) index_key_values;
@@ -165,15 +186,15 @@ module Index {
         #ok();
     };
 
-    public func remove(collection : StableCollection, index : Index, id : Nat, prev_candid_map : T.CandidMap) : T.Result<(), Text> {
-        let index_data_utils = CollectionUtils.get_index_data_utils(collection);
+    public func remove(collection : StableCollection, index : Index, document_id : Blob, prev_candid_map : T.CandidMap) : T.Result<(), Text> {
+        let index_data_utils = get_index_data_utils(collection);
 
-        let index_key_values = switch (CollectionUtils.getIndexColumns(collection, index.key_details, id, prev_candid_map)) {
+        let index_key_values = switch (CollectionUtils.getIndexColumns(collection, index.key_details, document_id, prev_candid_map)) {
             case (?index_key_values) index_key_values;
             case (null) {
                 Logger.lazyDebug(
                     collection.logger,
-                    func() = "Skipping indexing for document with id " # debug_show id # " because it does not have any values in the index",
+                    func() = "Skipping indexing for document with id " # debug_show document_id # " because it does not have any values in the index",
                 );
 
                 return #ok();
@@ -182,15 +203,15 @@ module Index {
 
         switch (BTree.remove(index.data, index_data_utils, index_key_values)) {
             case (null) return #err(
-                "Failed to remove document with id " # debug_show id # " from index " # index.name # ", because it does not exist"
+                "Failed to remove document with id " # debug_show document_id # " from index " # index.name # ", because it does not exist"
             );
             case (?prev_id) {
-                if (prev_id != id) {
+                if (prev_id != document_id) {
 
                     ignore BTree.put(index.data, index_data_utils, index_key_values, prev_id);
 
                     return #err(
-                        "Failed to remove document with id " # debug_show id # " from index " # index.name # ", because it was not found in the index. The document with id " # debug_show prev_id # " was found instead"
+                        "Failed to remove document with id " # debug_show document_id # " from index " # index.name # ", because it was not found in the index. The document with id " # debug_show prev_id # " was found instead"
                     );
                 };
             };
@@ -211,11 +232,11 @@ module Index {
 
         let doc_store_utils = DocumentStore.getBtreeUtils(collection.documents);
 
-        for ((id, candid_blob) in DocumentStore.entries(collection.documents, doc_store_utils)) {
+        for ((document_id, candid_blob) in DocumentStore.entries(collection.documents, doc_store_utils)) {
             let candid = CollectionUtils.decodeCandidBlob(collection, candid_blob);
-            let candid_map = CandidMap.new(collection.schema_map, id, candid);
+            let candid_map = CandidMap.new(collection.schema_map, document_id, candid);
 
-            switch (Index.insert(collection, index, id, candid_map)) {
+            switch (Index.insert(collection, index, document_id, candid_map)) {
                 case (#err(err)) {
                     return #err("populate_index() failed on index '" # index.name # "': " # err);
                 };
@@ -235,10 +256,10 @@ module Index {
         populate_index(collection, index);
     };
 
-    func populateIndexesFromCandidMapDocumentEntries(
+    func populate_indexes_From_candid_map_document_entries(
         collection : StableCollection,
         indexes : [T.Index],
-        document_entries : T.Iter<(Nat, T.CandidMap)>,
+        document_entries : T.Iter<(T.DocumentId, T.CandidMap)>,
         on_start : (T.Index) -> (),
     ) : T.Result<(), Text> {
 
@@ -264,15 +285,15 @@ module Index {
         indexes : [T.Index],
     ) : T.Result<(), Text> {
 
-        let candid_map_document_entries = Iter.map<(Nat, Blob), (Nat, T.CandidMap)>(
+        let candid_map_document_entries = Iter.map<(T.DocumentId, T.CandidBlob), (T.DocumentId, T.CandidMap)>(
             DocumentStore.entries(collection.documents, DocumentStore.getBtreeUtils(collection.documents)),
-            func((id, candid_blob) : (Nat, Blob)) : (Nat, T.CandidMap) {
+            func((id, candid_blob) : (T.DocumentId, T.CandidBlob)) : (T.DocumentId, T.CandidMap) {
                 let candid = CollectionUtils.decodeCandidBlob(collection, candid_blob);
                 (id, CandidMap.new(collection.schema_map, id, candid));
             },
         );
 
-        populateIndexesFromCandidMapDocumentEntries(
+        populate_indexes_From_candid_map_document_entries(
             collection,
             indexes,
             candid_map_document_entries,
@@ -286,15 +307,15 @@ module Index {
         indexes : [T.Index],
     ) : T.Result<(), Text> {
 
-        let candid_map_document_entries = Iter.map<(Nat, Blob), (Nat, T.CandidMap)>(
+        let candid_map_document_entries = Iter.map<(T.DocumentId, T.CandidBlob), (T.DocumentId, T.CandidMap)>(
             DocumentStore.entries(collection.documents, DocumentStore.getBtreeUtils(collection.documents)),
-            func((id, candid_blob) : (Nat, Blob)) : (Nat, T.CandidMap) {
+            func((id, candid_blob) : (T.DocumentId, T.CandidBlob)) : (T.DocumentId, T.CandidMap) {
                 let candid = CollectionUtils.decodeCandidBlob(collection, candid_blob);
                 (id, CandidMap.new(collection.schema_map, id, candid));
             },
         );
 
-        populateIndexesFromCandidMapDocumentEntries(
+        populate_indexes_From_candid_map_document_entries(
             collection,
             indexes,
             candid_map_document_entries,
@@ -307,10 +328,10 @@ module Index {
     // public func exists(
     //     collection : StableCollection,
     //     index : Index,
-    //     id : Nat,
+    //     id : Blob,
     //     candid_map : T.CandidMap,
     // ) : Bool {
-    //     let index_data_utils = CollectionUtils.get_index_data_utils(collection);
+    //     let index_data_utils = get_index_data_utils(collection);
 
     //     let index_key_values = switch (CollectionUtils.getIndexColumns(collection, index.key_details, id, candid_map)) {
     //         case (?index_key_values) index_key_values;
@@ -411,12 +432,12 @@ module Index {
         index : T.Index,
         start_query : [(Text, ?T.CandidInclusivityQuery)],
         end_query : [(Text, ?T.CandidInclusivityQuery)],
-        opt_cursor : ?(Nat, Candid.Candid),
-    ) : (Nat, Nat) {
+        opt_cursor : ?(T.DocumentId, Candid.Candid),
+    ) : T.Interval {
         // Debug.print("start_query: " # debug_show start_query);
         // Debug.print("end_query: " # debug_show end_query);
 
-        let index_data_utils = CollectionUtils.get_index_data_utils(collection);
+        let index_data_utils = get_index_data_utils(collection);
 
         func sort_by_key_details(a : (Text, Any), b : (Text, Any)) : Order {
             let pos_a = switch (Array.indexOf<(Text, SortDirection)>((a.0, #Ascending), index.key_details, Utils.tuple_eq(Text.equal))) {
@@ -436,7 +457,7 @@ module Index {
 
         func sort_and_fill_query_entries(
             query_entries : [(Text, ?T.CandidInclusivityQuery)],
-            opt_cursor : ?(Nat, T.PaginationDirection),
+            opt_cursor : ?(T.DocumentId, T.PaginationDirection),
             is_lower_bound : Bool,
         ) : [(Text, ?T.CandidInclusivityQuery)] {
             let sorted = Array.sort(query_entries, sort_by_key_details);
@@ -451,7 +472,10 @@ module Index {
                         case (?(id, pagination_direction)) if (index.key_details[i].0 == C.DOCUMENT_ID) {
                             // DOCUMENT_ID is only added in the query if it is a cursor
                             // todo: update based on pagination_direction and is_lower_bound
-                            return (C.DOCUMENT_ID, ?#Inclusive(#Nat(id + 1)));
+                            return (
+                                C.DOCUMENT_ID,
+                                ?#Inclusive(CandidUtils.getNextValue(#Blob(id))),
+                            );
                         };
                         case (null) {};
                     };
@@ -517,7 +541,7 @@ module Index {
 
         };
 
-        let opt_cursor_with_direction : ?(Nat, T.PaginationDirection) = switch (opt_cursor) {
+        let opt_cursor_with_direction : ?(Blob, T.PaginationDirection) = switch (opt_cursor) {
             case (null) null;
             case (?(id, cursor)) {
                 ?(id, #Forward);
@@ -562,9 +586,9 @@ module Index {
     public func from_interval(
         collection : T.StableCollection,
         index : Index,
-        interval : (Nat, Nat),
+        interval : T.Interval,
     ) : [([T.CandidQuery], T.DocumentId)] {
-        let index_data_utils = CollectionUtils.get_index_data_utils(collection);
+        let index_data_utils = get_index_data_utils(collection);
 
         let (start, end) = interval;
 
@@ -577,7 +601,7 @@ module Index {
         collection : T.StableCollection,
         index : Index,
     ) : T.RevIter<([T.CandidQuery], T.DocumentId)> {
-        let index_data_utils = CollectionUtils.get_index_data_utils(collection);
+        let index_data_utils = get_index_data_utils(collection);
 
         BTree.entries<[T.CandidQuery], T.DocumentId>(index.data, index_data_utils);
     };

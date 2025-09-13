@@ -29,11 +29,11 @@ import Logger "../Logger";
 import BTree "../BTree";
 
 import Index "Index";
+import Intervals "Intervals";
 import Orchid "Orchid";
 import Schema "Schema";
 import CollectionUtils "Utils";
 import QueryPlan "QueryPlan";
-import Intervals "Intervals";
 import DocumentStore "DocumentStore";
 
 module {
@@ -70,7 +70,7 @@ module {
 
     type IndexDetails = {
         var sorted_in_reverse : ?Bool;
-        intervals : Buffer.Buffer<(Nat, Nat)>;
+        intervals : Buffer.Buffer<T.Interval>;
     };
 
     // avoids sorting
@@ -149,7 +149,7 @@ module {
                         debug_show requires_additional_filtering,
                     );
 
-                    let index_data_utils = CollectionUtils.get_index_data_utils(collection);
+                    let index_data_utils = Index.get_index_data_utils(collection);
 
                     if (requires_additional_filtering) {
                         Logger.lazyDebug(collection.logger, func() = "QueryExecution.get_unique_document_ids(): Attempting index-based filtering");
@@ -173,7 +173,19 @@ module {
                                 switch (opt_filter_bounds) {
                                     case (?filter_bounds) {
                                         Logger.lazyDebug(collection.logger, func() = "QueryExecution.get_unique_document_ids(): Applying additional post-filtering");
-                                        CollectionUtils.multiFilter(collection, bitmap.vals(), Buffer.fromArray([filter_bounds]), query_plan.is_and_operation);
+                                        let document_ids = Iter.map<Nat, T.DocumentId>(
+                                            bitmap.vals(),
+                                            func(n : Nat) : T.DocumentId {
+                                                CollectionUtils.convert_bitmap_8_byte_to_document_id(collection, n);
+                                            },
+                                        );
+
+                                        CollectionUtils.multiFilter(
+                                            collection,
+                                            document_ids,
+                                            Buffer.fromArray([filter_bounds]),
+                                            query_plan.is_and_operation,
+                                        );
                                     };
                                     case (null) {
                                         Logger.lazyDebug(collection.logger, func() = "QueryExecution.get_unique_document_ids(): No additional filtering needed, adding bitmap directly");
@@ -187,7 +199,7 @@ module {
                                     collection.logger,
                                     func() = "QueryExecution.get_unique_document_ids(): Index-based filtering not applicable, falling back to standard approach",
                                 );
-                                let document_ids = CollectionUtils.documentIdsFromIndexIntervals(collection, index_name, [interval], false);
+                                let document_ids = Intervals.document_ids_from_index_intervals(collection, index_name, [interval], false);
                                 CollectionUtils.multiFilter(collection, document_ids, Buffer.fromArray([filter_bounds]), query_plan.is_and_operation);
                             };
                         };
@@ -206,7 +218,7 @@ module {
 
             Logger.lazyDebug(collection.logger, func() = "QueryExecution.get_unique_document_ids(): Creating bitmap from document IDs iterator");
             bitmaps.add(
-                BitMap.fromIter(document_ids_iter)
+                BitMap.fromIter(Iter.map(document_ids_iter, Utils.convert_last_8_bytes_to_nat))
             );
         };
 
@@ -231,7 +243,7 @@ module {
                 case (#Ids(document_ids_iter)) {
                     Logger.lazyDebug(collection.logger, func() = "QueryExecution.get_unique_document_ids(): Subplan returned document IDs iterator");
                     bitmaps.add(
-                        BitMap.fromIter(document_ids_iter)
+                        BitMap.fromIter(Iter.map(document_ids_iter, Utils.convert_last_8_bytes_to_nat))
                     );
                 };
                 case (#BitMap(sub_bitmap)) {
@@ -330,10 +342,11 @@ module {
                 let bitmap = BitMap.BitMap(1024);
 
                 for (interval in interval_details.intervals.vals()) {
-                    let document_ids = CollectionUtils.documentIdsFromIndexIntervals(collection, index.name, [interval], false);
+                    let document_ids = Intervals.document_ids_from_index_intervals(collection, index.name, [interval], false);
 
                     for (id in document_ids) {
-                        bitmap.set(id, true);
+                        let id_as_nat = Utils.convert_last_8_bytes_to_nat(id);
+                        bitmap.set(id_as_nat, true);
                     };
                 };
 
@@ -431,7 +444,7 @@ module {
         result;
     };
 
-    public func add_interval(intervals_by_index : Map<Text, IndexDetails>, index_name : Text, interval : (Nat, Nat), is_reversed : Bool) {
+    public func add_interval(intervals_by_index : Map<Text, IndexDetails>, index_name : Text, interval : T.Interval, is_reversed : Bool) {
         let details = switch (Map.get(intervals_by_index, thash, index_name)) {
             case (?details) {
                 switch (details.sorted_in_reverse) {
@@ -447,7 +460,7 @@ module {
                 details;
             };
             case (null) {
-                let buffer = Buffer.Buffer<(Nat, Nat)>(8);
+                let buffer = Buffer.Buffer<T.Interval>(8);
 
                 let details : IndexDetails = {
                     var sorted_in_reverse = ?is_reversed;
@@ -463,7 +476,7 @@ module {
     };
 
     type IndexIntervalFilterDetails = {
-        intervals_map : Map<Text, Buffer.Buffer<(Nat, Nat)>>;
+        intervals_map : Map<Text, Buffer.Buffer<T.Interval>>;
         opt_filter_bounds : ?T.Bounds;
     };
 
@@ -473,7 +486,7 @@ module {
         var prev = filter_bounds;
         var curr = filter_bounds;
 
-        let intervals_map = Map.new<Text, Buffer.Buffer<(Nat, Nat)>>();
+        let intervals_map = Map.new<Text, Buffer.Buffer<T.Interval>>();
 
         loop {
             let fields = Set.new<Text>();
@@ -579,7 +592,7 @@ module {
                         func() = "QueryExecution.get_index_based_filtering_intervals(): Creating new interval set for index '" #
                         index.name # "'",
                     );
-                    ignore Map.put(intervals_map, thash, index.name, Buffer.fromArray<(Nat, Nat)>([interval]));
+                    ignore Map.put(intervals_map, thash, index.name, Buffer.fromArray<T.Interval>([interval]));
                 };
             };
 
@@ -612,10 +625,10 @@ module {
 
     func retrieve_all_index_interval_iterators(
         collection : T.StableCollection,
-        index_intervals : Map<Text, Buffer.Buffer<(Nat, Nat)>>,
+        index_intervals : Map<Text, Buffer.Buffer<T.Interval>>,
         sorted_in_reverse : Bool,
         combine_intervals_in_same_index : Bool,
-    ) : Buffer<Iter<Nat>> {
+    ) : Buffer<Iter<T.DocumentId>> {
         Logger.lazyDebug(
             collection.logger,
             func() = "QueryExecution.retrieve_all_index_interval_iterators(): Retrieving iterators for " #
@@ -623,7 +636,7 @@ module {
             debug_show combine_intervals_in_same_index,
         );
 
-        let iterators = Buffer.Buffer<Iter<Nat>>(8);
+        let iterators = Buffer.Buffer<Iter<T.DocumentId>>(8);
 
         for ((index_name, intervals) in Map.entries(index_intervals)) {
             if (combine_intervals_in_same_index) {
@@ -633,7 +646,7 @@ module {
                     Nat.toText(intervals.size()) # " intervals on index '" # index_name # "'",
                 );
 
-                let document_ids = CollectionUtils.documentIdsFromIndexIntervals(collection, index_name, Buffer.toArray(intervals), sorted_in_reverse);
+                let document_ids = Intervals.document_ids_from_index_intervals(collection, index_name, Buffer.toArray(intervals), sorted_in_reverse);
                 iterators.add(document_ids);
 
             } else {
@@ -644,7 +657,7 @@ module {
                 );
 
                 for (interval in intervals.vals()) {
-                    let document_ids = CollectionUtils.documentIdsFromIndexIntervals(collection, index_name, [interval], sorted_in_reverse);
+                    let document_ids = Intervals.document_ids_from_index_intervals(collection, index_name, [interval], sorted_in_reverse);
                     iterators.add(document_ids);
                 };
             };
@@ -738,7 +751,7 @@ module {
                     intervals_map,
                     thash,
                     index_name,
-                    Buffer.fromArray<(Nat, Nat)>([interval]),
+                    Buffer.fromArray<T.Interval>([interval]),
                 );
             };
         };
@@ -802,8 +815,8 @@ module {
                         func() = "QueryExecution.indexBasedIntervalFiltering (): Creating new bitmap for interval",
                     );
 
-                    let document_ids = CollectionUtils.documentIdsFromIndexIntervals(collection, index_name, [interval], false);
-                    let bitmap = BitMap.fromIter(document_ids);
+                    let document_ids = Intervals.document_ids_from_index_intervals(collection, index_name, [interval], false);
+                    let bitmap = BitMap.fromIter(Iter.map(document_ids, Utils.convert_last_8_bytes_to_nat));
 
                     ignore Map.put(bitmap_cache, thash, interval_cache_key, bitmap);
                     bitmap;
@@ -834,7 +847,7 @@ module {
         collection : T.StableCollection,
         query_plan : T.QueryPlan,
         opt_sort_column : ?(Text, T.SortDirection),
-        sort_documents_by_field_cmp : (Nat, Nat) -> Order,
+        sort_documents_by_field_cmp : (T.DocumentId, T.DocumentId) -> Order,
     ) : EvalResult {
         assert query_plan.is_and_operation;
         let requires_sorting = Option.isSome(opt_sort_column);
@@ -856,8 +869,8 @@ module {
             };
         };
 
-        let iterators = Buffer.Buffer<Iter<Nat>>(8);
-        let sorted_documents_from_iter = Buffer.Buffer<Nat>(8);
+        let iterators = Buffer.Buffer<Iter<T.DocumentId>>(8);
+        let sorted_documents_from_iter = Buffer.Buffer<T.DocumentId>(8);
         let intervals_by_index = Map.new<Text, IndexDetails>();
         let full_scan_details_buffer = Buffer.Buffer<T.FullScanDetails>(8);
         let bitmaps = Buffer.Buffer<T.BitMap>(8);
@@ -880,7 +893,7 @@ module {
 
                 if (requires_additional_sorting or requires_additional_filtering) {
 
-                    var document_ids : Iter<Nat> = CollectionUtils.documentIdsFromIndexIntervals(collection, index_name, [interval], sorted_in_reverse);
+                    var document_ids : Iter<T.DocumentId> = Intervals.document_ids_from_index_intervals(collection, index_name, [interval], sorted_in_reverse);
 
                     if (requires_additional_filtering) {
                         document_ids := CollectionUtils.multiFilter(collection, document_ids, Buffer.fromArray([filter_bounds]), query_plan.is_and_operation);
@@ -913,7 +926,7 @@ module {
                     if (requires_sorting) {
                         iterators.add(iter);
                     } else {
-                        let bitmap = BitMap.fromIter(iter);
+                        let bitmap = BitMap.fromIter(Iter.map(iter, Utils.convert_last_8_bytes_to_nat));
                         bitmaps.add(bitmap);
                     };
                 };
@@ -971,7 +984,7 @@ module {
 
             let sorted_in_reverse = Option.get(interval_details.sorted_in_reverse, false);
 
-            let document_ids = CollectionUtils.documentIdsFromIndexIntervals(collection, index.name, [interval], sorted_in_reverse);
+            let document_ids = Intervals.document_ids_from_index_intervals(collection, index.name, [interval], sorted_in_reverse);
 
             if (requires_sorting and sorted_documents_from_iter.size() == 0) {
 
@@ -984,7 +997,7 @@ module {
                 iterators.add(sorted_documents_from_iter.vals());
 
             } else {
-                let bitmap = BitMap.fromIter(document_ids);
+                let bitmap = BitMap.fromIter(Iter.map(document_ids, Utils.convert_last_8_bytes_to_nat));
                 bitmaps.add(bitmap);
 
             };
@@ -1038,7 +1051,7 @@ module {
                     query_plan.is_and_operation,
                 );
             } else {
-                let document_ids_in_interval = CollectionUtils.documentIdsFromIndexIntervals(collection, smallest_interval_index, [(smallest_interval_start, smallest_interval_end)], false);
+                let document_ids_in_interval = Intervals.document_ids_from_index_intervals(collection, smallest_interval_index, [(smallest_interval_start, smallest_interval_end)], false);
 
                 let filtered_ids = CollectionUtils.multiFilter(collection, document_ids_in_interval, full_scan_filter_bounds, query_plan.is_and_operation);
             };
@@ -1069,7 +1082,7 @@ module {
             // Debug.print("query_plan.subplans.size() : " # debug_show query_plan.subplans.size());
             // Debug.print("query_plan.scans.size() : " # debug_show query_plan.scans.size());
 
-            let bitmap = BitMap.fromIter(filtered_ids);
+            let bitmap = BitMap.fromIter(Iter.map(filtered_ids, Utils.convert_last_8_bytes_to_nat));
             bitmaps.add(bitmap);
 
         };
@@ -1091,7 +1104,7 @@ module {
                     sorted_documents_from_iter.vals();
                 } else { _iter };
 
-                let bitmap = BitMap.fromIter(iter);
+                let bitmap = BitMap.fromIter(Iter.map(iter, Utils.convert_last_8_bytes_to_nat));
                 bitmaps.add(bitmap);
 
                 fill_sorted_documents_from_iter := false;
@@ -1108,9 +1121,9 @@ module {
         } else { BitMap.multiIntersect(bitmaps.vals()) };
 
         if (sorted_documents_from_iter.size() > 0) {
-            let sorted_bitmap_vals = Iter.filter<Nat>(
+            let sorted_bitmap_vals = Iter.filter<T.DocumentId>(
                 sorted_documents_from_iter.vals(),
-                func(id : Nat) : Bool = bitmap.get(id),
+                func(id : T.DocumentId) : Bool = bitmap.get(Utils.convert_last_8_bytes_to_nat(id)),
             );
 
             #Ids(sorted_bitmap_vals);
@@ -1125,7 +1138,7 @@ module {
         collection : T.StableCollection,
         query_plan : T.QueryPlan,
         opt_sort_column : ?(Text, T.SortDirection),
-        sort_documents_by_field_cmp : (Nat, Nat) -> Order,
+        sort_documents_by_field_cmp : (T.DocumentId, T.DocumentId) -> Order,
     ) : EvalResult {
         assert not query_plan.is_and_operation;
         let requires_sorting = Option.isSome(opt_sort_column);
@@ -1133,7 +1146,7 @@ module {
         let bitmaps = Buffer.Buffer<T.BitMap>(8);
         let intervals_by_index = Map.new<Text, IndexDetails>();
 
-        let iterators = Buffer.Buffer<Iter<Nat>>(8);
+        let iterators = Buffer.Buffer<Iter<T.DocumentId>>(8);
         let full_scan_details_buffer = Buffer.Buffer<T.FullScanDetails>(8);
 
         for (scan_details in query_plan.scans.vals()) switch (scan_details) {
@@ -1156,7 +1169,7 @@ module {
                     add_interval(intervals_by_index, index_name, interval, sorted_in_reverse);
 
                 } else {
-                    var document_ids : Iter<Nat> = CollectionUtils.documentIdsFromIndexIntervals(collection, index_name, [interval], sorted_in_reverse);
+                    var document_ids : Iter<T.DocumentId> = Intervals.document_ids_from_index_intervals(collection, index_name, [interval], sorted_in_reverse);
 
                     if (requires_additional_filtering) {
                         document_ids := CollectionUtils.multiFilter(collection, document_ids, Buffer.fromArray([filter_bounds]), query_plan.is_and_operation);
@@ -1164,7 +1177,7 @@ module {
 
                     if (requires_additional_sorting) {
 
-                        let buffer = Buffer.Buffer<Nat>(8);
+                        let buffer = Buffer.Buffer<T.DocumentId>(8);
 
                         for (id in document_ids) {
                             buffer.add(id);
@@ -1191,7 +1204,7 @@ module {
                     if (requires_sorting) {
                         iterators.add(iter);
                     } else {
-                        let bitmap = BitMap.fromIter(iter);
+                        let bitmap = BitMap.fromIter(Iter.map(iter, Utils.convert_last_8_bytes_to_nat));
                         bitmaps.add(bitmap);
                     };
                 };
@@ -1210,7 +1223,7 @@ module {
         func requires_additional_sorting_between_intervals(
             collection : T.StableCollection,
             index_name : Text,
-            intervals : Buffer.Buffer<(Nat, Nat)>,
+            intervals : Buffer.Buffer<T.Interval>,
             opt_sort_column : ?(Text, T.SortDirection),
         ) : Bool {
             if (intervals.size() <= 1) return false;
@@ -1263,18 +1276,18 @@ module {
 
         for ((index_name, interval_details) in Map.entries(intervals_by_index)) {
             let ?index = Map.get(collection.indexes, thash, index_name) else Debug.trap("Unreachable: IndexMap not found for index: " # index_name);
-            let index_data_utils = CollectionUtils.get_index_data_utils(collection);
+            let index_data_utils = Index.get_index_data_utils(collection);
 
             for (interval in interval_details.intervals.vals()) {
 
                 let sorted_in_reverse = Option.get(interval_details.sorted_in_reverse, false);
 
-                let document_ids = CollectionUtils.documentIdsFromIndexIntervals(collection, index_name, [interval], sorted_in_reverse);
+                let document_ids = Intervals.document_ids_from_index_intervals(collection, index_name, [interval], sorted_in_reverse);
 
                 if (requires_sorting) {
                     iterators.add(document_ids);
                 } else {
-                    let bitmap = BitMap.fromIter(document_ids);
+                    let bitmap = BitMap.fromIter(Iter.map(document_ids, Utils.convert_last_8_bytes_to_nat));
                     bitmaps.add(bitmap);
                 };
 
@@ -1294,7 +1307,7 @@ module {
             let filtered_ids = CollectionUtils.multiFilter(collection, document_ids, full_scan_filter_bounds, query_plan.is_and_operation);
 
             if (requires_sorting) {
-                let buffer = Buffer.Buffer<Nat>(8);
+                let buffer = Buffer.Buffer<T.DocumentId>(8);
                 for (id in filtered_ids) {
                     buffer.add(id);
                 };
@@ -1303,24 +1316,25 @@ module {
                 iterators.add(buffer.vals());
 
             } else {
-                let bitmap = BitMap.fromIter(filtered_ids);
+                let bitmap = BitMap.fromIter(Iter.map(filtered_ids, Utils.convert_last_8_bytes_to_nat));
                 bitmaps.add(bitmap);
             };
 
         };
 
         func deduplicate_document_ids_iter(
-            document_ids_iter : Iter<Nat>
-        ) : Iter<Nat> {
+            document_ids_iter : Iter<T.DocumentId>
+        ) : Iter<T.DocumentId> {
             let dedup_bitmap = BitMap.BitMap(1024);
 
             object {
-                public func next() : ?Nat {
+                public func next() : ?T.DocumentId {
                     loop switch (document_ids_iter.next()) {
                         case (null) return null;
                         case (?id) {
-                            if (not dedup_bitmap.get(id)) {
-                                dedup_bitmap.set(id, true);
+                            let nat_id = Utils.convert_last_8_bytes_to_nat(id);
+                            if (not dedup_bitmap.get(nat_id)) {
+                                dedup_bitmap.set(nat_id, true);
                                 return ?id;
                             };
                         };
@@ -1334,7 +1348,7 @@ module {
 
             if (iterators.size() == 0) return #Empty;
 
-            let merged_iterators = Itertools.kmerge<Nat>(Buffer.toArray(iterators), sort_documents_by_field_cmp);
+            let merged_iterators = Itertools.kmerge<T.DocumentId>(Buffer.toArray(iterators), sort_documents_by_field_cmp);
 
             let deduped_iter = deduplicate_document_ids_iter(merged_iterators);
 
@@ -1357,7 +1371,7 @@ module {
         collection : StableCollection,
         query_plan : T.QueryPlan,
         opt_sort_column : ?(Text, T.SortDirection),
-        sort_documents_by_field_cmp : (Nat, Nat) -> Order,
+        sort_documents_by_field_cmp : (T.DocumentId, T.DocumentId) -> Order,
     ) : EvalResult {
 
         Logger.lazyInfo(collection.logger, func() = "QueryExecution.generate_document_ids_for_query_plan(): Generating document IDs for query plan");

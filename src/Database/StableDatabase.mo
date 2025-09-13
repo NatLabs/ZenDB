@@ -136,6 +136,7 @@ module {
 
         var stable_collection : T.StableCollection = {
             ids = db.ids;
+            instance_id = db.instance_id;
             name;
             schema = processed_schema;
             schema_map = SchemaMap.new(processed_schema);
@@ -262,6 +263,49 @@ module {
         };
 
         #ok(stable_collection);
+    };
+
+    public func rename_collection(db : T.StableDatabase, old_name : Text, new_name : Text) : Result<(), Text> {
+        Logger.lazyInfo(
+            db.logger,
+            func() = "StableDatabase.rename_collection(): Renaming collection '" # old_name # "' to '" # new_name # "'",
+        );
+
+        if (old_name == new_name) {
+            Logger.lazyInfo(
+                db.logger,
+                func() = "StableDatabase.rename_collection(): Old name and new name are the same, no action taken",
+            );
+            return #ok(());
+        };
+
+        let stable_collection = switch (Map.get<Text, StableCollection>(db.collections, thash, old_name)) {
+            case (?collection) collection;
+            case (null) {
+                let error_msg = "StableDatabase.rename_collection(): Collection '" # old_name # "' not found";
+                return log_error_msg(db.logger, error_msg);
+            };
+        };
+
+        switch (Map.get<Text, StableCollection>(db.collections, thash, new_name)) {
+            case (?_) {
+                let error_msg = "StableDatabase.rename_collection(): Collection with new name '" # new_name # "' already exists";
+                return log_error_msg(db.logger, error_msg);
+            };
+            case (null) {};
+        };
+
+        ignore Map.remove<Text, StableCollection>(db.collections, thash, old_name);
+
+        let renamed_collection = { stable_collection with name = new_name };
+        ignore Map.put<Text, StableCollection>(db.collections, thash, new_name, renamed_collection);
+
+        Logger.lazyInfo(
+            db.logger,
+            func() = "StableDatabase.rename_collection(): Renamed collection '" # old_name # "' to '" # new_name # "' successfully",
+        );
+
+        #ok(());
     };
 
     public func list_collections(db : T.StableDatabase) : [Text] {

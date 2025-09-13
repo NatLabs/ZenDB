@@ -6,6 +6,7 @@ import Cmp "mo:augmented-btrees@0.7.1/Cmp";
 import BpTreeTypes "mo:augmented-btrees@0.7.1/BpTree/Types";
 import BpTreeMethods "mo:augmented-btrees@0.7.1/BpTree/Methods";
 import MemoryBTree "mo:memory-collection@0.3.2/MemoryBTree/Stable";
+import TypeUtils "mo:memory-collection@0.3.2/TypeUtils";
 import RevIter "mo:itertools@0.2.2/RevIter";
 
 import T "../Types";
@@ -16,17 +17,17 @@ import Utils "../Utils";
 /// BTree api wrapper for storing documents and handling their various versions.
 module DocumentStore {
 
-    public type DocumentStore = T.BTree<Nat, T.Document>;
+    public type DocumentStore = T.BTree<T.DocumentId, T.Document>;
 
-    public func new_stable_memory() : T.BTree<Nat, T.Document> {
+    public func new_stable_memory() : T.BTree<T.DocumentId, T.Document> {
         #stableMemory(MemoryBTree.new(?C.STABLE_MEMORY_BTREE_ORDER));
     };
 
-    public func new_heap() : T.BTree<Nat, T.Document> {
+    public func new_heap() : T.BTree<T.DocumentId, T.Document> {
         #heap(BpTree.new(?C.HEAP_BTREE_ORDER));
     };
 
-    public func new(is_stable_memory : Bool) : T.BTree<Nat, T.Document> {
+    public func new(is_stable_memory : Bool) : T.BTree<T.DocumentId, T.Document> {
         if (is_stable_memory) {
             new_stable_memory();
         } else {
@@ -58,21 +59,21 @@ module DocumentStore {
         cmp = #BlobCmp(Cmp.Blob);
     };
 
-    public let StableMemoryUtils : T.BTreeUtils<Nat, T.Document> = #stableMemory(
+    public let StableMemoryUtils : T.BTreeUtils<T.DocumentId, T.Document> = #stableMemory(
         {
-            key = Utils.typeutils_nat_as_nat64;
+            key = TypeUtils.Blob;
             value = stable_memory_document_typeutils;
-        } : T.MemoryBTreeUtils<Nat, T.Document>
+        } : T.MemoryBTreeUtils<T.DocumentId, T.Document>
     );
 
-    public let HeapUtils : T.BTreeUtils<Nat, T.Document> = #heap(
+    public let HeapUtils : T.BTreeUtils<T.DocumentId, T.Document> = #heap(
         {
-            blobify = Utils.typeutils_nat_as_nat64.blobify;
+            blobify = TypeUtils.Blobify.Blob;
             cmp = Cmp.Blob;
-        } : T.BpTreeUtils<Nat>
+        } : T.BpTreeUtils<T.DocumentId>
     );
 
-    public func getBtreeUtils(store : DocumentStore) : T.BTreeUtils<Nat, T.Document> {
+    public func getBtreeUtils(store : DocumentStore) : T.BTreeUtils<T.DocumentId, T.Document> {
         switch (store) {
             case (#stableMemory(_)) StableMemoryUtils;
             case (#heap(_)) HeapUtils;
@@ -95,14 +96,14 @@ module DocumentStore {
         };
     };
 
-    public func get(store : DocumentStore, cmp : T.BTreeUtils<Nat, T.Document>, key : Nat) : ?Blob {
+    public func get(store : DocumentStore, cmp : T.BTreeUtils<T.DocumentId, T.Document>, key : T.DocumentId) : ?Blob {
         Option.map<T.Document, Blob>(
             BTree.get(store, cmp, key),
             extract_candid_blob_from_document_v0,
         );
     };
 
-    public func put(store : DocumentStore, cmp : T.BTreeUtils<Nat, T.Document>, key : Nat, candid_blob : Blob) : ?Blob {
+    public func put(store : DocumentStore, cmp : T.BTreeUtils<T.DocumentId, T.Document>, key : T.DocumentId, candid_blob : Blob) : ?Blob {
 
         let document = switch (C.CURRENT_DOCUMENT_VERSION) {
             case (0) { #v0(candid_blob) };
@@ -115,58 +116,58 @@ module DocumentStore {
         );
     };
 
-    public func remove(store : DocumentStore, cmp : T.BTreeUtils<Nat, T.Document>, key : Nat) : ?Blob {
+    public func remove(store : DocumentStore, cmp : T.BTreeUtils<T.DocumentId, T.Document>, key : T.DocumentId) : ?Blob {
         Option.map<T.Document, Blob>(
             BTree.remove(store, cmp, key),
             extract_candid_blob_from_document_v0,
         );
     };
 
-    public func scan(store : DocumentStore, cmp : T.BTreeUtils<Nat, T.Document>, start_key : ?Nat, end_key : ?Nat) : T.RevIter<(Nat, Blob)> {
-        RevIter.map<(Nat, T.Document), (Nat, Blob)>(
-            BTree.scan<Nat, T.Document>(store, cmp, start_key, end_key),
-            func(pair : (Nat, T.Document)) : (Nat, Blob) {
+    public func scan(store : DocumentStore, cmp : T.BTreeUtils<T.DocumentId, T.Document>, start_key : ?T.DocumentId, end_key : ?T.DocumentId) : T.RevIter<(T.DocumentId, Blob)> {
+        RevIter.map<(T.DocumentId, T.Document), (T.DocumentId, Blob)>(
+            BTree.scan<T.DocumentId, T.Document>(store, cmp, start_key, end_key),
+            func(pair : (T.DocumentId, T.Document)) : (T.DocumentId, Blob) {
                 (pair.0, extract_candid_blob_from_document_v0(pair.1));
             },
         );
 
     };
 
-    public func keys(store : DocumentStore, cmp : T.BTreeUtils<Nat, T.Document>) : T.RevIter<Nat> {
+    public func keys(store : DocumentStore, cmp : T.BTreeUtils<T.DocumentId, T.Document>) : T.RevIter<T.DocumentId> {
         BTree.keys(store, cmp);
     };
 
-    public func vals(store : DocumentStore, cmp : T.BTreeUtils<Nat, T.Document>) : T.RevIter<Blob> {
+    public func vals(store : DocumentStore, cmp : T.BTreeUtils<T.DocumentId, T.Document>) : T.RevIter<Blob> {
         RevIter.map<T.Document, Blob>(
             BTree.vals(store, cmp),
             extract_candid_blob_from_document_v0,
         );
     };
 
-    public func entries(store : DocumentStore, cmp : T.BTreeUtils<Nat, T.Document>) : T.RevIter<(Nat, Blob)> {
-        RevIter.map<(Nat, T.Document), (Nat, Blob)>(
+    public func entries(store : DocumentStore, cmp : T.BTreeUtils<T.DocumentId, T.Document>) : T.RevIter<(T.DocumentId, Blob)> {
+        RevIter.map<(T.DocumentId, T.Document), (T.DocumentId, Blob)>(
             BTree.entries(store, cmp),
-            func(pair : (Nat, T.Document)) : (Nat, Blob) {
+            func(pair : (T.DocumentId, T.Document)) : (T.DocumentId, Blob) {
                 (pair.0, extract_candid_blob_from_document_v0(pair.1));
             },
         );
 
     };
 
-    public func range(store : DocumentStore, cmp : T.BTreeUtils<Nat, T.Document>, start : Nat, end : Nat) : T.RevIter<(Nat, Blob)> {
-        RevIter.map<(Nat, T.Document), (Nat, Blob)>(
+    public func range(store : DocumentStore, cmp : T.BTreeUtils<T.DocumentId, T.Document>, start : Nat, end : Nat) : T.RevIter<(T.DocumentId, Blob)> {
+        RevIter.map<(T.DocumentId, T.Document), (T.DocumentId, Blob)>(
             BTree.range(store, cmp, start, end),
-            func(pair : (Nat, T.Document)) : (Nat, Blob) {
+            func(pair : (T.DocumentId, T.Document)) : (T.DocumentId, Blob) {
                 (pair.0, extract_candid_blob_from_document_v0(pair.1));
             },
         );
     };
 
-    public func range_keys(store : DocumentStore, cmp : T.BTreeUtils<Nat, T.Document>, start : Nat, end : Nat) : T.RevIter<Nat> {
+    public func range_keys(store : DocumentStore, cmp : T.BTreeUtils<T.DocumentId, T.Document>, start : Nat, end : Nat) : T.RevIter<T.DocumentId> {
         BTree.range_keys(store, cmp, start, end);
     };
 
-    public func range_vals(store : DocumentStore, cmp : T.BTreeUtils<Nat, T.Document>, start : Nat, end : Nat) : T.RevIter<Blob> {
+    public func range_vals(store : DocumentStore, cmp : T.BTreeUtils<T.DocumentId, T.Document>, start : Nat, end : Nat) : T.RevIter<Blob> {
         RevIter.map<T.Document, Blob>(
             BTree.range_vals(store, cmp, start, end),
             extract_candid_blob_from_document_v0,
@@ -177,7 +178,7 @@ module DocumentStore {
         BTree.getExpectedIndex(btree, cmp, key);
     };
 
-    public func get_scan_as_interval<K, V>(btree : T.BTree<K, V>, cmp : T.BTreeUtils<K, V>, start_key : ?K, end_key : ?K) : (Nat, Nat) {
+    public func get_scan_as_interval<K, V>(btree : T.BTree<K, V>, cmp : T.BTreeUtils<K, V>, start_key : ?K, end_key : ?K) : T.Interval {
         BTree.getScanAsInterval(btree, cmp, start_key, end_key);
     };
 

@@ -259,7 +259,7 @@ module BTree {
         btree_utils : MemoryBTree.BTreeUtils<K, V>,
         start_key : ?K,
         end_key : ?K,
-    ) : (Nat, Nat) {
+    ) : T.Interval {
 
         let start_rank = switch (start_key) {
             case (?key) switch (MemoryBTree.getExpectedIndex(btree, btree_utils, key)) {
@@ -291,7 +291,7 @@ module BTree {
         heap_btree_utils : T.BpTreeUtils<K>,
         start_key : ?K,
         end_key : ?K,
-    ) : (Nat, Nat) {
+    ) : T.Interval {
 
         let start_rank = switch (start_key) {
             case (?key) {
@@ -321,7 +321,7 @@ module BTree {
         (start_rank, end_rank);
     };
 
-    public func getScanAsInterval<K, V>(btree : T.BTree<K, V>, cmp : T.BTreeUtils<K, V>, start_key : ?K, end_key : ?K) : (Nat, Nat) {
+    public func getScanAsInterval<K, V>(btree : T.BTree<K, V>, cmp : T.BTreeUtils<K, V>, start_key : ?K, end_key : ?K) : T.Interval {
         switch (btree, cmp) {
             case (#stableMemory(memory_btree), #stableMemory(memory_btree_utils)) {
                 memorybtree_scan_interval(memory_btree, memory_btree_utils, start_key, end_key);

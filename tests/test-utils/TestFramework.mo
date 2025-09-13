@@ -5,12 +5,14 @@ import Blob "mo:base@0.16.0/Blob";
 import Text "mo:base@0.16.0/Text";
 import Array "mo:base@0.16.0/Array";
 import Option "mo:base@0.16.0/Option";
+import Principal "mo:base@0.16.0/Principal";
 
 import ZenDB "../../src";
 
 import { test; suite } "mo:test";
 import Itertools "mo:itertools@0.2.2/Iter";
 import Map "mo:map@9.0.1/Map";
+import Fuzz "mo:fuzz";
 
 module TestFramework {
 
@@ -57,6 +59,7 @@ module TestFramework {
         options : ?Settings,
         zendb_suite : (zendb : ZenDB.Database, suite_utils : SuiteUtils) -> (),
     ) {
+        let fuzz = Fuzz.fromSeed(0x23123abc);
         let settings = Option.get(options, defaultSettings);
 
         func run_suite_with_or_without_indexes(memory_type_suite_name : Text, zendb_sstore : ZenDB.Types.VersionedStableStore) {
@@ -127,13 +130,14 @@ module TestFramework {
                         func() {
 
                             let zendb_sstore = let sstore = ZenDB.newStableStore(
+                                fuzz.principal.randomPrincipal(29),
                                 ?{
                                     logging = ?{
                                         log_level = settings.log_level;
                                         is_running_locally = true;
                                     };
                                     memory_type = ?(#stableMemory);
-                                }
+                                },
                             );
 
                             run_suite_with_or_without_indexes("Stable Memory", zendb_sstore);
@@ -145,13 +149,14 @@ module TestFramework {
                         "Heap Memory",
                         func() {
                             let zendb_sstore = let sstore = ZenDB.newStableStore(
+                                fuzz.principal.randomPrincipal(29),
                                 ?{
                                     logging = ?{
                                         log_level = settings.log_level;
                                         is_running_locally = true;
                                     };
                                     memory_type = ?(#heap);
-                                }
+                                },
                             );
                             run_suite_with_or_without_indexes("Heap Memory", zendb_sstore);
 

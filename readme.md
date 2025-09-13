@@ -72,11 +72,13 @@ This measurement is in pages, where each page is 64KiB. For a 200GB limit, the l
 #### 1. Initialize the Database
 
 ```motoko
+import Principal "mo:base/Principal";
 import ZenDB "mo:zendb";
 
-actor {
+actor class Canister() = canister_reference {
 
-  stable var zendb = ZenDB.newStableStore(null);
+  let canister_id = Principal.fromActor(canister_reference);
+  stable var zendb = ZenDB.newStableStore(canister_id, null);
   let db = ZenDB.launchDefaultDB(zendb);
 
 }

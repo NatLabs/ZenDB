@@ -47,7 +47,12 @@ List of terms as they are used in this library.
 A ZenDB instance is a collection of databases. You should typically create only one ZenDB instance per canister.
 
 ```motoko
-let zendb = ZenDB.newStableStore(null);
+actor class Canister() = canister_reference {
+
+  let canister_id = Principal.fromActor(canister_reference);
+  stable var zendb = ZenDB.newStableStore(canister_id, null);
+
+}
 ```
 
 ### Memory Types: Heap vs Stable Memory
@@ -58,10 +63,13 @@ These memory types have different performance characteristics, as shown in these
 By default, `#stableMemory` is selected for new ZenDB instances, but you can change this to heap memory:
 
 ```motoko
-let zendb = ZenDB.newStableStore(?{
-  ZenDB.defaultSettings with
-  memory_type = #heap; // or #stableMemory;
-});
+let zendb = ZenDB.newStableStore(
+  canister_id, 
+  ?{
+    ZenDB.defaultSettings with
+    memory_type = #heap; // or #stableMemory;
+  }
+);
 ```
 
 **Heap memory** offers better performance by avoiding the overhead of stable memory operations. However, it's currently limited to 6GB, which restricts the amount of data you can store.
@@ -96,7 +104,7 @@ ZenDB provides extensive logging to help you debug issues. The library uses stan
 By default, the minimum log level is set to `#Warn` (the lowest level that typically requires user action). You can adjust this at any time:
 
 ```motoko
-let zendb = ZenDB.newStableStore(null);
+let zendb = ZenDB.newStableStore(canister_id, null);
 ZenDB.setLogLevel(zendb, #Info);
 ```
 

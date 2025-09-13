@@ -53,6 +53,117 @@ module {
         };
     };
 
+    let bounding_12_byte_nat = 0x1_0000_0000_0000_0000;
+
+    public func convert_last_8_bytes_to_nat(blob : Blob) : Nat {
+        let size = blob.size();
+
+        let n64 = ByteUtils.BigEndian.toNat64(
+            [
+                blob.get(size - 8),
+                blob.get(size - 7),
+                blob.get(size - 6),
+                blob.get(size - 5),
+                blob.get(size - 4),
+                blob.get(size - 3),
+                blob.get(size - 2),
+                blob.get(size - 1),
+            ].vals()
+        );
+
+        Nat64.toNat(n64);
+    };
+
+    public func nat_from_12_byte_blob(blob : Blob) : Nat {
+        let top_4_bytes = ByteUtils.BigEndian.toNat32(
+            [
+                blob.get(0),
+                blob.get(1),
+                blob.get(2),
+                blob.get(3),
+            ].vals()
+        );
+
+        let bottom_8_bytes = ByteUtils.BigEndian.toNat64(
+            [
+                blob.get(4),
+                blob.get(5),
+                blob.get(6),
+                blob.get(7),
+                blob.get(8),
+                blob.get(9),
+                blob.get(10),
+                blob.get(11),
+            ].vals()
+        );
+
+        // (top_4_bytes) << 64 | bottom_8_bytes
+        // multiplying by  (2 ^ 64) is the same as shifting left by 64 bits
+        // (2 ^ 64) == 0x1_0000_0000_0000_0000
+        (Nat32.toNat(top_4_bytes) * bounding_12_byte_nat + Nat64.toNat(bottom_8_bytes))
+
+    };
+
+    public func nat_to_12_byte_blob(n : Nat) : Blob {
+        assert n < bounding_12_byte_nat;
+
+        let nat32 = Nat32.fromNat(n / bounding_12_byte_nat);
+        let nat64 = Nat64.fromNat(n % bounding_12_byte_nat);
+
+        let top_4_bytes = ByteUtils.BigEndian.fromNat32(nat32);
+        let bottom_8_bytes = ByteUtils.BigEndian.fromNat64(nat64);
+
+        Blob.fromArray([
+            // top 4 bytes
+            top_4_bytes[0],
+            top_4_bytes[1],
+            top_4_bytes[2],
+            top_4_bytes[3],
+            // bottom 8 bytes
+            bottom_8_bytes[0],
+            bottom_8_bytes[1],
+            bottom_8_bytes[2],
+            bottom_8_bytes[3],
+            bottom_8_bytes[4],
+            bottom_8_bytes[5],
+            bottom_8_bytes[6],
+            bottom_8_bytes[7],
+        ]);
+    };
+
+    public func big_endian_nat_from_blob(blob : Blob) : Nat {
+        assert blob.size() > 0;
+
+        var i = blob.size() - 1;
+        var nat = 0;
+
+        for (_ in Itertools.range(0, (blob.size() / 8))) {
+            let n64 = ByteUtils.BigEndian.toNat64(
+                (
+                    Array.tabulate(
+                        8,
+                        func(j : Nat) : Nat8 {
+                            if (i + j < 8) {
+                                0;
+                            } else {
+                                blob.get(i - 8 + j);
+                            };
+                        },
+                    )
+                ).vals()
+            );
+
+            if (nat > 0) nat *= (Nat64.toNat(Nat64.maximumValue) + 1);
+            nat += Nat64.toNat(n64);
+
+            if (i >= 8) i -= 8;
+
+        };
+
+        nat
+
+    };
+
     public func send_error<OldOk, NewOk, Error>(res : T.Result<OldOk, Error>) : T.Result<NewOk, Error> {
         switch (res) {
             case (#ok(_)) Prelude.unreachable();
@@ -230,32 +341,6 @@ module {
         func(a : (A, B), b : (A, B)) : Bool {
             eq(a.0, b.0);
         };
-    };
-
-    public let typeutils_nat_as_nat64 : TypeUtils.TypeUtils<Nat> = {
-        // converts to Nat64 because pointers are 64-bit
-        blobify = {
-            from_blob = func(blob : Blob) : Nat {
-                assert blob.size() == 8;
-
-                // must be big-endian, because these keys are sorted in the BTree
-                // and we need to be able to compare them correctly in their byte form
-                let n64 = ByteUtils.BigEndian.toNat64(blob.vals());
-                Nat64.toNat(n64);
-            };
-
-            to_blob = func(nat : Nat) : Blob {
-                let n64 = Nat64.fromNat(nat);
-                let bytes = ByteUtils.BigEndian.fromNat64(n64);
-                let blob = Blob.fromArray(bytes);
-
-                assert blob.size() == 8;
-                blob;
-            };
-        };
-
-        cmp = #BlobCmp(Int8Cmp.Blob);
-
     };
 
     public func add_all<A>(buffer : Buffer.Buffer<A>, iter : Iter.Iter<A>) {

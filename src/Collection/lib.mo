@@ -134,10 +134,10 @@ module {
         /// Returns the total number of documents in the collection.
         public func size() : Nat = StableCollection.size(collection);
 
-        let main_btree_utils : T.BTreeUtils<Nat, T.Document> = DocumentStore.getBtreeUtils(collection.documents);
+        let main_btree_utils : T.BTreeUtils<T.DocumentId, T.Document> = DocumentStore.getBtreeUtils(collection.documents);
 
         /// Returns an iterator over all the document ids in the collection.
-        public func keys() : Iter<Nat> {
+        public func keys() : Iter<T.DocumentId> {
             StableCollection.keys(collection, main_btree_utils);
         };
 
@@ -154,12 +154,12 @@ module {
         };
 
         /// Returns an iterator over a tuple containing the id and document for all entries in the collection.
-        public func entries() : Iter<(Nat, Record)> {
+        public func entries() : Iter<(T.DocumentId, Record)> {
             let iter = StableCollection.entries(collection, main_btree_utils);
 
-            let documents = Iter.map<(Nat, Blob), (Nat, Record)>(
+            let documents = Iter.map<(T.DocumentId, Blob), (T.DocumentId, Record)>(
                 iter,
-                func((id, candid_blob) : (Nat, Blob)) {
+                func((id, candid_blob) : (T.DocumentId, Blob)) {
                     (id, blobify.from_blob(candid_blob));
                 },
             );
@@ -175,11 +175,11 @@ module {
         /// ```
         ///
         /// If the document does not pass the schema validation or schema constraints, an error will be returned.
-        public func insert(document : Record) : Result<(Nat), Text> {
+        public func insert(document : Record) : Result<(T.DocumentId), Text> {
             put(document);
         };
 
-        public func put(document : Record) : Result<(Nat), Text> {
+        public func put(document : Record) : Result<(T.DocumentId), Text> {
 
             let candid_blob = blobify.to_blob(document);
 
@@ -190,7 +190,7 @@ module {
         };
 
         /// Retrieves a document by its id.
-        public func get(id : Nat) : ?Record {
+        public func get(id : T.DocumentId) : ?Record {
             Option.map(
                 StableCollection.get(collection, main_btree_utils, id),
                 blobify.from_blob,
@@ -222,7 +222,7 @@ module {
 
         type IndexDetails = {
             var sorted_in_reverse : ?Bool;
-            intervals : Buffer.Buffer<(Nat, Nat)>;
+            intervals : Buffer.Buffer<T.Interval>;
         };
 
         type Iter<A> = Iter.Iter<A>;
@@ -325,14 +325,14 @@ module {
             );
         };
 
-        public func replace(id : Nat, document : Record) : Result<(), Text> {
+        public func replace(id : T.DocumentId, document : Record) : Result<(), Text> {
             handleResult(
                 StableCollection.replace_by_id(collection, main_btree_utils, id, blobify.to_blob(document)),
                 "Failed to replace document with id: " # debug_show (id),
             );
         };
 
-        public func replaceDocs(documents : [(Nat, Record)]) : Result<(), Text> {
+        public func replaceDocs(documents : [(T.DocumentId, Record)]) : Result<(), Text> {
             for ((id, document) in documents.vals()) {
                 switch (replace(id, document)) {
                     case (#ok(_)) {};
@@ -344,7 +344,7 @@ module {
         };
 
         /// Updates a document by its id with the given update operations.
-        public func updateById(id : Nat, update_operations : [(Text, T.FieldUpdateOperations)]) : Result<(), Text> {
+        public func updateById(id : T.DocumentId, update_operations : [(Text, T.FieldUpdateOperations)]) : Result<(), Text> {
             handleResult(
                 StableCollection.update_by_id(collection, main_btree_utils, id, update_operations),
                 "Failed to update document with id: " # debug_show (id),
@@ -377,7 +377,7 @@ module {
             #ok(total_updated);
         };
 
-        public func deleteById(id : Nat) : Result<Record, Text> {
+        public func deleteById(id : T.DocumentId) : Result<Record, Text> {
             switch (
                 handleResult(
                     StableCollection.delete_by_id(collection, main_btree_utils, id),

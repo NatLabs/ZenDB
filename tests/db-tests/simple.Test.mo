@@ -59,7 +59,7 @@ ZenDBSuite.newSuite(
         let #ok(_) = suite_utils.createIndex(users.name(), "age_idx", [("age", #Ascending)], null) else return assert false;
         let #ok(_) = suite_utils.createIndex(users.name(), "email_idx", [("email", #Ascending)], null) else return assert false;
 
-        let inputs = Map.new<Nat, User>();
+        let inputs = Map.new<ZenDB.Types.DocumentId, User>();
 
         for (i in Iter.range(1, 10)) {
             let user = {
@@ -70,7 +70,7 @@ ZenDBSuite.newSuite(
 
             let #ok(id) = users.insert(user) else return assert false;
             // Debug.print("id: " # debug_show (id, user));
-            ignore Map.put(inputs, Map.nhash, id, user);
+            ignore Map.put(inputs, Map.bhash, id, user);
         };
 
         for (i in Iter.range(1, 10)) {
@@ -82,7 +82,7 @@ ZenDBSuite.newSuite(
 
             let #ok(id) = users.insert(user) else return assert false;
             // Debug.print("id: " # debug_show (id, user));
-            ignore Map.put(inputs, Map.nhash, id, user);
+            ignore Map.put(inputs, Map.bhash, id, user);
         };
 
         let total_documents = 20;
@@ -97,8 +97,9 @@ ZenDBSuite.newSuite(
                         assert results.size() == Map.size(inputs);
 
                         for ((id, user) in results.vals()) {
-                            assert ?user == Map.get(inputs, Map.nhash, id);
+                            assert ?user == Map.get(inputs, Map.bhash, id);
                         };
+
                     },
                 );
 
