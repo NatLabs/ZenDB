@@ -1,38 +1,38 @@
 /// A collection is a set of documents of the same type.
 
-import Principal "mo:base/Principal";
-import Array "mo:base/Array";
-import Debug "mo:base/Debug";
-import Text "mo:base/Text";
-import Char "mo:base/Char";
-import Nat32 "mo:base/Nat32";
-import Result "mo:base/Result";
-import Order "mo:base/Order";
-import Iter "mo:base/Iter";
-import Buffer "mo:base/Buffer";
-import Nat "mo:base/Nat";
-import Option "mo:base/Option";
-import Hash "mo:base/Hash";
-import Float "mo:base/Float";
-import Int "mo:base/Int";
-import Int32 "mo:base/Int32";
-import Blob "mo:base/Blob";
-import Nat64 "mo:base/Nat64";
-import Int16 "mo:base/Int16";
-import Int64 "mo:base/Int64";
-import Int8 "mo:base/Int8";
-import Nat16 "mo:base/Nat16";
-import Nat8 "mo:base/Nat8";
-import InternetComputer "mo:base/ExperimentalInternetComputer";
+import Principal "mo:base@0.16.0/Principal";
+import Array "mo:base@0.16.0/Array";
+import Debug "mo:base@0.16.0/Debug";
+import Text "mo:base@0.16.0/Text";
+import Char "mo:base@0.16.0/Char";
+import Nat32 "mo:base@0.16.0/Nat32";
+import Result "mo:base@0.16.0/Result";
+import Order "mo:base@0.16.0/Order";
+import Iter "mo:base@0.16.0/Iter";
+import Buffer "mo:base@0.16.0/Buffer";
+import Nat "mo:base@0.16.0/Nat";
+import Option "mo:base@0.16.0/Option";
+import Hash "mo:base@0.16.0/Hash";
+import Float "mo:base@0.16.0/Float";
+import Int "mo:base@0.16.0/Int";
+import Int32 "mo:base@0.16.0/Int32";
+import Blob "mo:base@0.16.0/Blob";
+import Nat64 "mo:base@0.16.0/Nat64";
+import Int16 "mo:base@0.16.0/Int16";
+import Int64 "mo:base@0.16.0/Int64";
+import Int8 "mo:base@0.16.0/Int8";
+import Nat16 "mo:base@0.16.0/Nat16";
+import Nat8 "mo:base@0.16.0/Nat8";
+import InternetComputer "mo:base@0.16.0/ExperimentalInternetComputer";
 
-import Map "mo:map/Map";
-import Set "mo:map/Set";
-import Serde "mo:serde";
-import Decoder "mo:serde/Candid/Blob/Decoder";
-import Candid "mo:serde/Candid";
-import Itertools "mo:itertools/Iter";
-import RevIter "mo:itertools/RevIter";
-import BitMap "mo:bit-map";
+import Map "mo:map@9.0.1/Map";
+import Set "mo:map@9.0.1/Set";
+import Serde "mo:serde@3.3.2";
+import Decoder "mo:serde@3.3.2/Candid/Blob/Decoder";
+import Candid "mo:serde@3.3.2/Candid";
+import Itertools "mo:itertools@0.2.2/Iter";
+import RevIter "mo:itertools@0.2.2/RevIter";
+import BitMap "mo:bit-map@0.1.2";
 
 import T "../Types";
 import Query "../Query";
@@ -109,6 +109,27 @@ module {
 
         /// Returns the collection name.
         public func name() : Text = collection_name;
+        public func getSchema() : T.Schema { collection.schema };
+
+        public func listIndexes() : [Text] {
+            Iter.toArray(Map.keys(collection.indexes));
+        };
+
+        public func getIndexes() : [(Text, T.IndexStats)] {
+            Array.map<(Text, T.Index), (Text, T.IndexStats)>(
+                Map.toArray(collection.indexes),
+                func((key, index) : (Text, T.Index)) : (Text, T.IndexStats) {
+                    (key, Index.stats(index, StableCollection.size(collection)));
+                },
+            );
+        };
+
+        public func getIndex(name : Text) : ?T.IndexStats {
+            switch (Map.get(collection.indexes, T.thash, name)) {
+                case (?index) ?Index.stats(index, StableCollection.size(collection));
+                case (null) null;
+            };
+        };
         public func get_schema() : T.Schema { collection.schema };
 
         /// Returns the total number of documents in the collection.
@@ -210,13 +231,13 @@ module {
         public func searchIter(query_builder : QueryBuilder) : Result<Iter<T.WrapId<Record>>, Text> {
             switch (
                 handleResult(
-                    StableCollection.internalSearch(collection, query_builder.build()),
+                    StableCollection.internal_search(collection, query_builder.build()),
                     "Failed to execute search",
                 )
             ) {
                 case (#err(err)) return #err(err);
                 case (#ok(document_ids_iter)) {
-                    let document_iter = StableCollection.idsToDocuments(collection, blobify, document_ids_iter);
+                    let document_iter = StableCollection.ids_to_documents(collection, blobify, document_ids_iter);
                     #ok(document_iter);
                 };
             };
@@ -279,13 +300,13 @@ module {
         public func search(query_builder : QueryBuilder) : Result<[T.WrapId<Record>], Text> {
             switch (
                 handleResult(
-                    StableCollection.internalSearch(collection, query_builder.build()),
+                    StableCollection.internal_search(collection, query_builder.build()),
                     "Failed to execute search",
                 )
             ) {
                 case (#err(err)) return #err(err);
                 case (#ok(document_ids_iter)) {
-                    let document_iter = StableCollection.idsToDocuments(collection, blobify, document_ids_iter);
+                    let document_iter = StableCollection.ids_to_documents(collection, blobify, document_ids_iter);
                     let documents = Iter.toArray(document_iter);
                     #ok(documents);
                 };
@@ -307,7 +328,7 @@ module {
 
         public func replace(id : Nat, document : Record) : Result<(), Text> {
             handleResult(
-                StableCollection.replaceById(collection, main_btree_utils, id, blobify.to_blob(document)),
+                StableCollection.replace_by_id(collection, main_btree_utils, id, blobify.to_blob(document)),
                 "Failed to replace document with id: " # debug_show (id),
             );
         };
@@ -326,7 +347,7 @@ module {
         /// Updates a document by its id with the given update operations.
         public func updateById(id : Nat, update_operations : [(Text, T.FieldUpdateOperations)]) : Result<(), Text> {
             handleResult(
-                StableCollection.updateById(collection, main_btree_utils, id, update_operations),
+                StableCollection.update_by_id(collection, main_btree_utils, id, update_operations),
                 "Failed to update document with id: " # debug_show (id),
             );
         };
@@ -334,7 +355,7 @@ module {
         public func update(query_builder : QueryBuilder, update_operations : [(Text, T.FieldUpdateOperations)]) : Result<Nat, Text> {
             let documents_iter = switch (
                 handleResult(
-                    StableCollection.internalSearch(collection, query_builder.build()),
+                    StableCollection.internal_search(collection, query_builder.build()),
                     "Failed to find documents to update",
                 )
             ) {
@@ -345,7 +366,7 @@ module {
             var total_updated = 0;
 
             for (id in documents_iter) {
-                switch (StableCollection.updateById(collection, main_btree_utils, id, update_operations)) {
+                switch (StableCollection.update_by_id(collection, main_btree_utils, id, update_operations)) {
                     case (#ok(_)) total_updated += 1;
                     case (#err(err)) {
                         Logger.lazyError(collection.logger, func() = "Failed to update document with id: " # debug_show (id) # ": " # err);
@@ -360,7 +381,7 @@ module {
         public func deleteById(id : Nat) : Result<Record, Text> {
             switch (
                 handleResult(
-                    StableCollection.deleteById(collection, main_btree_utils, id),
+                    StableCollection.delete_by_id(collection, main_btree_utils, id),
                     "Failed to delete document with id: " # debug_show (id),
                 )
             ) {
@@ -374,7 +395,7 @@ module {
 
         public func delete(query_builder : QueryBuilder) : Result<[(T.DocumentId, Record)], Text> {
             let internal_search_res = handleResult(
-                StableCollection.internalSearch(collection, query_builder.build()),
+                StableCollection.internal_search(collection, query_builder.build()),
                 "Failed to find documents to delete",
             );
 
@@ -427,22 +448,22 @@ module {
         // };
 
         type CreateIndexOptions = {
-            isUnique : Bool;
+            is_unique : Bool;
         };
 
         /// Creates a new index with the given index keys.
-        /// If `isUnique` is true, the index will be unique on the index keys and documents with duplicate index keys will be rejected.
+        /// If `is_unique` is true, the index will be unique on the index keys and documents with duplicate index keys will be rejected.
         public func createIndex(name : Text, index_key_details : [(Text, SortDirection)], options : ?CreateIndexOptions) : Result<(), Text> {
 
-            let isUnique = switch (options) {
-                case (?options) options.isUnique;
+            let is_unique = switch (options) {
+                case (?options) options.is_unique;
                 case (null) false;
             };
 
-            switch (StableCollection.createIndex(collection, main_btree_utils, name, index_key_details, isUnique)) {
+            switch (StableCollection.create_index(collection, main_btree_utils, name, index_key_details, is_unique)) {
                 case (#ok(success)) #ok();
                 case (#err(errorMsg)) {
-                    return Utils.logErrorMsg(collection.logger, "Failed to create index (" # name # "): " # errorMsg);
+                    return Utils.log_error_msg(collection.logger, "Failed to create index (" # name # "): " # errorMsg);
                 };
             };
 
@@ -451,7 +472,7 @@ module {
         /// Deletes an index from the collection that is not used internally.
         public func deleteIndex(name : Text) : Result<(), Text> {
             handleResult(
-                StableCollection.deleteIndex(collection, main_btree_utils, name),
+                StableCollection.delete_index(collection, main_btree_utils, name),
                 "Failed to delete index: " # name,
             );
         };
@@ -459,21 +480,21 @@ module {
         /// Clears an index from the collection that is not used internally.
         public func clearIndex(name : Text) : Result<(), Text> {
             handleResult(
-                StableCollection.clearIndex(collection, main_btree_utils, name),
+                StableCollection.clear_index(collection, main_btree_utils, name),
                 "Failed to clear index: " # name,
             );
         };
 
         public func repopulateIndex(name : Text) : Result<(), Text> {
             handleResult(
-                StableCollection.repopulateIndex(collection, main_btree_utils, name),
+                StableCollection.repopulate_index(collection, main_btree_utils, name),
                 "Failed to populate index: " # name,
             );
         };
 
         public func repopulateIndexes(names : [Text]) : Result<(), Text> {
             handleResult(
-                StableCollection.repopulateIndexes(collection, main_btree_utils, names),
+                StableCollection.repopulate_indexes(collection, main_btree_utils, names),
                 "Failed to populate indexes: " # debug_show (names),
             );
         };

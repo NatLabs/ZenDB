@@ -1,14 +1,14 @@
-import Iter "mo:base/Iter";
-import Debug "mo:base/Debug";
-import Prelude "mo:base/Prelude";
-import Text "mo:base/Text";
-import Char "mo:base/Char";
-import Buffer "mo:base/Buffer";
+import Iter "mo:base@0.16.0/Iter";
+import Debug "mo:base@0.16.0/Debug";
+import Prelude "mo:base@0.16.0/Prelude";
+import Text "mo:base@0.16.0/Text";
+import Char "mo:base@0.16.0/Char";
+import Buffer "mo:base@0.16.0/Buffer";
 
 import Bench "mo:bench";
 import Fuzz "mo:fuzz";
-import Candid "mo:serde/Candid";
-import Itertools "mo:itertools/Iter";
+import Candid "mo:serde@3.3.2/Candid";
+import Itertools "mo:itertools@0.2.2/Iter";
 
 import ZenDB "../src";
 

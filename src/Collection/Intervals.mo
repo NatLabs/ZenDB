@@ -1,25 +1,25 @@
-import Array "mo:base/Array";
-import Debug "mo:base/Debug";
-import Text "mo:base/Text";
-import Result "mo:base/Result";
-import Order "mo:base/Order";
-import Iter "mo:base/Iter";
-import Buffer "mo:base/Buffer";
-import Nat "mo:base/Nat";
-import Hash "mo:base/Hash";
+import Array "mo:base@0.16.0/Array";
+import Debug "mo:base@0.16.0/Debug";
+import Text "mo:base@0.16.0/Text";
+import Result "mo:base@0.16.0/Result";
+import Order "mo:base@0.16.0/Order";
+import Iter "mo:base@0.16.0/Iter";
+import Buffer "mo:base@0.16.0/Buffer";
+import Nat "mo:base@0.16.0/Nat";
+import Hash "mo:base@0.16.0/Hash";
 
-import Map "mo:map/Map";
-import Set "mo:map/Set";
-import Serde "mo:serde";
-import Decoder "mo:serde/Candid/Blob/Decoder";
-import Candid "mo:serde/Candid";
-import Itertools "mo:itertools/Iter";
-import RevIter "mo:itertools/RevIter";
-import BitMap "mo:bit-map";
-import Vector "mo:vector";
+import Map "mo:map@9.0.1/Map";
+import Set "mo:map@9.0.1/Set";
+import Serde "mo:serde@3.3.2";
+import Decoder "mo:serde@3.3.2/Candid/Blob/Decoder";
+import Candid "mo:serde@3.3.2/Candid";
+import Itertools "mo:itertools@0.2.2/Iter";
+import RevIter "mo:itertools@0.2.2/RevIter";
+import BitMap "mo:bit-map@0.1.2";
+import Vector "mo:vector@0.4.2";
 
-import TypeUtils "mo:memory-collection/TypeUtils";
-import Int8Cmp "mo:memory-collection/TypeUtils/Int8Cmp";
+import TypeUtils "mo:memory-collection@0.3.2/TypeUtils";
+import Int8Cmp "mo:memory-collection@0.3.2/TypeUtils/Int8Cmp";
 
 import T "../Types";
 import Query "../Query";
@@ -134,7 +134,7 @@ module {
 
     // tries to skip the number of documents requested within the instruction limit
     // returns the number of documents skipped
-    public func extractIntervalsInPaginationRange(collection : StableCollection, skip : Nat, opt_limit : ?Nat, index_name : Text, intervals : [(Nat, Nat)], sorted_in_reverse : Bool) : Iter<Nat> {
+    public func extract_intervals_in_pagination_range(collection : StableCollection, skip : Nat, opt_limit : ?Nat, index_name : Text, intervals : [(Nat, Nat)], sorted_in_reverse : Bool) : Iter<Nat> {
         // Debug.print("skip, opt_limit: " # debug_show (skip, opt_limit));
 
         var skipped = 0;
@@ -237,7 +237,7 @@ module {
 
     };
 
-    public func extractIntervalsInPaginationRangeForReversedIntervals(
+    public func extract_intervals_in_pagination_range_for_reversed_intervals(
         collection : StableCollection,
         skip : Nat,
         opt_limit : ?Nat,

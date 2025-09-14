@@ -29,11 +29,7 @@ import Int8Cmp "mo:memory-collection@0.3.2/TypeUtils/Int8Cmp";
 import BpTree "mo:augmented-btrees@0.7.1/BpTree";
 import BpTreeTypes "mo:augmented-btrees@0.7.1/BpTree/Types";
 
-import TypeMigrations "TypeMigrations";
-
 module T {
-
-    public type VersionedStableStore = TypeMigrations.VersionedStableStore;
 
     public type BitMap = BitMap.BitMap;
 
@@ -416,6 +412,9 @@ module T {
         /// The total size in bytes of all documents in the collection
         total_document_size : Nat;
 
+        /// The total size in bytes of all indexes in the collection
+        total_index_data_bytes : Nat;
+
         total_allocated_bytes : Nat;
 
         total_used_bytes : Nat;
@@ -425,11 +424,6 @@ module T {
         total_data_bytes : Nat;
 
         total_metadata_bytes : Nat;
-
-        total_document_store_bytes : Nat;
-
-        /// The total size in bytes of all indexes in the collection
-        total_index_store_bytes : Nat;
 
         // replicated_query_instructions : Nat;
 
@@ -461,9 +455,7 @@ module T {
 
         total_data_bytes : Nat;
         total_metadata_bytes : Nat;
-
-        total_document_store_bytes : Nat;
-        total_index_store_bytes : Nat;
+        total_index_data_bytes : Nat;
 
     };
 
@@ -488,9 +480,7 @@ module T {
 
         total_data_bytes : Nat;
         total_metadata_bytes : Nat;
-
-        total_document_store_bytes : Nat;
-        total_index_store_bytes : Nat;
+        total_index_data_bytes : Nat;
 
     };
 
@@ -545,12 +535,6 @@ module T {
         #concatAll : [FieldUpdateOperations];
 
     } or Candid;
-
-    public type CrossCanisterRecordsCursor = {
-        collection_name : Text;
-        collection_query : T.StableQuery;
-        results : T.Result<[(T.DocumentId, T.CandidBlob)], Text>;
-    };
 
     public type SchemaFieldConstraint = {
         #Min : Float;

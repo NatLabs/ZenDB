@@ -1,10 +1,10 @@
-import Principal "mo:base/Principal";
-import Random "mo:base/Random";
-import Int64 "mo:base/Int64";
-import Blob "mo:base/Blob";
-import Result "mo:base/Result";
+import Principal "mo:base@0.16.0/Principal";
+import Random "mo:base@0.16.0/Random";
+import Int64 "mo:base@0.16.0/Int64";
+import Blob "mo:base@0.16.0/Blob";
+import Result "mo:base@0.16.0/Result";
 
-import Map "mo:map/Map";
+import Map "mo:map@9.0.1/Map";
 
 import ClusterTypes "../Types";
 import ZenDB "../..";

@@ -1,34 +1,34 @@
 // @testmode wasi
-import Debug "mo:base/Debug";
-import Buffer "mo:base/Buffer";
-import Blob "mo:base/Blob";
-import Text "mo:base/Text";
-import Order "mo:base/Order";
-import Nat8 "mo:base/Nat8";
-import Nat16 "mo:base/Nat16";
-import Nat32 "mo:base/Nat32";
-import Nat64 "mo:base/Nat64";
-import Int8 "mo:base/Int8";
-import Int16 "mo:base/Int16";
-import Int32 "mo:base/Int32";
-import Int64 "mo:base/Int64";
-import Int "mo:base/Int";
-import Nat "mo:base/Nat";
-import Float "mo:base/Float";
-import Principal "mo:base/Principal";
-import Iter "mo:base/Iter";
-import Bool "mo:base/Bool";
-import Array "mo:base/Array";
-import Char "mo:base/Char";
-import Result "mo:base/Result";
+import Debug "mo:base@0.16.0/Debug";
+import Buffer "mo:base@0.16.0/Buffer";
+import Blob "mo:base@0.16.0/Blob";
+import Text "mo:base@0.16.0/Text";
+import Order "mo:base@0.16.0/Order";
+import Nat8 "mo:base@0.16.0/Nat8";
+import Nat16 "mo:base@0.16.0/Nat16";
+import Nat32 "mo:base@0.16.0/Nat32";
+import Nat64 "mo:base@0.16.0/Nat64";
+import Int8 "mo:base@0.16.0/Int8";
+import Int16 "mo:base@0.16.0/Int16";
+import Int32 "mo:base@0.16.0/Int32";
+import Int64 "mo:base@0.16.0/Int64";
+import Int "mo:base@0.16.0/Int";
+import Nat "mo:base@0.16.0/Nat";
+import Float "mo:base@0.16.0/Float";
+import Principal "mo:base@0.16.0/Principal";
+import Iter "mo:base@0.16.0/Iter";
+import Bool "mo:base@0.16.0/Bool";
+import Array "mo:base@0.16.0/Array";
+import Char "mo:base@0.16.0/Char";
+import Result "mo:base@0.16.0/Result";
 
 import ZenDB "../../src";
 import Index "../../src/Collection/Index";
 
 import { test; suite } "mo:test";
-import Itertools "mo:itertools/Iter";
+import Itertools "mo:itertools@0.2.2/Iter";
 import Fuzz "mo:fuzz";
-import Map "mo:map/Map";
+import Map "mo:map@9.0.1/Map";
 import ZenDBSuite "../test-utils/TestFramework";
 
 let fuzz = Fuzz.fromSeed(0x7eadbeef);
@@ -713,7 +713,7 @@ ZenDBSuite.newSuite(
 
                 let #ok(test) = zendb.createCollection("unique_index_test", OptNatSchema, candify_test, null) else return assert false;
 
-                let #ok(_) = suite_utils.createIndex(test.name(), "opt_nat_idx", [("opt_nat", #Ascending)], ?{ isUnique = true }) else return assert false;
+                let #ok(_) = suite_utils.createIndex(test.name(), "opt_nat_idx", [("opt_nat", #Ascending)], ?{ is_unique = true }) else return assert false;
 
                 let #ok(id1) = test.insert({ opt_nat = ?1 }) else return assert false;
                 let #ok(id2) = test.insert({ opt_nat = ?2 }) else return assert false;

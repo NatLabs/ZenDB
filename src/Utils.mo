@@ -1,37 +1,37 @@
-import Principal "mo:base/Principal";
-import Array "mo:base/Array";
-import Debug "mo:base/Debug";
-import Text "mo:base/Text";
-import Char "mo:base/Char";
-import Nat32 "mo:base/Nat32";
-import Nat64 "mo:base/Nat64";
-import Result "mo:base/Result";
-import Order "mo:base/Order";
-import Iter "mo:base/Iter";
-import Buffer "mo:base/Buffer";
-import Nat "mo:base/Nat";
-import Option "mo:base/Option";
-import Hash "mo:base/Hash";
-import Float "mo:base/Float";
-import Blob "mo:base/Blob";
-import Prelude "mo:base/Prelude";
+import Principal "mo:base@0.16.0/Principal";
+import Array "mo:base@0.16.0/Array";
+import Debug "mo:base@0.16.0/Debug";
+import Text "mo:base@0.16.0/Text";
+import Char "mo:base@0.16.0/Char";
+import Nat32 "mo:base@0.16.0/Nat32";
+import Nat64 "mo:base@0.16.0/Nat64";
+import Result "mo:base@0.16.0/Result";
+import Order "mo:base@0.16.0/Order";
+import Iter "mo:base@0.16.0/Iter";
+import Buffer "mo:base@0.16.0/Buffer";
+import Nat "mo:base@0.16.0/Nat";
+import Option "mo:base@0.16.0/Option";
+import Hash "mo:base@0.16.0/Hash";
+import Float "mo:base@0.16.0/Float";
+import Blob "mo:base@0.16.0/Blob";
+import Prelude "mo:base@0.16.0/Prelude";
 
-import Int "mo:base/Int";
+import Int "mo:base@0.16.0/Int";
 
-import Map "mo:map/Map";
-import Set "mo:map/Set";
-import Serde "mo:serde";
-import Decoder "mo:serde/Candid/Blob/Decoder";
-import Candid "mo:serde/Candid";
-import Itertools "mo:itertools/Iter";
-import RevIter "mo:itertools/RevIter";
+import Map "mo:map@9.0.1/Map";
+import Set "mo:map@9.0.1/Set";
+import Serde "mo:serde@3.3.2";
+import Decoder "mo:serde@3.3.2/Candid/Blob/Decoder";
+import Candid "mo:serde@3.3.2/Candid";
+import Itertools "mo:itertools@0.2.2/Iter";
+import RevIter "mo:itertools@0.2.2/RevIter";
 import Logger "Logger";
 
-import _TypeUtils "mo:memory-collection/TypeUtils";
-import Int8Cmp "mo:memory-collection/TypeUtils/Int8Cmp";
+import _TypeUtils "mo:memory-collection@0.3.2/TypeUtils";
+import Int8Cmp "mo:memory-collection@0.3.2/TypeUtils/Int8Cmp";
 
 import T "Types";
-import ByteUtils "mo:byte-utils";
+import ByteUtils "mo:byte-utils@0.1.1";
 
 module {
     type Order = Order.Order;
@@ -60,11 +60,11 @@ module {
         };
     };
 
-    public func ignoreThis() : None {
+    public func ignore_this() : None {
         Debug.trap("trap caused by ignoreThis()");
     };
 
-    public func concatBlob(blob1 : Blob, blob2 : Blob) : Blob {
+    public func concat_blob(blob1 : Blob, blob2 : Blob) : Blob {
         let size = blob1.size() + blob2.size();
         let res = Blob.fromArray(
             Array.tabulate(
@@ -81,7 +81,7 @@ module {
         res;
     };
 
-    public func sliceBlob(blob : Blob, start : Nat, end : Nat) : Blob {
+    public func slice_blob(blob : Blob, start : Nat, end : Nat) : Blob {
         let size = end - start;
 
         Blob.fromArray(
@@ -95,7 +95,7 @@ module {
     };
 
     /// Generic helper function to handle Result types with consistent error logging
-    public func handleResult<T>(logger : T.Logger, res : T.Result<T, Text>, context : Text) : T.Result<T, Text> {
+    public func handle_result<T>(logger : T.Logger, res : T.Result<T, Text>, context : Text) : T.Result<T, Text> {
         switch (res) {
             case (#ok(success)) #ok(success);
             case (#err(errorMsg)) {
@@ -109,14 +109,14 @@ module {
         Float.log(n) / Float.log(2);
     };
 
-    public func stripStart(text : Text, prefix : Text) : Text {
+    public func strip_start(text : Text, prefix : Text) : Text {
         switch (Text.stripStart(text, #text(prefix))) {
             case (?stripped) stripped;
             case (null) text;
         };
     };
 
-    public func concatFreeze<A>(buffers : [Buffer.Buffer<A>]) : [A] {
+    public func concat_freeze<A>(buffers : [Buffer.Buffer<A>]) : [A] {
         var i = 0;
         var total_size = 0;
         while (i < buffers.size()) {
@@ -142,7 +142,7 @@ module {
 
     };
 
-    public func getSchemaKeys(schema : T.Schema) : [Text] {
+    public func get_schema_keys(schema : T.Schema) : [Text] {
         let buffer = Buffer.Buffer<Text>(8);
 
         func extract(schema : T.Schema) {
@@ -175,7 +175,7 @@ module {
         Buffer.toArray(buffer);
     };
 
-    public func reverseOrder(order : T.Order) : T.Order {
+    public func reverse_order(order : T.Order) : T.Order {
         switch (order) {
             case (#less) #greater;
             case (#greater) #less;
@@ -183,26 +183,26 @@ module {
         };
     };
 
-    public func unwrapOrErr<A>(res : T.Result<A, Text>) : A {
+    public func unwrap_or_err<A>(res : T.Result<A, Text>) : A {
         switch (res) {
             case (#ok(success)) success;
             case (#err(err)) Debug.trap("unwrapOrErr: " # err);
         };
     };
 
-    public func assertResult<A>(res : T.Result<A, Text>) {
+    public func assert_result<A>(res : T.Result<A, Text>) {
         switch (res) {
             case (#ok(_)) ();
             case (#err(err)) Debug.trap("assertResult: " # err);
         };
     };
 
-    public func logErrorMsg<A>(logger : T.Logger, err_msg : Text) : T.Result<A, Text> {
+    public func log_error_msg<A>(logger : T.Logger, err_msg : Text) : T.Result<A, Text> {
         Logger.error(logger, err_msg);
         #err(err_msg);
     };
 
-    public func logError<A>(logger : T.Logger, res : T.Result<A, Text>, opt_prefix_msg : ?Text) : T.Result<A, Text> {
+    public func log_error<A>(logger : T.Logger, res : T.Result<A, Text>, opt_prefix_msg : ?Text) : T.Result<A, Text> {
         switch (res) {
             case (#ok(success)) #ok(success);
             case (#err(errorMsg)) {
@@ -220,13 +220,13 @@ module {
         };
     };
 
-    public func tupleCmp<A, B>(cmp : (A, A) -> T.Order) : ((A, B), (A, B)) -> Order {
+    public func tuple_cmp<A, B>(cmp : (A, A) -> T.Order) : ((A, B), (A, B)) -> Order {
         func(a : (A, B), b : (A, B)) : T.Order {
             cmp(a.0, b.0);
         };
     };
 
-    public func tupleEq<A, B>(eq : (A, A) -> Bool) : ((A, B), (A, B)) -> Bool {
+    public func tuple_eq<A, B>(eq : (A, A) -> Bool) : ((A, B), (A, B)) -> Bool {
         func(a : (A, B), b : (A, B)) : Bool {
             eq(a.0, b.0);
         };
@@ -258,12 +258,12 @@ module {
 
     };
 
-    public func addAll<A>(buffer : Buffer.Buffer<A>, iter : Iter.Iter<A>) {
+    public func add_all<A>(buffer : Buffer.Buffer<A>, iter : Iter.Iter<A>) {
         for (elem in iter) { buffer.add(elem) };
     };
 
     // add all elements from an iterator to a bufferlike object that has the add method
-    public func addAllLike<A>(buffer : { add : (A) -> () }, iter : Iter.Iter<A>) {
+    public func add_all_like<A>(buffer : { add : (A) -> () }, iter : Iter.Iter<A>) {
         for (elem in iter) { buffer.add(elem) };
     };
 

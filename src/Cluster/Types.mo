@@ -1,5 +1,5 @@
-import Map "mo:map/Map";
-import Vector "mo:vector";
+import Map "mo:map@9.0.1/Map";
+import Vector "mo:vector@0.4.2";
 
 import ZenDB_types "../Types";
 

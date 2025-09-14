@@ -1,16 +1,16 @@
 // @testmode wasi
-import Debug "mo:base/Debug";
-import Buffer "mo:base/Buffer";
-import Blob "mo:base/Blob";
-import Text "mo:base/Text";
-import Array "mo:base/Array";
-import Principal "mo:base/Principal";
-import Option "mo:base/Option";
-import Iter "mo:base/Iter";
+import Debug "mo:base@0.16.0/Debug";
+import Buffer "mo:base@0.16.0/Buffer";
+import Blob "mo:base@0.16.0/Blob";
+import Text "mo:base@0.16.0/Text";
+import Array "mo:base@0.16.0/Array";
+import Principal "mo:base@0.16.0/Principal";
+import Option "mo:base@0.16.0/Option";
+import Iter "mo:base@0.16.0/Iter";
 
 import { test; suite } "mo:test";
-import Itertools "mo:itertools/Iter";
-import Map "mo:map/Map";
+import Itertools "mo:itertools@0.2.2/Iter";
+import Map "mo:map@9.0.1/Map";
 import Fuzz "mo:fuzz";
 
 import ZenDB "../../src";

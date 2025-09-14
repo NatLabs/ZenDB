@@ -1,8 +1,8 @@
-import Debug "mo:base/Debug";
-import Array "mo:base/Array";
-import Nat "mo:base/Nat";
+import Debug "mo:base@0.16.0/Debug";
+import Array "mo:base@0.16.0/Array";
+import Nat "mo:base@0.16.0/Nat";
 
-import Itertools "mo:itertools/Iter";
+import Itertools "mo:itertools@0.2.2/Iter";
 
 import T "../Types";
 import CandidUtils "../CandidUtils";
@@ -165,11 +165,11 @@ module {
             case (#uppercase(text)) {
                 extract_candid_and_apply_fn_to_one_parameter(text, CandidUtils.Ops.uppercase);
             };
-            case (#replaceSubText(inner_op, search, replacement)) {
+            case (#replace_sub_text(inner_op, search, replacement)) {
                 extract_candid_and_apply_fn_to_one_parameter(
                     inner_op,
                     func(candid : T.Candid) : T.Result<T.Candid, Text> {
-                        CandidUtils.Ops.replaceSubText(candid, search, replacement);
+                        CandidUtils.Ops.replace_sub_text(candid, search, replacement);
                     },
                 );
             };
@@ -239,7 +239,7 @@ module {
                 #concat(_, _) or #get(_) or
                 #abs(_) or #neg(_) or #floor(_) or #ceil(_) or #sqrt(_) or
                 #pow(_, _) or #min(_, _) or #max(_, _) or #mod(_, _) or #trim(_, _) or
-                #lowercase(_) or #uppercase(_) or #replaceSubText(_, _, _) or #slice(_, _, _) or
+                #lowercase(_) or #uppercase(_) or #replace_sub_text(_, _, _) or #slice(_, _, _) or
                 #add(_, _) or #sub(_, _) or #mul(_, _) or #div(_, _) or #currValue(_)
             ) true;
             case (_) false;
@@ -289,7 +289,7 @@ module {
             case (#ok(new_value_cast_to_type)) return #ok(new_value_cast_to_type);
             case (#err(err)) {
                 let err_msg = "Failed to cast field result (" # debug_show (new_value) # ") to type '" # debug_show field_type # "': " # err;
-                return Utils.logErrorMsg(collection.logger, err_msg);
+                return Utils.log_error_msg(collection.logger, err_msg);
             };
         };
 

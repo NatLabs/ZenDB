@@ -1,12 +1,12 @@
-import Debug "mo:base/Debug";
-import Option "mo:base/Option";
+import Debug "mo:base@0.16.0/Debug";
+import Option "mo:base@0.16.0/Option";
 
-import BpTree "mo:augmented-btrees/BpTree";
-import Cmp "mo:augmented-btrees/Cmp";
-import BpTreeTypes "mo:augmented-btrees/BpTree/Types";
-import BpTreeMethods "mo:augmented-btrees/BpTree/Methods";
-import MemoryBTree "mo:memory-collection/MemoryBTree/Stable";
-import RevIter "mo:itertools/RevIter";
+import BpTree "mo:augmented-btrees@0.7.1/BpTree";
+import Cmp "mo:augmented-btrees@0.7.1/Cmp";
+import BpTreeTypes "mo:augmented-btrees@0.7.1/BpTree/Types";
+import BpTreeMethods "mo:augmented-btrees@0.7.1/BpTree/Methods";
+import MemoryBTree "mo:memory-collection@0.3.2/MemoryBTree/Stable";
+import RevIter "mo:itertools@0.2.2/RevIter";
 
 import T "../Types";
 import C "../Constants";
@@ -18,19 +18,19 @@ module DocumentStore {
 
     public type DocumentStore = T.BTree<Nat, T.Document>;
 
-    public func newStableMemory() : T.BTree<Nat, T.Document> {
+    public func new_stable_memory() : T.BTree<Nat, T.Document> {
         #stableMemory(MemoryBTree.new(?C.STABLE_MEMORY_BTREE_ORDER));
     };
 
-    public func newHeap() : T.BTree<Nat, T.Document> {
+    public func new_heap() : T.BTree<Nat, T.Document> {
         #heap(BpTree.new(?C.HEAP_BTREE_ORDER));
     };
 
     public func new(is_stable_memory : Bool) : T.BTree<Nat, T.Document> {
         if (is_stable_memory) {
-            newStableMemory();
+            new_stable_memory();
         } else {
-            newHeap();
+            new_heap();
         };
     };
 
@@ -38,7 +38,7 @@ module DocumentStore {
         to_blob = func(document : T.Document) : Blob {
             switch (document) {
                 case (#v0(candid_blob)) {
-                    Utils.concatBlob("\00", candid_blob);
+                    Utils.concat_blob("\00", candid_blob);
                 };
             };
         };
@@ -46,7 +46,7 @@ module DocumentStore {
             let version_id = blob.get(0);
 
             switch (version_id) {
-                case (0) { #v0(Utils.sliceBlob(blob, 1, blob.size())) };
+                case (0) { #v0(Utils.slice_blob(blob, 1, blob.size())) };
                 case (_) Debug.trap("Decoding document failed: Unsupported version id " # debug_show version_id);
             };
 
@@ -162,22 +162,22 @@ module DocumentStore {
         );
     };
 
-    public func rangeKeys(store : DocumentStore, cmp : T.BTreeUtils<Nat, T.Document>, start : Nat, end : Nat) : T.RevIter<Nat> {
-        BTree.rangeKeys(store, cmp, start, end);
+    public func range_keys(store : DocumentStore, cmp : T.BTreeUtils<Nat, T.Document>, start : Nat, end : Nat) : T.RevIter<Nat> {
+        BTree.range_keys(store, cmp, start, end);
     };
 
-    public func rangeVals(store : DocumentStore, cmp : T.BTreeUtils<Nat, T.Document>, start : Nat, end : Nat) : T.RevIter<Blob> {
+    public func range_vals(store : DocumentStore, cmp : T.BTreeUtils<Nat, T.Document>, start : Nat, end : Nat) : T.RevIter<Blob> {
         RevIter.map<T.Document, Blob>(
-            BTree.rangeVals(store, cmp, start, end),
+            BTree.range_vals(store, cmp, start, end),
             extract_candid_blob_from_document_v0,
         );
     };
 
-    public func getExpectedIndex<K, V>(btree : T.BTree<K, V>, cmp : T.BTreeUtils<K, V>, key : K) : BpTreeTypes.ExpectedIndex {
+    public func get_expected_index<K, V>(btree : T.BTree<K, V>, cmp : T.BTreeUtils<K, V>, key : K) : BpTreeTypes.ExpectedIndex {
         BTree.getExpectedIndex(btree, cmp, key);
     };
 
-    public func getScanAsInterval<K, V>(btree : T.BTree<K, V>, cmp : T.BTreeUtils<K, V>, start_key : ?K, end_key : ?K) : (Nat, Nat) {
+    public func get_scan_as_interval<K, V>(btree : T.BTree<K, V>, cmp : T.BTreeUtils<K, V>, start_key : ?K, end_key : ?K) : (Nat, Nat) {
         BTree.getScanAsInterval(btree, cmp, start_key, end_key);
     };
 

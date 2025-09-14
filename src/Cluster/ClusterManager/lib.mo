@@ -1,20 +1,20 @@
-import Debug "mo:base/Debug";
-import Order "mo:base/Order";
-import Array "mo:base/Array";
-import Option "mo:base/Option";
-import Principal "mo:base/Principal";
-import Nat "mo:base/Nat";
-import Float "mo:base/Float";
-import Cycles "mo:base/ExperimentalCycles";
-import Iter "mo:base/Iter";
-import Timer "mo:base/Timer";
+import Debug "mo:base@0.16.0/Debug";
+import Order "mo:base@0.16.0/Order";
+import Array "mo:base@0.16.0/Array";
+import Option "mo:base@0.16.0/Option";
+import Principal "mo:base@0.16.0/Principal";
+import Nat "mo:base@0.16.0/Nat";
+import Float "mo:base@0.16.0/Float";
+import Cycles "mo:base@0.16.0/ExperimentalCycles";
+import Iter "mo:base@0.16.0/Iter";
+import Timer "mo:base@0.16.0/Timer";
 
-import Itertools "mo:itertools/Iter";
-import Map "mo:map/Map";
-import Buffer "mo:base/Buffer";
-import Vector "mo:vector";
-import BpTree "mo:augmented-btrees/BpTree";
-import BpTreeCmp "mo:augmented-btrees/Cmp";
+import Itertools "mo:itertools@0.2.2/Iter";
+import Map "mo:map@9.0.1/Map";
+import Buffer "mo:base@0.16.0/Buffer";
+import Vector "mo:vector@0.4.2";
+import BpTree "mo:augmented-btrees@0.7.1/BpTree";
+import BpTreeCmp "mo:augmented-btrees@0.7.1/Cmp";
 
 import ZT "../../Types";
 import ClusterTypes "../Types";

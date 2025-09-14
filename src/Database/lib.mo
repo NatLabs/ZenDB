@@ -1,26 +1,26 @@
-import Principal "mo:base/Principal";
-import Array "mo:base/Array";
-import Debug "mo:base/Debug";
-import Text "mo:base/Text";
-import Char "mo:base/Char";
-import Nat32 "mo:base/Nat32";
-import Result "mo:base/Result";
-import Order "mo:base/Order";
-import Iter "mo:base/Iter";
-import Buffer "mo:base/Buffer";
-import Nat "mo:base/Nat";
-import Option "mo:base/Option";
-import Hash "mo:base/Hash";
-import Float "mo:base/Float";
-import Int "mo:base/Int";
+import Principal "mo:base@0.16.0/Principal";
+import Array "mo:base@0.16.0/Array";
+import Debug "mo:base@0.16.0/Debug";
+import Text "mo:base@0.16.0/Text";
+import Char "mo:base@0.16.0/Char";
+import Nat32 "mo:base@0.16.0/Nat32";
+import Result "mo:base@0.16.0/Result";
+import Order "mo:base@0.16.0/Order";
+import Iter "mo:base@0.16.0/Iter";
+import Buffer "mo:base@0.16.0/Buffer";
+import Nat "mo:base@0.16.0/Nat";
+import Option "mo:base@0.16.0/Option";
+import Hash "mo:base@0.16.0/Hash";
+import Float "mo:base@0.16.0/Float";
+import Int "mo:base@0.16.0/Int";
 
-import Map "mo:map/Map";
-import Set "mo:map/Set";
-import Serde "mo:serde";
-import Decoder "mo:serde/Candid/Blob/Decoder";
-import Candid "mo:serde/Candid";
-import Itertools "mo:itertools/Iter";
-import RevIter "mo:itertools/RevIter";
+import Map "mo:map@9.0.1/Map";
+import Set "mo:map@9.0.1/Set";
+import Serde "mo:serde@3.3.2";
+import Decoder "mo:serde@3.3.2/Candid/Blob/Decoder";
+import Candid "mo:serde@3.3.2/Candid";
+import Itertools "mo:itertools@0.2.2/Iter";
+import RevIter "mo:itertools@0.2.2/RevIter";
 
 import Collection "../Collection";
 import Utils "../Utils";
@@ -66,7 +66,7 @@ module {
 
         func validate_candify<A>(collection_name : Text, schema : T.Schema, external_candify : T.Candify<A>) : Result<T.InternalCandify<A>, Text> {
 
-            let default_candid_value : T.Candid = switch (Schema.generateDefaultValue(schema)) {
+            let default_candid_value : T.Candid = switch (Schema.generate_default_value(schema)) {
                 case (#ok(default_candid)) default_candid;
                 case (#err(msg)) return #err("Failed to generate default value for schema for candify validation: " # msg);
             };
@@ -137,7 +137,7 @@ module {
         /// ```
 
         public func createCollection<Record>(name : Text, schema : T.Schema, external_candify : T.Candify<Record>, options : ?T.CreateCollectionOptions) : Result<Collection<Record>, Text> {
-            let validate_candify_result = Utils.handleResult(
+            let validate_candify_result = Utils.handle_result(
                 stable_db.logger,
                 validate_candify(name, schema, external_candify),
                 "Failed to validate candify function: ",
@@ -145,10 +145,10 @@ module {
 
             let internal_candify : T.InternalCandify<Record> = switch (validate_candify_result) {
                 case (#ok(internal_candify)) internal_candify;
-                case (#err(msg)) return Utils.logErrorMsg(stable_db.logger, msg);
+                case (#err(msg)) return Utils.log_error_msg(stable_db.logger, msg);
             };
 
-            switch (StableDatabase.createCollection(stable_db, name, schema, options)) {
+            switch (StableDatabase.create_collection(stable_db, name, schema, options)) {
                 case (#ok(stable_collection)) {
                     #ok(
                         Collection.Collection<Record>(
@@ -158,7 +158,7 @@ module {
                         )
                     );
                 };
-                case (#err(msg)) Utils.logErrorMsg(stable_db.logger, msg);
+                case (#err(msg)) Utils.log_error_msg(stable_db.logger, msg);
             };
         };
 
@@ -169,7 +169,7 @@ module {
             external_candify : T.Candify<Record>,
         ) : Result<Collection<Record>, Text> {
 
-            switch (StableDatabase.getCollection(stable_db, name)) {
+            switch (StableDatabase.get_collection(stable_db, name)) {
                 case (#ok(stable_collection)) {
                     #ok(
                         Collection.Collection<Record>(
@@ -183,19 +183,23 @@ module {
             };
         };
 
+        public func getStableState() : T.StableDatabase {
+            stable_db;
+        };
+
         public func _create_index_on_collection(
             collection_name : Text,
             index_name : Text,
             index_fields : [(Text, T.SortDirection)],
             is_unique : Bool,
         ) : T.Result<(), Text> {
-            let stable_collection = switch (StableDatabase.getCollection(stable_db, collection_name)) {
+            let stable_collection = switch (StableDatabase.get_collection(stable_db, collection_name)) {
                 case (#ok(stable_collection)) stable_collection;
                 case (#err(msg)) return #err(msg);
             };
 
             switch (
-                StableCollection.createIndex(
+                StableCollection.create_index(
                     stable_collection,
                     CollectionUtils.getMainBtreeUtils(stable_collection),
                     index_name,

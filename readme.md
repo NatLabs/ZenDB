@@ -344,7 +344,6 @@ let #ok(_) = users.createIndex(
 - [ ] Aggregation functions (min, max, sum, avg, etc.)
 - [ ] Better support for migrations
 - [ ] Full Text search capabilities by implementing an inverted text index
-- [ ] Support for transactions
 - [ ] Data Certification of all documents, using the [ic-certification](https://mops.one/ic-certification) motoko library
 - [ ] Dedicated database canister for use by clients in other languages (e.g. JavaScript, Rust)
 - [ ] Database management tools to handle collection creation, index management, and data migrations

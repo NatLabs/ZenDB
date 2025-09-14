@@ -620,8 +620,8 @@ The `stats()` method returns a `CollectionStats` record containing:
 - **`memory`** - [Memory statistics](#memory-statistics) for the main document storage B-tree
 - **`avgDocumentIdSize`** - Average size of document IDs in bytes
 - **`totalDocumentIdSize`** - Total memory used by all document IDs
-- **`avgDocumentSize`** - Average size of documents in bytes  
-- **`totalDocumentSize`** - Total memory used by all documents
+- **`avg_document_size`** - Average size of documents in bytes  
+- **`total_document_size`** - Total memory used by all documents
 
 ##### Index Statistics
 - **`indexes`** - Array of [IndexStats](#indexstats-structure) for each index in the collection
@@ -634,13 +634,13 @@ Each index provides detailed statistics:
 - **`name`** - The index name
 - **`fields`** - Array of indexed field definitions with sort order
 - **`entries`** - Number of entries in the index
-- **`isUnique`** - Whether the index enforces uniqueness
-- **`usedInternally`** - Whether the index is used internally by ZenDB
+- **`is_unique`** - Whether the index enforces uniqueness
+- **`used_internally`** - Whether the index is used internally by ZenDB
 
 ##### Index Memory Metrics
 - **`memory`** - [Memory statistics](#memory-statistics) for the index B-tree
-- **`avgIndexKeySize`** - Average size of composite index keys in bytes
-- **`totalIndexKeySize`** - Total memory used by index keys
+- **`avg_index_key_size`** - Average size of composite index keys in bytes
+- **`total_index_key_size`** - Total memory used by index keys
 - **`avgDocumentIdSize`** - Average size of document ID values in bytes
 - **`totalDocumentIdSize`** - Total memory used by document ID references
 

@@ -1,6 +1,6 @@
-import Array "mo:base/Array";
-import Option "mo:base/Option";
-import Debug "mo:base/Debug";
+import Array "mo:base@0.16.0/Array";
+import Option "mo:base@0.16.0/Option";
+import Debug "mo:base@0.16.0/Debug";
 
 import ZT "../../Types";
 

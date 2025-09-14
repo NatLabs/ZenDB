@@ -1,11 +1,11 @@
-import Result "mo:base/Result";
-import Debug "mo:base/Debug";
+import Result "mo:base@0.16.0/Result";
+import Debug "mo:base@0.16.0/Debug";
 
-import Map "mo:map/Map";
-import Set "mo:map/Set";
+import Map "mo:map@9.0.1/Map";
+import Set "mo:map@9.0.1/Set";
 
-import Vector "mo:vector";
-import RevIter "mo:itertools/RevIter";
+import Vector "mo:vector@0.4.2";
+import RevIter "mo:itertools@0.2.2/RevIter";
 
 import StableRolesAuth "StableRolesAuth";
 

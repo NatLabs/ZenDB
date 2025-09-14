@@ -1,16 +1,16 @@
 // @testmode wasi
-import Debug "mo:base/Debug";
-import Buffer "mo:base/Buffer";
-import Blob "mo:base/Blob";
-import Text "mo:base/Text";
-import Array "mo:base/Array";
-import Option "mo:base/Option";
+import Debug "mo:base@0.16.0/Debug";
+import Buffer "mo:base@0.16.0/Buffer";
+import Blob "mo:base@0.16.0/Blob";
+import Text "mo:base@0.16.0/Text";
+import Array "mo:base@0.16.0/Array";
+import Option "mo:base@0.16.0/Option";
 
 import ZenDB "../../src";
 
 import { test; suite } "mo:test";
-import Itertools "mo:itertools/Iter";
-import Map "mo:map/Map";
+import Itertools "mo:itertools@0.2.2/Iter";
+import Map "mo:map@9.0.1/Map";
 
 module TestFramework {
 
@@ -59,7 +59,7 @@ module TestFramework {
     ) {
         let settings = Option.get(options, defaultSettings);
 
-        func run_suite_with_or_without_indexes(memory_type_suite_name : Text, zendb_sstore : ZenDB.Types.StableStore) {
+        func run_suite_with_or_without_indexes(memory_type_suite_name : Text, zendb_sstore : ZenDB.Types.VersionedStableStore) {
 
             if (settings.compare_with_no_index) {
                 suite(
@@ -103,7 +103,7 @@ module TestFramework {
                                     index_name,
                                     index_key_details,
                                     switch (options) {
-                                        case (?{ isUnique }) isUnique;
+                                        case (?{ is_unique }) is_unique;
                                         case (_) false;
                                     },
                                 );
@@ -118,46 +118,50 @@ module TestFramework {
 
         };
 
-        suite(
-            test_name,
-            func() {
-                suite(
-                    "Stable Memory",
-                    func() {
+        func run_suite_for_all_memory_types() {
+            suite(
+                test_name,
+                func() {
+                    suite(
+                        "Stable Memory",
+                        func() {
 
-                        let zendb_sstore = let sstore = ZenDB.newStableStore(
-                            ?{
-                                logging = ?{
-                                    log_level = settings.log_level;
-                                    is_running_locally = true;
-                                };
-                                memory_type = ?(#stableMemory);
-                            }
-                        );
+                            let zendb_sstore = let sstore = ZenDB.newStableStore(
+                                ?{
+                                    logging = ?{
+                                        log_level = settings.log_level;
+                                        is_running_locally = true;
+                                    };
+                                    memory_type = ?(#stableMemory);
+                                }
+                            );
 
-                        run_suite_with_or_without_indexes("Stable Memory", zendb_sstore);
+                            run_suite_with_or_without_indexes("Stable Memory", zendb_sstore);
 
-                    },
-                );
+                        },
+                    );
 
-                suite(
-                    "Heap Memory",
-                    func() {
-                        let zendb_sstore = let sstore = ZenDB.newStableStore(
-                            ?{
-                                logging = ?{
-                                    log_level = settings.log_level;
-                                    is_running_locally = true;
-                                };
-                                memory_type = ?(#heap);
-                            }
-                        );
-                        run_suite_with_or_without_indexes("Heap Memory", zendb_sstore);
+                    suite(
+                        "Heap Memory",
+                        func() {
+                            let zendb_sstore = let sstore = ZenDB.newStableStore(
+                                ?{
+                                    logging = ?{
+                                        log_level = settings.log_level;
+                                        is_running_locally = true;
+                                    };
+                                    memory_type = ?(#heap);
+                                }
+                            );
+                            run_suite_with_or_without_indexes("Heap Memory", zendb_sstore);
 
-                    },
-                );
-            },
-        );
+                        },
+                    );
+                },
+            );
+        };
+
+        run_suite_for_all_memory_types();
 
     };
 

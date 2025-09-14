@@ -1,39 +1,39 @@
 import Prim "mo:prim";
 
-import Principal "mo:base/Principal";
-import Array "mo:base/Array";
-import Debug "mo:base/Debug";
-import Text "mo:base/Text";
-import Char "mo:base/Char";
-import Nat32 "mo:base/Nat32";
-import Result "mo:base/Result";
-import Order "mo:base/Order";
-import Iter "mo:base/Iter";
-import Buffer "mo:base/Buffer";
-import Nat "mo:base/Nat";
-import Option "mo:base/Option";
-import Hash "mo:base/Hash";
-import Float "mo:base/Float";
-import Int "mo:base/Int";
-import Int32 "mo:base/Int32";
-import Blob "mo:base/Blob";
-import Nat64 "mo:base/Nat64";
-import Int16 "mo:base/Int16";
-import Int64 "mo:base/Int64";
-import Int8 "mo:base/Int8";
-import Nat16 "mo:base/Nat16";
-import Nat8 "mo:base/Nat8";
+import Principal "mo:base@0.16.0/Principal";
+import Array "mo:base@0.16.0/Array";
+import Debug "mo:base@0.16.0/Debug";
+import Text "mo:base@0.16.0/Text";
+import Char "mo:base@0.16.0/Char";
+import Nat32 "mo:base@0.16.0/Nat32";
+import Result "mo:base@0.16.0/Result";
+import Order "mo:base@0.16.0/Order";
+import Iter "mo:base@0.16.0/Iter";
+import Buffer "mo:base@0.16.0/Buffer";
+import Nat "mo:base@0.16.0/Nat";
+import Option "mo:base@0.16.0/Option";
+import Hash "mo:base@0.16.0/Hash";
+import Float "mo:base@0.16.0/Float";
+import Int "mo:base@0.16.0/Int";
+import Int32 "mo:base@0.16.0/Int32";
+import Blob "mo:base@0.16.0/Blob";
+import Nat64 "mo:base@0.16.0/Nat64";
+import Int16 "mo:base@0.16.0/Int16";
+import Int64 "mo:base@0.16.0/Int64";
+import Int8 "mo:base@0.16.0/Int8";
+import Nat16 "mo:base@0.16.0/Nat16";
+import Nat8 "mo:base@0.16.0/Nat8";
 
-import Map "mo:map/Map";
-import Set "mo:map/Set";
-import Serde "mo:serde";
-import Decoder "mo:serde/Candid/Blob/Decoder";
-import Candid "mo:serde/Candid";
-import Itertools "mo:itertools/Iter";
-import RevIter "mo:itertools/RevIter";
-import BitMap "mo:bit-map";
-import Vector "mo:vector";
-import MemoryBTree "mo:memory-collection/MemoryBTree/Stable";
+import Map "mo:map@9.0.1/Map";
+import Set "mo:map@9.0.1/Set";
+import Serde "mo:serde@3.3.2";
+import Decoder "mo:serde@3.3.2/Candid/Blob/Decoder";
+import Candid "mo:serde@3.3.2/Candid";
+import Itertools "mo:itertools@0.2.2/Iter";
+import RevIter "mo:itertools@0.2.2/RevIter";
+import BitMap "mo:bit-map@0.1.2";
+import Vector "mo:vector@0.4.2";
+import MemoryBTree "mo:memory-collection@0.3.2/MemoryBTree/Stable";
 import Ids "../Ids";
 
 import T "../Types";
@@ -94,7 +94,7 @@ module StableCollection {
     //     processed_schema : T.Schema,
     // ) : StableCollection {
 
-    //     let schema_keys = Utils.getSchemaKeys(processed_schema);
+    //     let schema_keys = Utils.get_schema_keys(processed_schema);
 
     //     var stable_collection : T.StableCollection = {
     //         ids = db.ids;
@@ -162,27 +162,27 @@ module StableCollection {
         DocumentStore.range(collection.documents, main_btree_utils, start, end);
     };
 
-    public func rangeKeys(collection : StableCollection, main_btree_utils : T.BTreeUtils<Nat, T.Document>, start : Nat, end : Nat) : Iter<Nat> {
-        DocumentStore.rangeKeys(collection.documents, main_btree_utils, start, end);
+    public func range_keys(collection : StableCollection, main_btree_utils : T.BTreeUtils<Nat, T.Document>, start : Nat, end : Nat) : Iter<Nat> {
+        DocumentStore.range_keys(collection.documents, main_btree_utils, start, end);
     };
 
-    public func rangeVals(collection : StableCollection, main_btree_utils : T.BTreeUtils<Nat, T.Document>, start : Nat, end : Nat) : Iter<Blob> {
-        DocumentStore.rangeVals(collection.documents, main_btree_utils, start, end);
+    public func range_vals(collection : StableCollection, main_btree_utils : T.BTreeUtils<Nat, T.Document>, start : Nat, end : Nat) : Iter<Blob> {
+        DocumentStore.range_vals(collection.documents, main_btree_utils, start, end);
     };
 
     // public func update_schema<NewRecord>(collection : StableCollection, schema : T.Schema) : Result<(), Text> {
     //     type PrevRecord = Record;
 
-    //     let is_compatible = Schema.isSchemaBackwardCompatible(collection.schema, schema);
-    //     if (not is_compatible) return Utils.logErrorMsg(collection.logger, "Schema is not backward compatible");
+    //     let is_compatible = Schema.is_schema_backward_compatible(collection.schema, schema);
+    //     if (not is_compatible) return Utils.log_error_msg(collection.logger, "Schema is not backward compatible");
 
-    //     let processed_schema = Schema.processSchema(schema);
-    //     let schema_keys = Utils.getSchemaKeys(processed_schema);
+    //     let processed_schema = Schema.process_schema(schema);
+    //     let schema_keys = Utils.get_schema_keys(processed_schema);
 
     //     collection.schema := processed_schema;
     //     collection.schema_keys := schema_keys;
 
-    //     let default_value_with_prev_schema = Schema.generateDefaultValue(collection.schema);
+    //     let default_value_with_prev_schema = Schema.generate_default_value(collection.schema);
 
     //     Logger.lazyInfo(
     //         collection.logger,
@@ -191,7 +191,7 @@ module StableCollection {
     //     #ok;
     // };
 
-    public func createIndexInternal(
+    public func create_index_internal(
         collection : StableCollection,
         index_name : Text,
         index_key_details : [(Text, SortDirection)],
@@ -228,7 +228,7 @@ module StableCollection {
         #ok(index);
     };
 
-    public func createIndex(
+    public func create_index(
         collection : StableCollection,
         main_btree_utils : T.BTreeUtils<Nat, T.Document>,
         index_name : Text,
@@ -236,14 +236,14 @@ module StableCollection {
         is_unique : Bool,
     ) : Result<(T.Index), Text> {
 
-        let index_creation_response = StableCollection.createIndexInternal(collection, index_name, _index_key_details, is_unique, false);
+        let index_creation_response = StableCollection.create_index_internal(collection, index_name, _index_key_details, is_unique, false);
 
         let index = switch (index_creation_response) {
             case (#ok(index)) index;
             case (#err(err_msg)) return #err(err_msg);
         };
 
-        switch (Index.populateIndex(collection, index)) {
+        switch (Index.populate_index(collection, index)) {
             case (#ok(_)) {};
             case (#err(err_msg)) return #err("Failed to create index '" # index_name # "': " # err_msg);
         };
@@ -257,7 +257,7 @@ module StableCollection {
 
     };
 
-    public func clearIndex(
+    public func clear_index(
         collection : StableCollection,
         _main_btree_utils : T.BTreeUtils<Nat, T.Document>,
         index_name : Text,
@@ -321,15 +321,15 @@ module StableCollection {
         max_entries;
     };
 
-    public func repopulateIndex(
+    public func repopulate_index(
         collection : StableCollection,
         _main_btree_utils : T.BTreeUtils<Nat, T.Document>,
         index_name : Text,
     ) : Result<(), Text> {
-        repopulateIndexes(collection, _main_btree_utils, [index_name]);
+        repopulate_indexes(collection, _main_btree_utils, [index_name]);
     };
 
-    public func repopulateIndexes(
+    public func repopulate_indexes(
         collection : StableCollection,
         _main_btree_utils : T.BTreeUtils<Nat, T.Document>,
         index_names : [Text],
@@ -355,11 +355,11 @@ module StableCollection {
             func() = "Collected " # debug_show indexes.size() # " indexes to populate",
         );
 
-        Index.repopulateIndexes(collection, Buffer.toArray(indexes));
+        Index.repopulate_indexes(collection, Buffer.toArray(indexes));
 
     };
 
-    public func deleteIndex(
+    public func delete_index(
         collection : StableCollection,
         _main_btree_utils : T.BTreeUtils<Nat, T.Document>,
         index_name : Text,
@@ -418,9 +418,9 @@ module StableCollection {
                 Logger.lazyDebug(collection.logger, func() = "paginate(): Interval iterator");
 
                 if (sorted_in_reverse) {
-                    return Intervals.extractIntervalsInPaginationRangeForReversedIntervals(collection, skip, opt_limit, index_name, _intervals, sorted_in_reverse);
+                    return Intervals.extract_intervals_in_pagination_range_for_reversed_intervals(collection, skip, opt_limit, index_name, _intervals, sorted_in_reverse);
                 } else {
-                    return Intervals.extractIntervalsInPaginationRange(collection, skip, opt_limit, index_name, _intervals, sorted_in_reverse);
+                    return Intervals.extract_intervals_in_pagination_range(collection, skip, opt_limit, index_name, _intervals, sorted_in_reverse);
                 };
 
             };
@@ -441,7 +441,7 @@ module StableCollection {
 
     };
 
-    public func validateSchemaConstraintsOnUpdatedFields(
+    public func validate_schema_constraints_on_updated_fields(
         collection : StableCollection,
         document_id : Nat,
         candid_map : T.CandidMap,
@@ -473,8 +473,8 @@ module StableCollection {
                 case (?field_value) field_value;
                 case (null) {
                     if (
-                        SchemaMap.isNestedVariantField(collection.schema_map, field_name) or
-                        SchemaMap.isNestedOptionField(collection.schema_map, field_name)
+                        SchemaMap.is_nested_variant_field(collection.schema_map, field_name) or
+                        SchemaMap.is_nested_option_field(collection.schema_map, field_name)
                     ) {
                         continue validating_field_constraints;
                     };
@@ -599,7 +599,7 @@ module StableCollection {
         label validating_unique_constraints for ((composite_field_keys, index) in unique_constraints_iter) {
 
             let ?compsite_field_values = CollectionUtils.getIndexColumns(collection, index.key_details, document_id, candid_map) else continue validating_unique_constraints;
-            let index_data_utils = CollectionUtils.getIndexDataUtils(collection);
+            let index_data_utils = CollectionUtils.get_index_data_utils(collection);
             // Debug.print("compsite_field_values: " # debug_show compsite_field_values);
 
             let opt_prev_document_id = BTree.get(index.data, index_data_utils, compsite_field_values);
@@ -655,7 +655,7 @@ module StableCollection {
 
         let candid_map = CandidMap.new(collection.schema_map, id, candid);
 
-        switch (validateSchemaConstraintsOnUpdatedFields(collection, id, candid_map, null)) {
+        switch (validate_schema_constraints_on_updated_fields(collection, id, candid_map, null)) {
             case (#ok(_)) {};
             case (#err(msg)) {
                 let err_msg = "Schema Constraint validation failed: " # msg;
@@ -698,7 +698,7 @@ module StableCollection {
         #ok(id);
     };
 
-    public func replaceById<Record>(
+    public func replace_by_id<Record>(
         collection : StableCollection,
         main_btree_utils : T.BTreeUtils<Nat, T.Document>,
         id : Nat,
@@ -720,7 +720,7 @@ module StableCollection {
             case (#ok(_)) {};
         };
 
-        switch (validateSchemaConstraintsOnUpdatedFields(collection, id, new_candid_map, null)) {
+        switch (validate_schema_constraints_on_updated_fields(collection, id, new_candid_map, null)) {
             case (#ok(_)) {};
             case (#err(msg)) {
                 let err_msg = "Schema Constraint validation failed: " # msg;
@@ -768,14 +768,14 @@ module StableCollection {
             func() = "Updated candid map, about to extract candid",
         );
 
-        let candid = CandidMap.extractCandid(candid_map);
+        let candid = CandidMap.extract_candid(candid_map);
 
         #ok(candid);
     };
 
     func update_indexed_document_fields(collection : StableCollection, index : Index, id : Nat, new_document_candid_map : T.CandidMap, opt_prev_document_candid_map : ?T.CandidMap) : Result<(), Text> {
 
-        let index_data_utils = CollectionUtils.getIndexDataUtils(collection);
+        let index_data_utils = CollectionUtils.get_index_data_utils(collection);
 
         ignore do ? {
             let prev_document_candid_map = opt_prev_document_candid_map!;
@@ -825,7 +825,7 @@ module StableCollection {
         #ok;
     };
 
-    public func updateById<Record>(collection : StableCollection, main_btree_utils : T.BTreeUtils<Nat, T.Document>, id : Nat, field_updates : [(Text, T.FieldUpdateOperations)]) : Result<(), Text> {
+    public func update_by_id<Record>(collection : StableCollection, main_btree_utils : T.BTreeUtils<Nat, T.Document>, id : Nat, field_updates : [(Text, T.FieldUpdateOperations)]) : Result<(), Text> {
         Logger.lazyInfo(
             collection.logger,
             func() = "Updating document with id: " # debug_show id,
@@ -864,7 +864,7 @@ module StableCollection {
             case (#ok(_)) {};
         };
 
-        switch (validateSchemaConstraintsOnUpdatedFields(collection, id, new_candid_map, ?fields_with_updates)) {
+        switch (validate_schema_constraints_on_updated_fields(collection, id, new_candid_map, ?fields_with_updates)) {
             case (#ok(_)) {};
             case (#err(msg)) {
                 let err_msg = "Schema Constraint validation failed: " # msg;
@@ -924,12 +924,12 @@ module StableCollection {
             func() = "Executing search with query: " # debug_show (stable_query),
         );
 
-        switch (internalSearch(collection, stable_query)) {
+        switch (internal_search(collection, stable_query)) {
             case (#err(err)) {
                 return #err("Search failed: " # err);
             };
             case (#ok(document_ids_iter)) {
-                let candid_blob_iter = idsToCandidBlobs(collection, document_ids_iter);
+                let candid_blob_iter = ids_to_candid_blobs(collection, document_ids_iter);
                 let candid_blobs = Iter.toArray(candid_blob_iter);
                 Logger.lazyDebug(
                     collection.logger,
@@ -940,7 +940,7 @@ module StableCollection {
         };
     };
 
-    public func evaluateQuery(collection : StableCollection, stable_query : T.StableQuery) : Result<Iter<Nat>, Text> {
+    public func evaluate_query(collection : StableCollection, stable_query : T.StableQuery) : Result<Iter<Nat>, Text> {
         Logger.lazyDebug(
             collection.logger,
             func() = "Evaluating query with operations: " # debug_show (stable_query.query_operations),
@@ -956,13 +956,13 @@ module StableCollection {
                     (?(id, document), CandidMap.new(collection.schema_map, id, document));
                 };
                 case (null) {
-                    let #ok(default_value) = Schema.generateDefaultValue(collection.schema) else Debug.trap("Couldn't generate default value for schema: " # debug_show collection.schema);
+                    let #ok(default_value) = Schema.generate_default_value(collection.schema) else Debug.trap("Couldn't generate default value for schema: " # debug_show collection.schema);
                     (null, CandidMap.new(collection.schema_map, 0, default_value));
                 };
 
             };
             case (null) {
-                let #ok(default_value) = Schema.generateDefaultValue(collection.schema) else Debug.trap("Couldn't generate default value for schema: " # debug_show collection.schema);
+                let #ok(default_value) = Schema.generate_default_value(collection.schema) else Debug.trap("Couldn't generate default value for schema: " # debug_show collection.schema);
                 (null, CandidMap.new(collection.schema_map, 0, default_value));
             };
         };
@@ -983,7 +983,7 @@ module StableCollection {
 
         // Debug.print("Formatted query operations: " # debug_show formatted_query_operations);
 
-        let query_plan : T.QueryPlan = QueryPlan.createQueryPlan(
+        let query_plan : T.QueryPlan = QueryPlan.create_query_plan(
             collection,
             formatted_query_operations,
             sort_by,
@@ -992,11 +992,11 @@ module StableCollection {
         );
 
         let sort_documents_by_field_cmp = switch (sort_by) {
-            case (?sort_by) getDocumentFieldCmp(collection, sort_by);
+            case (?sort_by) get_document_field_cmp(collection, sort_by);
             case (null) func(_ : Nat, _ : Nat) : Order = #equal;
         };
 
-        let eval = QueryExecution.generateDocumentIdsForQueryPlan(collection, query_plan, sort_by, sort_documents_by_field_cmp);
+        let eval = QueryExecution.generate_document_ids_for_query_plan(collection, query_plan, sort_by, sort_documents_by_field_cmp);
         let iter = paginate(collection, eval, Option.get(pagination.skip, 0), pagination.limit);
 
         Logger.lazyDebug(
@@ -1006,15 +1006,15 @@ module StableCollection {
         return #ok((iter));
     };
 
-    public func internalSearch(collection : StableCollection, stable_query : T.StableQuery) : Result<Iter<Nat>, Text> {
+    public func internal_search(collection : StableCollection, stable_query : T.StableQuery) : Result<Iter<Nat>, Text> {
         // let stable_query = query_builder.build();
-        switch (evaluateQuery(collection, stable_query)) {
+        switch (evaluate_query(collection, stable_query)) {
             case (#err(err)) return #err(err);
             case (#ok(eval_result)) #ok(eval_result);
         };
     };
 
-    public func idsToDocuments<Record>(collection : StableCollection, blobify : InternalCandify<Record>, iter : Iter<Nat>) : Iter<(Nat, Record)> {
+    public func ids_to_documents<Record>(collection : StableCollection, blobify : InternalCandify<Record>, iter : Iter<Nat>) : Iter<(Nat, Record)> {
         Iter.map<Nat, (Nat, Record)>(
             iter,
             func(id : Nat) : (Nat, Record) {
@@ -1024,7 +1024,7 @@ module StableCollection {
         );
     };
 
-    public func idsToCandidBlobs<Record>(collection : StableCollection, iter : Iter<Nat>) : Iter<(Nat, T.CandidBlob)> {
+    public func ids_to_candid_blobs<Record>(collection : StableCollection, iter : Iter<Nat>) : Iter<(Nat, T.CandidBlob)> {
         Iter.map<Nat, (Nat, T.CandidBlob)>(
             iter,
             func(id : Nat) : (Nat, T.CandidBlob) {
@@ -1034,21 +1034,21 @@ module StableCollection {
         );
     };
 
-    public func searchIter(
+    public func search_iter(
         collection : StableCollection,
         main_btree_utils : T.BTreeUtils<Nat, T.Document>,
         query_builder : QueryBuilder,
     ) : Result<Iter<T.WrapId<T.CandidBlob>>, Text> {
-        switch (internalSearch(collection, query_builder.build())) {
+        switch (internal_search(collection, query_builder.build())) {
             case (#err(err)) return #err(err);
             case (#ok(document_ids_iter)) {
-                let document_iter = idsToCandidBlobs(collection, document_ids_iter);
+                let document_iter = ids_to_candid_blobs(collection, document_ids_iter);
                 #ok(document_iter);
             };
         };
     };
 
-    public func getDocumentFieldCmp(
+    public func get_document_field_cmp(
         collection : StableCollection,
         sort_field : (Text, T.SortDirection),
     ) : (Nat, Nat) -> Order {
@@ -1098,7 +1098,7 @@ module StableCollection {
             let ?value_a = CandidMap.get(candid_map_a, collection.schema_map, sort_field.0) else Debug.trap("Couldn't get value from CandidMap for key: " # sort_field.0);
             let ?value_b = CandidMap.get(candid_map_b, collection.schema_map, sort_field.0) else Debug.trap("Couldn't get value from CandidMap for key: " # sort_field.0);
 
-            let order_num = Schema.cmpCandid(#Empty, value_a, value_b);
+            let order_num = Schema.cmp_candid(#Empty, value_a, value_b);
 
             let order_variant = if (sort_field.1 == #Ascending) {
                 if (order_num == 0) #equal else if (order_num == 1) #greater else #less;
@@ -1111,35 +1111,9 @@ module StableCollection {
         sort_documents_by_field_cmp;
     };
 
-    func get_memory_stats<K, V>(btree : T.BTree<K, V>) : T.MemoryBTreeStats {
-        switch (btree) {
-            case (#stableMemory(btree)) { MemoryBTree.stats(btree) };
-            case (#heap(_)) {
-                // This data is not available for the heap-based B-Tree
-                {
-                    allocatedPages = 0;
-                    bytesPerPage = 0;
-                    allocatedBytes = 0;
-                    usedBytes = 0;
-                    freeBytes = 0;
-                    dataBytes = 0;
-                    metadataBytes = 0;
-                    leafBytes = 0;
-                    branchBytes = 0;
-                    keyBytes = 0;
-                    valueBytes = 0;
-                    leafCount = 0;
-                    branchCount = 0;
-                    totalNodeCount = 0;
-                };
-            };
-        };
-
-    };
-
     public func stats(collection : StableCollection) : T.CollectionStats {
 
-        let main_collection_memory : T.MemoryBTreeStats = get_memory_stats(collection.documents);
+        let main_collection_memory : T.MemoryBTreeStats = BTree.getMemoryStats(collection.documents);
 
         let total_documents = StableCollection.size(collection);
 
@@ -1147,25 +1121,7 @@ module StableCollection {
             Iter.map<(Text, Index), T.IndexStats>(
                 Map.entries(collection.indexes),
                 func((index_name, index) : (Text, Index)) : T.IndexStats {
-                    let memory = get_memory_stats(index.data);
-                    let entries = Index.size(index);
-
-                    {
-                        name = index_name;
-                        fields = index.key_details;
-                        entries;
-                        memory;
-                        isUnique = index.is_unique;
-                        usedInternally = index.used_internally;
-
-                        // the index fields values are stored as the keys
-                        avgIndexKeySize = if (entries == 0) 0 else (memory.keyBytes / entries);
-                        totalIndexKeySize = memory.keyBytes;
-
-                        // includes the key and the document id as the value
-                        totalIndexDataSize = memory.dataBytes;
-
-                    };
+                    Index.stats(index, total_documents);
                 },
             )
         );
@@ -1176,7 +1132,7 @@ module StableCollection {
         var total_data_bytes : Nat = main_collection_memory.dataBytes;
         var total_metadata_bytes : Nat = main_collection_memory.metadataBytes;
 
-        var total_index_data_bytes : Nat = 0;
+        var total_index_store_bytes : Nat = 0;
 
         for (index_stats in indexes.vals()) {
             total_allocated_bytes += index_stats.memory.allocatedBytes;
@@ -1185,7 +1141,7 @@ module StableCollection {
             total_data_bytes += index_stats.memory.dataBytes;
             total_metadata_bytes += index_stats.memory.metadataBytes;
 
-            total_index_data_bytes += index_stats.totalIndexDataSize;
+            total_index_store_bytes += index_stats.memory.allocatedBytes;
         };
 
         let collection_stats : T.CollectionStats = {
@@ -1196,17 +1152,18 @@ module StableCollection {
             memoryType = collection.memory_type;
 
             // Each entry is a document stored as an 8 byte key and the candid blob as the value
-            avgDocumentSize = if (total_documents == 0) 0 else (main_collection_memory.dataBytes / total_documents);
-            totalDocumentSize = main_collection_memory.dataBytes;
+            avg_document_size = if (total_documents == 0) 0 else (main_collection_memory.dataBytes / total_documents);
+            total_document_size = main_collection_memory.dataBytes;
             indexes;
 
-            totalAllocatedBytes = total_allocated_bytes;
-            totalFreeBytes = total_free_bytes;
-            totalUsedBytes = total_used_bytes;
-            totalDataBytes = total_data_bytes;
-            totalMetadataBytes = total_metadata_bytes;
+            total_allocated_bytes = total_allocated_bytes;
+            total_free_bytes = total_free_bytes;
+            total_used_bytes = total_used_bytes;
+            total_data_bytes = total_data_bytes;
+            total_metadata_bytes = total_metadata_bytes;
 
-            totalIndexDataSize = total_index_data_bytes;
+            total_document_store_bytes = main_collection_memory.allocatedBytes;
+            total_index_store_bytes = total_index_store_bytes;
         };
 
         collection_stats;
@@ -1215,14 +1172,14 @@ module StableCollection {
     public func count(collection : StableCollection, query_builder : QueryBuilder) : Result<Nat, Text> {
         let stable_query = query_builder.build();
 
-        let query_plan = QueryPlan.createQueryPlan(
+        let query_plan = QueryPlan.create_query_plan(
             collection,
             stable_query.query_operations,
             null,
             null,
         );
 
-        let count = switch (QueryExecution.getUniqueDocumentIdsFromQueryPlan(collection, Map.new(), query_plan)) {
+        let count = switch (QueryExecution.get_unique_document_ids_from_query_plan(collection, Map.new(), query_plan)) {
             case (#Empty) 0;
             case (#BitMap(bitmap)) bitmap.size();
             case (#Ids(iter)) Iter.size(iter);
@@ -1246,7 +1203,7 @@ module StableCollection {
     public func exists(collection : StableCollection, query_builder : QueryBuilder) : Result<Bool, Text> {
         let stable_query = query_builder.Limit(1).build();
 
-        let query_plan = QueryPlan.createQueryPlan(
+        let query_plan = QueryPlan.create_query_plan(
             collection,
             stable_query.query_operations,
             null,
@@ -1255,7 +1212,7 @@ module StableCollection {
 
         let sort_documents_by_field_cmp = func(_ : Nat, _ : Nat) : Order = #equal;
 
-        let eval = QueryExecution.generateDocumentIdsForQueryPlan(collection, query_plan, null, sort_documents_by_field_cmp);
+        let eval = QueryExecution.generate_document_ids_for_query_plan(collection, query_plan, null, sort_documents_by_field_cmp);
 
         let greater_than_0 = switch (eval) {
             case (#Empty) false;
@@ -1278,7 +1235,7 @@ module StableCollection {
 
     };
 
-    public func deleteById(collection : StableCollection, main_btree_utils : T.BTreeUtils<Nat, T.Document>, id : Nat) : Result<(T.CandidBlob), Text> {
+    public func delete_by_id(collection : StableCollection, main_btree_utils : T.BTreeUtils<Nat, T.Document>, id : Nat) : Result<(T.CandidBlob), Text> {
         Logger.lazyInfo(
             collection.logger,
             func() = "Deleting document with id: " # debug_show id,

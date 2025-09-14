@@ -1,22 +1,22 @@
-import Text "mo:base/Text";
-import Array "mo:base/Array";
-import Buffer "mo:base/Buffer";
-import Order "mo:base/Order";
-import Debug "mo:base/Debug";
-import Nat "mo:base/Nat";
-import Int "mo:base/Int";
-import Option "mo:base/Option";
-import Iter "mo:base/Iter";
-import Float "mo:base/Float";
+import Text "mo:base@0.16.0/Text";
+import Array "mo:base@0.16.0/Array";
+import Buffer "mo:base@0.16.0/Buffer";
+import Order "mo:base@0.16.0/Order";
+import Debug "mo:base@0.16.0/Debug";
+import Nat "mo:base@0.16.0/Nat";
+import Int "mo:base@0.16.0/Int";
+import Option "mo:base@0.16.0/Option";
+import Iter "mo:base@0.16.0/Iter";
+import Float "mo:base@0.16.0/Float";
 
-import Map "mo:map/Map";
-import Set "mo:map/Set";
-import Serde "mo:serde";
-import Decoder "mo:serde/Candid/Blob/Decoder";
-import Candid "mo:serde/Candid";
-import Itertools "mo:itertools/Iter";
-import RevIter "mo:itertools/RevIter";
-import BitMap "mo:bit-map";
+import Map "mo:map@9.0.1/Map";
+import Set "mo:map@9.0.1/Set";
+import Serde "mo:serde@3.3.2";
+import Decoder "mo:serde@3.3.2/Candid/Blob/Decoder";
+import Candid "mo:serde@3.3.2/Candid";
+import Itertools "mo:itertools@0.2.2/Iter";
+import RevIter "mo:itertools@0.2.2/RevIter";
+import BitMap "mo:bit-map@0.1.2";
 
 import T "../Types";
 import CandidMap "../CandidMap";
@@ -106,7 +106,7 @@ module Index {
         let index : Index = {
             name;
             key_details;
-            data = CollectionUtils.newBtree(collection);
+            data = CollectionUtils.new_btree(collection);
             used_internally;
             is_unique;
         };
@@ -126,7 +126,7 @@ module Index {
         candid_map : T.CandidMap,
     ) : T.Result<(), Text> {
 
-        let index_data_utils = CollectionUtils.getIndexDataUtils(collection);
+        let index_data_utils = CollectionUtils.get_index_data_utils(collection);
 
         let index_key_values = switch (CollectionUtils.getIndexColumns(collection, index.key_details, id, candid_map)) {
             case (?index_key_values) index_key_values;
@@ -166,7 +166,7 @@ module Index {
     };
 
     public func remove(collection : StableCollection, index : Index, id : Nat, prev_candid_map : T.CandidMap) : T.Result<(), Text> {
-        let index_data_utils = CollectionUtils.getIndexDataUtils(collection);
+        let index_data_utils = CollectionUtils.get_index_data_utils(collection);
 
         let index_key_values = switch (CollectionUtils.getIndexColumns(collection, index.key_details, id, prev_candid_map)) {
             case (?index_key_values) index_key_values;
@@ -203,7 +203,7 @@ module Index {
         BTree.clear(index.data);
     };
 
-    public func populateIndex(
+    public func populate_index(
         collection : StableCollection,
         index : Index,
     ) : T.Result<(), Text> {
@@ -229,10 +229,10 @@ module Index {
     };
 
     /// Clears the index and repopulates it with all documents from the collection.
-    public func repopulateIndex(collection : StableCollection, index : Index) : T.Result<(), Text> {
+    public func repopulate_index(collection : StableCollection, index : Index) : T.Result<(), Text> {
         // clear the index first
         Index.clear(collection, index);
-        populateIndex(collection, index);
+        populate_index(collection, index);
     };
 
     func populateIndexesFromCandidMapDocumentEntries(
@@ -259,7 +259,7 @@ module Index {
         #ok();
     };
 
-    public func populateIndexes(
+    public func populate_indexes(
         collection : StableCollection,
         indexes : [T.Index],
     ) : T.Result<(), Text> {
@@ -281,7 +281,7 @@ module Index {
 
     };
 
-    public func repopulateIndexes(
+    public func repopulate_indexes(
         collection : StableCollection,
         indexes : [T.Index],
     ) : T.Result<(), Text> {
@@ -310,7 +310,7 @@ module Index {
     //     id : Nat,
     //     candid_map : T.CandidMap,
     // ) : Bool {
-    //     let index_data_utils = CollectionUtils.getIndexDataUtils(collection);
+    //     let index_data_utils = CollectionUtils.get_index_data_utils(collection);
 
     //     let index_key_values = switch (CollectionUtils.getIndexColumns(collection, index.key_details, id, candid_map)) {
     //         case (?index_key_values) index_key_values;
@@ -354,7 +354,7 @@ module Index {
             case (#gte(candid)) {
                 switch (Map.get(lower, thash, field)) {
                     case (?#Inclusive(val) or ?#Exclusive(val)) {
-                        if (Schema.cmpCandid(#Empty, candid, val) == 1) {
+                        if (Schema.cmp_candid(#Empty, candid, val) == 1) {
                             ignore Map.put(lower, thash, field, #Inclusive(candid));
                         };
                     };
@@ -364,7 +364,7 @@ module Index {
             case (#lte(candid)) {
                 switch (Map.get(upper, thash, field)) {
                     case (?#Inclusive(val) or ?#Exclusive(val)) {
-                        if (Schema.cmpCandid(#Empty, candid, val) == -1) {
+                        if (Schema.cmp_candid(#Empty, candid, val) == -1) {
                             ignore Map.put(upper, thash, field, #Inclusive(candid));
                         };
                     };
@@ -374,7 +374,7 @@ module Index {
             case (#lt(candid)) {
                 switch (Map.get(upper, thash, field)) {
                     case (?#Inclusive(val) or ?#Exclusive(val)) {
-                        let cmp = Schema.cmpCandid(#Empty, candid, val);
+                        let cmp = Schema.cmp_candid(#Empty, candid, val);
                         if (cmp == -1 or cmp == 0) {
                             ignore Map.put(upper, thash, field, #Exclusive(candid));
                         };
@@ -385,7 +385,7 @@ module Index {
             case (#gt(candid)) {
                 switch (Map.get(lower, thash, field)) {
                     case (?#Inclusive(val) or ?#Exclusive(val)) {
-                        let cmp = Schema.cmpCandid(#Empty, candid, val);
+                        let cmp = Schema.cmp_candid(#Empty, candid, val);
                         if (cmp == 1 or cmp == 0) {
                             ignore Map.put(lower, thash, field, #Exclusive(candid));
                         };
@@ -416,15 +416,15 @@ module Index {
         // Debug.print("start_query: " # debug_show start_query);
         // Debug.print("end_query: " # debug_show end_query);
 
-        let index_data_utils = CollectionUtils.getIndexDataUtils(collection);
+        let index_data_utils = CollectionUtils.get_index_data_utils(collection);
 
         func sort_by_key_details(a : (Text, Any), b : (Text, Any)) : Order {
-            let pos_a = switch (Array.indexOf<(Text, SortDirection)>((a.0, #Ascending), index.key_details, Utils.tupleEq(Text.equal))) {
+            let pos_a = switch (Array.indexOf<(Text, SortDirection)>((a.0, #Ascending), index.key_details, Utils.tuple_eq(Text.equal))) {
                 case (?pos) pos;
                 case (null) index.key_details.size();
             };
 
-            let pos_b = switch (Array.indexOf<(Text, SortDirection)>((b.0, #Ascending), index.key_details, Utils.tupleEq(Text.equal))) {
+            let pos_b = switch (Array.indexOf<(Text, SortDirection)>((b.0, #Ascending), index.key_details, Utils.tuple_eq(Text.equal))) {
                 case (?pos) pos;
                 case (null) index.key_details.size();
             };
@@ -559,12 +559,12 @@ module Index {
         scans;
     };
 
-    public func fromInterval(
+    public func from_interval(
         collection : T.StableCollection,
         index : Index,
         interval : (Nat, Nat),
     ) : [([T.CandidQuery], T.DocumentId)] {
-        let index_data_utils = CollectionUtils.getIndexDataUtils(collection);
+        let index_data_utils = CollectionUtils.get_index_data_utils(collection);
 
         let (start, end) = interval;
 
@@ -577,7 +577,7 @@ module Index {
         collection : T.StableCollection,
         index : Index,
     ) : T.RevIter<([T.CandidQuery], T.DocumentId)> {
-        let index_data_utils = CollectionUtils.getIndexDataUtils(collection);
+        let index_data_utils = CollectionUtils.get_index_data_utils(collection);
 
         BTree.entries<[T.CandidQuery], T.DocumentId>(index.data, index_data_utils);
     };
@@ -605,7 +605,7 @@ module Index {
 
     // };
 
-    public func extractBounds(lower : Map<Text, T.CandidInclusivityQuery>, upper : Map<Text, T.CandidInclusivityQuery>, opt_index_key_details : ?[(Text, T.SortDirection)], opt_fully_covered_equality_and_range_fields : ?Set.Set<Text>) : (Bounds, Bounds) {
+    public func extract_bounds(lower : Map<Text, T.CandidInclusivityQuery>, upper : Map<Text, T.CandidInclusivityQuery>, opt_index_key_details : ?[(Text, T.SortDirection)], opt_fully_covered_equality_and_range_fields : ?Set.Set<Text>) : (Bounds, Bounds) {
 
         assert Option.isSome(opt_index_key_details) == Option.isSome(opt_fully_covered_equality_and_range_fields);
 
@@ -703,7 +703,7 @@ module Index {
 
     };
 
-    public func convertSimpleOpsToBounds(is_and_operation : Bool, simple_operations : [(Text, T.ZqlOperators)], opt_index_key_details : ?[(Text, T.SortDirection)], opt_fully_covered_equality_and_range_fields : ?Set.Set<Text>) : (T.Bounds, T.Bounds) {
+    public func convert_simple_ops_to_bounds(is_and_operation : Bool, simple_operations : [(Text, T.ZqlOperators)], opt_index_key_details : ?[(Text, T.SortDirection)], opt_fully_covered_equality_and_range_fields : ?Set.Set<Text>) : (T.Bounds, T.Bounds) {
 
         let lower_bound = Map.new<Text, T.State<T.CandidQuery>>();
         let upper_bound = Map.new<Text, T.State<T.CandidQuery>>();
@@ -743,7 +743,7 @@ module Index {
 
         };
 
-        extractBounds(lower_bound, upper_bound, opt_index_key_details, opt_fully_covered_equality_and_range_fields);
+        extract_bounds(lower_bound, upper_bound, opt_index_key_details, opt_fully_covered_equality_and_range_fields);
 
     };
 
@@ -787,7 +787,7 @@ module Index {
 
     };
 
-    public func fillFieldMaps(equal_fields : Set.Set<Text>, sort_fields : Buffer<(Text, T.SortDirection)>, range_fields : Set.Set<Text>, operations : [(Text, T.ZqlOperators)], sort_field : ?(Text, T.SortDirection)) {
+    public func fill_field_maps(equal_fields : Set.Set<Text>, sort_fields : Buffer<(Text, T.SortDirection)>, range_fields : Set.Set<Text>, operations : [(Text, T.ZqlOperators)], sort_field : ?(Text, T.SortDirection)) {
 
         sort_fields.clear();
 
@@ -806,13 +806,13 @@ module Index {
         };
     };
 
-    public func getBestIndex(collection : StableCollection, operations : [(Text, T.ZqlOperators)], sort_field : ?(Text, T.SortDirection)) : ?BestIndexResult {
+    public func get_best_index(collection : StableCollection, operations : [(Text, T.ZqlOperators)], sort_field : ?(Text, T.SortDirection)) : ?BestIndexResult {
         let equal_fields = Set.new<Text>();
         let sort_fields = Buffer.Buffer<(Text, T.SortDirection)>(8);
         let range_fields = Set.new<Text>();
         // let partially_covered_fields = Set.new<Text>();
 
-        fillFieldMaps(equal_fields, sort_fields, range_fields, operations, sort_field);
+        fill_field_maps(equal_fields, sort_fields, range_fields, operations, sort_field);
 
         // the sorting direction of the query and the index can either be a direct match
         // or a direct opposite in order to return the results without additional sorting
@@ -914,7 +914,7 @@ module Index {
 
             if (num_of_equal_fields_covered > 0 or num_of_range_fields_covered > 0 or num_of_sort_fields_covered > 0) {
 
-                let (scan_bounds, filter_bounds) = convertSimpleOpsToBounds(false, operations, ?index.key_details, ?fully_covered_equality_and_range_fields);
+                let (scan_bounds, filter_bounds) = convert_simple_ops_to_bounds(false, operations, ?index.key_details, ?fully_covered_equality_and_range_fields);
 
                 let interval = scan(collection, index, scan_bounds.0, scan_bounds.1, null);
 
@@ -1007,187 +1007,26 @@ module Index {
 
     };
 
-    // public func getIndexDataUtils_v1(collection : StableCollection, operations : [(Text, T.ZqlOperators)], sort_field : ?(Text, T.SortDirection)) : ?BestIndexResult {
-    //     let equal_fields = Set.new<Text>();
-    //     let sort_fields = Buffer.Buffer<(Text, T.SortDirection)>(8);
-    //     let range_fields = Set.new<Text>();
-    //     // let partially_covered_fields = Set.new<Text>();
+    public func stats(index : Index, collection_entries : Nat) : T.IndexStats {
 
-    //     func fillFieldMaps(equal_fields : Set.Set<Text>, sort_fields : Buffer<(Text, T.SortDirection)>, range_fields : Set.Set<Text>, operations : [(Text, T.ZqlOperators)], sort_field : ?(Text, T.SortDirection)) {
+        let memory = BTree.getMemoryStats(index.data);
+        let index_entries = Index.size(index); // could be less or more than collection entries depending on the index type and if there are duplicate values
 
-    //         sort_fields.clear();
+        {
+            name = index.name;
+            fields = index.key_details;
+            entries = index_entries;
+            memory;
+            is_unique = index.is_unique;
+            used_internally = index.used_internally;
 
-    //         switch (sort_field) {
-    //             case (?(field, direction)) sort_fields.add(field, direction);
-    //             case (null) {};
-    //         };
+            // the index fields values are stored as the keys
+            avg_index_key_size = if (collection_entries == 0) 0 else (memory.keyBytes / collection_entries);
+            total_index_key_size = memory.keyBytes;
 
-    //         // sort_fields.reverse(); or add in reverse order
+            // includes the key and the document id as the value
+            total_index_data_bytes = memory.dataBytes;
+        };
+    };
 
-    //         for ((field, op) in operations.vals()) {
-    //             switch (op) {
-    //                 case (#eq(_)) ignore Set.put(equal_fields, thash, field);
-    //                 case (_) ignore Set.put(range_fields, thash, field);
-    //             };
-    //         };
-    //     };
-
-    //     fillFieldMaps(equal_fields, sort_fields, range_fields, operations, sort_field);
-
-    //     var best_score = 0;
-    //     var best_index : ?Index = null;
-    //     var best_requires_additional_sorting = false;
-    //     var best_requires_additional_filtering = false;
-    //     var best_fully_covered_equality_and_range_fields = Set.new<Text>();
-
-    //     // the sorting direction of the query and the index can either be a direct match
-    //     // or a direct opposite in order to return the results without additional sorting
-    //     var is_query_and_index_direction_a_match : ?Bool = null;
-
-    //     let EQUALITY_SCORE = 4;
-    //     let SORT_SCORE = 2;
-    //     let RANGE_SCORE = 1;
-
-    //     // let indexes = Buffer.Buffer<BestIndexResult>(indexes.size());
-
-    //     for (index in Map.vals(collection.indexes)) {
-
-    //         var num_of_equal_fields_evaluated = 0;
-    //         var num_of_sort_fields_evaluated = 0;
-    //         var num_of_range_fields_evaluated = 0;
-
-    //         var index_score = 0;
-    //         var requires_additional_filtering = false;
-    //         var requires_additional_sorting = false;
-    //         var positions_matching_equality_or_range = Set.new<Nat>();
-    //         let fully_covered_equality_and_range_fields = Set.new<Text>();
-
-    //         var index_key_details_position = 0;
-
-    //         label scoring_indexes for ((index_key, direction) in index.key_details.vals()) {
-    //             index_key_details_position += 1;
-
-    //             if (index_key == C.DOCUMENT_ID) break scoring_indexes;
-
-    //             var matches_at_least_one_column = false;
-
-    //             switch (Set.has(equal_fields, thash, index_key)) {
-    //                 case (true) {
-    //                     index_score += EQUALITY_SCORE;
-    //                     num_of_equal_fields_evaluated += 1;
-    //                     matches_at_least_one_column := true;
-    //                     Set.add(positions_matching_equality_or_range, nhash, index_key_details_position);
-    //                     Set.add(fully_covered_equality_and_range_fields, thash, index_key);
-    //                 };
-    //                 case (false) {};
-    //             };
-
-    //             if (num_of_sort_fields_evaluated < sort_fields.size()) {
-    //                 let i = sort_fields.size() - 1 - num_of_sort_fields_evaluated;
-    //                 let sort_field = sort_fields.get(i);
-
-    //                 if (index_key == sort_field.0) {
-
-    //                     matches_at_least_one_column := true;
-
-    //                     num_of_sort_fields_evaluated += 1;
-    //                     switch (is_query_and_index_direction_a_match) {
-    //                         case (null) {
-    //                             is_query_and_index_direction_a_match := ?(direction == sort_field.1);
-    //                             index_score += SORT_SCORE;
-    //                         };
-    //                         case (?is_a_match) {
-    //                             if (is_a_match == (direction == sort_field.1)) {
-    //                                 index_score += SORT_SCORE;
-    //                             } else {
-    //                                 requires_additional_sorting := true;
-    //                             };
-    //                         };
-    //                     };
-    //                 };
-    //             };
-
-    //             if (Set.has(range_fields, thash, index_key)) {
-    //                 index_score += RANGE_SCORE;
-    //                 num_of_range_fields_evaluated += 1;
-    //                 matches_at_least_one_column := true;
-
-    //                 Set.add(positions_matching_equality_or_range, nhash, index_key_details_position);
-    //                 Set.add(fully_covered_equality_and_range_fields, thash, index_key);
-
-    //                 break scoring_indexes;
-    //             };
-
-    //             // Debug.print("index_key, index_score: " # debug_show (index_key, index_score));
-
-    //             if (not matches_at_least_one_column) break scoring_indexes;
-
-    //         };
-
-    //         if (
-    //             num_of_range_fields_evaluated < Set.size(range_fields) or num_of_equal_fields_evaluated < Set.size(equal_fields)
-    //         ) {
-    //             requires_additional_filtering := true;
-    //         };
-
-    //         if ((Set.size(positions_matching_equality_or_range) == 0 and operations.size() > 0)) {
-    //             requires_additional_filtering := true;
-    //         };
-
-    //         label searching_for_holes for ((prev, current) in Itertools.slidingTuples(Set.keys(positions_matching_equality_or_range))) {
-    //             if (current - prev > 1) {
-    //                 requires_additional_filtering := true;
-    //                 break searching_for_holes;
-    //             };
-    //         };
-
-    //       // Debug.print("index matching results:");
-    //       // Debug.print("index, score: " # debug_show (index.name, index_score));
-    //       // Debug.print("operations: " # debug_show operations);
-
-    //       // Debug.print("index_key_details: " # debug_show index.key_details);
-    //       // Debug.print("equal_fields: " # debug_show Set.toArray(equal_fields));
-    //       // Debug.print("  num_of_equal_fields_evaluated: " # debug_show num_of_equal_fields_evaluated);
-
-    //       // Debug.print("sort_fields: " # debug_show Buffer.toArray(sort_fields));
-    //       // Debug.print("  num_of_sort_fields_evaluated: " # debug_show num_of_sort_fields_evaluated);
-    //       // Debug.print("range_fields: " # debug_show Set.toArray(range_fields));
-    //       // Debug.print("  num_of_range_fields_evaluated: " # debug_show num_of_range_fields_evaluated);
-
-    //       // Debug.print("requires_additional_filtering: " # debug_show requires_additional_filtering);
-    //       // Debug.print("requires_additional_sorting: " # debug_show requires_additional_sorting);
-    //       // Debug.print("num, range_size: " # debug_show (num_of_range_fields_evaluated, Set.size(range_fields)));
-    //       // Debug.print("num, equal_size: " # debug_show (num_of_equal_fields_evaluated, Set.size(equal_fields)));
-    //       // Debug.print("fully_covered_equality_and_range_fields: " # debug_show Set.toArray(fully_covered_equality_and_range_fields));
-
-    //         if (index_score > best_score) {
-    //             best_score := index_score;
-    //             best_index := ?index;
-    //             best_requires_additional_filtering := requires_additional_filtering;
-    //             best_requires_additional_sorting := requires_additional_sorting or num_of_sort_fields_evaluated < sort_fields.size();
-    //             best_fully_covered_equality_and_range_fields := fully_covered_equality_and_range_fields;
-    //         };
-
-    //     };
-
-    //     let index = switch (best_index) {
-    //         case (null) return null;
-    //         case (?index) index;
-    //     };
-
-    //     let index_response = {
-    //         index;
-    //         requires_additional_sorting = best_requires_additional_sorting;
-    //         requires_additional_filtering = best_requires_additional_filtering;
-    //         sorted_in_reverse = switch (is_query_and_index_direction_a_match) {
-    //             case (null) false;
-    //             case (?is_a_match) not is_a_match;
-    //         };
-    //         fully_covered_equality_and_range_fields = best_fully_covered_equality_and_range_fields;
-    //         score = best_score;
-    //     };
-
-    //     ?index_response;
-
-    // };
 };

@@ -1,14 +1,14 @@
-import Array "mo:base/Array";
+import Array "mo:base@0.16.0/Array";
 
-import Text "mo:base/Text";
-import Debug "mo:base/Debug";
+import Text "mo:base@0.16.0/Text";
+import Debug "mo:base@0.16.0/Debug";
 
-import Buffer "mo:base/Buffer";
-import Option "mo:base/Option";
-import Nat "mo:base/Nat";
+import Buffer "mo:base@0.16.0/Buffer";
+import Option "mo:base@0.16.0/Option";
+import Nat "mo:base@0.16.0/Nat";
 
-import Map "mo:map/Map";
-import Set "mo:map/Set";
+import Map "mo:map@9.0.1/Map";
+import Set "mo:map@9.0.1/Set";
 
 import T "Types";
 import C "Constants";
