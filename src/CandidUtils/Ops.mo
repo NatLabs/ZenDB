@@ -318,14 +318,14 @@ module CandidOps {
 
     };
 
-    public func replace_sub_text(self : Candid, toReplace : Text, replacement : Text) : Result<Candid, Text> {
+    public func replaceSubText(self : Candid, toReplace : Text, replacement : Text) : Result<Candid, Text> {
         switch (self) {
             case (#Text(text)) {
                 let replaced = Text.replace(text, #text(toReplace), replacement);
                 #ok(#Text(replaced));
             };
             case (other) {
-                return #err("Cannot complete #replace_sub_texts operation on " # debug_show (self) # ". Only text is supported");
+                return #err("Cannot complete #replaceSubTexts operation on " # debug_show (self) # ". Only text is supported");
             };
         };
 

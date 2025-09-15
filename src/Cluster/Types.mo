@@ -110,16 +110,16 @@ module {
         zendb_collection_get_schema : shared query (Text, Text) -> async (ZT.Result<ZT.Schema, Text>);
 
         /// Replace document in a collection.
-        zendb_collection_replace_document : shared (Text, Text, Nat, Blob) -> async (ZT.Result<(), Text>);
+        zendb_collection_replace_document : shared (Text, Text, ZT.DocumentId, Blob) -> async (ZT.Result<(), Text>);
 
         /// Delete document by id from a collection.
-        zendb_collection_delete_document_by_id : shared (Text, Text, Nat) -> async (ZT.Result<(Blob), Text>);
+        zendb_collection_delete_document_by_id : shared (Text, Text, ZT.DocumentId) -> async (ZT.Result<(Blob), Text>);
 
         /// Update document by id in a collection.
-        zendb_collection_update_document_by_id : shared (Text, Text, Nat, [(Text, ZT.FieldUpdateOperations)]) -> async (ZT.Result<(), Text>);
+        zendb_collection_update_document_by_id : shared (Text, Text, ZT.DocumentId, [(Text, ZT.FieldUpdateOperations)]) -> async (ZT.Result<(), Text>);
 
         /// Update documents matching query in a collection.
-        zendb_collection_update_documents : shared (Text, Text, ZT.StableQuery, [(Text, ZT.FieldUpdateOperations)]) -> async (ZT.Result<[Nat], Text>);
+        zendb_collection_update_documents : shared (Text, Text, ZT.StableQuery, [(Text, ZT.FieldUpdateOperations)]) -> async (ZT.Result<[ZT.DocumentId], Text>);
 
         /// Create index on a collection.
         zendb_collection_create_index : shared (Text, Text, Text, [(Text, ZT.SortDirection)], ?ZT.CreateIndexOptions) -> async (ZT.Result<(), Text>);
@@ -129,6 +129,10 @@ module {
 
         /// Repopulate index in a collection.
         zendb_collection_repopulate_index : shared query (Text, Text, Text) -> async (ZT.Result<(), Text>);
+
+        /// List Canisters in the cluster
+        zendb_list_canisters : shared query () -> async [CanisterInfo];
+        zendb_canister_stats : shared query () -> async ([ZT.InstanceStats]);
     };
 
     /// The canister acts as a database service.

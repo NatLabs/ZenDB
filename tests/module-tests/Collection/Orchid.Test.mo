@@ -129,7 +129,7 @@ for (i in Itertools.range(0, limit)) {
 
     let candid_map = CandidMap.new(
         schema_map,
-        0,
+        ("\FF" : Blob),
         #Record([
             ("text", #Text(document.text)),
             ("nat", #Nat(document.nat)),
@@ -781,7 +781,7 @@ suite(
                                     Iter.map<(T.Candid, T.Candid), Int8>(
                                         Itertools.zip(a.vals(), b.vals()),
                                         func((a, b) : (T.Candid, T.Candid)) : Int8 {
-                                            Schema.cmpCandid(MotokoTypesSchema, a, b);
+                                            Schema.cmp_candid(MotokoTypesSchema, a, b);
                                         },
                                     )
                                 );
@@ -898,7 +898,7 @@ suite(
                 let prefix_bytes = get_prefix(a, b);
                 assert prefix_bytes.size() >= 14 + 1; // 14 bytes for the prefix and 1 byte for the type encoding
 
-                let ?prefix = Text.decodeUtf8(Utils.sliceBlob(prefix_bytes, 1, prefix_bytes.size()));
+                let ?prefix = Text.decodeUtf8(Utils.slice_blob(prefix_bytes, 1, prefix_bytes.size()));
 
                 assert Text.endsWith(prefix, #text("this might be "));
 

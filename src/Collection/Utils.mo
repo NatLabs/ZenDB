@@ -31,6 +31,7 @@ import Candid "mo:serde@3.3.2/Candid";
 import Itertools "mo:itertools@0.2.2/Iter";
 import RevIter "mo:itertools@0.2.2/RevIter";
 import BitMap "mo:bit-map@0.1.2";
+import ByteUtils "mo:byte-utils@0.1.1";
 
 import MemoryBTree "mo:memory-collection@0.3.2/MemoryBTree/Stable";
 import TypeUtils "mo:memory-collection@0.3.2/TypeUtils";
@@ -95,30 +96,33 @@ module CollectionUtils {
         };
     };
 
-    public func get_index_key_utils() : TypeUtils.TypeUtils<[T.CandidQuery]> {
-        Orchid.Orchid;
+    public func convert_bitmap_8_byte_to_document_id(collection : StableCollection, bitmap_value : Nat) : T.DocumentId {
+        let n64 = Nat64.fromNat(bitmap_value);
+
+        let n_bytes = ByteUtils.BigEndian.fromNat64(n64);
+
+        Blob.fromArray([
+            collection.instance_id[0],
+            collection.instance_id[1],
+            collection.instance_id[2],
+            collection.instance_id[3],
+            n_bytes[0],
+            n_bytes[1],
+            n_bytes[2],
+            n_bytes[3],
+            n_bytes[4],
+            n_bytes[5],
+            n_bytes[6],
+            n_bytes[7],
+        ]);
+
     };
 
-    public func get_index_data_utils(collection : StableCollection) : T.BTreeUtils<[T.CandidQuery], T.DocumentId> {
-        switch (collection.memory_type) {
-            case (#stableMemory(_)) {
-                #stableMemory(MemoryBTree.createUtils<[T.CandidQuery], T.DocumentId>(Orchid.Orchid, TypeUtils.Nat));
-            };
-            case (#heap(_)) {
-                #heap({
-                    blobify = Orchid.Orchid.blobify;
-                    cmp = Orchid.Orchid.btree_cmp;
-                });
-            };
-        };
-
-    };
-
-    public func getMainBtreeUtils(collection : StableCollection) : T.BTreeUtils<Nat, T.Document> {
+    public func getMainBtreeUtils(collection : StableCollection) : T.BTreeUtils<T.DocumentId, T.Document> {
         DocumentStore.getBtreeUtils(collection.documents);
     };
 
-    public func getIndexColumns(collection : T.StableCollection, index_key_details : [(Text, SortDirection)], id : Nat, candid_map : T.CandidMap) : ?[Candid] {
+    public func getIndexColumns(collection : T.StableCollection, index_key_details : [(Text, SortDirection)], document_id : T.DocumentId, candid_map : T.CandidMap) : ?[Candid] {
         let buffer = Buffer.Buffer<Candid>(8);
 
         var field_columns_excluding_document_id = 0;
@@ -130,17 +134,17 @@ module CollectionUtils {
         for ((index_key, dir) in index_key_details.vals()) {
             if (index_key == C.UNIQUE_INDEX_NULL_EXEMPT_ID) {
                 let val = if (null_option_field_value_count == option_field_type_count) {
-                    #Nat(id); // use the document id to ensure the key is unique in the index
+                    #Blob(document_id); // use the document id to ensure the key is unique in the index
                 } else {
                     // if at least one optional field has a value, we don't need to exempt the key from the btree's uniqueness restriction
                     // so we can set the value to a dummy value
-                    #Nat(0);
+                    #Blob("" : Blob);
                 };
 
                 buffer.add(val)
 
             } else if (index_key == C.DOCUMENT_ID) {
-                buffer.add(#Nat(id));
+                buffer.add(#Blob(document_id));
             } else {
                 field_columns_excluding_document_id += 1;
 
@@ -180,7 +184,7 @@ module CollectionUtils {
         Logger.lazyDebug(
             collection.logger,
             func() : Text {
-                "Retrieved index key values (" # debug_show (indexKeyValues) # ") for index key details (" # debug_show (index_key_details) # ") for id [" # debug_show id # "] in collection (" # debug_show collection.name # ")";
+                "Retrieved index key values (" # debug_show (indexKeyValues) # ") for index key details (" # debug_show (index_key_details) # ") for id [" # debug_show document_id # "] in collection (" # debug_show collection.name # ")";
             },
         );
 
@@ -188,13 +192,13 @@ module CollectionUtils {
 
     };
 
-    public func lookupDocument<Record>(collection : T.StableCollection, blobify : T.InternalCandify<Record>, id : Nat) : Record {
+    public func lookupDocument<Record>(collection : T.StableCollection, blobify : T.InternalCandify<Record>, id : T.DocumentId) : Record {
         let ?documentDetails = DocumentStore.get(collection.documents, DocumentStore.getBtreeUtils(collection.documents), id) else Debug.trap("lookupDocument: document not found for id: " # debug_show id);
         let document = blobify.from_blob(documentDetails);
         document;
     };
 
-    public func lookupCandidBlob(collection : StableCollection, id : Nat) : Blob {
+    public func lookupCandidBlob(collection : StableCollection, id : T.DocumentId) : Blob {
         let ?documentDetails : ?Blob = DocumentStore.get(collection.documents, DocumentStore.getBtreeUtils(collection.documents), id) else Debug.trap("lookupCandidBlob: document not found for id: " # debug_show id);
         documentDetails;
     };
@@ -206,21 +210,14 @@ module CollectionUtils {
         candid;
     };
 
-    public func lookupCandidDocument(collection : StableCollection, id : Nat) : ?Candid.Candid {
+    public func lookupCandidDocument(collection : StableCollection, id : T.DocumentId) : ?Candid.Candid {
         let ?document_details = DocumentStore.get(collection.documents, DocumentStore.getBtreeUtils(collection.documents), id) else return null;
         let candid = decodeCandidBlob(collection, document_details);
 
         ?candid;
     };
 
-    // public func lookup_candid_map_bytes(collection : StableCollection, id : Nat) : ?[Nat8] {
-    //     let ?document_details = MemoryBTree.get(collection.documents, getMainBtreeUtils(collection), id) else return null;
-    //     let bytes = document_details.1;
-
-    //     ?bytes;
-    // };
-
-    public func candidMapFilterCondition(collection : StableCollection, id : Nat, candid_document : Candid.Candid, lower : [(Text, ?T.CandidInclusivityQuery)], upper : [(Text, ?T.CandidInclusivityQuery)]) : Bool {
+    public func candidMapFilterCondition(collection : StableCollection, id : T.DocumentId, candid_document : Candid.Candid, lower : [(Text, ?T.CandidInclusivityQuery)], upper : [(Text, ?T.CandidInclusivityQuery)]) : Bool {
 
         let candid_map = CandidMap.new(collection.schema_map, id, candid_document);
 
@@ -266,66 +263,16 @@ module CollectionUtils {
 
     };
 
-    public func documentIdsFromIndexIntervals(collection : StableCollection, index_name : Text, _intervals : [(Nat, Nat)], sorted_in_reverse : Bool) : Iter<Nat> {
-
-        let intervals = if (sorted_in_reverse) {
-            Array.reverse(_intervals);
-        } else {
-            _intervals;
-        };
-
-        // Debug.print("documentIdsFromIndexIntervals: intervals: " # debug_show intervals);
-
-        if (index_name == C.DOCUMENT_ID) {
-            let main_btree_utils = DocumentStore.getBtreeUtils(collection.documents);
-
-            let document_ids = Itertools.flatten(
-                Iter.map(
-                    intervals.vals(),
-                    func(interval : (Nat, Nat)) : Iter<(Nat)> {
-                        let document_ids = DocumentStore.range_keys(collection.documents, main_btree_utils, interval.0, interval.1);
-
-                        if (sorted_in_reverse) {
-                            return document_ids.rev();
-                        };
-
-                        document_ids;
-                    },
-                )
-            );
-
-            return document_ids;
-        };
-
-        let ?index = Map.get(collection.indexes, thash, index_name) else Debug.trap("Unreachable: IndexMap not found for index: " # index_name);
-
-        let index_data_utils = CollectionUtils.get_index_data_utils(collection);
-
-        Itertools.flatten(
-            Iter.map(
-                intervals.vals(),
-                func(interval : (Nat, Nat)) : Iter<(Nat)> {
-                    let document_ids = BTree.range_vals(index.data, index_data_utils, interval.0, interval.1);
-
-                    if (sorted_in_reverse) {
-                        return document_ids.rev();
-                    };
-                    document_ids;
-                },
-            )
-        );
-    };
-
     public func multiFilter(
         collection : StableCollection,
-        documents : Iter<Nat>,
+        documents : Iter<T.DocumentId>,
         bounds : Buffer.Buffer<(lower : [(Text, ?T.CandidInclusivityQuery)], upper : [(Text, ?T.CandidInclusivityQuery)])>,
         is_and : Bool,
-    ) : Iter<Nat> {
+    ) : Iter<T.DocumentId> {
 
-        Iter.filter<Nat>(
+        Iter.filter<T.DocumentId>(
             documents,
-            func(id : Nat) : Bool {
+            func(id : T.DocumentId) : Bool {
                 let ?candid = CollectionUtils.lookupCandidDocument(collection, id) else Debug.trap("multiFilter: candid_map_bytes not found");
 
                 func filter_fn(

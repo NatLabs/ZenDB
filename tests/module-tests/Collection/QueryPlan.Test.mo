@@ -46,7 +46,8 @@ let indexible_fields = [
 suite(
     "Query Plan Tests",
     func() {
-        let zendb = ZenDB.newStableStore(null);
+        let canister_id = fuzz.principal.randomPrincipal(29);
+        let zendb = ZenDB.newStableStore(canister_id, null);
         let db = ZenDB.launchDefaultDB(zendb);
 
         type RecordWithAllTypes = {
@@ -109,7 +110,7 @@ suite(
 
                 let stable_collection = collection._get_stable_state();
 
-                let query_plan = QueryPlan.createQueryPlan(
+                let query_plan = QueryPlan.create_query_plan(
                     stable_collection,
                     ZenDB.QueryBuilder().Where(
                         "text",
@@ -148,7 +149,7 @@ suite(
 
                 let stable_collection = collection._get_stable_state();
 
-                let query_plan = QueryPlan.createQueryPlan(
+                let query_plan = QueryPlan.create_query_plan(
                     stable_collection,
                     ZenDB.QueryBuilder().Where(
                         "text",

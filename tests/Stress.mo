@@ -17,14 +17,16 @@ actor {
 
     let limit = 10_000;
 
+    let canister_id = fuzz.principal.randomPrincipal(29);
     stable let sstore = ZenDB.newStableStore(
+        canister_id,
         ?{
             logging = ?{
                 log_level = #Error;
                 is_running_locally = true;
             };
             memory_type = ?(#stableMemory);
-        }
+        },
     );
 
     let zendb = ZenDB.launchDefaultDB(sstore);

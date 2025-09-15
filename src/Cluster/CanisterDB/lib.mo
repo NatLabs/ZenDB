@@ -14,6 +14,7 @@ import StableCollection "../../Collection/StableCollection";
 import RolesAuth "../RolesAuth";
 import CollectionUtils "../../Collection/Utils";
 import Utils "../../Utils";
+import TypeMigrations "../../TypeMigrations";
 
 shared ({ caller = owner }) persistent actor class CanisterDB() = this_canister {
 
@@ -60,7 +61,7 @@ shared ({ caller = owner }) persistent actor class CanisterDB() = this_canister 
         }
     );
 
-    stable var zendb_instance = ZenDB.newStableStore(null);
+    stable var zendb_instance = ZenDB.newStableStore(canister_id, null);
 
     public shared query func zendb_api_version() : async Text {
         "0.0.1";
@@ -135,11 +136,12 @@ shared ({ caller = owner }) persistent actor class CanisterDB() = this_canister 
             caller,
             Permissions.MANAGE,
             func() : (ZT.Result<(), Text>) {
-                let ?db = Map.get<Text, ZenDB.Types.StableDatabase>(zendb_instance.databases, Map.thash, db_name) else {
+                let sstore = TypeMigrations.get_current_state(zendb_instance);
+                let ?db = Map.get<Text, ZT.StableDatabase>(sstore.databases, Map.thash, db_name) else {
                     return #err("Database '" # db_name # "' does not exist");
                 };
 
-                let collection = StableDatabase.createCollection(db, collection_name, schema, null);
+                let collection = StableDatabase.create_collection(db, collection_name, schema, null);
 
                 Result.mapOk<ZT.StableCollection, (), Text>(collection, func(_) { () });
             },
@@ -148,11 +150,12 @@ shared ({ caller = owner }) persistent actor class CanisterDB() = this_canister 
     };
 
     func get_collection(db_name : Text, collection_name : Text) : ZT.Result<ZT.StableCollection, Text> {
-        let ?db = Map.get<Text, ZenDB.Types.StableDatabase>(zendb_instance.databases, Map.thash, db_name) else {
+        let sstore = TypeMigrations.get_current_state(zendb_instance);
+        let ?db = Map.get<Text, ZT.StableDatabase>(sstore.databases, Map.thash, db_name) else {
             return #err("Database '" # db_name # "' does not exist");
         };
 
-        let #ok(collection) = StableDatabase.getCollection(db, collection_name) else {
+        let #ok(collection) = StableDatabase.get_collection(db, collection_name) else {
             return #err("Collection '" # collection_name # "' does not exist in database '" # db_name # "'");
         };
 
@@ -193,11 +196,11 @@ shared ({ caller = owner }) persistent actor class CanisterDB() = this_canister 
         );
     };
 
-    public shared query ({ caller }) func zendb_collection_search(db_name : Text, collection_name : Text, stable_query : ZT.StableQuery) : async (ZT.Result<[(Nat, Blob)], Text>) {
+    public shared query ({ caller }) func zendb_collection_search(db_name : Text, collection_name : Text, stable_query : ZT.StableQuery) : async (ZT.Result<[(ZT.DocumentId, Blob)], Text>) {
         auth.allow_rs(
             caller,
             Permissions.READ,
-            func() : (ZT.Result<[(Nat, Blob)], Text>) {
+            func() : (ZT.Result<[(ZT.DocumentId, Blob)], Text>) {
 
                 let collection_res = get_collection(db_name, collection_name);
                 let #ok(collection) = collection_res else return Utils.send_error(collection_res);
@@ -217,7 +220,6 @@ shared ({ caller = owner }) persistent actor class CanisterDB() = this_canister 
                 ZenDB.stats(zendb_instance);
             },
         );
-
     };
 
     public shared query ({ caller }) func zendb_collection_get_schema(db_name : Text, collection_name : Text) : async ZT.Result<ZT.Schema, Text> {
@@ -233,7 +235,7 @@ shared ({ caller = owner }) persistent actor class CanisterDB() = this_canister 
         );
     };
 
-    public shared ({ caller }) func zendb_collection_replace_document(db_name : Text, collection_name : Text, id : Nat, document_blob : Blob) : async ZT.Result<(), Text> {
+    public shared ({ caller }) func zendb_collection_replace_document(db_name : Text, collection_name : Text, id : ZT.DocumentId, document_blob : Blob) : async ZT.Result<(), Text> {
         auth.allow(
             caller,
             Permissions.WRITE,
@@ -243,13 +245,13 @@ shared ({ caller = owner }) persistent actor class CanisterDB() = this_canister 
 
                 let main_btree_utils = CollectionUtils.getMainBtreeUtils(collection);
 
-                StableCollection.replaceById(collection, main_btree_utils, id, document_blob);
+                StableCollection.replace_by_id(collection, main_btree_utils, id, document_blob);
             },
         );
 
     };
 
-    public shared ({ caller }) func zendb_collection_delete_document_by_id(db_name : Text, collection_name : Text, id : Nat) : async ZT.Result<Blob, Text> {
+    public shared ({ caller }) func zendb_collection_delete_document_by_id(db_name : Text, collection_name : Text, id : ZT.DocumentId) : async ZT.Result<Blob, Text> {
         auth.allow(
             caller,
             Permissions.WRITE,
@@ -259,16 +261,16 @@ shared ({ caller = owner }) persistent actor class CanisterDB() = this_canister 
 
                 let main_btree_utils = CollectionUtils.getMainBtreeUtils(collection);
 
-                StableCollection.deleteById(collection, main_btree_utils, id);
+                StableCollection.delete_by_id(collection, main_btree_utils, id);
             },
         );
     };
 
-    // public shared ({ caller }) func zendb_collection_delete_document(db_name : Text, collection_name : Text, db_query : ZT.StableQuery) : async ZT.Result<[(Nat, Blob)], Text> {
+    // public shared ({ caller }) func zendb_collection_delete_document(db_name : Text, collection_name : Text, db_query : ZT.StableQuery) : async ZT.Result<[(ZT.DocumentId, Blob)], Text> {
     //     auth.allow(
     //         caller,
     //         Permissions.WRITE,
-    //         func() : (ZT.Result<[(Nat, Blob)], Text>) {
+    //         func() : (ZT.Result<[(ZT.DocumentId, Blob)], Text>) {
     //             let collection_res = get_collection(db_name, collection_name);
     //             let #ok(collection) = collection_res else return Utils.send_error(collection_res);
 
@@ -279,7 +281,7 @@ shared ({ caller = owner }) persistent actor class CanisterDB() = this_canister 
     //     );
     // };
 
-    public shared ({ caller }) func zendb_collection_update_document_by_id(db_name : Text, collection_name : Text, id : Nat, update_operations : [(Text, ZT.FieldUpdateOperations)]) : async ZT.Result<(), Text> {
+    public shared ({ caller }) func zendb_collection_update_document_by_id(db_name : Text, collection_name : Text, id : ZT.DocumentId, update_operations : [(Text, ZT.FieldUpdateOperations)]) : async ZT.Result<(), Text> {
         auth.allow(
             caller,
             Permissions.WRITE,
@@ -289,16 +291,16 @@ shared ({ caller = owner }) persistent actor class CanisterDB() = this_canister 
 
                 let main_btree_utils = CollectionUtils.getMainBtreeUtils(collection);
 
-                StableCollection.updateById(collection, main_btree_utils, id, update_operations);
+                StableCollection.update_by_id(collection, main_btree_utils, id, update_operations);
             },
         );
     };
 
-    // public shared ({ caller }) func zendb_collection_update_documents(db_name : Text, collection_name : Text, stable_query : ZT.StableQuery, update_operations : [(Text, ZT.FieldUpdateOperations)]) : async ZT.Result<[Nat], Text> {
+    // public shared ({ caller }) func zendb_collection_update_documents(db_name : Text, collection_name : Text, stable_query : ZT.StableQuery, update_operations : [(Text, ZT.FieldUpdateOperations)]) : async ZT.Result<[ZT.DocumentId], Text> {
     //     auth.allow(
     //         caller,
     //         Permissions.WRITE,
-    //         func() : (ZT.Result<[Nat], Text>) {
+    //         func() : (ZT.Result<[ZT.DocumentId], Text>) {
     //             let collection_res = get_collection(db_name, collection_name);
     //             let #ok(collection) = collection_res else return Utils.send_error(collection_res);
 
@@ -320,11 +322,11 @@ shared ({ caller = owner }) persistent actor class CanisterDB() = this_canister 
                 let main_btree_utils = CollectionUtils.getMainBtreeUtils(collection);
 
                 let is_unique = switch (options) {
-                    case (?options) options.isUnique;
+                    case (?options) options.is_unique;
                     case (null) false;
                 };
 
-                let res = StableCollection.createIndex(collection, main_btree_utils, index_name, index_fields, is_unique);
+                let res = StableCollection.create_index(collection, main_btree_utils, index_name, index_fields, is_unique);
                 Result.mapOk<Any, (), Text>(res, func(_) { () });
             },
         );
@@ -340,7 +342,7 @@ shared ({ caller = owner }) persistent actor class CanisterDB() = this_canister 
 
                 let main_btree_utils = CollectionUtils.getMainBtreeUtils(collection);
 
-                StableCollection.deleteIndex(collection, main_btree_utils, index_name);
+                StableCollection.delete_index(collection, main_btree_utils, index_name);
             },
         );
     };
@@ -355,8 +357,20 @@ shared ({ caller = owner }) persistent actor class CanisterDB() = this_canister 
 
                 let main_btree_utils = CollectionUtils.getMainBtreeUtils(collection);
 
-                StableCollection.repopulateIndex(collection, main_btree_utils, index_name);
+                StableCollection.repopulate_index(collection, main_btree_utils, index_name);
             },
         );
     };
+
+    /// Cluster management functions
+    /// Need to implement to be compatible with the ClusterServiceApi
+    public shared query func zendb_list_canisters() : async [ClusterTypes.CanisterInfo] {
+        [];
+    };
+
+    public shared query func zendb_canister_stats() : async ([ZT.InstanceStats]) {
+        [];
+
+    };
+
 };

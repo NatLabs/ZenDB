@@ -15,6 +15,7 @@ import Option "mo:base@0.16.0/Option";
 import Hash "mo:base@0.16.0/Hash";
 import Float "mo:base@0.16.0/Float";
 import Int "mo:base@0.16.0/Int";
+import Blob "mo:base@0.16.0/Blob";
 
 import Map "mo:map@9.0.1/Map";
 import Set "mo:map@9.0.1/Set";
@@ -24,6 +25,7 @@ import Candid "mo:serde@3.3.2/Candid";
 import Itertools "mo:itertools@0.2.2/Iter";
 import RevIter "mo:itertools@0.2.2/RevIter";
 import Vector "mo:vector@0.4.2";
+import ByteUtils "mo:byte-utils@0.1.1";
 import Ids "Ids";
 
 import TypeUtils "mo:memory-collection@0.3.2/TypeUtils";
@@ -123,10 +125,20 @@ module {
         memory_type = ?(#stableMemory);
     };
 
-    public func newStableStore(opt_settings : ?Settings) : T.VersionedStableStore {
+    public func newStableStore(canister_id : Principal, opt_settings : ?Settings) : T.VersionedStableStore {
         let settings = Option.get(opt_settings, defaultSettings);
 
+        let canister_id_blob = Principal.toBlob(canister_id);
+        let instance_id = Blob.fromArray([
+            canister_id_blob[0],
+            canister_id_blob[1],
+            canister_id_blob[2],
+            canister_id_blob[3],
+        ]);
+
         let zendb : T.StableStore = {
+            canister_id;
+            instance_id;
             ids = Ids.new();
             databases = Map.new<Text, T.StableDatabase>();
             memory_type = Option.get(settings.memory_type, #heap);
@@ -137,6 +149,7 @@ module {
         let default_db : T.StableDatabase = {
             name = "default";
             ids = zendb.ids;
+            instance_id = zendb.instance_id;
             collections = Map.new<Text, T.StableCollection>();
             freed_btrees = zendb.freed_btrees;
             logger = zendb.logger;
@@ -173,6 +186,7 @@ module {
         let db : T.StableDatabase = {
             name = db_name;
             ids = sstore.ids;
+            instance_id = sstore.instance_id;
             collections = Map.new<Text, T.StableCollection>();
             freed_btrees = sstore.freed_btrees;
             logger = sstore.logger;

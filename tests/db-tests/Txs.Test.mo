@@ -18,6 +18,7 @@ import BitMap "mo:bit-map@0.1.2";
 import ZenDB "../../src";
 import TestUtils "../test-utils/TestUtils";
 import ZenDBSuite "../test-utils/TestFramework";
+import Utils "../../src/Utils";
 
 let fuzz = Fuzz.fromSeed(0x7eadbeef);
 let { QueryBuilder } = ZenDB;
@@ -183,7 +184,7 @@ ZenDBSuite.newSuite(
         assert txs.size() == limit;
 
         var size = 0;
-        let bitmap = BitMap.fromIter(txs.keys());
+        let bitmap = BitMap.fromIter(Iter.map(txs.keys(), Utils.convert_last_8_bytes_to_nat));
 
         Debug.print("bitmap: " # debug_show bitmap.size());
         assert bitmap.size() == limit;
@@ -291,7 +292,7 @@ ZenDBSuite.newSuite(
 
         };
 
-        func get_txs(options : Options) : [(Nat, Tx)] {
+        func get_txs(options : Options) : [(ZenDB.Types.DocumentId, Tx)] {
             let Query = options_to_query(options);
 
             let query_res = txs.search(Query);
@@ -301,7 +302,7 @@ ZenDBSuite.newSuite(
 
         };
 
-        func get_txs_from_query(db_query : ZenDB.QueryBuilder) : [(Nat, Tx)] {
+        func get_txs_from_query(db_query : ZenDB.QueryBuilder) : [(ZenDB.Types.DocumentId, Tx)] {
 
             let query_res = txs.search(db_query);
             let #ok(matching_txs) = query_res else Debug.trap("get_txs failed: " # debug_show query_res);
@@ -310,12 +311,12 @@ ZenDBSuite.newSuite(
 
         };
 
-        func skip_limit_paginated_query(db_query : ZenDB.QueryBuilder, pagination_limit : Nat) : [(Nat, Tx)] {
+        func skip_limit_paginated_query(db_query : ZenDB.QueryBuilder, pagination_limit : Nat) : [(ZenDB.Types.DocumentId, Tx)] {
 
             ignore db_query.Limit(pagination_limit);
             let #ok(matching_txs) = txs.search(db_query);
-            let bitmap = BitMap.fromIter(Iter.map<(Nat, Tx), Nat>(matching_txs.vals(), func((id, _) : (Nat, Tx)) : Nat = id));
-            let documents = Buffer.fromArray<(Nat, Tx)>(matching_txs);
+            let bitmap = BitMap.fromIter(Iter.map(matching_txs.vals(), func((id, _) : (ZenDB.Types.DocumentId, Tx)) : Nat = Utils.convert_last_8_bytes_to_nat(id)));
+            let documents = Buffer.fromArray<ZenDB.Types.WrapId<Tx>>(matching_txs);
             var batch_size = documents.size();
 
             label skip_limit_pagination while (batch_size > 0) {
@@ -332,11 +333,12 @@ ZenDBSuite.newSuite(
 
                 for ((id, tx) in matching_txs.vals()) {
                     documents.add((id, tx));
+                    let nat_id = Utils.convert_last_8_bytes_to_nat(id);
 
-                    if (bitmap.get(id)) {
+                    if (bitmap.get(nat_id)) {
                         Debug.trap("Duplicate entry for id " # debug_show id);
                     } else {
-                        bitmap.set(id, true);
+                        bitmap.set(nat_id, true);
                     };
                 };
 
@@ -348,7 +350,7 @@ ZenDBSuite.newSuite(
 
         };
 
-        // func cursor_paginated_query(db_query : ZenDB.QueryBuilder, pagination_limit : Nat) : [(Nat, Tx)] {
+        // func cursor_paginated_query(db_query : ZenDB.QueryBuilder, pagination_limit : Nat) : [(ZenDB.Types.DocumentId, Tx)] {
 
         //     ignore db_query.Limit(pagination_limit);
         //     let #ok(matching_txs) = txs.search(db_query);
@@ -818,7 +820,7 @@ ZenDBSuite.newSuite(
 
                             TestUtils.validate_documents(
                                 input_txs,
-                                results,
+                                Array.map<(ZenDB.Types.DocumentId, Tx), (Nat, Tx)>(results, func((id, tx)) = (Utils.convert_last_8_bytes_to_nat(id), tx)),
                                 q.check_if_result_matches_query,
                                 func(tx : Tx) : Text = debug_show tx,
                             );
@@ -843,7 +845,7 @@ ZenDBSuite.newSuite(
 
                             TestUtils.validate_documents(
                                 input_txs,
-                                paginated_results,
+                                Array.map<(ZenDB.Types.DocumentId, Tx), (Nat, Tx)>(paginated_results, func((id, tx)) = (Utils.convert_last_8_bytes_to_nat(id), tx)),
                                 q.check_if_result_matches_query,
                                 func(tx : Tx) : Text = debug_show tx,
                             );
@@ -871,7 +873,7 @@ ZenDBSuite.newSuite(
 
                             TestUtils.validate_sorted_documents(
                                 input_txs,
-                                results,
+                                Array.map<(ZenDB.Types.DocumentId, Tx), (Nat, Tx)>(results, func((id, tx)) = (Utils.convert_last_8_bytes_to_nat(id), tx)),
                                 q.check_if_result_matches_query,
                                 q.check_if_results_are_sorted,
                                 q.display_document,
@@ -899,7 +901,7 @@ ZenDBSuite.newSuite(
 
                             TestUtils.validate_sorted_documents(
                                 input_txs,
-                                paginated_results,
+                                Array.map<(ZenDB.Types.DocumentId, Tx), (Nat, Tx)>(paginated_results, func((id, tx)) = (Utils.convert_last_8_bytes_to_nat(id), tx)),
                                 q.check_if_result_matches_query,
                                 q.check_if_results_are_sorted,
                                 q.display_document,

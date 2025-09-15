@@ -69,9 +69,9 @@ shared ({ caller = owner }) persistent actor class ClusterManager(
         public func put(canisters_map : CanistersMap, canister_id : Principal, canister_db_stats : ClusterTypes.CanisterStats) : ?ClusterTypes.CanisterInfo {
 
             let is_full = (
-                canister_db_stats.totalAllocatedBytes >= get_max_canister_size_in_bytes(sharding_strategy)
+                canister_db_stats.total_allocated_bytes >= get_max_canister_size_in_bytes(sharding_strategy)
             ) and (
-                (Float.fromInt(canister_db_stats.totalUsedBytes) / Float.fromInt(canister_db_stats.totalAllocatedBytes)) > get_min_threshold_percent(sharding_strategy)
+                (Float.fromInt(canister_db_stats.total_used_bytes) / Float.fromInt(canister_db_stats.total_allocated_bytes)) > get_min_threshold_percent(sharding_strategy)
             );
 
             let opt_existing_info = Map.get<Principal, ClusterTypes.CanisterInfo>(canisters_map.principal_map, Map.phash, canister_id);
@@ -91,12 +91,12 @@ shared ({ caller = owner }) persistent actor class ClusterManager(
             let canister_info = {
                 id = canister_id;
                 status = if (is_full) { #full } else { #active };
-                total_allocated_bytes = canister_db_stats.totalAllocatedBytes;
-                total_used_bytes = canister_db_stats.totalUsedBytes;
-                total_free_bytes = canister_db_stats.totalFreeBytes;
-                total_data_bytes = canister_db_stats.totalDataBytes;
-                total_metadata_bytes = canister_db_stats.totalMetadataBytes;
-                total_index_data_bytes = canister_db_stats.totalIndexDataBytes;
+                total_allocated_bytes = canister_db_stats.total_allocated_bytes;
+                total_used_bytes = canister_db_stats.total_used_bytes;
+                total_free_bytes = canister_db_stats.total_free_bytes;
+                total_data_bytes = canister_db_stats.total_data_bytes;
+                total_metadata_bytes = canister_db_stats.total_metadata_bytes;
+                total_index_data_bytes = canister_db_stats.total_index_store_bytes;
             };
 
             ignore Map.put<Principal, ClusterTypes.CanisterInfo>(canisters_map.principal_map, Map.phash, canister_id, canister_info);
@@ -148,9 +148,9 @@ shared ({ caller = owner }) persistent actor class ClusterManager(
 
             ignore CanistersMap.put(canisters, canister_id, canister_db_stats);
 
-            for (db_stat in canister_db_stats.databaseStats.vals()) {
+            for (db_stat in canister_db_stats.database_stats.vals()) {
 
-                for (collection_stat in db_stat.collectionStats.vals()) {
+                for (collection_stat in db_stat.collection_stats.vals()) {
                     let collection_layout : ClusterTypes.CollectionLayout = {
                         name = collection_stat.name;
                         schema = collection_stat.schema;
@@ -735,8 +735,24 @@ shared ({ caller = owner }) persistent actor class ClusterManager(
         };
     };
 
-    public query func zendb_api_version() : async Text {
+    public shared query func zendb_api_version() : async Text {
         "0.0.1";
+    };
+
+    public shared query func zendb_list_canisters() : async [ClusterTypes.CanisterInfo] {
+        Iter.toArray(CanistersMap.vals(canisters));
+    };
+
+    public shared query func zendb_canister_stats() : async [ZT.CanisterStats] {
+        let buffer = Buffer.Buffer<ZT.CanisterStats>(8);
+
+        for (canister_info in CanistersMap.vals(canisters)) {
+            let canister_db : CanisterDB.CanisterDB = actor (Principal.toText(canister_info.id));
+            let canister_db_stats = await canister_db.zendb_stats();
+            buffer.add(canister_db_stats);
+        };
+
+        Buffer.toArray(buffer);
     };
 
     func update_all_canister_info() : async () {

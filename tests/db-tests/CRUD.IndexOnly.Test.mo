@@ -17,6 +17,7 @@ import ZenDB "../../src";
 import CollectionUtils "../../src/Collection/Utils";
 import CandidMap "../../src/CandidMap";
 import Index "../../src/Collection/Index";
+import Utils "../../src/Utils";
 
 import ZenDBSuite "../test-utils/TestFramework";
 
@@ -130,7 +131,7 @@ ZenDBSuite.newSuite(
 
                 let #ok(crud_collection) = zendb.createCollection("CRUD", RecordWithAllTypesSchema, candify_document, null) else return assert false;
                 let schema_map = crud_collection._get_schema_map();
-                let candid_maps = Map.new<Nat, ZenDB.Types.CandidMap>();
+                let candid_maps = Map.new<ZenDB.Types.DocumentId, ZenDB.Types.CandidMap>();
 
                 for (field in indexible_fields.vals()) {
                     let #ok(_) = suite_utils.createIndex(crud_collection.name(), field # "_idx", [(field, #Ascending)], null) else return assert false;
@@ -149,7 +150,7 @@ ZenDBSuite.newSuite(
                             );
 
                             let candid_map = CandidMap.new(crud_collection._get_schema_map(), id, candid_document);
-                            ignore Map.put(candid_maps, Map.nhash, id, candid_map);
+                            ignore Map.put(candid_maps, Map.bhash, id, candid_map);
                         };
 
                     },
@@ -160,9 +161,9 @@ ZenDBSuite.newSuite(
                     func() {
                         for ((id, document) in crud_collection.entries()) {
 
-                            let ?candid_map = Map.get(candid_maps, Map.nhash, id) else return assert false;
+                            let ?candid_map = Map.get(candid_maps, Map.bhash, id) else return assert false;
 
-                            assert CandidMap.get(candid_map, schema_map, ZenDB.Constants.DOCUMENT_ID) == ?#Nat(id);
+                            assert CandidMap.get(candid_map, schema_map, ZenDB.Constants.DOCUMENT_ID) == ?#Blob(id);
 
                             for (field in indexible_fields.vals()) {
                                 let ?field_value = CandidMap.get(candid_map, schema_map, field) else return assert false;
@@ -174,7 +175,7 @@ ZenDBSuite.newSuite(
                                         #eq(field_value),
                                     ).And(
                                         ZenDB.Constants.DOCUMENT_ID,
-                                        #eq(#Nat(id)),
+                                        #eq(#Blob(id)),
                                     )
                                 ) else return assert false;
 

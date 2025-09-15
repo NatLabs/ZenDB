@@ -44,7 +44,7 @@ module {
         collection : T.StableCollection,
         query_statements : [T.ZenQueryLang],
         sort_column : ?(Text, T.SortDirection),
-        cursor_record : ?(Nat, Candid.Candid),
+        cursor_record : ?(T.DocumentId, Candid.Candid),
     ) : QueryPlan {
         Logger.lazyDebug(
             collection.logger,
@@ -279,7 +279,7 @@ module {
         collection : T.StableCollection,
         query_statements : [T.ZenQueryLang],
         sort_column : ?(Text, T.SortDirection),
-        cursor_record : ?(Nat, Candid.Candid),
+        cursor_record : ?(T.DocumentId, Candid.Candid),
         parent_simple_and_operations : [(Text, T.ZqlOperators)],
     ) : QueryPlan {
         Logger.lazyDebug(
@@ -417,7 +417,7 @@ module {
         collection : T.StableCollection,
         db_query : ZenQueryLang,
         sort_column : ?(Text, T.SortDirection),
-        cursor_record : ?(Nat, Candid.Candid),
+        cursor_record : ?(T.DocumentId, Candid.Candid),
     ) : QueryPlan {
         Logger.lazyInfo(
             collection.logger,
