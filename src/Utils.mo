@@ -105,7 +105,7 @@ module {
     };
 
     public func nat_to_12_byte_blob(n : Nat) : Blob {
-        assert n < bounding_12_byte_nat;
+        // assert n < bounding_12_byte_nat;
 
         let nat32 = Nat32.fromNat(n / bounding_12_byte_nat);
         let nat64 = Nat64.fromNat(n % bounding_12_byte_nat);

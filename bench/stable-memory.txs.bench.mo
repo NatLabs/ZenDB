@@ -93,7 +93,7 @@ module {
 
         ]);
 
-        let limit = 1_000;
+        let limit = 10_000;
 
         let txs_benchmarks = TxsBenchUtils.TxsBenchmarks(limit);
 

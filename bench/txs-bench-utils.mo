@@ -15,6 +15,7 @@ import Itertools "mo:itertools@0.2.2/Iter";
 import BitMap "mo:bit-map@0.1.2";
 
 import ZenDB "../src";
+import Utils "../src/Utils";
 
 module TxsBenchUtils {
 
@@ -111,7 +112,13 @@ module TxsBenchUtils {
         ("ts", #Nat),
         (
             "tx",
-            #Record([("amt", #Nat), ("from", #Option(AccountSchema)), ("to", #Option(AccountSchema)), ("spender", #Option(AccountSchema)), ("memo", #Option(#Blob))]),
+            #Record([
+                ("amt", #Nat),
+                ("from", #Option(AccountSchema)),
+                ("to", #Option(AccountSchema)),
+                ("spender", #Option(AccountSchema)),
+                ("memo", #Option(#Blob)),
+            ]),
         ),
         ("fee", #Option(#Nat)),
     ]);
@@ -227,7 +234,7 @@ module TxsBenchUtils {
         );
 
         let predefined_txs = Buffer.Buffer<Tx>(limit);
-        let tx_ids = Buffer.Buffer<Nat>(limit);
+        let tx_ids = Buffer.Buffer<Blob>(limit);
 
         for (i in Iter.range(0, limit - 1)) {
             let tx = TxsBenchUtils.new_tx(fuzz, principals);
@@ -324,7 +331,7 @@ module TxsBenchUtils {
                         for (i in Iter.range(0, limit - 1)) {
                             let tx = inputs.get(i);
                             let #ok(id) = collection.insert(tx);
-                            tx_ids.add(id);
+                            tx_ids.add(Utils.nat_from_12_byte_blob(id));
                         };
 
                     };
@@ -506,14 +513,14 @@ module TxsBenchUtils {
                     case ("update(): single operation -> #add amt += 100") {
                         // Debug.print("tx_ids.size(): " # debug_show (tx_ids.size()));
                         for (i in Itertools.take(tx_ids.vals(), limit)) {
-                            let #ok(_) = collection.updateById(i, [("tx.amt", #add(#currValue, #Nat(100)))]);
+                            let #ok(_) = collection.updateById(Utils.nat_to_12_byte_blob(i), [("tx.amt", #add(#currValue, #Nat(100)))]);
                         };
                     };
 
                     case ("update(): multiple independent operations -> #add, #sub, #mul, #div on tx.amt") {
                         for (i in Itertools.take(tx_ids.vals(), limit)) {
                             let #ok(_) = collection.updateById(
-                                i,
+                                Utils.nat_to_12_byte_blob(i),
                                 [
                                     ("tx.amt", #add(#currValue, #Nat(100))),
                                     ("tx.amt", #sub(#currValue, #Nat(50))),
@@ -527,7 +534,7 @@ module TxsBenchUtils {
                     case ("update(): multiple nested operations -> #add, #sub, #mul, #div on tx.amt") {
                         for (i in Itertools.take(tx_ids.vals(), limit)) {
                             let #ok(_) = collection.updateById(
-                                i,
+                                Utils.nat_to_12_byte_blob(i),
                                 [("tx.amt", #div(#mul(#sub(#add(#currValue, #Nat(100)), #Nat(50)), #Nat(2)), #Nat(2)))],
                             );
                         };
@@ -536,7 +543,7 @@ module TxsBenchUtils {
                     case ("update(): multiple operations on multiple fields -> #add, #sub, #mul, #div on (tx.amt, ts, fee)") {
                         for (i in Itertools.take(tx_ids.vals(), limit)) {
                             let #ok(_) = collection.updateById(
-                                i,
+                                Utils.nat_to_12_byte_blob(i),
                                 [
                                     ("tx.amt", #add(#currValue, #Nat(100))),
                                     ("ts", #sub(#currValue, #Nat(50))),
@@ -549,13 +556,13 @@ module TxsBenchUtils {
 
                     case ("replace() -> replace half the tx with new tx") {
                         for (i in Itertools.take(tx_ids.vals(), limit)) {
-                            let #ok(_) = collection.replace(i, new_tx(fuzz, principals));
+                            let #ok(_) = collection.replace(Utils.nat_to_12_byte_blob(i), new_tx(fuzz, principals));
                         };
                     };
 
                     case ("delete()") {
                         for (i in Itertools.take(tx_ids.vals(), limit)) {
-                            let #ok(_) = collection.deleteById(i);
+                            let #ok(_) = collection.deleteById(Utils.nat_to_12_byte_blob(i));
                         };
                     };
 
@@ -799,12 +806,12 @@ module TxsBenchUtils {
             skip += documents.size();
         };
 
-        func skip_limit_skip_limit_paginated_query(db_query : ZenDB.QueryBuilder, pagination_limit : Nat) : [(Nat, Tx)] {
+        func skip_limit_skip_limit_paginated_query(db_query : ZenDB.QueryBuilder, pagination_limit : Nat) : [(Blob, Tx)] {
 
             ignore db_query.Limit(pagination_limit);
             let #ok(matching_txs) = txs.search(db_query);
-            let bitmap = BitMap.fromIter(Iter.map<(Nat, Tx), Nat>(matching_txs.vals(), func((id, _) : (Nat, Tx)) : Nat = id));
-            let documents = Buffer.fromArray<(Nat, Tx)>(matching_txs);
+            let bitmap = BitMap.fromIter(Iter.map<(Blob, Tx), Nat>(matching_txs.vals(), func((id, _) : (Blob, Tx)) : Nat = Utils.nat_from_12_byte_blob(id)));
+            let documents = Buffer.fromArray<(Blob, Tx)>(matching_txs);
             var batch_size = documents.size();
 
             label skip_limit_pagination while (batch_size > 0) {
@@ -819,10 +826,10 @@ module TxsBenchUtils {
                 for ((id, tx) in matching_txs.vals()) {
                     documents.add((id, tx));
 
-                    if (bitmap.get(id)) {
+                    if (bitmap.get(Utils.nat_from_12_byte_blob(id))) {
                         Debug.trap("Duplicate entry for id " # debug_show id);
                     } else {
-                        bitmap.set(id, true);
+                        bitmap.set(Utils.nat_from_12_byte_blob(id), true);
                     };
                 };
 
