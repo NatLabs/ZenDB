@@ -1,12 +1,13 @@
-import Debug "mo:base/Debug";
-import Text "mo:base/Text";
-import Array "mo:base/Array";
-import Char "mo:base/Char";
+import Debug "mo:base@0.16.0/Debug";
+import Text "mo:base@0.16.0/Text";
+import Array "mo:base@0.16.0/Array";
+import Char "mo:base@0.16.0/Char";
 
 import { test; suite } "mo:test";
 
 import Query "../../src/Query";
 import T "../../src/Types";
+import Utils "../../src/Utils";
 
 suite(
     "QueryBuilder",
@@ -270,9 +271,9 @@ suite(
             "Pagination with cursor and limit",
             func() {
                 let builder = Query.QueryBuilder();
-                let result = builder.Where("name", #eq(#Text("Alice"))).Pagination(?100, 10).build();
+                let result = builder.Where("name", #eq(#Text("Alice"))).Pagination(?("\F0" : Blob), 10).build();
 
-                assert result.pagination.cursor == ?(100, #Forward);
+                assert result.pagination.cursor == ?(("\F0" : Blob), #Forward);
                 assert result.pagination.limit == ?10;
                 assert result.pagination.skip == null;
             },
@@ -306,9 +307,9 @@ suite(
             "Combined pagination options",
             func() {
                 let builder = Query.QueryBuilder();
-                let result = builder.Where("name", #eq(#Text("Alice"))).Pagination(?100, 10).Skip(5).build();
+                let result = builder.Where("name", #eq(#Text("Alice"))).Pagination(?("\F0" : Blob), 10).Skip(5).build();
 
-                assert result.pagination.cursor == ?(100, #Forward);
+                assert result.pagination.cursor == ?(("\F0" : Blob), #Forward);
                 assert result.pagination.limit == ?10;
                 assert result.pagination.skip == ?5;
             },

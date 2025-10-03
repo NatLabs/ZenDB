@@ -29,11 +29,7 @@ import Int8Cmp "mo:memory-collection@0.3.2/TypeUtils/Int8Cmp";
 import BpTree "mo:augmented-btrees@0.7.1/BpTree";
 import BpTreeTypes "mo:augmented-btrees@0.7.1/BpTree/Types";
 
-import TypeMigrations "TypeMigrations";
-
 module T {
-
-    public type VersionedStableStore = TypeMigrations.VersionedStableStore;
 
     public type BitMap = BitMap.BitMap;
 

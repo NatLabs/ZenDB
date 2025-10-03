@@ -1,29 +1,31 @@
-import Principal "mo:base/Principal";
-import Array "mo:base/Array";
-import Debug "mo:base/Debug";
-import Text "mo:base/Text";
-import Char "mo:base/Char";
-import Nat32 "mo:base/Nat32";
-import Result "mo:base/Result";
-import Order "mo:base/Order";
-import Iter "mo:base/Iter";
-import Buffer "mo:base/Buffer";
-import Nat "mo:base/Nat";
-import Option "mo:base/Option";
-import Hash "mo:base/Hash";
-import Float "mo:base/Float";
-import Int "mo:base/Int";
+import Prim "mo:prim";
 
-import Map "mo:map/Map";
-import Set "mo:map/Set";
-import Serde "mo:serde";
-import Decoder "mo:serde/Candid/Blob/Decoder";
-import Candid "mo:serde/Candid";
-import Itertools "mo:itertools/Iter";
-import RevIter "mo:itertools/RevIter";
+import Principal "mo:base@0.16.0/Principal";
+import Array "mo:base@0.16.0/Array";
+import Debug "mo:base@0.16.0/Debug";
+import Text "mo:base@0.16.0/Text";
+import Char "mo:base@0.16.0/Char";
+import Nat32 "mo:base@0.16.0/Nat32";
+import Result "mo:base@0.16.0/Result";
+import Order "mo:base@0.16.0/Order";
+import Iter "mo:base@0.16.0/Iter";
+import Buffer "mo:base@0.16.0/Buffer";
+import Nat "mo:base@0.16.0/Nat";
+import Option "mo:base@0.16.0/Option";
+import Hash "mo:base@0.16.0/Hash";
+import Float "mo:base@0.16.0/Float";
+import Int "mo:base@0.16.0/Int";
+
+import Map "mo:map@9.0.1/Map";
+import Set "mo:map@9.0.1/Set";
+import Serde "mo:serde@3.3.2";
+import Decoder "mo:serde@3.3.2/Candid/Blob/Decoder";
+import Candid "mo:serde@3.3.2/Candid";
+import Itertools "mo:itertools@0.2.2/Iter";
+import RevIter "mo:itertools@0.2.2/RevIter";
 import Ids "../Ids";
 
-import Vector "mo:vector";
+import Vector "mo:vector@0.4.2";
 
 import Collection "../Collection";
 import StableCollection "../Collection/StableCollection";
@@ -37,7 +39,7 @@ import BTree "../BTree";
 
 module {
 
-    let { logErrorMsg } = Utils;
+    let { log_error_msg } = Utils;
 
     public type InternalCandify<T> = T.InternalCandify<T>;
     public type Map<K, V> = Map.Map<K, V>;
@@ -63,53 +65,53 @@ module {
         schemaConstraints : [T.SchemaConstraint];
     };
 
-    public func createCollection(db : T.StableDatabase, name : Text, schema : T.Schema, options : ?T.CreateCollectionOptions) : Result<StableCollection, Text> {
+    public func create_collection(db : T.StableDatabase, name : Text, schema : T.Schema, options : ?T.CreateCollectionOptions) : T.Result<StableCollection, Text> {
 
         Logger.lazyInfo(
             db.logger,
-            func() = "StableDatabase.createCollection(): Creating collection '" # name # "'",
+            func() = "StableDatabase.create_collection(): Creating collection '" # name # "'",
         );
 
-        switch (Schema.validateSchema(schema)) {
+        switch (Schema.validate_schema(schema)) {
             case (#ok(_)) {
                 Logger.lazyInfo(
                     db.logger,
-                    func() = "StableDatabase.createCollection(): Schema validation passed for collection '" # name # "'",
+                    func() = "StableDatabase.create_collection(): Schema validation passed for collection '" # name # "'",
                 );
             };
             case (#err(msg)) {
-                let error_msg = "StableDatabase.createCollection(): Schema validation failed: " # msg;
-                return logErrorMsg(db.logger, error_msg);
+                let error_msg = "StableDatabase.create_collection(): Schema validation failed: " # msg;
+                return log_error_msg(db.logger, error_msg);
             };
         };
 
-        let processed_schema = Schema.processSchema(schema);
+        let processed_schema = Schema.process_schema(schema);
 
-        switch (Map.get<Text, StableCollection>(db.collections, thash, name)) {
+        switch (Map.get<Text, StableCollection>(db.collections, Map.thash, name)) {
             case (?stable_collection) {
                 Logger.lazyDebug(
                     db.logger,
-                    func() = "StableDatabase.createCollection(): Collection '" # name # "' already exists, checking schema compatibility",
+                    func() = "StableDatabase.create_collection(): Collection '" # name # "' already exists, checking schema compatibility",
                 );
 
                 if (stable_collection.schema != processed_schema) {
                     Logger.lazyError(
                         db.logger,
-                        func() = "StableDatabase.createCollection(): Schema mismatch for existing collection '" # name # "'",
+                        func() = "StableDatabase.create_collection(): Schema mismatch for existing collection '" # name # "'",
                     );
-                    return logErrorMsg(db.logger, "Schema error: collection already exists with different schema");
+                    return log_error_msg(db.logger, "Schema error: collection already exists with different schema");
                 };
 
                 Logger.lazyInfo(
                     db.logger,
-                    func() = "StableDatabase.createCollection(): Returning existing collection '" # name # "'",
+                    func() = "StableDatabase.create_collection(): Returning existing collection '" # name # "'",
                 );
                 return #ok(stable_collection);
             };
             case (null) {
                 Logger.lazyDebug(
                     db.logger,
-                    func() = "StableDatabase.createCollection(): Collection '" # name # "' does not exist, creating new one",
+                    func() = "StableDatabase.create_collection(): Collection '" # name # "' does not exist, creating new one",
                 );
             };
         };
@@ -122,23 +124,23 @@ module {
         };
 
         // Validate schema constraints
-        let { field_constraints; unique_constraints } = switch (SchemaMap.validateSchemaConstraints(schema_map, schema_constraints)) {
+        let { field_constraints; unique_constraints } = switch (SchemaMap.validate_schema_constraints(schema_map, schema_constraints)) {
             case (#ok(res)) res;
             case (#err(msg)) {
-                let error_msg = "StableDatabase.createCollection(): Schema constraints validation failed: " # msg;
-                return logErrorMsg(db.logger, error_msg);
+                let error_msg = "StableDatabase.create_collection(): Schema constraints validation failed: " # msg;
+                return log_error_msg(db.logger, error_msg);
             };
         };
 
-        let schema_keys = Utils.getSchemaKeys(processed_schema);
+        let schema_keys = Utils.get_schema_keys(processed_schema);
 
         var stable_collection : T.StableCollection = {
-            ids = Ids.new();
+
             name;
             schema = processed_schema;
             schema_map = SchemaMap.new(processed_schema);
             schema_keys;
-            schema_keys_set = Set.fromIter(schema_keys.vals(), thash);
+            schema_keys_set = Set.fromIter(schema_keys.vals(), Map.thash);
             documents = switch (db.memory_type) {
                 case (#heap) { BTree.newHeap() };
                 case (#stableMemory) {
@@ -154,19 +156,20 @@ module {
             };
 
             indexes = Map.new<Text, T.Index>();
-            text_indexes = Map.new<Text, T.TextIndex>();
 
             field_constraints;
             unique_constraints = [];
             fields_with_unique_constraints = Map.new();
 
             // db references
+            ids = db.ids;
+            instance_id = db.instance_id;
             freed_btrees = db.freed_btrees;
             logger = db.logger;
             memory_type = db.memory_type;
         };
 
-        let unique_constraints_buffer = Buffer.Buffer<([Text], T.Index)>(8);
+        let unique_constraints_buffer = Buffer.Buffer<([Text], T.CompositeIndex)>(8);
 
         for (unique_field_names in unique_constraints.vals()) {
 
@@ -175,7 +178,7 @@ module {
                 func(field_name : Text) : (Text, T.SortDirection) = (field_name, #Ascending),
             );
 
-            let index_res = StableCollection.createIndexInternal(
+            let index_res = StableCollection.create_index_internal(
                 stable_collection,
                 "internal_index_" # debug_show (Map.size(stable_collection.indexes)) # "_unique",
                 unique_field_names_with_direction,
@@ -183,18 +186,18 @@ module {
                 true,
             );
 
-            let index : T.Index = switch (index_res) {
+            let index : T.CompositeIndex = switch (index_res) {
                 case (#ok(index)) {
                     Logger.lazyInfo(
                         db.logger,
-                        func() = "StableDatabase.createCollection(): Created index for unique constraint on fields: " # debug_show unique_field_names,
+                        func() = "StableDatabase.create_collection(): Created index for unique constraint on fields: " # debug_show unique_field_names,
                     );
 
                     index;
                 };
                 case (#err(msg)) {
-                    let error_msg = "StableDatabase.createCollection(): Failed to create index for unique constraint on fields: " # debug_show unique_field_names # ", error: " # msg;
-                    return logErrorMsg(db.logger, error_msg);
+                    let error_msg = "StableDatabase.create_collection(): Failed to create index for unique constraint on fields: " # debug_show unique_field_names # ", error: " # msg;
+                    return log_error_msg(db.logger, error_msg);
                 };
             };
 
@@ -206,7 +209,7 @@ module {
                     case (?set) set;
                     case (null) {
                         let set = Set.new<Nat>();
-                        ignore Map.put(stable_collection.fields_with_unique_constraints, thash, unique_field_name, set);
+                        ignore Map.put(stable_collection.fields_with_unique_constraints, Map.thash, unique_field_name, set);
                         set;
                     };
                 };
@@ -222,45 +225,138 @@ module {
             unique_constraints = Buffer.toArray(unique_constraints_buffer);
         };
 
-        ignore Map.put<Text, StableCollection>(db.collections, thash, name, stable_collection);
+        ignore Map.put<Text, StableCollection>(db.collections, Map.thash, name, stable_collection);
 
         Logger.lazyInfo(
             db.logger,
-            func() = "StableDatabase.createCollection(): Created collection '" # name # "' successfully",
+            func() = "StableDatabase.create_collection(): Created collection '" # name # "' successfully",
         );
         Logger.lazyDebug(
             db.logger,
-            func() = "StableDatabase.createCollection(): Schema for collection '" # name # "': " # debug_show schema,
+            func() = "StableDatabase.create_collection(): Schema for collection '" # name # "': " # debug_show schema,
         );
 
         #ok(stable_collection);
 
     };
 
-    public func getCollection(db : T.StableDatabase, name : Text) : Result<StableCollection, Text> {
+    public func get_collection(db : T.StableDatabase, name : Text) : T.Result<StableCollection, Text> {
         Logger.lazyDebug(
             db.logger,
-            func() = "StableDatabase.getCollection(): Getting collection '" # name # "'",
+            func() = "StableDatabase.get_collection(): Getting collection '" # name # "'",
         );
 
-        let stable_collection = switch (Map.get<Text, StableCollection>(db.collections, thash, name)) {
+        let stable_collection = switch (Map.get<Text, StableCollection>(db.collections, Map.thash, name)) {
             case (?collection) {
                 Logger.lazyDebug(
                     db.logger,
-                    func() = "StableDatabase.getCollection(): Found collection '" # name # "'",
+                    func() = "StableDatabase.get_collection(): Found collection '" # name # "'",
                 );
                 collection;
             };
             case (null) {
                 Logger.lazyWarn(
                     db.logger,
-                    func() = "StableDatabase.getCollection(): Collection '" # name # "' not found",
+                    func() = "StableDatabase.get_collection(): Collection '" # name # "' not found",
                 );
-                return logErrorMsg(db.logger, "ZenDB Database.getCollection(): Collection " # debug_show name # " not found");
+                return log_error_msg(db.logger, "ZenDB Database.get_collection(): Collection " # debug_show name # " not found");
             };
         };
 
         #ok(stable_collection);
+    };
+
+    public func rename_collection(db : T.StableDatabase, old_name : Text, new_name : Text) : T.Result<(), Text> {
+        Logger.lazyInfo(
+            db.logger,
+            func() = "StableDatabase.rename_collection(): Renaming collection '" # old_name # "' to '" # new_name # "'",
+        );
+
+        if (old_name == new_name) {
+            Logger.lazyInfo(
+                db.logger,
+                func() = "StableDatabase.rename_collection(): Old name and new name are the same, no action taken",
+            );
+            return #ok(());
+        };
+
+        let stable_collection = switch (Map.get<Text, StableCollection>(db.collections, Map.thash, old_name)) {
+            case (?collection) collection;
+            case (null) {
+                let error_msg = "StableDatabase.rename_collection(): Collection '" # old_name # "' not found";
+                return log_error_msg(db.logger, error_msg);
+            };
+        };
+
+        switch (Map.get<Text, StableCollection>(db.collections, Map.thash, new_name)) {
+            case (?_) {
+                let error_msg = "StableDatabase.rename_collection(): Collection with new name '" # new_name # "' already exists";
+                return log_error_msg(db.logger, error_msg);
+            };
+            case (null) {};
+        };
+
+        ignore Map.remove<Text, StableCollection>(db.collections, Map.thash, old_name);
+
+        let renamed_collection = { stable_collection with name = new_name };
+        ignore Map.put<Text, StableCollection>(db.collections, Map.thash, new_name, renamed_collection);
+
+        Logger.lazyInfo(
+            db.logger,
+            func() = "StableDatabase.rename_collection(): Renamed collection '" # old_name # "' to '" # new_name # "' successfully",
+        );
+
+        #ok(());
+    };
+
+    public func list_collections(db : T.StableDatabase) : [Text] {
+        Iter.toArray(Map.keys(db.collections));
+    };
+
+    public func stats(db : T.StableDatabase) : T.DatabaseStats {
+        let collections = Map.toArray<Text, T.StableCollection>(db.collections);
+
+        let collection_stats = Array.map(
+            collections,
+            func((collection_name, stable_collection) : (Text, T.StableCollection)) : T.CollectionStats {
+                StableCollection.stats(stable_collection);
+            },
+        );
+
+        var total_allocated_bytes : Nat = 0;
+        var total_free_bytes : Nat = 0;
+        var total_used_bytes : Nat = 0;
+        var total_data_bytes : Nat = 0;
+        var total_metadata_bytes : Nat = 0;
+        var total_document_store_bytes : Nat = 0;
+        var total_index_store_bytes : Nat = 0;
+
+        for (stats in collection_stats.vals()) {
+            total_allocated_bytes += stats.total_allocated_bytes;
+            total_free_bytes += stats.total_free_bytes;
+            total_used_bytes += stats.total_used_bytes;
+            total_data_bytes += stats.total_document_size;
+            total_metadata_bytes += stats.total_metadata_bytes;
+
+            total_document_store_bytes += stats.total_document_store_bytes;
+            total_index_store_bytes += stats.total_index_store_bytes;
+        };
+
+        {
+            name = db.name;
+            memoryType = db.memory_type;
+            collections = collections.size();
+            collection_stats = collection_stats;
+
+            total_allocated_bytes = total_allocated_bytes;
+            total_used_bytes = total_used_bytes;
+            total_free_bytes = total_free_bytes;
+            total_data_bytes = total_data_bytes;
+            total_metadata_bytes = total_metadata_bytes;
+
+            total_document_store_bytes = total_document_store_bytes;
+            total_index_store_bytes = total_index_store_bytes;
+        };
     };
 
 };

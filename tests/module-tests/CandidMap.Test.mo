@@ -1,16 +1,17 @@
-import Debug "mo:base/Debug";
-import Iter "mo:base/Iter";
-import Text "mo:base/Text";
-import Char "mo:base/Char";
+import Debug "mo:base@0.16.0/Debug";
+import Iter "mo:base@0.16.0/Iter";
+import Text "mo:base@0.16.0/Text";
+import Char "mo:base@0.16.0/Char";
 
 import { test; suite } "mo:test";
-import Candid "mo:serde/Candid";
-import Map "mo:map/Map";
+import Candid "mo:serde@3.3.2/Candid";
+import Map "mo:map@9.0.1/Map";
 
 import SchemaMap "../../src/Collection/SchemaMap";
 import CandidMap "../../src/CandidMap";
 import ZenDB "../../src";
 import Constants "../../src/Constants";
+import Utils "../../src/Utils";
 
 let schema : ZenDB.Types.Schema = #Record([
     ("name", #Text),
@@ -56,8 +57,8 @@ let candid : Candid.Candid = #Record([
     ("comments", #Array([#Record([("content", #Text("comment1")), ("created_at", #Nat(1234567890))])])),
 ]);
 
-let candid_map = CandidMap.new(schema_map, 0, candid);
-assert CandidMap.get(candid_map, schema_map, Constants.DOCUMENT_ID) == ?#Nat(0);
+let candid_map = CandidMap.new(schema_map, ("" : Blob), candid);
+assert CandidMap.get(candid_map, schema_map, Constants.DOCUMENT_ID) == ?#Blob("" : Blob);
 
 suite(
     "CandidMap",
@@ -250,9 +251,9 @@ suite(
         );
 
         test(
-            "extractCandid()",
+            "extract_candid()",
             func() {
-                let extracted_candid = CandidMap.extractCandid(candid_map);
+                let extracted_candid = CandidMap.extract_candid(candid_map);
 
                 assert extracted_candid == #Record([
                     ("name", #Text("Bob")),
@@ -282,7 +283,7 @@ suite(
             "CandidMap: store primitive types",
             func() {
                 let schema_map = SchemaMap.new(#Nat);
-                let candid_map = CandidMap.new(schema_map, 0, #Nat(42));
+                let candid_map = CandidMap.new(schema_map, ("" : Blob), #Nat(42));
                 assert CandidMap.get(candid_map, schema_map, "") == ?#Nat(42);
                 assert CandidMap.get(candid_map, schema_map, "0") == null;
 

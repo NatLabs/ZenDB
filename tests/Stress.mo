@@ -1,12 +1,12 @@
-import Region "mo:base/Region";
-import Debug "mo:base/Debug";
-import Nat64 "mo:base/Nat64";
-import Buffer "mo:base/Buffer";
+import Region "mo:base@0.16.0/Region";
+import Debug "mo:base@0.16.0/Debug";
+import Nat64 "mo:base@0.16.0/Nat64";
+import Buffer "mo:base@0.16.0/Buffer";
 
 import { test; suite } "mo:test";
-import Itertools "mo:itertools/Iter";
+import Itertools "mo:itertools@0.2.2/Iter";
 import Fuzz "mo:fuzz";
-import Map "mo:map/Map";
+import Map "mo:map@9.0.1/Map";
 
 import ZenDB "../src";
 
@@ -17,14 +17,16 @@ actor {
 
     let limit = 10_000;
 
+    let canister_id = fuzz.principal.randomPrincipal(29);
     stable let sstore = ZenDB.newStableStore(
+        canister_id,
         ?{
             logging = ?{
                 log_level = #Error;
                 is_running_locally = true;
             };
             memory_type = ?(#stableMemory);
-        }
+        },
     );
 
     let zendb = ZenDB.launchDefaultDB(sstore);

@@ -11,7 +11,7 @@ import Map "mo:map/Map";
 import Itertools "mo:itertools/Iter";
 import BufferDeque "mo:buffer-deque/BufferDeque";
 
-import T "../Types";
+import T "../../../Types";
 
 module BasicTokenizer {
 

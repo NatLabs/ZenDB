@@ -1,27 +1,28 @@
 // @testmode wasi
 // crafted by claude-3-sonnet-20240229
 
-import Blob "mo:base/Blob";
-import Debug "mo:base/Debug";
-import Array "mo:base/Array";
-import Iter "mo:base/Iter";
-import Text "mo:base/Text";
-import Nat "mo:base/Nat";
-import Buffer "mo:base/Buffer";
-import Option "mo:base/Option";
-import Result "mo:base/Result";
-import Order "mo:base/Order";
+import Blob "mo:base@0.16.0/Blob";
+import Debug "mo:base@0.16.0/Debug";
+import Array "mo:base@0.16.0/Array";
+import Iter "mo:base@0.16.0/Iter";
+import Text "mo:base@0.16.0/Text";
+import Nat "mo:base@0.16.0/Nat";
+import Buffer "mo:base@0.16.0/Buffer";
+import Option "mo:base@0.16.0/Option";
+import Result "mo:base@0.16.0/Result";
+import Order "mo:base@0.16.0/Order";
 
 import { test; suite } "mo:test";
 import Bench "mo:bench";
 import Fuzz "mo:fuzz";
-import Candid "mo:serde/Candid";
+import Candid "mo:serde@3.3.2/Candid";
 
 import ZenDB "../../src";
 import SchemaMap "../../src/Collection/SchemaMap";
 import CandidMap "../../src/CandidMap";
 import { Orchid } "../../src/Collection/Orchid";
 import ZenDBSuite "../test-utils/TestFramework";
+import Utils "../../src/Utils";
 
 let fuzz = Fuzz.fromSeed(0x7eadbeef);
 let { QueryBuilder } = ZenDB;
@@ -359,8 +360,8 @@ ZenDBSuite.newSuite(
                         assert Result.isOk(result1);
                         let #ok(data1) = result1 else return assert false;
                         assert data1.size() == 4;
-                        assert Array.find<Nat>(
-                            Array.map<(Nat, NumericDoc), Nat>(
+                        assert Array.find<ZenDB.Types.DocumentId>(
+                            Array.map<ZenDB.Types.WrapId<NumericDoc>, ZenDB.Types.DocumentId>(
                                 data1,
                                 func((id, _)) { id },
                             ),
@@ -380,13 +381,13 @@ ZenDBSuite.newSuite(
                         let #ok(data) = result else return assert false;
                         assert data.size() == 2;
 
-                        let ids = Array.map<(Nat, NumericDoc), Nat>(
+                        let ids = Array.map<ZenDB.Types.WrapId<NumericDoc>, ZenDB.Types.DocumentId>(
                             data,
                             func((id, _)) { id },
                         );
 
-                        assert Array.find<Nat>(ids, func(id) { id == numeric_id_0 }) == ?numeric_id_0;
-                        assert Array.find<Nat>(ids, func(id) { id == numeric_id_1 }) == ?numeric_id_1;
+                        assert Array.find<ZenDB.Types.DocumentId>(ids, func(id) { id == numeric_id_0 }) == ?numeric_id_0;
+                        assert Array.find<ZenDB.Types.DocumentId>(ids, func(id) { id == numeric_id_1 }) == ?numeric_id_1;
                     },
                 );
 
@@ -401,14 +402,14 @@ ZenDBSuite.newSuite(
                         let #ok(data) = result else return assert false;
                         assert data.size() == 3;
 
-                        let ids = Array.map<(Nat, NumericDoc), Nat>(
+                        let ids = Array.map<ZenDB.Types.WrapId<NumericDoc>, ZenDB.Types.DocumentId>(
                             data,
                             func((id, _)) { id },
                         );
 
-                        assert Array.find<Nat>(ids, func(id) { id == numeric_id_0 }) == ?numeric_id_0;
-                        assert Array.find<Nat>(ids, func(id) { id == numeric_id_1 }) == ?numeric_id_1;
-                        assert Array.find<Nat>(ids, func(id) { id == numeric_id_2 }) == ?numeric_id_2;
+                        assert Array.find<ZenDB.Types.DocumentId>(ids, func(id) { id == numeric_id_0 }) == ?numeric_id_0;
+                        assert Array.find<ZenDB.Types.DocumentId>(ids, func(id) { id == numeric_id_1 }) == ?numeric_id_1;
+                        assert Array.find<ZenDB.Types.DocumentId>(ids, func(id) { id == numeric_id_2 }) == ?numeric_id_2;
                     },
                 );
 
@@ -423,13 +424,13 @@ ZenDBSuite.newSuite(
                         let #ok(data) = result else return assert false;
                         assert data.size() == 2;
 
-                        let ids = Array.map<(Nat, NumericDoc), Nat>(
+                        let ids = Array.map<ZenDB.Types.WrapId<NumericDoc>, ZenDB.Types.DocumentId>(
                             data,
                             func((id, _)) { id },
                         );
 
-                        assert Array.find<Nat>(ids, func(id) { id == numeric_id_3 }) == ?numeric_id_3;
-                        assert Array.find<Nat>(ids, func(id) { id == numeric_id_4 }) == ?numeric_id_4;
+                        assert Array.find<ZenDB.Types.DocumentId>(ids, func(id) { id == numeric_id_3 }) == ?numeric_id_3;
+                        assert Array.find<ZenDB.Types.DocumentId>(ids, func(id) { id == numeric_id_4 }) == ?numeric_id_4;
                     },
                 );
 
@@ -444,14 +445,14 @@ ZenDBSuite.newSuite(
                         let #ok(data) = result else return assert false;
                         assert data.size() == 3;
 
-                        let ids = Array.map<(Nat, NumericDoc), Nat>(
+                        let ids = Array.map<ZenDB.Types.WrapId<NumericDoc>, ZenDB.Types.DocumentId>(
                             data,
                             func((id, _)) { id },
                         );
 
-                        assert Array.find<Nat>(ids, func(id) { id == numeric_id_2 }) == ?numeric_id_2;
-                        assert Array.find<Nat>(ids, func(id) { id == numeric_id_3 }) == ?numeric_id_3;
-                        assert Array.find<Nat>(ids, func(id) { id == numeric_id_4 }) == ?numeric_id_4;
+                        assert Array.find<ZenDB.Types.DocumentId>(ids, func(id) { id == numeric_id_2 }) == ?numeric_id_2;
+                        assert Array.find<ZenDB.Types.DocumentId>(ids, func(id) { id == numeric_id_3 }) == ?numeric_id_3;
+                        assert Array.find<ZenDB.Types.DocumentId>(ids, func(id) { id == numeric_id_4 }) == ?numeric_id_4;
                     },
                 );
 
@@ -468,16 +469,16 @@ ZenDBSuite.newSuite(
                         Debug.print(debug_show ({ data = data }));
                         assert data.size() == 3;
 
-                        let ids = Array.map<(Nat, NumericDoc), Nat>(
+                        let ids = Array.map<ZenDB.Types.WrapId<NumericDoc>, ZenDB.Types.DocumentId>(
                             data,
                             func((id, _)) { id },
                         );
 
                         Debug.print(debug_show ({ ids = ids }));
 
-                        assert Array.find<Nat>(ids, func(id) { id == numeric_id_0 }) == ?numeric_id_0;
-                        assert Array.find<Nat>(ids, func(id) { id == numeric_id_1 }) == ?numeric_id_1;
-                        assert Array.find<Nat>(ids, func(id) { id == numeric_id_2 }) == ?numeric_id_2;
+                        assert Array.find<ZenDB.Types.DocumentId>(ids, func(id) { id == numeric_id_0 }) == ?numeric_id_0;
+                        assert Array.find<ZenDB.Types.DocumentId>(ids, func(id) { id == numeric_id_1 }) == ?numeric_id_1;
+                        assert Array.find<ZenDB.Types.DocumentId>(ids, func(id) { id == numeric_id_2 }) == ?numeric_id_2;
                     },
                 );
 
@@ -493,14 +494,14 @@ ZenDBSuite.newSuite(
                         let #ok(data) = result else return assert false;
                         assert data.size() == 3; // ids 1, 2, and 3
 
-                        let ids = Array.map<(Nat, NumericDoc), Nat>(
+                        let ids = Array.map<ZenDB.Types.WrapId<NumericDoc>, ZenDB.Types.DocumentId>(
                             data,
                             func((id, _)) { id },
                         );
 
-                        assert Array.find<Nat>(ids, func(id) { id == numeric_id_1 }) == ?numeric_id_1;
-                        assert Array.find<Nat>(ids, func(id) { id == numeric_id_2 }) == ?numeric_id_2;
-                        assert Array.find<Nat>(ids, func(id) { id == numeric_id_3 }) == ?numeric_id_3;
+                        assert Array.find<ZenDB.Types.DocumentId>(ids, func(id) { id == numeric_id_1 }) == ?numeric_id_1;
+                        assert Array.find<ZenDB.Types.DocumentId>(ids, func(id) { id == numeric_id_2 }) == ?numeric_id_2;
+                        assert Array.find<ZenDB.Types.DocumentId>(ids, func(id) { id == numeric_id_3 }) == ?numeric_id_3;
                     },
                 );
             },
@@ -554,15 +555,15 @@ ZenDBSuite.newSuite(
                         Debug.print(debug_show { data1 = data1 });
                         assert data1.size() == 4; // "", "a", "A", "!@#$%^"
 
-                        let ids = Array.map<(Nat, TextDoc), Nat>(
+                        let ids = Array.map<ZenDB.Types.WrapId<TextDoc>, ZenDB.Types.DocumentId>(
                             data1,
                             func((id, _)) { id },
                         );
 
-                        assert Array.find<Nat>(ids, func(id) { id == text_id_0 }) == ?text_id_0; // empty string
-                        assert Array.find<Nat>(ids, func(id) { id == text_id_1 }) == ?text_id_1; // "a"
-                        assert Array.find<Nat>(ids, func(id) { id == text_id_3 }) == ?text_id_3; // "A"
-                        assert Array.find<Nat>(ids, func(id) { id == text_id_4 }) == ?text_id_4; // "!@#$%^"
+                        assert Array.find<ZenDB.Types.DocumentId>(ids, func(id) { id == text_id_0 }) == ?text_id_0; // empty string
+                        assert Array.find<ZenDB.Types.DocumentId>(ids, func(id) { id == text_id_1 }) == ?text_id_1; // "a"
+                        assert Array.find<ZenDB.Types.DocumentId>(ids, func(id) { id == text_id_3 }) == ?text_id_3; // "A"
+                        assert Array.find<ZenDB.Types.DocumentId>(ids, func(id) { id == text_id_4 }) == ?text_id_4; // "!@#$%^"
 
                         // Test greater than
                         let result2 = text_collection.search(
@@ -573,8 +574,8 @@ ZenDBSuite.newSuite(
 
                         // Should include "b"
                         assert data2.size() > 0;
-                        assert Array.find<Nat>(
-                            Array.map<(Nat, TextDoc), Nat>(
+                        assert Array.find<ZenDB.Types.DocumentId>(
+                            Array.map<ZenDB.Types.WrapId<TextDoc>, ZenDB.Types.DocumentId>(
                                 data2,
                                 func((id, _)) { id },
                             ),
@@ -595,13 +596,13 @@ ZenDBSuite.newSuite(
                         let #ok(data) = result else return assert false;
                         assert data.size() == 2; // "a" and "b"
 
-                        let ids = Array.map<(Nat, TextDoc), Nat>(
+                        let ids = Array.map<ZenDB.Types.WrapId<TextDoc>, ZenDB.Types.DocumentId>(
                             data,
                             func((id, _)) { id },
                         );
 
-                        assert Array.find<Nat>(ids, func(id) { id == text_id_1 }) == ?text_id_1; // "a"
-                        assert Array.find<Nat>(ids, func(id) { id == text_id_2 }) == ?text_id_2; // "b"
+                        assert Array.find<ZenDB.Types.DocumentId>(ids, func(id) { id == text_id_1 }) == ?text_id_1; // "a"
+                        assert Array.find<ZenDB.Types.DocumentId>(ids, func(id) { id == text_id_2 }) == ?text_id_2; // "b"
                     },
                 );
 
@@ -642,7 +643,7 @@ ZenDBSuite.newSuite(
                             Debug.print(debug_show { candid = candid });
                             let schema_map = SchemaMap.new(EdgeCaseSchema);
 
-                            let candid_map = CandidMap.new(schema_map, 0, candid[0]);
+                            let candid_map = CandidMap.new(schema_map, ("" : Blob), candid[0]);
                             let opt_field = CandidMap.get(candid_map, schema_map, "opt_field");
                             Debug.print(debug_show { opt_field = opt_field });
 
@@ -681,13 +682,13 @@ ZenDBSuite.newSuite(
                         let #ok(data) = result else return assert false;
                         assert data.size() == 2;
 
-                        let ids = Array.map<(Nat, EdgeDoc), Nat>(
+                        let ids = Array.map<ZenDB.Types.WrapId<EdgeDoc>, ZenDB.Types.DocumentId>(
                             data,
                             func((id, _)) { id },
                         );
 
-                        assert Array.find<Nat>(ids, func(id) { id == edge_id_0 }) == ?edge_id_0;
-                        assert Array.find<Nat>(ids, func(id) { id == edge_id_2 }) == ?edge_id_2;
+                        assert Array.find<ZenDB.Types.DocumentId>(ids, func(id) { id == edge_id_0 }) == ?edge_id_0;
+                        assert Array.find<ZenDB.Types.DocumentId>(ids, func(id) { id == edge_id_2 }) == ?edge_id_2;
                     },
                 );
 
@@ -750,13 +751,13 @@ ZenDBSuite.newSuite(
                         let #ok(data) = result else return assert false;
                         assert data.size() == 2; // ids 2 and 4
 
-                        let ids = Array.map<(Nat, NumericDoc), Nat>(
+                        let ids = Array.map<ZenDB.Types.WrapId<NumericDoc>, ZenDB.Types.DocumentId>(
                             data,
                             func((id, _)) { id },
                         );
 
-                        assert Array.find<Nat>(ids, func(id) { id == numeric_id_2 }) == ?numeric_id_2;
-                        assert Array.find<Nat>(ids, func(id) { id == numeric_id_4 }) == ?numeric_id_4;
+                        assert Array.find<ZenDB.Types.DocumentId>(ids, func(id) { id == numeric_id_2 }) == ?numeric_id_2;
+                        assert Array.find<ZenDB.Types.DocumentId>(ids, func(id) { id == numeric_id_4 }) == ?numeric_id_4;
                     },
                 );
 
@@ -772,13 +773,13 @@ ZenDBSuite.newSuite(
                         let #ok(data) = result else return assert false;
                         assert data.size() == 2; // ids 0 and 4
 
-                        let ids = Array.map<(Nat, NumericDoc), Nat>(
+                        let ids = Array.map<ZenDB.Types.WrapId<NumericDoc>, ZenDB.Types.DocumentId>(
                             data,
                             func((id, _)) { id },
                         );
 
-                        assert Array.find<Nat>(ids, func(id) { id == numeric_id_0 }) == ?numeric_id_0;
-                        assert Array.find<Nat>(ids, func(id) { id == numeric_id_4 }) == ?numeric_id_4;
+                        assert Array.find<ZenDB.Types.DocumentId>(ids, func(id) { id == numeric_id_0 }) == ?numeric_id_0;
+                        assert Array.find<ZenDB.Types.DocumentId>(ids, func(id) { id == numeric_id_4 }) == ?numeric_id_4;
                     },
                 );
 
@@ -794,14 +795,14 @@ ZenDBSuite.newSuite(
                         let #ok(data) = result else return assert false;
                         assert data.size() == 3;
 
-                        let ids = Array.map<(Nat, NumericDoc), Nat>(
+                        let ids = Array.map<ZenDB.Types.WrapId<NumericDoc>, ZenDB.Types.DocumentId>(
                             data,
                             func((id, _)) { id },
                         );
 
-                        assert Array.find<Nat>(ids, func(id) { id == numeric_id_1 }) == ?numeric_id_1;
-                        assert Array.find<Nat>(ids, func(id) { id == numeric_id_3 }) == ?numeric_id_3;
-                        assert Array.find<Nat>(ids, func(id) { id == numeric_id_4 }) == ?numeric_id_4;
+                        assert Array.find<ZenDB.Types.DocumentId>(ids, func(id) { id == numeric_id_1 }) == ?numeric_id_1;
+                        assert Array.find<ZenDB.Types.DocumentId>(ids, func(id) { id == numeric_id_3 }) == ?numeric_id_3;
+                        assert Array.find<ZenDB.Types.DocumentId>(ids, func(id) { id == numeric_id_4 }) == ?numeric_id_4;
                     },
                 );
             },
@@ -826,13 +827,13 @@ ZenDBSuite.newSuite(
                         // Should include A-10 and A-15, but not A-5 or A-7
                         assert data.size() == 2;
 
-                        let ids = Array.map<(Nat, CompositeDoc), Nat>(
+                        let ids = Array.map<ZenDB.Types.WrapId<CompositeDoc>, ZenDB.Types.DocumentId>(
                             data,
                             func((id, _)) { id },
                         );
 
-                        assert Array.find<Nat>(ids, func(id) { id == comp_id_2 }) == ?comp_id_2; // A-10
-                        assert Array.find<Nat>(ids, func(id) { id == comp_id_5 }) == ?comp_id_5; // A-15
+                        assert Array.find<ZenDB.Types.DocumentId>(ids, func(id) { id == comp_id_2 }) == ?comp_id_2; // A-10
+                        assert Array.find<ZenDB.Types.DocumentId>(ids, func(id) { id == comp_id_5 }) == ?comp_id_5; // A-15
                     },
                 );
 
@@ -852,13 +853,13 @@ ZenDBSuite.newSuite(
                         // Should include A-5 and A-7, but not A-10 or A-15
                         assert data.size() == 2;
 
-                        let ids = Array.map<(Nat, CompositeDoc), Nat>(
+                        let ids = Array.map<ZenDB.Types.WrapId<CompositeDoc>, ZenDB.Types.DocumentId>(
                             data,
                             func((id, _)) { id },
                         );
 
-                        assert Array.find<Nat>(ids, func(id) { id == comp_id_1 }) == ?comp_id_1; // A-5
-                        assert Array.find<Nat>(ids, func(id) { id == comp_id_4 }) == ?comp_id_4; // A-7
+                        assert Array.find<ZenDB.Types.DocumentId>(ids, func(id) { id == comp_id_1 }) == ?comp_id_1; // A-5
+                        assert Array.find<ZenDB.Types.DocumentId>(ids, func(id) { id == comp_id_4 }) == ?comp_id_4; // A-7
                     },
                 );
 
@@ -879,13 +880,13 @@ ZenDBSuite.newSuite(
                         // Should include [12, 32, 45, 0], [12, 32, 45, 1] but not [12, 32, 44]
                         assert data.size() == 2;
 
-                        let ids = Array.map<(Nat, CompositeDoc), Nat>(
+                        let ids = Array.map<ZenDB.Types.WrapId<CompositeDoc>, ZenDB.Types.DocumentId>(
                             data,
                             func((id, _)) { id },
                         );
 
-                        assert Array.find<Nat>(ids, func(id) { id == blob_id_3 }) == ?blob_id_3; // [12, 32, 45, 0]
-                        assert Array.find<Nat>(ids, func(id) { id == blob_id_2 }) == ?blob_id_2; // [12, 32, 45, 1]
+                        assert Array.find<ZenDB.Types.DocumentId>(ids, func(id) { id == blob_id_3 }) == ?blob_id_3; // [12, 32, 45, 0]
+                        assert Array.find<ZenDB.Types.DocumentId>(ids, func(id) { id == blob_id_2 }) == ?blob_id_2; // [12, 32, 45, 1]
                     },
                 );
 
@@ -905,12 +906,12 @@ ZenDBSuite.newSuite(
                         // Should include [12, 32, 44] but not [12, 32, 45, x]
                         assert data.size() == 1;
 
-                        let ids = Array.map<(Nat, CompositeDoc), Nat>(
+                        let ids = Array.map<ZenDB.Types.WrapId<CompositeDoc>, ZenDB.Types.DocumentId>(
                             data,
                             func((id, _)) { id },
                         );
 
-                        assert Array.find<Nat>(ids, func(id) { id == blob_id_4 }) == ?blob_id_4; // [12, 32, 44]
+                        assert Array.find<ZenDB.Types.DocumentId>(ids, func(id) { id == blob_id_4 }) == ?blob_id_4; // [12, 32, 44]
                     },
                 );
 
@@ -930,13 +931,13 @@ ZenDBSuite.newSuite(
                         // Should include [12, 32, 44] and [12, 32, 45] but not [12, 32, 45, x]
                         assert data.size() == 2;
 
-                        let ids = Array.map<(Nat, CompositeDoc), Nat>(
+                        let ids = Array.map<ZenDB.Types.WrapId<CompositeDoc>, ZenDB.Types.DocumentId>(
                             data,
                             func((id, _)) { id },
                         );
 
-                        assert Array.find<Nat>(ids, func(id) { id == blob_id_1 }) == ?blob_id_1; // [12, 32, 45]
-                        assert Array.find<Nat>(ids, func(id) { id == blob_id_4 }) == ?blob_id_4; // [12, 32, 44]
+                        assert Array.find<ZenDB.Types.DocumentId>(ids, func(id) { id == blob_id_1 }) == ?blob_id_1; // [12, 32, 45]
+                        assert Array.find<ZenDB.Types.DocumentId>(ids, func(id) { id == blob_id_4 }) == ?blob_id_4; // [12, 32, 44]
                     },
                 );
 
@@ -956,13 +957,13 @@ ZenDBSuite.newSuite(
                         // Should include only A-7 and A-10
                         assert data.size() == 2;
 
-                        let ids = Array.map<(Nat, CompositeDoc), Nat>(
+                        let ids = Array.map<ZenDB.Types.WrapId<CompositeDoc>, ZenDB.Types.DocumentId>(
                             data,
                             func((id, _)) { id },
                         );
 
-                        assert Array.find<Nat>(ids, func(id) { id == comp_id_2 }) == ?comp_id_2; // A-10
-                        assert Array.find<Nat>(ids, func(id) { id == comp_id_4 }) == ?comp_id_4; // A-7
+                        assert Array.find<ZenDB.Types.DocumentId>(ids, func(id) { id == comp_id_2 }) == ?comp_id_2; // A-10
+                        assert Array.find<ZenDB.Types.DocumentId>(ids, func(id) { id == comp_id_4 }) == ?comp_id_4; // A-7
                     },
                 );
             },

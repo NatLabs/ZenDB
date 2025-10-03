@@ -1,8 +1,8 @@
-import Debug "mo:base/Debug";
-import Array "mo:base/Array";
-import Nat "mo:base/Nat";
+import Debug "mo:base@0.16.0/Debug";
+import Array "mo:base@0.16.0/Array";
+import Nat "mo:base@0.16.0/Nat";
 
-import Itertools "mo:itertools/Iter";
+import Itertools "mo:itertools@0.2.2/Iter";
 
 import T "../Types";
 import CandidUtils "../CandidUtils";
@@ -289,7 +289,7 @@ module {
             case (#ok(new_value_cast_to_type)) return #ok(new_value_cast_to_type);
             case (#err(err)) {
                 let err_msg = "Failed to cast field result (" # debug_show (new_value) # ") to type '" # debug_show field_type # "': " # err;
-                return Utils.logErrorMsg(collection.logger, err_msg);
+                return Utils.log_error_msg(collection.logger, err_msg);
             };
         };
 

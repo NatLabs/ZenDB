@@ -1,14 +1,14 @@
-import Array "mo:base/Array";
+import Array "mo:base@0.16.0/Array";
 
-import Text "mo:base/Text";
-import Debug "mo:base/Debug";
+import Text "mo:base@0.16.0/Text";
+import Debug "mo:base@0.16.0/Debug";
 
-import Buffer "mo:base/Buffer";
-import Option "mo:base/Option";
-import Nat "mo:base/Nat";
+import Buffer "mo:base@0.16.0/Buffer";
+import Option "mo:base@0.16.0/Option";
+import Nat "mo:base@0.16.0/Nat";
 
-import Map "mo:map/Map";
-import Set "mo:map/Set";
+import Map "mo:map@9.0.1/Map";
+import Set "mo:map@9.0.1/Set";
 
 import T "Types";
 import C "Constants";
@@ -275,22 +275,22 @@ module {
     };
 
     // validate that all the query fields are defined in the schema
-    public func validateQuery(collection : T.StableCollection, hydra_query : T.ZenQueryLang) : T.Result<(), Text> {
+    public func validateQuery(collection : T.StableCollection, zendb_query : T.ZenQueryLang) : T.Result<(), Text> {
 
-        switch (hydra_query) {
+        switch (zendb_query) {
             case (#Operation(field, op)) {
                 // Debug.print(debug_show (Set.toArray(collection.schema_keys_set)));
 
                 if (
                     field != "" and
                     Option.isNull(Nat.fromText(field)) and
-                    not Set.has(collection.schema_keys_set, thash, field) and
+                    not Set.has(collection.schema_keys_set, Map.thash, field) and
                     field != C.DOCUMENT_ID
                 ) {
 
                     if (Text.contains(field, #text("."))) {
                         for (key in Text.split(field, #text("."))) {
-                            if (Option.isNull(Nat.fromText(key)) and not Set.has(collection.schema_keys_set, thash, key)) {
+                            if (Option.isNull(Nat.fromText(key)) and not Set.has(collection.schema_keys_set, Map.thash, key)) {
                                 return #err("Field '" # key # "' not found in schema when validating query");
                             };
                         };

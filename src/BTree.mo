@@ -1,11 +1,11 @@
-import Debug "mo:base/Debug";
-import Option "mo:base/Option";
+import Debug "mo:base@0.16.0/Debug";
+import Option "mo:base@0.16.0/Option";
 
-import BpTree "mo:augmented-btrees/BpTree";
-import BpTreeTypes "mo:augmented-btrees/BpTree/Types";
-import BpTreeMethods "mo:augmented-btrees/BpTree/Methods";
-import MemoryBTree "mo:memory-collection/MemoryBTree/Stable";
-import RevIter "mo:itertools/RevIter";
+import BpTree "mo:augmented-btrees@0.7.1/BpTree";
+import BpTreeTypes "mo:augmented-btrees@0.7.1/BpTree/Types";
+import BpTreeMethods "mo:augmented-btrees@0.7.1/BpTree/Methods";
+import MemoryBTree "mo:memory-collection@0.3.2/MemoryBTree/Stable";
+import RevIter "mo:itertools@0.2.2/RevIter";
 
 import T "Types";
 import C "Constants"
@@ -205,7 +205,7 @@ module BTree {
         };
     };
 
-    public func rangeKeys<K, V>(btree : T.BTree<K, V>, cmp : T.BTreeUtils<K, V>, start : Nat, end : Nat) : T.RevIter<K> {
+    public func range_keys<K, V>(btree : T.BTree<K, V>, cmp : T.BTreeUtils<K, V>, start : Nat, end : Nat) : T.RevIter<K> {
         switch (btree, cmp) {
             case (#stableMemory(memory_btree), #stableMemory(memory_btree_utils)) {
                 return MemoryBTree.rangeKeys(memory_btree, memory_btree_utils, start, end);
@@ -226,7 +226,7 @@ module BTree {
         };
     };
 
-    public func rangeVals<K, V>(btree : T.BTree<K, V>, cmp : T.BTreeUtils<K, V>, start : Nat, end : Nat) : T.RevIter<V> {
+    public func range_vals<K, V>(btree : T.BTree<K, V>, cmp : T.BTreeUtils<K, V>, start : Nat, end : Nat) : T.RevIter<V> {
         switch (btree, cmp) {
             case (#stableMemory(memory_btree), #stableMemory(memory_btree_utils)) {
                 return MemoryBTree.rangeVals(memory_btree, memory_btree_utils, start, end);
@@ -259,7 +259,7 @@ module BTree {
         btree_utils : MemoryBTree.BTreeUtils<K, V>,
         start_key : ?K,
         end_key : ?K,
-    ) : (Nat, Nat) {
+    ) : T.Interval {
 
         let start_rank = switch (start_key) {
             case (?key) switch (MemoryBTree.getExpectedIndex(btree, btree_utils, key)) {
@@ -291,7 +291,7 @@ module BTree {
         heap_btree_utils : T.BpTreeUtils<K>,
         start_key : ?K,
         end_key : ?K,
-    ) : (Nat, Nat) {
+    ) : T.Interval {
 
         let start_rank = switch (start_key) {
             case (?key) {
@@ -321,7 +321,7 @@ module BTree {
         (start_rank, end_rank);
     };
 
-    public func getScanAsInterval<K, V>(btree : T.BTree<K, V>, cmp : T.BTreeUtils<K, V>, start_key : ?K, end_key : ?K) : (Nat, Nat) {
+    public func getScanAsInterval<K, V>(btree : T.BTree<K, V>, cmp : T.BTreeUtils<K, V>, start_key : ?K, end_key : ?K) : T.Interval {
         switch (btree, cmp) {
             case (#stableMemory(memory_btree), #stableMemory(memory_btree_utils)) {
                 memorybtree_scan_interval(memory_btree, memory_btree_utils, start_key, end_key);
@@ -333,6 +333,32 @@ module BTree {
                 Debug.trap("Invalid BTree type");
             };
         };
+    };
+
+    public func getMemoryStats<K, V>(btree : T.BTree<K, V>) : T.MemoryBTreeStats {
+        switch (btree) {
+            case (#stableMemory(btree)) { MemoryBTree.stats(btree) };
+            case (#heap(_)) {
+                // This data is not available for the heap-based B-Tree
+                {
+                    allocatedPages = 0;
+                    bytesPerPage = 0;
+                    allocatedBytes = 0;
+                    usedBytes = 0;
+                    freeBytes = 0;
+                    dataBytes = 0;
+                    metadataBytes = 0;
+                    leafBytes = 0;
+                    branchBytes = 0;
+                    keyBytes = 0;
+                    valueBytes = 0;
+                    leafCount = 0;
+                    branchCount = 0;
+                    totalNodeCount = 0;
+                };
+            };
+        };
+
     };
 
 };

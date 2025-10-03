@@ -1,19 +1,19 @@
 import Prim "mo:prim";
 
-import Array "mo:base/Array";
-import Iter "mo:base/Iter";
-import IC "mo:base/ExperimentalInternetComputer";
-import Principal "mo:base/Principal";
-import Debug "mo:base/Debug";
-import Nat64 "mo:base/Nat64";
-import Nat "mo:base/Nat";
-import Cycles "mo:base/ExperimentalCycles";
-import Buffer "mo:base/Buffer";
-import Option "mo:base/Option";
-import Time "mo:base/Time";
+import Array "mo:base@0.16.0/Array";
+import Iter "mo:base@0.16.0/Iter";
+import IC "mo:base@0.16.0/ExperimentalInternetComputer";
+import Principal "mo:base@0.16.0/Principal";
+import Debug "mo:base@0.16.0/Debug";
+import Nat64 "mo:base@0.16.0/Nat64";
+import Nat "mo:base@0.16.0/Nat";
+import Cycles "mo:base@0.16.0/ExperimentalCycles";
+import Buffer "mo:base@0.16.0/Buffer";
+import Option "mo:base@0.16.0/Option";
+import Time "mo:base@0.16.0/Time";
 
-import Vector "mo:vector";
-import Itertools "mo:itertools/Iter";
+import Vector "mo:vector@0.4.2";
+import Itertools "mo:itertools@0.2.2/Iter";
 
 import Ledger "ledger";
 import ZenDB "../../../src";

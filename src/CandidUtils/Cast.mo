@@ -1,23 +1,23 @@
-import Array "mo:base/Array";
-import Debug "mo:base/Debug";
-import Text "mo:base/Text";
-import Nat32 "mo:base/Nat32";
-import Result "mo:base/Result";
-import Buffer "mo:base/Buffer";
-import Nat "mo:base/Nat";
-import Float "mo:base/Float";
-import Int "mo:base/Int";
-import Int32 "mo:base/Int32";
-import Nat64 "mo:base/Nat64";
-import Int16 "mo:base/Int16";
-import Int64 "mo:base/Int64";
-import Int8 "mo:base/Int8";
-import Nat16 "mo:base/Nat16";
-import Nat8 "mo:base/Nat8";
+import Array "mo:base@0.16.0/Array";
+import Debug "mo:base@0.16.0/Debug";
+import Text "mo:base@0.16.0/Text";
+import Nat32 "mo:base@0.16.0/Nat32";
+import Result "mo:base@0.16.0/Result";
+import Buffer "mo:base@0.16.0/Buffer";
+import Nat "mo:base@0.16.0/Nat";
+import Float "mo:base@0.16.0/Float";
+import Int "mo:base@0.16.0/Int";
+import Int32 "mo:base@0.16.0/Int32";
+import Nat64 "mo:base@0.16.0/Nat64";
+import Int16 "mo:base@0.16.0/Int16";
+import Int64 "mo:base@0.16.0/Int64";
+import Int8 "mo:base@0.16.0/Int8";
+import Nat16 "mo:base@0.16.0/Nat16";
+import Nat8 "mo:base@0.16.0/Nat8";
 // Additional imports for new casting functionality
-import Principal "mo:base/Principal";
-import Bool "mo:base/Bool";
-import Char "mo:base/Char";
+import Principal "mo:base@0.16.0/Principal";
+import Bool "mo:base@0.16.0/Bool";
+import Char "mo:base@0.16.0/Char";
 
 import T "../Types";
 
@@ -50,7 +50,7 @@ module Cast {
         };
     };
 
-    public func castToBool(candid : Candid) : Result<Candid, Text> {
+    public func cast_to_bool(candid : Candid) : T.Result<Candid, Text> {
         let converted = switch (candid) {
             case (#Bool(_)) candid;
             // Convert numeric types: 0 = false, anything else = true
@@ -77,7 +77,7 @@ module Cast {
         #ok(converted);
     };
 
-    public func castToPrincipal(candid : Candid) : Result<Candid, Text> {
+    public func cast_to_principal(candid : Candid) : T.Result<Candid, Text> {
         let converted = switch (candid) {
             case (#Principal(_)) candid;
             case (#Text(t)) {
@@ -93,9 +93,9 @@ module Cast {
         #ok(converted);
     };
 
-    public func castToNat(candid : Candid) : Result<Candid, Text> {
+    public func cast_to_nat(candid : Candid) : T.Result<Candid, Text> {
 
-        func int_to_nat_if_positive(int : Int) : Result<Candid, Text> {
+        func int_to_nat_if_positive(int : Int) : T.Result<Candid, Text> {
             if (int >= 0) {
                 #ok(#Nat(Int.abs(int)));
             } else {
@@ -130,9 +130,9 @@ module Cast {
         #ok(converted);
     };
 
-    public func castToNat8(candid : Candid) : Result<Candid, Text> {
+    public func cast_to_nat8(candid : Candid) : T.Result<Candid, Text> {
 
-        func int_to_nat8_if_within_bounds(int : Int) : Result<Candid, Text> {
+        func int_to_nat8_if_within_bounds(int : Int) : T.Result<Candid, Text> {
             if (int >= 0 and int <= 255) {
                 #ok(#Nat8(Nat8.fromNat(Int.abs(int))));
             } else {
@@ -166,8 +166,8 @@ module Cast {
 
     };
 
-    public func castToNat16(candid : Candid) : Result<Candid, Text> {
-        func int_to_nat16_if_within_bounds(int : Int) : Result<Candid, Text> {
+    public func cast_to_nat16(candid : Candid) : T.Result<Candid, Text> {
+        func int_to_nat16_if_within_bounds(int : Int) : T.Result<Candid, Text> {
             if (int >= 0 and int <= Nat16.toNat(Nat16.maximumValue)) {
                 #ok(#Nat16(Nat16.fromNat(Int.abs(int))));
             } else {
@@ -196,8 +196,8 @@ module Cast {
         #ok(converted);
     };
 
-    public func castToNat32(candid : Candid) : Result<Candid, Text> {
-        func int_to_nat32_if_within_bounds(int : Int) : Result<Candid, Text> {
+    public func cast_to_nat32(candid : Candid) : T.Result<Candid, Text> {
+        func int_to_nat32_if_within_bounds(int : Int) : T.Result<Candid, Text> {
             if (int >= 0 and int <= Nat32.toNat(Nat32.maximumValue)) {
                 #ok(#Nat32(Nat32.fromNat(Int.abs(int))));
             } else {
@@ -227,9 +227,9 @@ module Cast {
         #ok(converted);
     };
 
-    public func castToNat64(candid : Candid) : Result<Candid, Text> {
+    public func cast_to_nat64(candid : Candid) : T.Result<Candid, Text> {
 
-        func int_to_nat64_if_positive(int : Int) : Result<Candid, Text> {
+        func int_to_nat64_if_positive(int : Int) : T.Result<Candid, Text> {
             if (int >= 0 and int <= Nat64.toNat(Nat64.maximumValue)) {
                 #ok(#Nat64(Nat64.fromNat(Int.abs(int))));
             } else {
@@ -258,9 +258,9 @@ module Cast {
         #ok(converted);
     };
 
-    public func castToInt8(candid : Candid) : Result<Candid, Text> {
+    public func cast_to_int8(candid : Candid) : T.Result<Candid, Text> {
 
-        func int_to_int8_if_within_bounds(int : Int) : Result<Candid, Text> {
+        func int_to_int8_if_within_bounds(int : Int) : T.Result<Candid, Text> {
             if (int >= -128 and int <= 127) {
                 #ok(#Int8(Int8.fromInt(int)));
             } else {
@@ -290,9 +290,9 @@ module Cast {
 
     };
 
-    public func castToInt16(candid : Candid) : Result<Candid, Text> {
+    public func cast_to_int16(candid : Candid) : T.Result<Candid, Text> {
 
-        func int_to_int16_if_within_bounds(int : Int) : Result<Candid, Text> {
+        func int_to_int16_if_within_bounds(int : Int) : T.Result<Candid, Text> {
             if (int >= Int16.toInt(Int16.minimumValue) and int <= Int16.toInt(Int16.maximumValue)) {
                 #ok(#Int16(Int16.fromInt(int)));
             } else {
@@ -322,9 +322,9 @@ module Cast {
 
     };
 
-    public func castToInt32(candid : Candid) : Result<Candid, Text> {
+    public func cast_to_int32(candid : Candid) : T.Result<Candid, Text> {
 
-        func int_to_int32_if_within_bounds(int : Int) : Result<Candid, Text> {
+        func int_to_int32_if_within_bounds(int : Int) : T.Result<Candid, Text> {
             if (int >= Int32.toInt(Int32.minimumValue) and int <= Int32.toInt(Int32.maximumValue)) {
                 #ok(#Int32(Int32.fromInt(int)));
             } else {
@@ -354,9 +354,9 @@ module Cast {
 
     };
 
-    public func castToInt64(candid : Candid) : Result<Candid, Text> {
+    public func cast_to_int64(candid : Candid) : T.Result<Candid, Text> {
 
-        func int_to_int64_if_within_bounds(int : Int) : Result<Candid, Text> {
+        func int_to_int64_if_within_bounds(int : Int) : T.Result<Candid, Text> {
             if (int >= Int64.toInt(Int64.minimumValue) and int <= Int64.toInt(Int64.maximumValue)) {
                 #ok(#Int64(Int64.fromInt(int)));
             } else {
@@ -386,7 +386,7 @@ module Cast {
 
     };
 
-    public func castToFloat(candid : Candid) : Result<Candid, Text> {
+    public func cast_to_float(candid : Candid) : T.Result<Candid, Text> {
 
         let converted = switch (candid) {
             case (#Float(n)) candid;
@@ -413,7 +413,7 @@ module Cast {
 
     };
 
-    public func castToInt(candid : Candid) : Result<Candid, Text> {
+    public func cast_to_int(candid : Candid) : T.Result<Candid, Text> {
 
         let converted = switch (candid) {
             case (#Int(n)) candid;
@@ -443,7 +443,7 @@ module Cast {
 
     };
 
-    public func castToText(candid : Candid) : Result<Candid, Text> {
+    public func cast_to_text(candid : Candid) : T.Result<Candid, Text> {
         let converted = switch (candid) {
             case (#Text(_)) candid;
             case (#Blob(b)) switch (Text.decodeUtf8(b)) {
@@ -469,7 +469,7 @@ module Cast {
 
     };
 
-    public func castToBlob(candid : Candid) : Result<Candid, Text> {
+    public func cast_to_blob(candid : Candid) : T.Result<Candid, Text> {
         let converted = switch (candid) {
             case (#Blob(b)) candid;
             case (#Text(t)) #Blob(Text.encodeUtf8(t));
@@ -482,24 +482,24 @@ module Cast {
 
     };
 
-    public func cast(candid_type : CandidType, value_to_cast : Candid) : Result<Candid, Text> {
+    public func cast(candid_type : CandidType, value_to_cast : Candid) : T.Result<Candid, Text> {
 
         switch (candid_type) {
-            case (#Nat(_)) castToNat(value_to_cast);
-            case (#Nat8(_)) castToNat8(value_to_cast);
-            case (#Nat16(_)) castToNat16(value_to_cast);
-            case (#Nat32(_)) castToNat32(value_to_cast);
-            case (#Nat64(_)) castToNat64(value_to_cast);
-            case (#Int8(_)) castToInt8(value_to_cast);
-            case (#Int16(_)) castToInt16(value_to_cast);
-            case (#Int32(_)) castToInt32(value_to_cast);
-            case (#Int64(_)) castToInt64(value_to_cast);
-            case (#Int(_)) castToInt(value_to_cast);
-            case (#Float(_)) castToFloat(value_to_cast);
-            case (#Text(_)) castToText(value_to_cast);
-            case (#Blob(_)) castToBlob(value_to_cast);
-            case (#Bool(_)) castToBool(value_to_cast);
-            case (#Principal(_)) castToPrincipal(value_to_cast);
+            case (#Nat(_)) cast_to_nat(value_to_cast);
+            case (#Nat8(_)) cast_to_nat8(value_to_cast);
+            case (#Nat16(_)) cast_to_nat16(value_to_cast);
+            case (#Nat32(_)) cast_to_nat32(value_to_cast);
+            case (#Nat64(_)) cast_to_nat64(value_to_cast);
+            case (#Int8(_)) cast_to_int8(value_to_cast);
+            case (#Int16(_)) cast_to_int16(value_to_cast);
+            case (#Int32(_)) cast_to_int32(value_to_cast);
+            case (#Int64(_)) cast_to_int64(value_to_cast);
+            case (#Int(_)) cast_to_int(value_to_cast);
+            case (#Float(_)) cast_to_float(value_to_cast);
+            case (#Text(_)) cast_to_text(value_to_cast);
+            case (#Blob(_)) cast_to_blob(value_to_cast);
+            case (#Bool(_)) cast_to_bool(value_to_cast);
+            case (#Principal(_)) cast_to_principal(value_to_cast);
             case (#Option(inner)) {
                 switch (value_to_cast) {
                     case (#Null) #ok(#Null);

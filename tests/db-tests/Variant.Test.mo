@@ -1,15 +1,15 @@
 // @testmode wasi
-import Debug "mo:base/Debug";
-import Buffer "mo:base/Buffer";
-import Blob "mo:base/Blob";
-import Text "mo:base/Text";
-import Array "mo:base/Array";
+import Debug "mo:base@0.16.0/Debug";
+import Buffer "mo:base@0.16.0/Buffer";
+import Blob "mo:base@0.16.0/Blob";
+import Text "mo:base@0.16.0/Text";
+import Array "mo:base@0.16.0/Array";
 
 import ZenDB "../../src";
 
 import { test; suite } "mo:test";
-import Itertools "mo:itertools/Iter";
-import Map "mo:map/Map";
+import Itertools "mo:itertools@0.2.2/Iter";
+import Map "mo:map@9.0.1/Map";
 import ZenDBSuite "../test-utils/TestFramework";
 
 type SizeVariant = {
@@ -61,10 +61,16 @@ ZenDBSuite.newSuite(
         let #ok(_) = suite_utils.createIndex(data.name(), "index_2", [("version.v1.a", #Ascending)], null) else return assert false;
         let #ok(_) = suite_utils.createIndex(data.name(), "index_3", [("version.v3.size.known", #Ascending)], null) else return assert false;
 
-        let #ok(_) = data.insert({ version = #v1({ a = 42; b = "hello" }) }) else return assert false;
-        let #ok(_) = data.insert({ version = #v2({ c = "world"; d = true }) }) else return assert false;
-        let #ok(_) = data.insert({ version = #v3({ size = #known(32) }) }) else return assert false;
-        let #ok(_) = data.insert({ version = #v3({ size = #unknown }) }) else return assert false;
+        let #ok(v1_id) = data.insert({ version = #v1({ a = 42; b = "hello" }) }) else return assert false;
+        let #ok(v2_id) = data.insert({
+            version = #v2({ c = "world"; d = true });
+        }) else return assert false;
+        let #ok(v3_known_id) = data.insert({
+            version = #v3({ size = #known(32) });
+        }) else return assert false;
+        let #ok(v3_unknown_id) = data.insert({
+            version = #v3({ size = #unknown });
+        }) else return assert false;
 
         assert data.size() == 4;
 
@@ -78,7 +84,7 @@ ZenDBSuite.newSuite(
 
                         assert data.search(
                             ZenDB.QueryBuilder().Where("version.v1.a", #eq(#Nat(42)))
-                        ) == #ok([(0, { version = #v1({ a = 42; b = "hello" }) })]);
+                        ) == #ok([(v1_id, { version = #v1({ a = 42; b = "hello" }) })]);
 
                         Debug.print(
                             "searching for version.v3.size.known == 32: " # debug_show (
@@ -90,7 +96,7 @@ ZenDBSuite.newSuite(
 
                         assert data.search(
                             ZenDB.QueryBuilder().Where("version.v3.size.known", #eq(#Nat(32)))
-                        ) == #ok([(2, { version = #v3({ size = #known(32) }) })]);
+                        ) == #ok([(v3_known_id, { version = #v3({ size = #known(32) }) })]);
 
                     },
                 );
@@ -101,11 +107,11 @@ ZenDBSuite.newSuite(
 
                         assert data.search(
                             ZenDB.QueryBuilder().Where("version.v2.d", #eq(#Bool(true)))
-                        ) == #ok([(1, { version = #v2({ c = "world"; d = true }) })]);
+                        ) == #ok([(v2_id, { version = #v2({ c = "world"; d = true }) })]);
 
                         assert data.search(
                             ZenDB.QueryBuilder().Where("version.v2.d", #exists)
-                        ) == #ok([(1, { version = #v2({ c = "world"; d = true }) })]);
+                        ) == #ok([(v2_id, { version = #v2({ c = "world"; d = true }) })]);
 
                         Debug.print(
                             "exists: " # debug_show (
@@ -117,7 +123,7 @@ ZenDBSuite.newSuite(
 
                         assert data.search(
                             ZenDB.QueryBuilder().Where("version.v3.size", #eq(#Text("unknown")))
-                        ) == #ok([(3, { version = #v3({ size = #unknown }) })]);
+                        ) == #ok([(v3_unknown_id, { version = #v3({ size = #unknown }) })]);
 
                     },
                 );
@@ -127,26 +133,26 @@ ZenDBSuite.newSuite(
                     func() {
                         assert data.search(
                             ZenDB.QueryBuilder().Where("version", #eq(#Text("v1")))
-                        ) == #ok([(0, { version = #v1({ a = 42; b = "hello" }) })]);
+                        ) == #ok([(v1_id, { version = #v1({ a = 42; b = "hello" }) })]);
 
                         assert data.search(
                             ZenDB.QueryBuilder().Where("version", #eq(#Text("v2")))
-                        ) == #ok([(1, { version = #v2({ c = "world"; d = true }) })]);
+                        ) == #ok([(v2_id, { version = #v2({ c = "world"; d = true }) })]);
 
                         assert data.search(
                             ZenDB.QueryBuilder().Where("version", #eq(#Text("v3")))
                         ) == #ok([
-                            (2, { version = #v3({ size = #known(32) }) }),
-                            (3, { version = #v3({ size = #unknown }) }),
+                            (v3_known_id, { version = #v3({ size = #known(32) }) }),
+                            (v3_unknown_id, { version = #v3({ size = #unknown }) }),
                         ]);
 
                         assert data.search(
                             ZenDB.QueryBuilder().Where("version.v3.size", #eq(#Text("unknown")))
-                        ) == #ok([(3, { version = #v3({ size = #unknown }) })]);
+                        ) == #ok([(v3_unknown_id, { version = #v3({ size = #unknown }) })]);
 
                         assert data.search(
                             ZenDB.QueryBuilder().Where("version.v3.size", #eq(#Text("known")))
-                        ) == #ok([(2, { version = #v3({ size = #known(32) }) })]);
+                        ) == #ok([(v3_known_id, { version = #v3({ size = #known(32) }) })]);
 
                     },
                 );

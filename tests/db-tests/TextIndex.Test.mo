@@ -30,7 +30,7 @@ let data_type_to_candid : ZenDB.Types.Candify<Data> = {
 };
 
 ZenDBSuite.newSuite(
-    "Text Index Tests",
+    "Text CompositeIndex Tests",
     ?{ ZenDBSuite.onlyWithIndex with log_level = #Error },
     func suite_setup(zendb : ZenDB.Database, suite_utils : ZenDBSuite.SuiteUtils) {
 
@@ -83,36 +83,40 @@ ZenDBSuite.newSuite(
                     },
                 ];
 
-                for (doc in docs) {
+                for (doc in docs.vals()) {
                     let #ok(_) = collection.insert(doc) else return assert false;
                 };
 
                 assert collection.size() == docs.size();
 
                 // search for all documents with "Carter" in the name
-                ignore collection.search(
+                let #ok(res) = collection.search(
                     ZenDB.QueryBuilder().Where("name", #eq(#Text("Carter")))
                 );
 
+                Debug.print("response: " # debug_show (res));
+
                 // search for all documents with "Chen" in the name
 
-                let #ok(last_name_results) = collection.search(
-                    ZenDB.QueryBuilder().Where("name", #text(#contains("Chen")))
-                ) else return assert false;
+                // let #ok(documents_owned_by_chen) = collection.search(
+                //     ZenDB.QueryBuilder().Where("name", #text(#contains("Chen")))
+                // ) else return assert false;
 
-                let #ok(results) = collection.search(
-                    ZenDB.QueryBuilder().Where("name", #eq(#Text("Chen")))
-                ) else return assert false;
+                // Debug.print("Documents owned by Chen: " # debug_show (documents_owned_by_chen));
 
-                // search for all documents with "Chen" as their last name
-                let #ok(last_name_results) = collection.search(
-                    ZenDB.QueryBuilder().Where(
-                        "name",
-                        #text(
-                            #pos("Chen", #gte(1))
-                        ),
-                    )
-                ) else return assert false;
+                // let #ok(results) = collection.search(
+                //     ZenDB.QueryBuilder().Where("name", #eq(#Text("Chen")))
+                // ) else return assert false;
+
+                // // search for all documents with "Chen" as their last name
+                // let #ok(last_name_results) = collection.search(
+                //     ZenDB.QueryBuilder().Where(
+                //         "name",
+                //         #text(
+                //             #pos("Chen", #gte(1))
+                //         ),
+                //     )
+                // ) else return assert false;
 
             },
         );

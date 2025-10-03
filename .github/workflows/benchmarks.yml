@@ -61,13 +61,11 @@ jobs:
         continue-on-error: true
 
       - name: Checkout out the branch with benchmark results
-        if: github.event_name == 'pull_request'
         uses: actions/checkout@v4
         with:
           ref: benchmark-results
           path: .benchmark-results-branch/
       - name: Move Saved Benchmarks
-        if: github.event_name == 'pull_request'
         run: mv .benchmark-results-branch/.bench .bench 2>/dev/null || mkdir -p .bench
 
       - name: Benchmarks

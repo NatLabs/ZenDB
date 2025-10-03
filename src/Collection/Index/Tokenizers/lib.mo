@@ -1,6 +1,6 @@
 import BasicTokenizer "BasicTokenizer";
 
-import T "../Types";
+import T "../../../Types";
 
 module Tokenizer {
 

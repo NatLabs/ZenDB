@@ -1,11 +1,11 @@
-import Debug "mo:base/Debug";
-import Iter "mo:base/Iter";
-import Text "mo:base/Text";
-import Nat "mo:base/Nat";
-import Map "mo:map/Map";
+import Debug "mo:base@0.16.0/Debug";
+import Iter "mo:base@0.16.0/Iter";
+import Text "mo:base@0.16.0/Text";
+import Nat "mo:base@0.16.0/Nat";
+import Map "mo:map@9.0.1/Map";
 
 import { test; suite } "mo:test";
-import Candid "mo:serde/Candid";
+import Candid "mo:serde@3.3.2/Candid";
 import SchemaMap "../../../src/Collection/SchemaMap";
 import T "../../../src/Types";
 import ZenDB "../../../src";
@@ -154,7 +154,7 @@ suite(
         );
 
         test(
-            "validateSchemaConstraints() - validates field constraints correctly",
+            "validate_schema_constraints() - validates field constraints correctly",
             func() {
                 // Define schema constraints for testing
                 let constraints : [T.SchemaConstraint] = [
@@ -167,7 +167,7 @@ suite(
                 ];
 
                 // Validate the constraints
-                let validation_result = SchemaMap.validateSchemaConstraints(schema_map, constraints);
+                let validation_result = SchemaMap.validate_schema_constraints(schema_map, constraints);
 
                 switch (validation_result) {
                     case (#ok(response)) {
@@ -203,14 +203,14 @@ suite(
         );
 
         test(
-            "validateSchemaConstraints() - rejects invalid constraints",
+            "validate_schema_constraints() - rejects invalid constraints",
             func() {
                 // Test invalid field constraint (non-existent field)
                 let invalid_field_constraint : [T.SchemaConstraint] = [
                     #Field("nonexistent", [#Min(0)]),
                 ];
 
-                let invalid_field_result = SchemaMap.validateSchemaConstraints(schema_map, invalid_field_constraint);
+                let invalid_field_result = SchemaMap.validate_schema_constraints(schema_map, invalid_field_constraint);
                 assert switch (invalid_field_result) {
                     case (#err(_)) true;
                     case (#ok(_)) false;
@@ -221,7 +221,7 @@ suite(
                     #Field("name", [#Min(0)]),
                 ];
 
-                let invalid_type_result = SchemaMap.validateSchemaConstraints(schema_map, invalid_constraint_type);
+                let invalid_type_result = SchemaMap.validate_schema_constraints(schema_map, invalid_constraint_type);
                 assert switch (invalid_type_result) {
                     case (#err(_)) true;
                     case (#ok(_)) false;
@@ -232,7 +232,7 @@ suite(
                     #Field("age", [#MaxSize(10)]),
                 ];
 
-                let invalid_size_result = SchemaMap.validateSchemaConstraints(schema_map, invalid_size_constraint);
+                let invalid_size_result = SchemaMap.validate_schema_constraints(schema_map, invalid_size_constraint);
                 assert switch (invalid_size_result) {
                     case (#err(_)) true;
                     case (#ok(_)) false;
@@ -243,7 +243,7 @@ suite(
                     #Unique(["details"]),
                 ];
 
-                let invalid_unique_result = SchemaMap.validateSchemaConstraints(schema_map, invalid_unique_constraint);
+                let invalid_unique_result = SchemaMap.validate_schema_constraints(schema_map, invalid_unique_constraint);
                 assert switch (invalid_unique_result) {
                     case (#err(_)) true;
                     case (#ok(_)) false;
@@ -252,7 +252,7 @@ suite(
         );
 
         test(
-            "validateSchemaConstraints() - handles nested and option types properly",
+            "validate_schema_constraints() - handles nested and option types properly",
             func() {
                 // Test constraints on nested fields and option types
                 let nested_constraints : [T.SchemaConstraint] = [
@@ -260,7 +260,7 @@ suite(
                     #Unique(["details.phone", "email"]),
                 ];
 
-                let nested_result = SchemaMap.validateSchemaConstraints(schema_map, nested_constraints);
+                let nested_result = SchemaMap.validate_schema_constraints(schema_map, nested_constraints);
 
                 switch (nested_result) {
                     case (#ok(response)) {

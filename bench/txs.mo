@@ -1,18 +1,18 @@
-import Iter "mo:base/Iter";
-import Array "mo:base/Array";
-import Debug "mo:base/Debug";
-import Prelude "mo:base/Prelude";
-import Text "mo:base/Text";
-import Char "mo:base/Char";
-import Buffer "mo:base/Buffer";
-import Nat "mo:base/Nat";
-import Option "mo:base/Option";
+import Iter "mo:base@0.16.0/Iter";
+import Array "mo:base@0.16.0/Array";
+import Debug "mo:base@0.16.0/Debug";
+import Prelude "mo:base@0.16.0/Prelude";
+import Text "mo:base@0.16.0/Text";
+import Char "mo:base@0.16.0/Char";
+import Buffer "mo:base@0.16.0/Buffer";
+import Nat "mo:base@0.16.0/Nat";
+import Option "mo:base@0.16.0/Option";
 
 import Bench "mo:bench";
 import Fuzz "mo:fuzz";
-import Candid "mo:serde/Candid";
-import Itertools "mo:itertools/Iter";
-import BitMap "mo:bit-map";
+import Candid "mo:serde@3.3.2/Candid";
+import Itertools "mo:itertools@0.2.2/Iter";
+import BitMap "mo:bit-map@0.1.2";
 
 import ZenDB "../src";
 import TxsBenchUtils "txs-bench-utils";
@@ -93,7 +93,7 @@ module {
 
         ]);
 
-        let limit = 1_000;
+        let limit = 1_0;
         let fuzz = Fuzz.fromSeed(0x7eadbeef);
 
         let principals = Array.tabulate(
@@ -128,13 +128,15 @@ module {
             predefined_txs.add(tx);
         };
 
-        let heap_db_sstore = ZenDB.newStableStore(?{ ZenDB.defaultSettings with memory_type = ?(#heap) });
+        let canister_id = fuzz.principal.randomPrincipal(29);
+
+        let heap_db_sstore = ZenDB.newStableStore(canister_id, ?{ ZenDB.defaultSettings with memory_type = ?(#heap) });
         let heap_db = ZenDB.launchDefaultDB(heap_db_sstore);
         let #ok(heap_no_index) = heap_db.createCollection<Tx>("heap_no_index", TxSchema, candify_tx, []);
         let #ok(heap_single_field_indexes) = heap_db.createCollection<Tx>("heap_single_field_indexes", TxSchema, candify_tx, []);
         let #ok(heap_fully_covered_indexes) = heap_db.createCollection<Tx>("heap_fully_covered_indexes", TxSchema, candify_tx, []);
 
-        let stable_memory_db_sstore = ZenDB.newStableStore(?{ ZenDB.defaultSettings with memory_type = ?(#stableMemory) });
+        let stable_memory_db_sstore = ZenDB.newStableStore(canister_id, ?{ ZenDB.defaultSettings with memory_type = ?(#stableMemory) });
         let stable_memory_db = ZenDB.launchDefaultDB(stable_memory_db_sstore);
         let #ok(stable_memory_no_index) = stable_memory_db.createCollection<Tx>("stable_memory_no_index", TxSchema, candify_tx, []);
         let #ok(stable_memory_single_field_indexes) = stable_memory_db.createCollection<Tx>("stable_memory_single_field_indexes", TxSchema, candify_tx, []);

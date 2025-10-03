@@ -1,15 +1,15 @@
 // @testmode wasi
-import Debug "mo:base/Debug";
-import Iter "mo:base/Iter";
-import Text "mo:base/Text";
-import Char "mo:base/Char";
-import Buffer "mo:base/Buffer";
+import Debug "mo:base@0.16.0/Debug";
+import Iter "mo:base@0.16.0/Iter";
+import Text "mo:base@0.16.0/Text";
+import Char "mo:base@0.16.0/Char";
+import Buffer "mo:base@0.16.0/Buffer";
 
 import { test; suite } "mo:test";
-import Candid "mo:serde/Candid";
+import Candid "mo:serde@3.3.2/Candid";
 import Fuzz "mo:fuzz";
-import Itertools "mo:itertools/Iter";
-import Map "mo:map/Map";
+import Itertools "mo:itertools@0.2.2/Iter";
+import Map "mo:map@9.0.1/Map";
 
 import ZenDB "../../src";
 import ZenDBSuite "../test-utils/TestFramework";
@@ -59,14 +59,7 @@ ZenDBSuite.newSuite(
         let #ok(_) = suite_utils.createIndex(users.name(), "age_idx", [("age", #Ascending)], null) else return assert false;
         let #ok(_) = suite_utils.createIndex(users.name(), "email_idx", [("email", #Ascending)], null) else return assert false;
 
-        let inputs = Buffer.Buffer<User>(20);
-        for (i in Iter.range(1, 20)) {
-            inputs.add({
-                name = "dummy";
-                age = 0;
-                email = "values";
-            });
-        };
+        let inputs = Map.new<ZenDB.Types.DocumentId, User>();
 
         for (i in Iter.range(1, 10)) {
             let user = {
@@ -77,7 +70,7 @@ ZenDBSuite.newSuite(
 
             let #ok(id) = users.insert(user) else return assert false;
             // Debug.print("id: " # debug_show (id, user));
-            inputs.put(id, user);
+            ignore Map.put(inputs, Map.bhash, id, user);
         };
 
         for (i in Iter.range(1, 10)) {
@@ -89,7 +82,7 @@ ZenDBSuite.newSuite(
 
             let #ok(id) = users.insert(user) else return assert false;
             // Debug.print("id: " # debug_show (id, user));
-            inputs.put(id, user);
+            ignore Map.put(inputs, Map.bhash, id, user);
         };
 
         let total_documents = 20;
@@ -101,11 +94,12 @@ ZenDBSuite.newSuite(
                     "retrieve all documents",
                     func() {
                         let #ok(results) = users.search(ZenDB.QueryBuilder()) else return assert false;
-                        assert results.size() == inputs.size();
+                        assert results.size() == Map.size(inputs);
 
                         for ((id, user) in results.vals()) {
-                            assert user == inputs.get(id);
+                            assert ?user == Map.get(inputs, Map.bhash, id);
                         };
+
                     },
                 );
 
@@ -290,6 +284,19 @@ ZenDBSuite.newSuite(
                         // Assert the right number were deleted
                         assert deleted.size() == before_count;
                         assert after_results.size() == 0;
+                    },
+                );
+
+                test(
+                    "clear entire collection",
+                    func() {
+
+                        assert users.size() > 0;
+
+                        users.clear();
+
+                        assert users.size() == 0;
+
                     },
                 );
             },
