@@ -19,9 +19,9 @@ import Blob "mo:base@0.16.0/Blob";
 
 import Map "mo:map@9.0.1/Map";
 import Set "mo:map@9.0.1/Set";
-import Serde "mo:serde@3.3.2";
-import Decoder "mo:serde@3.3.2/Candid/Blob/Decoder";
-import Candid "mo:serde@3.3.2/Candid";
+import Serde "mo:serde@3.3.3";
+import Decoder "mo:serde@3.3.3/Candid/Blob/Decoder";
+import Candid "mo:serde@3.3.3/Candid";
 import Itertools "mo:itertools@0.2.2/Iter";
 import RevIter "mo:itertools@0.2.2/RevIter";
 import Vector "mo:vector@0.4.2";
@@ -117,12 +117,14 @@ module {
         memory_type : ?T.MemoryType;
     };
 
+    public let DefaultMemoryType = #stableMemory;
+
     public let defaultSettings : Settings = {
         logging = ?{
             log_level = #Warn;
             is_running_locally = false;
         };
-        memory_type = ?(#stableMemory);
+        memory_type = ?(DefaultMemoryType);
     };
 
     public func newStableStore(canister_id : Principal, opt_settings : ?Settings) : T.VersionedStableStore {
@@ -141,7 +143,7 @@ module {
             instance_id;
             ids = Ids.new();
             databases = Map.new<Text, T.StableDatabase>();
-            memory_type = Option.get(settings.memory_type, #heap);
+            memory_type = Option.get(settings.memory_type, DefaultMemoryType);
             freed_btrees = Vector.new<T.MemoryBTree>();
             logger = Logger.init(#Error, false);
         };
@@ -166,6 +168,10 @@ module {
         };
 
         TypeMigrations.share_version(zendb);
+    };
+
+    public func upgrade(versioned_sstore : T.VersionedStableStore) : T.VersionedStableStore {
+        TypeMigrations.upgrade(versioned_sstore);
     };
 
     public func launchDefaultDB(versioned_sstore : T.VersionedStableStore) : Database.Database {

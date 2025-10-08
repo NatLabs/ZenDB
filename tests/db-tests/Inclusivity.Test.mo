@@ -15,7 +15,7 @@ import Order "mo:base@0.16.0/Order";
 import { test; suite } "mo:test";
 import Bench "mo:bench";
 import Fuzz "mo:fuzz";
-import Candid "mo:serde@3.3.2/Candid";
+import Candid "mo:serde@3.3.3/Candid";
 
 import ZenDB "../../src";
 import SchemaMap "../../src/Collection/SchemaMap";

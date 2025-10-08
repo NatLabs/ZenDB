@@ -66,7 +66,7 @@ module CollectionUtils {
 
     public type Schema = Candid.CandidType;
 
-    public type Index = T.Index;
+    public type CompositeIndex = T.CompositeIndex;
     public type Candid = T.Candid;
     public type SortDirection = T.SortDirection;
     public type State<R> = T.State<R>;
@@ -80,12 +80,13 @@ module CollectionUtils {
 
     public let { thash; bhash } = Map;
 
-    public func new_btree<K, V>(collection : StableCollection) : T.BTree<K, V> {
+    public func new_btree<K, V>(collection : T.StableCollection) : T.BTree<K, V> {
         switch (collection.memory_type) {
             case (#heap) { BTree.newHeap() };
             case (#stableMemory) {
                 switch (Vector.removeLast(collection.freed_btrees)) {
                     case (?memory_btree) {
+                        MemoryBTree.clear(memory_btree);
                         #stableMemory(memory_btree);
                     };
                     case (null) {
@@ -96,7 +97,7 @@ module CollectionUtils {
         };
     };
 
-    public func convert_bitmap_8_byte_to_document_id(collection : StableCollection, bitmap_value : Nat) : T.DocumentId {
+    public func convert_bitmap_8_byte_to_document_id(collection : T.StableCollection, bitmap_value : Nat) : T.DocumentId {
         let n64 = Nat64.fromNat(bitmap_value);
 
         let n_bytes = ByteUtils.BigEndian.fromNat64(n64);
@@ -118,7 +119,7 @@ module CollectionUtils {
 
     };
 
-    public func getMainBtreeUtils(collection : StableCollection) : T.BTreeUtils<T.DocumentId, T.Document> {
+    public func getMainBtreeUtils(collection : T.StableCollection) : T.BTreeUtils<T.DocumentId, T.Document> {
         DocumentStore.getBtreeUtils(collection.documents);
     };
 
@@ -198,26 +199,26 @@ module CollectionUtils {
         document;
     };
 
-    public func lookupCandidBlob(collection : StableCollection, id : T.DocumentId) : Blob {
+    public func lookupCandidBlob(collection : T.StableCollection, id : T.DocumentId) : Blob {
         let ?documentDetails : ?Blob = DocumentStore.get(collection.documents, DocumentStore.getBtreeUtils(collection.documents), id) else Debug.trap("lookupCandidBlob: document not found for id: " # debug_show id);
         documentDetails;
     };
 
-    public func decodeCandidBlob(collection : StableCollection, candid_blob : Blob) : Candid.Candid {
+    public func decodeCandidBlob(collection : T.StableCollection, candid_blob : Blob) : Candid.Candid {
         let candid_result = Candid.decode(candid_blob, collection.schema_keys, null);
         let #ok(candid_values) = candid_result else Debug.trap("decodeCandidBlob: decoding candid blob failed: " # debug_show candid_result);
         let candid = candid_values[0];
         candid;
     };
 
-    public func lookupCandidDocument(collection : StableCollection, id : T.DocumentId) : ?Candid.Candid {
+    public func lookupCandidDocument(collection : T.StableCollection, id : T.DocumentId) : ?Candid.Candid {
         let ?document_details = DocumentStore.get(collection.documents, DocumentStore.getBtreeUtils(collection.documents), id) else return null;
         let candid = decodeCandidBlob(collection, document_details);
 
         ?candid;
     };
 
-    public func candidMapFilterCondition(collection : StableCollection, id : T.DocumentId, candid_document : Candid.Candid, lower : [(Text, ?T.CandidInclusivityQuery)], upper : [(Text, ?T.CandidInclusivityQuery)]) : Bool {
+    public func candidMapFilterCondition(collection : T.StableCollection, id : T.DocumentId, candid_document : Candid.Candid, lower : [(Text, ?T.CandidInclusivityQuery)], upper : [(Text, ?T.CandidInclusivityQuery)]) : Bool {
 
         let candid_map = CandidMap.new(collection.schema_map, id, candid_document);
 
@@ -264,7 +265,7 @@ module CollectionUtils {
     };
 
     public func multiFilter(
-        collection : StableCollection,
+        collection : T.StableCollection,
         documents : Iter<T.DocumentId>,
         bounds : Buffer.Buffer<(lower : [(Text, ?T.CandidInclusivityQuery)], upper : [(Text, ?T.CandidInclusivityQuery)])>,
         is_and : Bool,

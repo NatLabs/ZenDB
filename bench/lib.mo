@@ -7,7 +7,7 @@ import Buffer "mo:base@0.16.0/Buffer";
 
 import Bench "mo:bench";
 import Fuzz "mo:fuzz";
-import Candid "mo:serde@3.3.2/Candid";
+import Candid "mo:serde@3.3.3/Candid";
 import Itertools "mo:itertools@0.2.2/Iter";
 
 import ZenDB "../src";
