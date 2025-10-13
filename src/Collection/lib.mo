@@ -27,9 +27,9 @@ import InternetComputer "mo:base@0.16.0/ExperimentalInternetComputer";
 
 import Map "mo:map@9.0.1/Map";
 import Set "mo:map@9.0.1/Set";
-import Serde "mo:serde@3.3.2";
-import Decoder "mo:serde@3.3.2/Candid/Blob/Decoder";
-import Candid "mo:serde@3.3.2/Candid";
+import Serde "mo:serde@3.3.3";
+import Decoder "mo:serde@3.3.3/Candid/Blob/Decoder";
+import Candid "mo:serde@3.3.3/Candid";
 import Itertools "mo:itertools@0.2.2/Iter";
 import RevIter "mo:itertools@0.2.2/RevIter";
 import BitMap "mo:bit-map@0.1.2";
@@ -178,18 +178,17 @@ module {
         /// ```
         ///
         /// If the document does not pass the schema validation or schema constraints, an error will be returned.
-        public func insert(document : Record) : T.Result<(T.DocumentId), Text> {
-            put(document);
-        };
-
-        public func put(document : Record) : T.Result<(T.DocumentId), Text> {
-
+        public func insert(document : Record) : Result<(T.DocumentId), Text> {
             let candid_blob = blobify.to_blob(document);
 
             handleResult(
-                StableCollection.put(collection, main_btree_utils, candid_blob),
-                "Failed to put document",
+                StableCollection.insert(collection, main_btree_utils, candid_blob),
+                "Failed to insert document",
             );
+        };
+
+        public func insertDocs(documents : [Record]) : Result<[T.DocumentId], Text> {
+            StableCollection.insert_docs(collection, main_btree_utils, Array.map<Record, Blob>(documents, blobify.to_blob));
         };
 
         /// Retrieves a document by its id.

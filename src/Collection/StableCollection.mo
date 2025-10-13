@@ -26,9 +26,9 @@ import Nat8 "mo:base@0.16.0/Nat8";
 
 import Map "mo:map@9.0.1/Map";
 import Set "mo:map@9.0.1/Set";
-import Serde "mo:serde@3.3.2";
-import Decoder "mo:serde@3.3.2/Candid/Blob/Decoder";
-import Candid "mo:serde@3.3.2/Candid";
+import Serde "mo:serde@3.3.3";
+import Decoder "mo:serde@3.3.3/Candid/Blob/Decoder";
+import Candid "mo:serde@3.3.3/Candid";
 import Itertools "mo:itertools@0.2.2/Iter";
 import RevIter "mo:itertools@0.2.2/RevIter";
 import BitMap "mo:bit-map@0.1.2";
@@ -953,6 +953,34 @@ module StableCollection {
 
     public func insert(collection : T.StableCollection, main_btree_utils : T.BTreeUtils<T.DocumentId, T.Document>, candid_blob : T.CandidBlob) : T.Result<T.DocumentId, Text> {
         put(collection, main_btree_utils, candid_blob);
+    };
+
+    public func insert_docs(
+        collection : StableCollection,
+        main_btree_utils : T.BTreeUtils<T.DocumentId, T.Document>,
+        documents : [T.CandidBlob],
+    ) : Result<[T.DocumentId], Text> {
+        let ids = Buffer.Buffer<T.DocumentId>(documents.size());
+
+        for (document in documents.vals()) {
+            switch (insert(collection, main_btree_utils, document)) {
+                case (#ok(id)) ids.add(id);
+                case (#err(err)) {
+                    for (id in ids.vals()) {
+                        // rollback previously inserted documents
+                        switch (delete_by_id(collection, main_btree_utils, id)) {
+                            case (#ok(_)) {};
+                            case (#err(err)) {
+                                Logger.lazyError(collection.logger, func() = "Failed to rollback document with id: " # debug_show (id) # ": " # err);
+                            };
+                        };
+                    };
+                    return #err(err);
+                };
+            };
+        };
+
+        #ok(Buffer.toArray(ids));
     };
 
     public func get(
