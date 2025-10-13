@@ -913,6 +913,34 @@ module StableCollection {
         put(collection, main_btree_utils, candid_blob);
     };
 
+    public func insert_docs(
+        collection : StableCollection,
+        main_btree_utils : T.BTreeUtils<T.DocumentId, T.Document>,
+        documents : [T.CandidBlob],
+    ) : Result<[T.DocumentId], Text> {
+        let ids = Buffer.Buffer<T.DocumentId>(documents.size());
+
+        for (document in documents.vals()) {
+            switch (insert(collection, main_btree_utils, document)) {
+                case (#ok(id)) ids.add(id);
+                case (#err(err)) {
+                    for (id in ids.vals()) {
+                        // rollback previously inserted documents
+                        switch (delete_by_id(collection, main_btree_utils, id)) {
+                            case (#ok(_)) {};
+                            case (#err(err)) {
+                                Logger.lazyError(collection.logger, func() = "Failed to rollback document with id: " # debug_show (id) # ": " # err);
+                            };
+                        };
+                    };
+                    return #err(err);
+                };
+            };
+        };
+
+        #ok(Buffer.toArray(ids));
+    };
+
     public func get(
         collection : StableCollection,
         main_btree_utils : T.BTreeUtils<T.DocumentId, T.Document>,

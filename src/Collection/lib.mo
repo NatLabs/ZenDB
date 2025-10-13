@@ -176,17 +176,16 @@ module {
         ///
         /// If the document does not pass the schema validation or schema constraints, an error will be returned.
         public func insert(document : Record) : Result<(T.DocumentId), Text> {
-            put(document);
-        };
-
-        public func put(document : Record) : Result<(T.DocumentId), Text> {
-
             let candid_blob = blobify.to_blob(document);
 
             handleResult(
-                StableCollection.put(collection, main_btree_utils, candid_blob),
-                "Failed to put document",
+                StableCollection.insert(collection, main_btree_utils, candid_blob),
+                "Failed to insert document",
             );
+        };
+
+        public func insertDocs(documents : [Record]) : Result<[T.DocumentId], Text> {
+            StableCollection.insert_docs(collection, main_btree_utils, Array.map<Record, Blob>(documents, blobify.to_blob));
         };
 
         /// Retrieves a document by its id.
