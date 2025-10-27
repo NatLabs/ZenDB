@@ -16,4 +16,8 @@ module {
     public let MAX_COLLECTIONS_PER_DATABASE = 65536; // 2^16
     public let MAX_RECORDS_PER_COLLECTION = 1_099_511_627_776; // 2^40
 
+    public let MILLION = 1_000_000;
+    public let BILLION = 1_000_000_000;
+    public let TRILLION = 1_000_000_000_000;
+
 };

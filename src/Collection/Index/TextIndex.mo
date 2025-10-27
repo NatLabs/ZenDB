@@ -47,6 +47,13 @@ module TextIndex {
 
     };
 
+    public func deallocate(
+        collection : T.StableCollection,
+        text_index : T.TextIndex,
+    ) {
+        CompositeIndex.deallocate(collection, text_index.internal_index);
+    };
+
     public func insert(
         collection : T.StableCollection,
         text_index : T.TextIndex,

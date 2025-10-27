@@ -23,6 +23,7 @@ import Int64 "mo:base@0.16.0/Int64";
 import Int8 "mo:base@0.16.0/Int8";
 import Nat16 "mo:base@0.16.0/Nat16";
 import Nat8 "mo:base@0.16.0/Nat8";
+import ExperimentalInternetComputer "mo:base@0.16.0/ExperimentalInternetComputer";
 
 import Map "mo:map@9.0.1/Map";
 import Set "mo:map@9.0.1/Set";
@@ -219,6 +220,10 @@ module StableCollection {
             collection.logger,
             func() = "Creating index '" # index_name # "' with key details: " # debug_show index_key_details,
         );
+        Logger.lazyDebug(
+            collection.logger,
+            func() = "index_key_details: " # debug_show (index_key_details),
+        );
 
         let index = CompositeIndex.new(collection, index_name, index_key_details, is_unique, used_internally);
 
@@ -258,6 +263,477 @@ module StableCollection {
         );
 
         #ok(index)
+
+    };
+
+    func get_existing_keys<V>(
+        map : Map<Text, V>,
+        index_names : [Text],
+    ) : [Text] {
+
+        let indexes = Buffer.Buffer<Text>(index_names.size());
+
+        for (index_name in index_names.vals()) {
+            switch (Map.get(map, Map.thash, index_name)) {
+                case (?index) indexes.add(index_name);
+                case (null) {};
+            };
+        };
+
+        Buffer.toArray(indexes)
+
+    };
+
+    public func create_populate_indexes_batch(
+        collection : StableCollection,
+        index_configs : [T.CreateIndexBatchConfig],
+        opt_performance_init : ?Nat,
+    ) : T.Result<(batch_id : Nat), Text> {
+
+        let performance = Performance(collection.is_running_locally, opt_performance_init);
+        let index_names = Array.map(index_configs, func(config : T.CreateIndexBatchConfig) : Text = config.0);
+
+        // then check if there any of those indexes are currently being populated or created
+        let existing_indexes_in_batch_operations = get_existing_keys(collection.indexes_in_batch_operations, index_names);
+        if (existing_indexes_in_batch_operations.size() > 0) {
+            return #err(
+                "Failed to create indexes because the following indexes are currently being created or populated: " # debug_show (existing_indexes_in_batch_operations)
+            );
+        };
+
+        let newly_created_indexes = Buffer.Buffer<T.Index>(index_configs.size());
+
+        for ((index_name, index_key_details, is_unique, used_internally) in index_configs.vals()) {
+            Logger.lazyInfo(
+                collection.logger,
+                func() = "Creating indexes: " # debug_show (index_name, index_key_details),
+            );
+            let composite_index = CompositeIndex.new(collection, index_name, index_key_details, is_unique, used_internally);
+            let index = #composite_index(composite_index);
+            ignore Map.put(collection.indexes_in_batch_operations, Map.thash, index_name, index);
+            newly_created_indexes.add(index);
+        };
+
+        let main_btree_utils = DocumentStore.getBtreeUtils(collection.documents);
+
+        /// create batch population job
+        let first_document_id = if (DocumentStore.size(collection.documents) != 0) {
+            switch (DocumentStore.getMin(collection.documents, main_btree_utils)) {
+                case (?(doc_id, _)) doc_id;
+                case (null) ("" : Blob);
+            };
+        } else ("" : Blob);
+
+        let batch : T.BatchPopulateIndex = {
+            id = Ids.next(collection.ids);
+            indexes = Buffer.toArray(newly_created_indexes);
+            var indexed_documents = 0;
+            total_documents = StableCollection.size(collection);
+
+            var avg_instructions_per_document = 0;
+            var total_instructions_used = performance.total_instructions_used();
+
+            var next_document_to_process = first_document_id;
+
+            var num_documents_to_process_per_batch = null;
+            var done_processing = false;
+
+        };
+
+        // store the batch in the stable store
+        ignore Map.put<Nat, T.BatchPopulateIndex>(collection.populate_index_batches, Map.nhash, batch.id, batch);
+
+        Logger.lazyInfo(
+            collection.logger,
+            func() = "Created Batch with id: " # debug_show (batch.id),
+        );
+
+        #ok(batch.id)
+
+    };
+
+    public func batch_create_indexes(
+        collection : StableCollection,
+        index_configs : [(name : Text, [(field : Text, SortDirection)], is_unique : Bool, used_internally : Bool)],
+    ) : Result<(batch_id : Nat), Text> {
+        if (index_configs.size() == 0) {
+            return #err("No index configurations provided");
+        };
+
+        let performance = Performance(collection.is_running_locally, null);
+
+        // first check if any of the indexes already exist, fail if they do
+        let index_names = Array.map(index_configs, func(config : T.CreateIndexBatchConfig) : Text = config.0);
+        let existing_indexes = get_existing_keys(collection.indexes, index_names);
+        if (existing_indexes.size() > 0) {
+            return #err(
+                "Failed to create indexes because the following indexes already exist: " # debug_show (existing_indexes)
+            );
+        };
+
+        create_populate_indexes_batch(collection, index_configs, ?(performance.total_instructions_used()));
+
+    };
+
+    func process_index_population_batch(
+        collection : StableCollection,
+        batch : T.BatchPopulateIndex,
+        starting_document_id : T.DocumentId,
+        num_documents_to_process : Nat,
+    ) : T.Result<(Nat), Text> {
+
+        if (batch.total_documents == 0 or batch.done_processing) {
+            batch.done_processing := true;
+            let res = commit_batch_populate_indexes(collection, batch.id);
+            return Result.mapOk<(), Nat, Text>(res, func(_ : ()) : Nat = 0);
+        };
+
+        let main_btree_utils = DocumentStore.getBtreeUtils(collection.documents);
+        let document_scan_iter = DocumentStore.scan(collection.documents, main_btree_utils, ?starting_document_id, null);
+
+        // Convert to an array to avoid sliding iterator issues
+        let entries = Iter.toArray(Itertools.take(document_scan_iter, num_documents_to_process + 1)); // +1 to peek next
+        let entries_iter = Itertools.peekable(entries.vals());
+
+        let errors = Buffer.Buffer<Text>(collection.indexes.size());
+        var processed_documents = 0;
+
+        for ((document_id, candid_blob) in Itertools.take(entries_iter, num_documents_to_process)) {
+            let candid = CollectionUtils.decodeCandidBlob(collection, candid_blob);
+            let candid_map = CandidMap.new(collection.schema_map, document_id, candid);
+
+            let processed_indexes = Buffer.Buffer<T.Index>(collection.indexes.size());
+
+            for (index in batch.indexes.vals()) {
+                switch (CommonIndexFns.insertWithCandidMap(collection, index, document_id, candid_map)) {
+                    case (#err(err)) { errors.add(err) };
+                    case (#ok(_)) { processed_indexes.add(index) };
+                };
+            };
+
+            if (errors.size() > 0) {
+
+                for (processed_index in processed_indexes.vals()) {
+                    ignore CommonIndexFns.removeWithCandidMap(collection, processed_index, document_id, candid_map);
+                };
+
+                return #err(
+                    "Failed to populate indexes for document id " # debug_show (document_id) # " due to the following errors: " # debug_show (Buffer.toArray(errors))
+                );
+
+            };
+
+            batch.indexed_documents += 1;
+            processed_documents += 1;
+
+            switch (entries_iter.peek()) {
+                case (?(document_id, _)) batch.next_document_to_process := document_id;
+                case (null) {};
+            };
+
+        };
+
+        switch (document_scan_iter.next()) {
+            case (?_) return #ok(processed_documents); // still more to process
+            case (null) {};
+        };
+
+        // done processing all documents in the collection
+        batch.done_processing := true;
+
+        switch (commit_batch_populate_indexes(collection, batch.id)) {
+            case (#ok(())) {};
+            case (#err(err_msg)) return #err(err_msg);
+        };
+
+        #ok(processed_documents);
+
+    };
+
+    func commit_batch_populate_indexes(
+        collection : StableCollection,
+        batch_id : Nat,
+    ) : Result<(), Text> {
+
+        Logger.lazyInfo(
+            collection.logger,
+            func() = "Committing batch with id " # debug_show batch_id,
+        );
+        let ?batch = Map.get(collection.populate_index_batches, Map.nhash, batch_id) else {
+            return #err("Batch with id " # debug_show batch_id # " not found");
+        };
+
+        if (not batch.done_processing) {
+            return #err("Cannot commit batch with id " # debug_show batch_id # " because it is not done processing");
+        };
+
+        // commit batch
+        let replaced_indexes = Buffer.Buffer<T.Index>(batch.indexes.size());
+
+        for (index in batch.indexes.vals()) {
+            let name = CommonIndexFns.name(index);
+
+            // - Replace any existing index in the main indexes map and store the old one
+            switch (Map.put(collection.indexes, Map.thash, name, index)) {
+                case (?old_index) replaced_indexes.add(old_index);
+                case (null) {};
+            };
+
+            // - Remove the index from the indexes_in_batch_operations map
+            ignore Map.remove(collection.indexes_in_batch_operations, Map.thash, name);
+        };
+
+        // - Now safely deallocate all the old/replaced indexes
+        for (old_index in replaced_indexes.vals()) {
+            CommonIndexFns.deallocate(collection, old_index);
+        };
+
+        ignore Map.remove<Nat, T.BatchPopulateIndex>(collection.populate_index_batches, Map.nhash, batch.id);
+
+        #ok(());
+
+    };
+
+    class Performance(is_running_locally : Bool, opt_init_instructions : ?Nat) {
+        let init_instructions = Option.get(opt_init_instructions, 0);
+        var instructions_at_last_call = init_instructions;
+
+        func get_instructions() : Nat {
+            if (is_running_locally) {
+                instructions_at_last_call += 100;
+                instructions_at_last_call;
+            } else {
+                Nat64.toNat(ExperimentalInternetComputer.performanceCounter(0));
+            };
+        };
+
+        public func total_instructions_used() : Nat {
+            get_instructions();
+        };
+
+        public func instructions_used_since_init() : Nat {
+            get_instructions() - init_instructions;
+        };
+
+        public func instructions_used_since_last_call() : Nat {
+            let current_instructions = get_instructions();
+            let used = current_instructions - instructions_at_last_call;
+            instructions_at_last_call := current_instructions;
+            used
+
+        };
+
+    };
+
+    public func populate_indexes_in_batch(
+        collection : StableCollection,
+        batch_id : Nat,
+        opt_performance_init : ?Nat,
+    ) : Result<(Bool), Text> {
+
+        let MAX_INSTRUCTIONS = Nat64.toNat(C.MAX_UPDATE_INSTRUCTIONS * 80 / 100);
+
+        let performance = Performance(collection.is_running_locally, opt_performance_init);
+        let main_btree_utils = DocumentStore.getBtreeUtils(collection.documents);
+
+        let batch = switch (Map.get(collection.populate_index_batches, Map.nhash, batch_id)) {
+            case (?batch) batch;
+            case (null) return #err("Batch with id " # debug_show batch_id # " not found");
+        };
+
+        var error : ?Text = null;
+
+        Logger.lazyDebug(
+            collection.logger,
+            func() = "total expected documents in batch: " # debug_show (batch.total_documents),
+        );
+        Logger.lazyDebug(
+            collection.logger,
+            func() = "total documents in collection: " # debug_show (StableCollection.size(collection)),
+        );
+
+        let num_documents_to_process_per_batch = switch (batch.num_documents_to_process_per_batch) {
+            case (?num) num;
+            case (null) {
+                var documents_to_process = 100; // Start with initial calibration batch size
+
+                while (
+                    (performance.total_instructions_used() + (batch.avg_instructions_per_document * documents_to_process)) < MAX_INSTRUCTIONS and
+                    not batch.done_processing
+                ) {
+                    Logger.lazyDebug(
+                        collection.logger,
+                        func() = "Calibrating batch size, trying: " # debug_show documents_to_process,
+                    );
+
+                    Debug.print("Calibrating batch size, trying: " # debug_show documents_to_process);
+
+                    Logger.lazyDebug(
+                        collection.logger,
+                        func() = "Starting document id: " # debug_show (batch.next_document_to_process),
+                    );
+
+                    switch (process_index_population_batch(collection, batch, batch.next_document_to_process, documents_to_process)) {
+                        case (#err(err)) error := ?err;
+                        case (#ok(_)) {};
+                    };
+
+                    batch.total_instructions_used += performance.instructions_used_since_last_call();
+                    Logger.lazyDebug(
+                        collection.logger,
+                        func() = " batch.total_instructions_used: " # debug_show (batch.total_instructions_used),
+                    );
+
+                    Logger.lazyDebug(
+                        collection.logger,
+                        func() = " batch.indexed_documents: " # debug_show (batch.indexed_documents),
+                    );
+
+                    batch.avg_instructions_per_document := batch.total_instructions_used / (if (batch.indexed_documents == 0) 1 else batch.indexed_documents);
+                    Logger.lazyDebug(
+                        collection.logger,
+                        func() = " batch.avg_instructions_per_document: " # debug_show (batch.avg_instructions_per_document),
+                    );
+
+                    Debug.print(" batch.indexed_documents: " # debug_show (batch.indexed_documents));
+                    Debug.print(" batch.total_instructions_used: " # debug_show (batch.total_instructions_used));
+                    Debug.print(" avg instructions per document: " # debug_show (batch.avg_instructions_per_document));
+                    Debug.print("Total Instructions in this call: " # debug_show (performance.total_instructions_used()));
+
+                    switch (error) {
+                        case (?err) {
+                            return #err("Failed to populate indexes in batch " # debug_show batch.id # ": " # err);
+                        };
+                        case (null) {};
+                    };
+
+                    Logger.lazyDebug(
+                        collection.logger,
+                        func() = "was there an error? " # debug_show (error),
+                    );
+
+                    Logger.lazyDebug(
+                        collection.logger,
+                        func() = "done processing? " # debug_show (batch.done_processing),
+                    );
+
+                    if (batch.done_processing) {
+                        batch.num_documents_to_process_per_batch := ?batch.indexed_documents;
+                        return #ok(false);
+                    };
+
+                    documents_to_process *= 2;
+                };
+
+                batch.num_documents_to_process_per_batch := ?batch.indexed_documents;
+                return #ok(not batch.done_processing);
+            };
+        };
+
+        Logger.lazyDebug(
+            collection.logger,
+            func() = "second while loop for some reason",
+        );
+        while (
+            (performance.total_instructions_used() + (batch.avg_instructions_per_document * num_documents_to_process_per_batch)) < MAX_INSTRUCTIONS and
+            not batch.done_processing
+        ) {
+
+            Debug.print("Processing batch " # debug_show (num_documents_to_process_per_batch) # " documents with batch id " # debug_show (batch.id));
+
+            switch (process_index_population_batch(collection, batch, batch.next_document_to_process, num_documents_to_process_per_batch)) {
+                case (#err(err)) error := ?err;
+                case (#ok(_)) {};
+            };
+
+            batch.total_instructions_used += performance.instructions_used_since_last_call();
+            batch.avg_instructions_per_document := batch.total_instructions_used / batch.indexed_documents;
+
+            Debug.print(" batch.indexed_documents: " # debug_show (batch.indexed_documents));
+            Debug.print(" batch.total_instructions_used: " # debug_show (batch.total_instructions_used));
+            Debug.print(" avg instructions per document: " # debug_show (batch.avg_instructions_per_document));
+            Debug.print("Total Instructions in this call: " # debug_show (performance.total_instructions_used()));
+
+            switch (error) {
+                case (?err) return #err("Failed to populate indexes in batch " # debug_show batch.id # ": " # err);
+                case (null) {};
+            };
+
+        };
+
+        #ok(not batch.done_processing);
+
+    };
+
+    func rollback_and_delete_batch_populate_indexes(
+        collection : StableCollection,
+        batch_id : Nat,
+    ) : Result<(), Text> {
+        Logger.info(
+            collection.logger,
+            "Rolling back batch populate indexes with id: " # debug_show batch_id,
+        );
+
+        // Get the batch from storage
+        let ?batch = Map.get(collection.populate_index_batches, Map.nhash, batch_id) else {
+            return #err("Batch with id " # debug_show batch_id # " not found");
+        };
+
+        // Remove all indexes from the batch operations map and deallocate them
+        for (index in batch.indexes.vals()) {
+            let index_name = CommonIndexFns.name(index);
+
+            switch (Map.remove(collection.indexes_in_batch_operations, Map.thash, index_name)) {
+                case (?removed_index) {
+                    Logger.lazyDebug(
+                        collection.logger,
+                        func() = "Deallocating index: " # index_name,
+                    );
+                    CommonIndexFns.deallocate(collection, removed_index);
+                };
+                case (null) {
+
+                };
+            };
+        };
+
+        // Remove the batch from storage
+        ignore Map.remove<Nat, T.BatchPopulateIndex>(collection.populate_index_batches, Map.nhash, batch_id);
+
+        Logger.lazyInfo(
+            collection.logger,
+            func() = "Successfully rolled back batch populate indexes with id: " # debug_show batch_id,
+        );
+
+        #ok();
+    };
+
+    public func create_and_populate_index_in_one_call(
+        collection : T.StableCollection,
+        index_name : Text,
+        index_key_details : [(Text, T.SortDirection)],
+        options : T.CreateIndexInternalOptions,
+    ) : T.Result<(), Text> {
+
+        let performance = Performance(collection.is_running_locally, null);
+        let index_config = [(index_name, index_key_details, options.is_unique, options.used_internally)];
+
+        let batch_id = switch (batch_create_indexes(collection, index_config)) {
+            case (#ok(batch_id)) batch_id;
+            case (#err(err)) return #err(err);
+        };
+
+        label batch_processing loop switch (populate_indexes_in_batch(collection, batch_id, ?(performance.total_instructions_used()))) {
+            case (#ok(continue_processing)) {
+                if (not continue_processing) break batch_processing;
+            };
+            case (#err(err)) {
+                ignore rollback_and_delete_batch_populate_indexes(collection, batch_id);
+                return #err(err);
+            };
+        };
+
+        #ok();
 
     };
 
@@ -345,12 +821,10 @@ module StableCollection {
     func recommended_entries_to_populate_based_on_benchmarks(
         num_indexes : Nat
     ) : Nat {
-        let TRILLION = 1_000_000_000_000;
-        let MILLION = 1_000_000;
 
-        let max_instructions = 30 * TRILLION; // allows for 10T buffer
-        let decode_cost = 300 * MILLION; // per entry
-        let insert_cost = 150 * MILLION; // per entry per index
+        let max_instructions = 30 * C.TRILLION; // allows for 10T buffer
+        let decode_cost = 300 * C.MILLION; // per entry
+        let insert_cost = 150 * C.MILLION; // per entry per index
 
         // Calculate maximum number of entries
         let max_entries = max_instructions / (decode_cost + insert_cost * num_indexes);
@@ -652,7 +1126,10 @@ module StableCollection {
 
             let ?compsite_field_values = CollectionUtils.getIndexColumns(collection, index.key_details, document_id, candid_map) else continue validating_unique_constraints;
             let index_data_utils = CompositeIndex.get_index_data_utils(collection);
-            // Debug.print("compsite_field_values: " # debug_show compsite_field_values);
+            Logger.lazyDebug(
+                collection.logger,
+                func() = "compsite_field_values: " # debug_show compsite_field_values,
+            );
 
             let opt_prev_document_id = BTree.get(index.data, index_data_utils, compsite_field_values);
 
@@ -673,81 +1150,6 @@ module StableCollection {
 
         #ok()
 
-    };
-
-    public func put(
-        collection : T.StableCollection,
-        main_btree_utils : T.BTreeUtils<T.DocumentId, T.Document>,
-        candid_blob : T.CandidBlob,
-    ) : T.Result<T.DocumentId, Text> {
-
-        let next_id = Ids.next(collection.ids);
-        let next_id_as_blob = Blob.fromArray(ByteUtils.BigEndian.fromNat64(Nat64.fromNat(next_id)));
-        let document_id = Utils.concat_blob(collection.instance_id, next_id_as_blob);
-
-        Logger.lazyInfo(
-            collection.logger,
-            func() = "ZenDB Collection.put(): Inserting document with id " # debug_show document_id,
-        );
-
-        let candid = CollectionUtils.decodeCandidBlob(collection, candid_blob);
-
-        Logger.lazyDebug(
-            collection.logger,
-            func() = "ZenDB Collection.put(): Inserting document with id " # debug_show document_id # " and candid " # debug_show candid,
-        );
-
-        switch (Schema.validate(collection.schema, candid)) {
-            case (#ok(_)) {};
-            case (#err(msg)) {
-                let err_msg = "Schema validation failed: " # msg;
-                return #err(err_msg);
-            };
-        };
-
-        let candid_map = CandidMap.new(collection.schema_map, document_id, candid);
-
-        switch (validate_schema_constraints_on_updated_fields(collection, document_id, candid_map, null)) {
-            case (#ok(_)) {};
-            case (#err(msg)) {
-                let err_msg = "Schema Constraint validation failed: " # msg;
-                return #err(err_msg);
-            };
-        };
-
-        let opt_prev = DocumentStore.put(collection.documents, main_btree_utils, document_id, candid_blob);
-
-        switch (opt_prev) {
-            case (null) {};
-            case (?prev) {
-                Debug.trap("put(): Record with id " # debug_show document_id # " already exists. Internal error found, report this to the developers");
-            };
-        };
-
-        if (Map.size(collection.indexes) == 0) return #ok(document_id);
-
-        let updated_indexes = Buffer.Buffer<T.Index>(Map.size(collection.indexes));
-
-        label updating_indexes for (index in Map.vals(collection.indexes)) {
-            let res = update_indexed_document_fields(collection, index, document_id, candid_map, null);
-
-            switch (res) {
-                case (#err(err)) {
-                    for (index in updated_indexes.vals()) {
-                        ignore CommonIndexFns.removeWithCandidMap(collection, index, document_id, candid_map);
-                    };
-
-                    ignore DocumentStore.remove(collection.documents, main_btree_utils, document_id);
-
-                    return #err(err);
-                };
-                case (#ok(_)) {};
-            };
-
-            updated_indexes.add(index);
-        };
-
-        #ok(document_id);
     };
 
     public func replace_by_id<Record>(
@@ -952,7 +1354,79 @@ module StableCollection {
     };
 
     public func insert(collection : T.StableCollection, main_btree_utils : T.BTreeUtils<T.DocumentId, T.Document>, candid_blob : T.CandidBlob) : T.Result<T.DocumentId, Text> {
-        put(collection, main_btree_utils, candid_blob);
+
+        let next_id = Ids.next(collection.ids);
+        let next_id_as_blob = Blob.fromArray(ByteUtils.BigEndian.fromNat64(Nat64.fromNat(next_id)));
+        let document_id = Utils.concat_blob(collection.instance_id, next_id_as_blob);
+
+        Logger.lazyInfo(
+            collection.logger,
+            func() = "ZenDB Collection.put(): Inserting document with id " # debug_show document_id,
+        );
+
+        let candid = CollectionUtils.decodeCandidBlob(collection, candid_blob);
+
+        Logger.lazyDebug(
+            collection.logger,
+            func() = "ZenDB Collection.put(): Inserting document with id " # debug_show document_id # " and candid " # debug_show candid,
+        );
+
+        switch (Schema.validate(collection.schema, candid)) {
+            case (#ok(_)) {};
+            case (#err(msg)) {
+                let err_msg = "Schema validation failed: " # msg;
+                return #err(err_msg);
+            };
+        };
+
+        let candid_map = CandidMap.new(collection.schema_map, document_id, candid);
+
+        switch (validate_schema_constraints_on_updated_fields(collection, document_id, candid_map, null)) {
+            case (#ok(_)) {};
+            case (#err(msg)) {
+                let err_msg = "Schema Constraint validation failed: " # msg;
+                return #err(err_msg);
+            };
+        };
+
+        let opt_prev = DocumentStore.put(collection.documents, main_btree_utils, document_id, candid_blob);
+
+        switch (opt_prev) {
+            case (null) {};
+            case (?prev) {
+                Debug.trap("put(): Record with id " # debug_show document_id # " already exists. Internal error found, report this to the developers");
+            };
+        };
+
+        Logger.lazyDebug(
+            collection.logger,
+            func() = "Total indexes: " # debug_show (Map.size(collection.indexes)),
+        );
+
+        if (Map.size(collection.indexes) == 0) return #ok(document_id);
+
+        let updated_indexes = Buffer.Buffer<T.Index>(Map.size(collection.indexes));
+
+        label updating_indexes for (index in Map.vals(collection.indexes)) {
+            let res = update_indexed_document_fields(collection, index, document_id, candid_map, null);
+
+            switch (res) {
+                case (#err(err)) {
+                    for (index in updated_indexes.vals()) {
+                        ignore CommonIndexFns.removeWithCandidMap(collection, index, document_id, candid_map);
+                    };
+
+                    ignore DocumentStore.remove(collection.documents, main_btree_utils, document_id);
+
+                    return #err(err);
+                };
+                case (#ok(_)) {};
+            };
+
+            updated_indexes.add(index);
+        };
+
+        #ok(document_id);
     };
 
     public func insert_docs(
@@ -1064,7 +1538,10 @@ module StableCollection {
             };
         };
 
-        // Debug.print("Formatted query operations: " # debug_show formatted_query_operations);
+        Logger.lazyDebug(
+            collection.logger,
+            func() = "Formatted query operations: " # debug_show formatted_query_operations,
+        );
 
         let query_plan : T.QueryPlan = QueryPlan.create_query_plan(
             collection,

@@ -91,6 +91,22 @@ module {
 
     };
 
+    public func deallocate(
+        collection : T.StableCollection,
+        index : T.Index,
+    ) {
+
+        switch (index) {
+            case (#text_index(text_index)) {
+                TextIndex.deallocate(collection, text_index);
+            };
+            case (#composite_index(composite_index)) {
+                CompositeIndex.deallocate(collection, composite_index);
+            };
+        };
+
+    };
+
     public func insertWithCandidMap(
         collection : T.StableCollection,
         index : T.Index,

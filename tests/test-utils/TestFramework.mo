@@ -8,6 +8,10 @@ import Option "mo:base@0.16.0/Option";
 import Principal "mo:base@0.16.0/Principal";
 
 import ZenDB "../../src";
+import CollectionUtils "../../src/Collection/CollectionUtils";
+import StableCollection "../../src/Collection/StableCollection";
+import CommonIndexFns "../../src/Collection/Index/CommonIndexFns";
+import TypeMigrations "../../src/TypeMigrations";
 
 import { test; suite } "mo:test";
 import Itertools "mo:itertools@0.2.2/Iter";
@@ -103,22 +107,52 @@ module TestFramework {
                             indexOnlyFns = func(callback_fns : Function<(), ()>) {
                                 callback_fns();
                             };
+
                             createIndex : CreateIndexOnCollection = func(
                                 collection_name : Text,
                                 index_name : Text,
                                 index_key_details : [(Text, ZenDB.Types.SortDirection)],
-                                options : ?ZenDB.Types.CreateIndexOptions,
+                                opt_options : ?ZenDB.Types.CreateIndexOptions,
                             ) {
 
-                                zendb._create_index_on_collection(
-                                    collection_name,
+                                let stable_state = TypeMigrations.get_current_state(zendb_sstore);
+
+                                let db = Option.unwrap(Map.get(stable_state.databases, Map.thash, "with_index"));
+                                let collection = Option.unwrap(Map.get(db.collections, Map.thash, collection_name));
+
+                                let internal_options : ZenDB.Types.CreateIndexInternalOptions = switch (opt_options) {
+                                    case (?options) ZenDB.Types.CreateIndexOptions.to_internal_default(options);
+                                    case (null) ZenDB.Types.CreateIndexOptions.internal_default();
+                                };
+
+                                Debug.print("Create Batch Index Internal Options: " # debug_show (internal_options));
+
+                                let res = StableCollection.create_and_populate_index_in_one_call(
+                                    collection,
                                     index_name,
                                     index_key_details,
-                                    switch (options) {
-                                        case (?{ is_unique }) is_unique;
-                                        case (_) false;
-                                    },
+                                    internal_options,
                                 );
+
+                                // assert the indexes were properly created
+                                let ?index = Map.get(collection.indexes, Map.thash, index_name) else return Debug.trap("ZenDB Test Suite -> createIndex(): Could not retrieve Index named '" # index_name # "' after it was supposedly created");
+
+                                let collection_size = StableCollection.size(collection);
+                                let index_size = CommonIndexFns.size(index);
+
+                                assert CommonIndexFns.name(index) == index_name;
+                                let internal_index = CommonIndexFns.get_internal_index(index);
+
+                                // Debug.print("ZenDB Test Suite -> createIndex(): Index Key details mismatch (expected: " # debug_show (index_key_details) # ", actual: " # debug_show (internal_index.key_details) # ")");
+                                // assert internal_index.key_details == index_key_details;
+
+                                if (collection_size > 0) if (index_size == 0) {
+                                    Debug.trap(
+                                        "ZenDB Test Suite -> createIndex(): Created Index does not match collection size (collection_size: " # debug_show (collection_size) # ", index_size: " # debug_show (index_size) # ")"
+                                    );
+                                };
+
+                                res;
 
                             };
                         };
@@ -127,7 +161,6 @@ module TestFramework {
                     },
                 );
             };
-
         };
 
         func run_suite_for_all_memory_types() {
@@ -150,7 +183,6 @@ module TestFramework {
                             );
 
                             run_suite_with_or_without_indexes("Stable Memory", zendb_sstore);
-
                         },
                     );
 
@@ -168,7 +200,6 @@ module TestFramework {
                                 },
                             );
                             run_suite_with_or_without_indexes("Heap Memory", zendb_sstore);
-
                         },
                     );
                 },

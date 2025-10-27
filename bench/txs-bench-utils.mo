@@ -37,6 +37,10 @@ module TxsBenchUtils {
     public let Rows = [
         "insert with no index",
         "create and populate indexes",
+        "create and populate indexes 2",
+        "create and populate indexes 3",
+        "create and populate indexes 4",
+        "create and populate indexes 5",
         "clear collection entries and indexes",
         "insert with indexes",
 
@@ -199,12 +203,12 @@ module TxsBenchUtils {
         };
     };
 
-    public class TxsBenchmarks(limit : Nat) {
+    public class TxsBenchmarks(input_limit : Nat, iteration_limit : Nat) {
 
         let fuzz = Fuzz.fromSeed(0x7eadbeef);
 
         let principals = Array.tabulate(
-            50,
+            (input_limit / iteration_limit) * 50,
             func(i : Nat) : Principal {
                 fuzz.principal.randomPrincipal(29);
             },
@@ -227,10 +231,10 @@ module TxsBenchUtils {
             func(p : Principal) : ZenDB.Types.Candid = #Principal(p),
         );
 
-        let predefined_txs = Buffer.Buffer<Tx>(limit);
-        let tx_ids = Buffer.Buffer<Blob>(limit);
+        let predefined_txs = Buffer.Buffer<Tx>(input_limit);
+        let tx_ids = Buffer.Buffer<Blob>(input_limit);
 
-        for (i in Iter.range(0, limit - 1)) {
+        for (i in Iter.range(0, input_limit - 1)) {
             let tx = TxsBenchUtils.new_tx(fuzz, principals);
             predefined_txs.add(tx);
         };
@@ -295,15 +299,41 @@ module TxsBenchUtils {
             candid_principals_0_10 : [ZenDB.Types.Candid],
             new_query : () -> ZenDB.QueryBuilder,
             fuzz : Fuzz.Fuzzer,
-            limit : Nat,
+            iteration_limit : Nat,
         ) {
+
+            // Batch processing state variables
+            var batch_id : ?Nat = null;
+            var needs_processing : Bool = false;
+
+            // Helper function to continue processing batch if needed
+            func continue_batch_processing() {
+                switch (batch_id) {
+                    case (?id) {
+                        if (needs_processing) {
+                            switch (collection.processIndexBatch(id)) {
+                                case (#ok(continue_processing)) {
+                                    needs_processing := continue_processing;
+                                    // If processing is complete, reset batch_id since batch is automatically cleaned up
+                                    if (not continue_processing) {
+                                        batch_id := null;
+                                    };
+                                };
+                                case (#err(err_msg)) {
+                                    Debug.trap(err_msg);
+                                };
+                            };
+                        };
+                    };
+                    case (null) {};
+                };
+            };
 
             public func run_benchmark(benchmark_name : Text) {
 
                 switch (benchmark_name) {
                     case ("insert with no index") {
-                        for (i in Iter.range(0, limit - 1)) {
-                            let tx = inputs.get(i);
+                        for (tx in inputs.vals()) {
                             let #ok(_) = collection.insert(tx);
                         };
 
@@ -311,10 +341,54 @@ module TxsBenchUtils {
                     };
 
                     case ("create and populate indexes") {
-                        for ((i, index_details) in Itertools.enumerate(indexes.vals())) {
-                            let #ok(_) = collection.createIndex("index_" # debug_show (i), index_details, null);
-                        };
+                        // Create batch for indexes
+                        let index_configs = Array.tabulate<ZenDB.Types.CreateIndexBatchConfig>(
+                            indexes.size(),
+                            func(i : Nat) : ZenDB.Types.CreateIndexBatchConfig {
+                                let index_name = "index_" # debug_show (i);
+                                (index_name, indexes[i], false, false); // name, key_details, is_unique, used_internally
+                            },
+                        );
 
+                        if (index_configs.size() == 0) return;
+
+                        let res = collection.batchCreateIndexes(index_configs);
+                        switch (res) {
+                            case (#ok(id)) {
+                                batch_id := ?id;
+                                needs_processing := true;
+                                // Process the first batch
+                                switch (collection.processIndexBatch(id)) {
+                                    case (#ok(continue_processing)) {
+                                        needs_processing := continue_processing;
+                                        // If processing is complete, reset batch_id since batch is automatically cleaned up
+                                        if (not continue_processing) {
+                                            batch_id := null;
+                                        };
+                                    };
+                                    case (#err(err_msg)) {
+                                        Debug.trap(err_msg);
+                                    };
+                                };
+                            };
+                            case (#err(err)) { Debug.trap(err) };
+                        };
+                    };
+
+                    case ("create and populate indexes 2") {
+                        continue_batch_processing();
+                    };
+
+                    case ("create and populate indexes 3") {
+                        continue_batch_processing();
+                    };
+
+                    case ("create and populate indexes 4") {
+                        continue_batch_processing();
+                    };
+
+                    case ("create and populate indexes 5") {
+                        continue_batch_processing();
                     };
 
                     case ("clear collection entries and indexes") {
@@ -322,18 +396,16 @@ module TxsBenchUtils {
                     };
 
                     case ("insert with indexes") {
-                        for (i in Iter.range(0, limit - 1)) {
-                            let tx = inputs.get(i);
+                        for (tx in inputs.vals()) {
                             let #ok(id) = collection.insert(tx);
                             tx_ids.add(Utils.nat_from_12_byte_blob(id));
                         };
-
                     };
 
                     case ("query(): no filter (all txs)") {
                         let db_query = new_query();
                         let #ok(matching_txs) = collection.search(db_query);
-                        // assert matching_txs.size() == limit;
+                        // assert matching_txs.size() == iteration_limit;
                     };
 
                     case ("query(): single field (btype = '1mint')") {
@@ -506,13 +578,13 @@ module TxsBenchUtils {
                     };
                     case ("update(): single operation -> #add amt += 100") {
                         // Debug.print("tx_ids.size(): " # debug_show (tx_ids.size()));
-                        for (i in Itertools.take(tx_ids.vals(), limit)) {
+                        for (i in Itertools.take(tx_ids.vals(), iteration_limit)) {
                             let #ok(_) = collection.updateById(Utils.nat_to_12_byte_blob(i), [("tx.amt", #add(#currValue, #Nat(100)))]);
                         };
                     };
 
                     case ("update(): multiple independent operations -> #add, #sub, #mul, #div on tx.amt") {
-                        for (i in Itertools.take(tx_ids.vals(), limit)) {
+                        for (i in Itertools.take(tx_ids.vals(), iteration_limit)) {
                             let #ok(_) = collection.updateById(
                                 Utils.nat_to_12_byte_blob(i),
                                 [
@@ -526,7 +598,7 @@ module TxsBenchUtils {
                     };
 
                     case ("update(): multiple nested operations -> #add, #sub, #mul, #div on tx.amt") {
-                        for (i in Itertools.take(tx_ids.vals(), limit)) {
+                        for (i in Itertools.take(tx_ids.vals(), iteration_limit)) {
                             let #ok(_) = collection.updateById(
                                 Utils.nat_to_12_byte_blob(i),
                                 [("tx.amt", #div(#mul(#sub(#add(#currValue, #Nat(100)), #Nat(50)), #Nat(2)), #Nat(2)))],
@@ -535,7 +607,7 @@ module TxsBenchUtils {
                     };
 
                     case ("update(): multiple operations on multiple fields -> #add, #sub, #mul, #div on (tx.amt, ts, fee)") {
-                        for (i in Itertools.take(tx_ids.vals(), limit)) {
+                        for (i in Itertools.take(tx_ids.vals(), iteration_limit)) {
                             let #ok(_) = collection.updateById(
                                 Utils.nat_to_12_byte_blob(i),
                                 [
@@ -549,13 +621,13 @@ module TxsBenchUtils {
                     };
 
                     case ("replace() -> replace half the tx with new tx") {
-                        for (i in Itertools.take(tx_ids.vals(), limit)) {
+                        for (i in Itertools.take(tx_ids.vals(), iteration_limit)) {
                             let #ok(_) = collection.replace(Utils.nat_to_12_byte_blob(i), new_tx(fuzz, principals));
                         };
                     };
 
                     case ("delete()") {
-                        for (i in Itertools.take(tx_ids.vals(), limit)) {
+                        for (i in Itertools.take(tx_ids.vals(), iteration_limit)) {
                             let #ok(_) = collection.deleteById(Utils.nat_to_12_byte_blob(i));
                         };
                     };
@@ -572,144 +644,144 @@ module TxsBenchUtils {
             heap_no_index,
             [],
             predefined_txs,
-            Buffer.Buffer<Nat>(limit),
+            Buffer.Buffer<Nat>(iteration_limit),
             principals,
             candid_principals_0_10,
             new_query(),
             fuzz,
-            limit,
+            iteration_limit,
         );
 
         let stable_memory_no_index_benchmark = CollectionBenchmark(
             stable_memory_no_index,
             [],
             predefined_txs,
-            Buffer.Buffer<Nat>(limit),
+            Buffer.Buffer<Nat>(iteration_limit),
             principals,
             candid_principals_0_10,
             new_query(),
             fuzz,
-            limit,
+            iteration_limit,
         );
 
         let stable_memory_single_field_indexes_benchmark = CollectionBenchmark(
             stable_memory_single_field_indexes,
             single_field_indexes,
             predefined_txs,
-            Buffer.Buffer<Nat>(limit),
+            Buffer.Buffer<Nat>(iteration_limit),
             principals,
             candid_principals_0_10,
             new_query(),
             fuzz,
-            limit,
+            iteration_limit,
         );
 
         let heap_single_field_indexes_benchmark = CollectionBenchmark(
             heap_single_field_indexes,
             single_field_indexes,
             predefined_txs,
-            Buffer.Buffer<Nat>(limit),
+            Buffer.Buffer<Nat>(iteration_limit),
             principals,
             candid_principals_0_10,
             new_query(),
             fuzz,
-            limit,
+            iteration_limit,
         );
 
         let heap_fully_covered_indexes_benchmark = CollectionBenchmark(
             heap_fully_covered_indexes,
             fully_covered_indexes,
             predefined_txs,
-            Buffer.Buffer<Nat>(limit),
+            Buffer.Buffer<Nat>(iteration_limit),
             principals,
             candid_principals_0_10,
             new_query(),
             fuzz,
-            limit,
+            iteration_limit,
         );
 
         let stable_memory_fully_covered_indexes_benchmark = CollectionBenchmark(
             stable_memory_fully_covered_indexes,
             fully_covered_indexes,
             predefined_txs,
-            Buffer.Buffer<Nat>(limit),
+            Buffer.Buffer<Nat>(iteration_limit),
             principals,
             candid_principals_0_10,
             new_query(),
             fuzz,
-            limit,
+            iteration_limit,
         );
 
         let heap_sorted_no_index_benchmark = CollectionBenchmark(
             heap_sorted_no_index,
             [],
             predefined_txs,
-            Buffer.Buffer<Nat>(limit),
+            Buffer.Buffer<Nat>(iteration_limit),
             principals,
             candid_principals_0_10,
             new_sorted_query("ts", #Ascending),
             fuzz,
-            limit,
+            iteration_limit,
         );
 
         let stable_memory_sorted_no_index_benchmark = CollectionBenchmark(
             stable_memory_sorted_no_index,
             [],
             predefined_txs,
-            Buffer.Buffer<Nat>(limit),
+            Buffer.Buffer<Nat>(iteration_limit),
             principals,
             candid_principals_0_10,
             new_sorted_query("ts", #Ascending),
             fuzz,
-            limit,
+            iteration_limit,
         );
 
         let stable_memory_sorted_single_field_indexes_benchmark = CollectionBenchmark(
             stable_memory_sorted_single_field_indexes,
             single_field_indexes,
             predefined_txs,
-            Buffer.Buffer<Nat>(limit),
+            Buffer.Buffer<Nat>(iteration_limit),
             principals,
             candid_principals_0_10,
             new_sorted_query("tx.amt", #Ascending),
             fuzz,
-            limit,
+            iteration_limit,
         );
 
         let heap_sorted_single_field_indexes_benchmark = CollectionBenchmark(
             heap_sorted_single_field_indexes,
             single_field_indexes,
             predefined_txs,
-            Buffer.Buffer<Nat>(limit),
+            Buffer.Buffer<Nat>(iteration_limit),
             principals,
             candid_principals_0_10,
             new_sorted_query("tx.amt", #Ascending),
             fuzz,
-            limit,
+            iteration_limit,
         );
 
         let heap_sorted_fully_covered_indexes_benchmark = CollectionBenchmark(
             heap_sorted_fully_covered_indexes,
             fully_covered_indexes,
             predefined_txs,
-            Buffer.Buffer<Nat>(limit),
+            Buffer.Buffer<Nat>(iteration_limit),
             principals,
             candid_principals_0_10,
             new_sorted_query("ts", #Ascending),
             fuzz,
-            limit,
+            iteration_limit,
         );
 
         let stable_memory_sorted_fully_covered_indexes_benchmark = CollectionBenchmark(
             stable_memory_sorted_fully_covered_indexes,
             fully_covered_indexes,
             predefined_txs,
-            Buffer.Buffer<Nat>(limit),
+            Buffer.Buffer<Nat>(iteration_limit),
             principals,
             candid_principals_0_10,
             new_sorted_query("ts", #Ascending),
             fuzz,
-            limit,
+            iteration_limit,
         );
 
         public func run_benchmarks(row : Text, col : Text) {
@@ -772,7 +844,7 @@ module TxsBenchUtils {
     func paginated_queries(
         txs : ZenDB.Collection<Tx>,
         section : Text,
-        limit : Nat,
+        iteration_limit : Nat,
         predefined_txs : Buffer.Buffer<Tx>,
         principals : [Principal],
         candid_principals : [ZenDB.Types.Candid],
@@ -941,7 +1013,7 @@ module TxsBenchUtils {
             };
 
             case (_) {
-                Debug.trap("Should be unreachable:\n row = zenDB (skip_limit_pagination limit = 100, -> array) and col = \"" # debug_show section # "\"");
+                Debug.trap("Should be unreachable:\n row = zenDB (skip_limit_pagination iteration_limit = 100, -> array) and col = \"" # debug_show section # "\"");
             };
 
         };

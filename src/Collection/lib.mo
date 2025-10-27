@@ -448,26 +448,72 @@ module {
         //     handleResult(StableCollection.update_schema(collection, schema), "Failed to update schema");
         // };
 
-        type CreateIndexOptions = {
-            is_unique : Bool;
-        };
-
         /// Creates a new index with the given index keys.
         /// If `is_unique` is true, the index will be unique on the index keys and documents with duplicate index keys will be rejected.
-        public func createIndex(name : Text, index_key_details : [(Text, SortDirection)], options : ?CreateIndexOptions) : T.Result<(), Text> {
+        public func createIndex(name : Text, index_key_details : [(Text, SortDirection)], opt_options : ?T.CreateIndexOptions) : T.Result<(), Text> {
 
-            let is_unique = switch (options) {
-                case (?options) options.is_unique;
-                case (null) false;
+            let internal_options : T.CreateIndexInternalOptions = switch (opt_options) {
+                case (?options) T.CreateIndexOptions.to_internal_default(options);
+                case (null) T.CreateIndexOptions.internal_default();
             };
 
-            switch (StableCollection.create_composite_index(collection, main_btree_utils, name, index_key_details, is_unique)) {
-                case (#ok(success)) #ok();
-                case (#err(errorMsg)) {
-                    return Utils.log_error_msg(collection.logger, "Failed to create index (" # name # "): " # errorMsg);
-                };
+            StableCollection.create_and_populate_index_in_one_call(
+                collection,
+                name,
+                index_key_details,
+                internal_options,
+            );
+        };
+
+        public func batchCreateIndexes(index_configs : [T.CreateIndexBatchConfig]) : T.Result<(batch_id : Nat), Text> {
+            handleResult(
+                StableCollection.batch_create_indexes(collection, index_configs),
+                "Failed to create index batch",
+            );
+        };
+
+        public func batchPopulateIndexes(index_names : [Text]) : T.Result<(batch_id : Nat), Text> {
+
+            var error : ?Text = null;
+
+            let index_configs = Array.map<Text, T.CreateIndexBatchConfig>(
+                index_names,
+                func(name : Text) : T.CreateIndexBatchConfig {
+                    switch (Map.get(collection.indexes, T.thash, name)) {
+                        case (?index) switch (index) {
+                            case (#composite_index(composite_index)) {
+                                (name, composite_index.key_details, composite_index.is_unique, composite_index.used_internally);
+                            };
+                            case (#text_index(text_index)) {
+                                (text_index.internal_index.name, text_index.internal_index.key_details, text_index.internal_index.is_unique, text_index.internal_index.used_internally);
+                            };
+                        };
+                        case (null) {
+                            error := ?("Could not find index with name: " # name);
+                            ("", [], false, false); // dummy return to satisfy the type checker
+                        };
+                    };
+
+                },
+
+            );
+
+            switch (error) {
+                case (?err) return #err(err);
+                case (null) {};
             };
 
+            handleResult(
+                StableCollection.create_populate_indexes_batch(collection, index_configs, null),
+                "Failed to create populate index batch",
+            );
+        };
+
+        public func processIndexBatch(batch_id : Nat) : T.Result<(done_processing : Bool), Text> {
+            handleResult(
+                StableCollection.populate_indexes_in_batch(collection, batch_id, null),
+                "Failed to process index batch with id: " # debug_show (batch_id),
+            );
         };
 
         /// Deletes an index from the collection that is not used internally.

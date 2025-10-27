@@ -166,6 +166,29 @@ module T {
 
     public type DocumentStore = BTree<DocumentId, Document>;
 
+    public type CreateIndexBatchConfig = (
+        name : Text,
+        key_details : [(field : Text, SortDirection)],
+        is_unique : Bool,
+        used_internally : Bool,
+    );
+
+    public type BatchPopulateIndex = {
+        id : Nat;
+        indexes : [Index];
+        var indexed_documents : Nat;
+        total_documents : Nat;
+
+        var avg_instructions_per_document : Nat;
+        var total_instructions_used : Nat;
+
+        var next_document_to_process : DocumentId;
+
+        var num_documents_to_process_per_batch : ?Nat;
+        var done_processing : Bool;
+
+    };
+
     public type StableCollection = {
         ids : Ids;
         instance_id : Blob;
@@ -177,6 +200,8 @@ module T {
 
         documents : DocumentStore;
         indexes : Map<Text, Index>;
+        indexes_in_batch_operations : Map<Text, Index>;
+        populate_index_batches : Map<Nat, BatchPopulateIndex>;
 
         field_constraints : Map<Text, [SchemaFieldConstraint]>;
         unique_constraints : [([Text], CompositeIndex)];
@@ -187,6 +212,7 @@ module T {
         freed_btrees : Vector.Vector<MemoryBTree.StableMemoryBTree>;
         logger : Logger;
         memory_type : MemoryType;
+        is_running_locally : Bool;
     };
 
     type NestedCandid = {
@@ -214,6 +240,7 @@ module T {
         // the ZenDB database document
         freed_btrees : Vector.Vector<MemoryBTree.StableMemoryBTree>;
         logger : Logger;
+        is_running_locally : Bool;
     };
 
     public type StableStore = {
@@ -227,6 +254,7 @@ module T {
         memory_type : MemoryType;
         freed_btrees : Vector.Vector<MemoryBTree.StableMemoryBTree>;
         logger : Logger;
+        is_running_locally : Bool;
     };
 
     public type LogLevel = {
@@ -337,8 +365,32 @@ module T {
         is_unique : Bool;
     };
 
+    public type CreateIndexInternalOptions = CreateIndexOptions and {
+        used_internally : Bool;
+    };
+
+    public module CreateIndexOptions {
+        public func default() : CreateIndexOptions {
+            { is_unique = false };
+        };
+
+        public func internal_default() : CreateIndexInternalOptions {
+            { default() with used_internally = false };
+        };
+
+        public func to_internal_default(options : CreateIndexOptions) : CreateIndexInternalOptions {
+            { is_unique = options.is_unique; used_internally = false };
+        };
+    };
+
     public type CreateCollectionOptions = {
         schemaConstraints : [T.SchemaConstraint];
+    };
+
+    public module CreateCollectionOptions {
+        public func default() : CreateCollectionOptions {
+            { schemaConstraints = [] };
+        };
     };
 
     /// MemoryBTree Stats

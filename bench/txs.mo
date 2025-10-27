@@ -48,6 +48,10 @@ module {
         bench.rows([
             "insert with no index",
             "create and populate indexes",
+            "create and populate indexes 2",
+            "create and populate indexes 3",
+            "create and populate indexes 4",
+            "create and populate indexes 5",
             "clear collection entries and indexes",
             "insert with indexes",
 

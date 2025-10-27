@@ -19,6 +19,7 @@ import RevIter "mo:itertools@0.2.2/RevIter";
 import BitMap "mo:bit-map@0.1.2";
 import MemoryBTree "mo:memory-collection@0.3.2/MemoryBTree/Stable";
 import TypeUtils "mo:memory-collection@0.3.2/TypeUtils";
+import Vector "mo:vector@0.4.2";
 
 import T "../../Types";
 import CandidMap "../../CandidMap";
@@ -99,6 +100,19 @@ module CompositeIndex {
         };
 
         index;
+
+    };
+
+    public func deallocate(collection : T.StableCollection, index : CompositeIndex) {
+        BTree.clear(index.data);
+
+        // deallocate the btree if using stable memory
+        switch (index.data) {
+            case (#stableMemory(memory_btree)) {
+                Vector.add(collection.freed_btrees, memory_btree);
+            };
+            case (#heap(_)) {};
+        };
 
     };
 

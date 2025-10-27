@@ -133,6 +133,17 @@ module DocumentStore {
 
     };
 
+    public func scanKeys(store : DocumentStore, cmp : T.BTreeUtils<T.DocumentId, T.Document>, start_key : ?T.DocumentId, end_key : ?T.DocumentId) : T.RevIter<T.DocumentId> {
+        BTree.scanKeys(store, cmp, start_key, end_key);
+    };
+
+    public func scanVals(store : DocumentStore, cmp : T.BTreeUtils<T.DocumentId, T.Document>, start_key : ?T.DocumentId, end_key : ?T.DocumentId) : T.RevIter<Blob> {
+        RevIter.map<T.Document, Blob>(
+            BTree.scanVals(store, cmp, start_key, end_key),
+            extract_candid_blob_from_document_v0,
+        );
+    };
+
     public func keys(store : DocumentStore, cmp : T.BTreeUtils<T.DocumentId, T.Document>) : T.RevIter<T.DocumentId> {
         BTree.keys(store, cmp);
     };
@@ -180,6 +191,24 @@ module DocumentStore {
 
     public func get_scan_as_interval<K, V>(btree : T.BTree<K, V>, cmp : T.BTreeUtils<K, V>, start_key : ?K, end_key : ?K) : T.Interval {
         BTree.getScanAsInterval(btree, cmp, start_key, end_key);
+    };
+
+    public func getMin(store : DocumentStore, cmp : T.BTreeUtils<T.DocumentId, T.Document>) : ?(T.DocumentId, Blob) {
+        Option.map<(T.DocumentId, T.Document), (T.DocumentId, Blob)>(
+            BTree.getMin(store, cmp),
+            func(pair : (T.DocumentId, T.Document)) : (T.DocumentId, Blob) {
+                (pair.0, extract_candid_blob_from_document_v0(pair.1));
+            },
+        );
+    };
+
+    public func getMax(store : DocumentStore, cmp : T.BTreeUtils<T.DocumentId, T.Document>) : ?(T.DocumentId, Blob) {
+        Option.map<(T.DocumentId, T.Document), (T.DocumentId, Blob)>(
+            BTree.getMax(store, cmp),
+            func(pair : (T.DocumentId, T.Document)) : (T.DocumentId, Blob) {
+                (pair.0, extract_candid_blob_from_document_v0(pair.1));
+            },
+        );
     };
 
 };

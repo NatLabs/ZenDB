@@ -129,6 +129,54 @@ module BTree {
         };
     };
 
+    public func scanKeys<K, V>(btree : T.BTree<K, V>, cmp : T.BTreeUtils<K, V>, start_key : ?K, end_key : ?K) : T.RevIter<K> {
+        switch (btree, cmp) {
+            case (#stableMemory(memory_btree), #stableMemory(memory_btree_utils)) {
+                return MemoryBTree.scanKeys(memory_btree, memory_btree_utils, start_key, end_key);
+            };
+            case (#heap(heap_btree), #heap(heap_btree_utils)) {
+                return BpTree.scan<Blob, V>(
+                    heap_btree,
+                    heap_btree_utils.cmp,
+                    Option.map(start_key, heap_btree_utils.blobify.to_blob),
+                    Option.map(end_key, heap_btree_utils.blobify.to_blob),
+                ) |> RevIter.map<(Blob, V), K>(
+                    _,
+                    func(pair : (Blob, V)) : K {
+                        heap_btree_utils.blobify.from_blob(pair.0);
+                    },
+                );
+            };
+            case (_) {
+                Debug.trap("Invalid BTree type");
+            };
+        };
+    };
+
+    public func scanVals<K, V>(btree : T.BTree<K, V>, cmp : T.BTreeUtils<K, V>, start_key : ?K, end_key : ?K) : T.RevIter<V> {
+        switch (btree, cmp) {
+            case (#stableMemory(memory_btree), #stableMemory(memory_btree_utils)) {
+                return MemoryBTree.scanVals(memory_btree, memory_btree_utils, start_key, end_key);
+            };
+            case (#heap(heap_btree), #heap(heap_btree_utils)) {
+                return BpTree.scan<Blob, V>(
+                    heap_btree,
+                    heap_btree_utils.cmp,
+                    Option.map(start_key, heap_btree_utils.blobify.to_blob),
+                    Option.map(end_key, heap_btree_utils.blobify.to_blob),
+                ) |> RevIter.map<(Blob, V), V>(
+                    _,
+                    func(pair : (Blob, V)) : V {
+                        pair.1;
+                    },
+                );
+            };
+            case (_) {
+                Debug.trap("Invalid BTree type");
+            };
+        };
+    };
+
     public func keys<K, V>(btree : T.BTree<K, V>, cmp : T.BTreeUtils<K, V>) : T.RevIter<K> {
         switch (btree, cmp) {
             case (#stableMemory(memory_btree), #stableMemory(memory_btree_utils)) {
@@ -247,6 +295,46 @@ module BTree {
             };
             case (#heap(heap_btree), #heap(heap_btree_utils)) {
                 return BpTree.getExpectedIndex<Blob, V>(heap_btree, heap_btree_utils.cmp, heap_btree_utils.blobify.to_blob(key));
+            };
+            case (_) {
+                Debug.trap("Invalid BTree type");
+            };
+        };
+    };
+
+    public func getMin<K, V>(btree : T.BTree<K, V>, cmp : T.BTreeUtils<K, V>) : ?(K, V) {
+        switch (btree, cmp) {
+            case (#stableMemory(memory_btree), #stableMemory(memory_btree_utils)) {
+                return MemoryBTree.getMin(memory_btree, memory_btree_utils);
+            };
+            case (#heap(heap_btree), #heap(heap_btree_utils)) {
+                switch (BpTree.min(heap_btree)) {
+                    case (?pair) {
+                        let key = heap_btree_utils.blobify.from_blob(pair.0);
+                        ?(key, pair.1);
+                    };
+                    case (null) null;
+                };
+            };
+            case (_) {
+                Debug.trap("Invalid BTree type");
+            };
+        };
+    };
+
+    public func getMax<K, V>(btree : T.BTree<K, V>, cmp : T.BTreeUtils<K, V>) : ?(K, V) {
+        switch (btree, cmp) {
+            case (#stableMemory(memory_btree), #stableMemory(memory_btree_utils)) {
+                return MemoryBTree.getMax(memory_btree, memory_btree_utils);
+            };
+            case (#heap(heap_btree), #heap(heap_btree_utils)) {
+                switch (BpTree.max(heap_btree)) {
+                    case (?pair) {
+                        let key = heap_btree_utils.blobify.from_blob(pair.0);
+                        ?(key, pair.1);
+                    };
+                    case (null) null;
+                };
             };
             case (_) {
                 Debug.trap("Invalid BTree type");

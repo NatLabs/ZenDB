@@ -27,28 +27,31 @@ module {
         let bench = Bench.Bench();
 
         bench.name("Benchmarking zenDB with icrc3 txs");
-        bench.description("Benchmarking the performance of sorted queries with 1k txs");
+        bench.description("Benchmarking the performance with 10k txs");
 
         bench.cols([
             // "#heap no index",
-            "#stableMemory no index (sorted by ts)",
+            "#stableMemory no index",
 
-            // partially covered indexes sorted by tx.amt
-            // "#heap 7 single field indexes (sorted by tx.amt)",
-            "#stableMemory 7 single field indexes (sorted by tx.amt)",
+            // partially covered indexes
+            // "#heap 7 single field indexes",
+            "#stableMemory 7 single field indexes",
 
-            // multi-field indexes sorted by timestamp
-            // "#heap 6 fully covered indexes (sorted by ts)",
-            "#stableMemory 6 fully covered indexes (sorted by ts)",
+            // multi-field indexes
+            // "#heap 6 fully covered indexes",
+            "#stableMemory 6 fully covered indexes",
+
+            // "(skip_limit_pagination limit = 100, -> array"
 
         ]);
 
         bench.rows([
             "insert with no index",
             "create and populate indexes",
-
-            "clear collection entries and indexes",
-            "insert with indexes",
+            "create and populate indexes 2",
+            "create and populate indexes 3",
+            "create and populate indexes 4",
+            "create and populate indexes 5",
 
             "query(): no filter (all txs)",
             "query(): single field (btype = '1mint')",
@@ -79,22 +82,23 @@ module {
             // #Or, nested or query on 2 fields (btype, amt)
             "query(): #Or (btype in ['1xfer', '1burn'] OR (tx.amt < 200 OR tx.amt >= 800))",
 
-            "query() -> principals[0] == tx.to.owner (is recipient)",
-            "query() -> principals[0..10] == tx.to.owner (is recipient)",
-            "query() -> all txs involving principals[0]",
-            "query() -> all txs involving principals[0..10]",
+            // "query() -> principals[0] == tx.to.owner (is recipient)",
+            // "query() -> principals[0..10] == tx.to.owner (is recipient)",
+            // "query() -> all txs involving principals[0]",
+            // "query() -> all txs involving principals[0..10]",
             "update(): single operation -> #add amt += 100",
             "update(): multiple independent operations -> #add, #sub, #mul, #div on tx.amt",
             "update(): multiple nested operations -> #add, #sub, #mul, #div on tx.amt",
             "update(): multiple operations on multiple fields -> #add, #sub, #mul, #div on (tx.amt, ts, fee)",
-            "replace() -> replace half the tx with new tx",
-            "delete()",
+            // "replace() -> replace half the tx with new tx",
+            // "delete()",
 
         ]);
 
+        let input_limit = 20_000;
         let limit = 1_000;
 
-        let txs_benchmarks = TxsBenchUtils.TxsBenchmarks(limit, limit);
+        let txs_benchmarks = TxsBenchUtils.TxsBenchmarks(input_limit, limit);
 
         bench.runner(
             func(col, row) = txs_benchmarks.run_benchmarks(row, col)

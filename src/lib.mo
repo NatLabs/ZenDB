@@ -146,6 +146,10 @@ module {
             memory_type = Option.get(settings.memory_type, DefaultMemoryType);
             freed_btrees = Vector.new<T.MemoryBTree>();
             logger = Logger.init(#Error, false);
+            is_running_locally = Option.get(
+                Option.map(settings.logging, func(s : { is_running_locally : Bool }) : Bool = s.is_running_locally),
+                false,
+            );
         };
 
         let default_db : T.StableDatabase = {
@@ -156,6 +160,7 @@ module {
             freed_btrees = zendb.freed_btrees;
             logger = zendb.logger;
             memory_type = zendb.memory_type;
+            is_running_locally = zendb.is_running_locally;
         };
 
         ignore Map.put(zendb.databases, T.thash, "default", default_db);
@@ -197,6 +202,7 @@ module {
             freed_btrees = sstore.freed_btrees;
             logger = sstore.logger;
             memory_type = sstore.memory_type;
+            is_running_locally = sstore.is_running_locally;
         };
 
         ignore Map.put(sstore.databases, T.thash, db_name, db);

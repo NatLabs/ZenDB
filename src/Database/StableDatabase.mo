@@ -156,6 +156,8 @@ module {
             };
 
             indexes = Map.new<Text, T.Index>();
+            indexes_in_batch_operations = Map.new<Text, T.Index>();
+            populate_index_batches = Map.new<Nat, T.BatchPopulateIndex>();
 
             field_constraints;
             unique_constraints = [];
@@ -167,6 +169,7 @@ module {
             freed_btrees = db.freed_btrees;
             logger = db.logger;
             memory_type = db.memory_type;
+            is_running_locally = db.is_running_locally;
         };
 
         let unique_constraints_buffer = Buffer.Buffer<([Text], T.CompositeIndex)>(8);

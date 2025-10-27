@@ -47,7 +47,17 @@ suite(
     "Query Plan Tests",
     func() {
         let canister_id = fuzz.principal.randomPrincipal(29);
-        let zendb = ZenDB.newStableStore(canister_id, null);
+        let zendb = ZenDB.newStableStore(
+            canister_id,
+            ?{
+                logging = ?{
+                    log_level = #Info;
+                    is_running_locally = true;
+                };
+                memory_type = ?(#heap);
+            },
+        );
+        // ZenDB.setIsRunLocally(zendb, true);
         let db = ZenDB.launchDefaultDB(zendb);
 
         type RecordWithAllTypes = {
@@ -145,7 +155,9 @@ suite(
             func() {
 
                 let #ok(collection) = db.createCollection("query_plan_test", RecordWithAllTypesSchema, candify_document, null) else return assert false;
-                let #ok(_) = collection.createIndex("text_idx", [("text", #Ascending)], null) else return assert false;
+                let create_text_index_res = collection.createIndex("text_idx", [("text", #Ascending)], null) else return assert false;
+                Debug.print("Create text index res: " # debug_show create_text_index_res);
+                let #ok() = create_text_index_res else return assert false;
 
                 let stable_collection = collection._get_stable_state();
 
