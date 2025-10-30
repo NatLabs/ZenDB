@@ -312,6 +312,31 @@ module {
         #ok(());
     };
 
+    public func delete_collection(db : T.StableDatabase, name : Text) : T.Result<(), Text> {
+        Logger.lazyInfo(
+            db.logger,
+            func() = "StableDatabase.delete_collection(): Deleting collection '" # name # "'",
+        );
+
+        let collection = switch (Map.get<Text, StableCollection>(db.collections, Map.thash, name)) {
+            case (?collection) { collection };
+            case (null) {
+                let error_msg = "StableDatabase.delete_collection(): Collection '" # name # "' not found";
+                return log_error_msg(db.logger, error_msg);
+            };
+        };
+
+        StableCollection.deallocate(collection);
+        ignore Map.remove<Text, StableCollection>(db.collections, Map.thash, name);
+
+        Logger.lazyInfo(
+            db.logger,
+            func() = "StableDatabase.delete_collection(): Deleted collection '" # name # "' successfully",
+        );
+
+        #ok(());
+    };
+
     public func list_collections(db : T.StableDatabase) : [Text] {
         Iter.toArray(Map.keys(db.collections));
     };

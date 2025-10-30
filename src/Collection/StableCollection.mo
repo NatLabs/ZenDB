@@ -1828,4 +1828,24 @@ module StableCollection {
         #ok(candid_blob);
     };
 
+    public func deallocate(collection : T.StableCollection) : () {
+        Logger.info(collection.logger, "Deallocating collection: " # collection.name);
+
+        for (index in Itertools.chain(Map.vals(collection.indexes), Map.vals(collection.indexes_in_batch_operations))) {
+            CommonIndexFns.deallocate(collection, index);
+        };
+
+        BTree.clear(collection.documents);
+
+        switch (collection.documents) {
+            case (#stableMemory(memory_btree)) {
+                Vector.add(collection.freed_btrees, memory_btree);
+            };
+            case (#heap(_)) {};
+        };
+
+        Logger.info(collection.logger, "Successfully deallocated collection: " # collection.name);
+
+    };
+
 };
