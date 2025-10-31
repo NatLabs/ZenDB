@@ -16,7 +16,7 @@ module {
 
     public func upgrade(versions : VersionedStableStore) : VersionedStableStore {
         switch (versions) {
-            case (#v0(v0)) { #v0(v0) };
+            case (#v0(v0)) { #v0(V0.upgrade(v0)) };
         };
     };
 
@@ -25,7 +25,7 @@ module {
             case (#v0(stable_store)) { V0.get_current_state(stable_store) };
             case (_) Debug.trap(
                 "
-                Invalid version of stable store. Please call upgrade() on the stable store.
+                Invalid version of stable store" # debug_show (to_text(asset_versions)) # ". Please call upgrade() on the stable store.
                 "
             );
         };

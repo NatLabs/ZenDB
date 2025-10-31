@@ -551,117 +551,78 @@ module StableCollection {
             collection.logger,
             func() = "total documents in collection: " # debug_show (StableCollection.size(collection)),
         );
+        var documents_to_process = 100; // Start with initial calibration batch size
+        var multiplier : Float = 2.0;
 
-        let num_documents_to_process_per_batch = switch (batch.num_documents_to_process_per_batch) {
-            case (?num) num;
-            case (null) {
-                var documents_to_process = 100; // Start with initial calibration batch size
+        while (multiplier > 1.0) {
 
-                while (
-                    (performance.total_instructions_used() + (batch.avg_instructions_per_document * documents_to_process)) < MAX_INSTRUCTIONS and
-                    not batch.done_processing
-                ) {
-                    Logger.lazyDebug(
-                        collection.logger,
-                        func() = "Calibrating batch size, trying: " # debug_show documents_to_process,
-                    );
+            while (
+                (performance.total_instructions_used() + (batch.avg_instructions_per_document * documents_to_process)) < MAX_INSTRUCTIONS and
+                not batch.done_processing
+            ) {
+                Logger.lazyDebug(
+                    collection.logger,
+                    func() = "Calibrating batch size, trying: " # debug_show documents_to_process,
+                );
 
-                    Debug.print("Calibrating batch size, trying: " # debug_show documents_to_process);
+                Logger.lazyDebug(
+                    collection.logger,
+                    func() = "Starting document id: " # debug_show (batch.next_document_to_process),
+                );
 
-                    Logger.lazyDebug(
-                        collection.logger,
-                        func() = "Starting document id: " # debug_show (batch.next_document_to_process),
-                    );
-
-                    switch (process_index_population_batch(collection, batch, batch.next_document_to_process, documents_to_process)) {
-                        case (#err(err)) error := ?err;
-                        case (#ok(_)) {};
-                    };
-
-                    batch.total_instructions_used += performance.instructions_used_since_last_call();
-                    Logger.lazyDebug(
-                        collection.logger,
-                        func() = " batch.total_instructions_used: " # debug_show (batch.total_instructions_used),
-                    );
-
-                    Logger.lazyDebug(
-                        collection.logger,
-                        func() = " batch.indexed_documents: " # debug_show (batch.indexed_documents),
-                    );
-
-                    batch.avg_instructions_per_document := batch.total_instructions_used / (if (batch.indexed_documents == 0) 1 else batch.indexed_documents);
-                    Logger.lazyDebug(
-                        collection.logger,
-                        func() = " batch.avg_instructions_per_document: " # debug_show (batch.avg_instructions_per_document),
-                    );
-
-                    Debug.print(" batch.indexed_documents: " # debug_show (batch.indexed_documents));
-                    Debug.print(" batch.total_instructions_used: " # debug_show (batch.total_instructions_used));
-                    Debug.print(" avg instructions per document: " # debug_show (batch.avg_instructions_per_document));
-                    Debug.print("Total Instructions in this call: " # debug_show (performance.total_instructions_used()));
-
-                    switch (error) {
-                        case (?err) {
-                            return #err("Failed to populate indexes in batch " # debug_show batch.id # ": " # err);
-                        };
-                        case (null) {};
-                    };
-
-                    Logger.lazyDebug(
-                        collection.logger,
-                        func() = "was there an error? " # debug_show (error),
-                    );
-
-                    Logger.lazyDebug(
-                        collection.logger,
-                        func() = "done processing? " # debug_show (batch.done_processing),
-                    );
-
-                    if (batch.done_processing) {
-                        batch.num_documents_to_process_per_batch := ?batch.indexed_documents;
-                        return #ok(false);
-                    };
-
-                    documents_to_process *= 2;
+                switch (process_index_population_batch(collection, batch, batch.next_document_to_process, documents_to_process)) {
+                    case (#err(err)) error := ?err;
+                    case (#ok(_)) {};
                 };
 
-                batch.num_documents_to_process_per_batch := ?batch.indexed_documents;
-                return #ok(not batch.done_processing);
+                batch.total_instructions_used += performance.instructions_used_since_last_call();
+                Logger.lazyDebug(
+                    collection.logger,
+                    func() = " batch.total_instructions_used: " # debug_show (batch.total_instructions_used),
+                );
+
+                Logger.lazyDebug(
+                    collection.logger,
+                    func() = " batch.indexed_documents: " # debug_show (batch.indexed_documents),
+                );
+
+                batch.avg_instructions_per_document := batch.total_instructions_used / (if (batch.indexed_documents == 0) 1 else batch.indexed_documents);
+                Logger.lazyDebug(
+                    collection.logger,
+                    func() = " batch.avg_instructions_per_document: " # debug_show (batch.avg_instructions_per_document),
+                );
+
+                switch (error) {
+                    case (?err) {
+                        return #err("Failed to populate indexes in batch " # debug_show batch.id # ": " # err);
+                    };
+                    case (null) {};
+                };
+
+                Logger.lazyDebug(
+                    collection.logger,
+                    func() = "was there an error? " # debug_show (error),
+                );
+
+                Logger.lazyDebug(
+                    collection.logger,
+                    func() = "done processing? " # debug_show (batch.done_processing),
+                );
+
+                if (batch.done_processing) {
+                    batch.num_documents_to_process_per_batch := ?batch.indexed_documents;
+                    return #ok(false);
+                };
+
+                documents_to_process := Int.abs(Float.toInt(Float.fromInt(documents_to_process) * multiplier));
             };
+
+            multiplier -= 0.5;
+
         };
 
-        Logger.lazyDebug(
-            collection.logger,
-            func() = "second while loop for some reason",
-        );
-        while (
-            (performance.total_instructions_used() + (batch.avg_instructions_per_document * num_documents_to_process_per_batch)) < MAX_INSTRUCTIONS and
-            not batch.done_processing
-        ) {
-
-            Debug.print("Processing batch " # debug_show (num_documents_to_process_per_batch) # " documents with batch id " # debug_show (batch.id));
-
-            switch (process_index_population_batch(collection, batch, batch.next_document_to_process, num_documents_to_process_per_batch)) {
-                case (#err(err)) error := ?err;
-                case (#ok(_)) {};
-            };
-
-            batch.total_instructions_used += performance.instructions_used_since_last_call();
-            batch.avg_instructions_per_document := batch.total_instructions_used / batch.indexed_documents;
-
-            Debug.print(" batch.indexed_documents: " # debug_show (batch.indexed_documents));
-            Debug.print(" batch.total_instructions_used: " # debug_show (batch.total_instructions_used));
-            Debug.print(" avg instructions per document: " # debug_show (batch.avg_instructions_per_document));
-            Debug.print("Total Instructions in this call: " # debug_show (performance.total_instructions_used()));
-
-            switch (error) {
-                case (?err) return #err("Failed to populate indexes in batch " # debug_show batch.id # ": " # err);
-                case (null) {};
-            };
-
-        };
-
-        #ok(not batch.done_processing);
+        batch.num_documents_to_process_per_batch := ?batch.indexed_documents;
+        return #ok(not batch.done_processing);
 
     };
 
@@ -1846,6 +1807,127 @@ module StableCollection {
 
         Logger.info(collection.logger, "Successfully deallocated collection: " # collection.name);
 
+    };
+
+    /// Updates multiple documents matching a query with the given update operations
+    public func update_documents(
+        collection : StableCollection,
+        main_btree_utils : T.BTreeUtils<T.DocumentId, T.Document>,
+        query_builder : QueryBuilder,
+        update_operations : [(Text, T.FieldUpdateOperations)],
+    ) : Result<Nat, Text> {
+        let documents_iter = switch (internal_search(collection, query_builder.build())) {
+            case (#err(err)) {
+                Logger.lazyError(collection.logger, func() = "Failed to find documents to update: " # err);
+                return #err("Failed to find documents to update: " # err);
+            };
+            case (#ok(documents_iter)) documents_iter;
+        };
+
+        var total_updated = 0;
+
+        for (id in documents_iter) {
+            switch (update_by_id(collection, main_btree_utils, id, update_operations)) {
+                case (#ok(_)) total_updated += 1;
+                case (#err(err)) {
+                    Logger.lazyError(collection.logger, func() = "Failed to update document with id: " # debug_show (id) # ": " # err);
+                    return #err("Failed to update document with id: " # debug_show (id) # ": " # err);
+                };
+            };
+        };
+
+        #ok(total_updated);
+    };
+
+    /// Replaces multiple documents by their ids
+    public func replace_docs(
+        collection : StableCollection,
+        main_btree_utils : T.BTreeUtils<T.DocumentId, T.Document>,
+        documents : [(T.DocumentId, Blob)],
+    ) : Result<(), Text> {
+        for ((id, candid_blob) in documents.vals()) {
+            switch (replace_by_id(collection, main_btree_utils, id, candid_blob)) {
+                case (#ok(_)) {};
+                case (#err(err)) return #err(err);
+            };
+        };
+
+        #ok();
+    };
+
+    /// Deletes multiple documents matching a query
+    public func delete_documents<Record>(
+        collection : StableCollection,
+        main_btree_utils : T.BTreeUtils<T.DocumentId, T.Document>,
+        blobify : T.InternalCandify<Record>,
+        query_builder : QueryBuilder,
+    ) : Result<[(T.DocumentId, Record)], Text> {
+        let results_iter = switch (internal_search(collection, query_builder.build())) {
+            case (#err(err)) {
+                Logger.lazyError(collection.logger, func() = "Failed to find documents to delete: " # err);
+                return #err("Failed to find documents to delete: " # err);
+            };
+            case (#ok(documents_iter)) documents_iter;
+        };
+
+        // need to convert the iterator to an array before deleting
+        // to avoid invalidating the iterator as its reference in the btree
+        // might slide when elements are deleted.
+        let results = Iter.toArray(results_iter);
+
+        let buffer = Buffer.Buffer<(T.DocumentId, Record)>(8);
+        for (id in results.vals()) {
+            switch (delete_by_id(collection, main_btree_utils, id)) {
+                case (#ok(candid_blob)) {
+                    let document = blobify.from_blob(candid_blob);
+                    buffer.add(id, document);
+                };
+                case (#err(err)) return #err(err);
+            };
+        };
+
+        #ok(Buffer.toArray(buffer));
+    };
+
+    /// Creates a batch populate operation from index names
+    public func batch_populate_indexes_from_names(
+        collection : StableCollection,
+        index_names : [Text],
+    ) : Result<(batch_id : Nat), Text> {
+        var error : ?Text = null;
+
+        let index_configs = Array.map<Text, T.CreateIndexBatchConfig>(
+            index_names,
+            func(name : Text) : T.CreateIndexBatchConfig {
+                switch (Map.get(collection.indexes, Map.thash, name)) {
+                    case (?index) switch (index) {
+                        case (#composite_index(composite_index)) {
+                            (name, composite_index.key_details, composite_index.is_unique, composite_index.used_internally);
+                        };
+                        case (#text_index(text_index)) {
+                            (text_index.internal_index.name, text_index.internal_index.key_details, text_index.internal_index.is_unique, text_index.internal_index.used_internally);
+                        };
+                    };
+                    case (null) {
+                        error := ?("Could not find index with name: " # name);
+                        ("", [], false, false); // dummy return to satisfy the type checker
+                    };
+                };
+            },
+        );
+
+        switch (error) {
+            case (?err) return #err(err);
+            case (null) {};
+        };
+
+        switch (create_populate_indexes_batch(collection, index_configs, null)) {
+            case (#err(err)) {
+                Logger.lazyError(collection.logger, func() = "Failed to create populate index batch: " # err);
+                #err("Failed to create populate index batch: " # err);
+            };
+            case (#ok(batch_id)) #ok(batch_id);
+        };
     };
 
 };

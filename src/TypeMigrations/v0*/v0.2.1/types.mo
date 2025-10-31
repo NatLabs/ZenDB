@@ -140,7 +140,7 @@ module T {
         #v0 : CandidBlob;
     };
 
-    public type Index = {
+    public type CompositeIndex = {
         name : Text;
         key_details : [(Text, SortDirection)];
 
@@ -149,7 +149,41 @@ module T {
         is_unique : Bool; // if true, the index is unique and the document ids are not concatenated with the index key values to make duplicate values appear unique
     };
 
+    public type TextIndex = {
+        internal_index : T.CompositeIndex;
+        field : Text; // the field this index is on
+        tokenizer : Tokenizer; // the tokenizer used for this index
+    };
+
+    public type Index = {
+        #text_index : T.TextIndex;
+        #composite_index : T.CompositeIndex;
+    };
+
     public type DocumentStore = BTree<DocumentId, Document>;
+
+    public type CreateIndexBatchConfig = (
+        name : Text,
+        key_details : [(field : Text, SortDirection)],
+        is_unique : Bool,
+        used_internally : Bool,
+    );
+
+    public type BatchPopulateIndex = {
+        id : Nat;
+        indexes : [Index];
+        var indexed_documents : Nat;
+        total_documents : Nat;
+
+        var avg_instructions_per_document : Nat;
+        var total_instructions_used : Nat;
+
+        var next_document_to_process : DocumentId;
+
+        var num_documents_to_process_per_batch : ?Nat;
+        var done_processing : Bool;
+
+    };
 
     public type StableCollection = {
         ids : Ids;
@@ -162,9 +196,11 @@ module T {
 
         documents : DocumentStore;
         indexes : Map<Text, Index>;
+        indexes_in_batch_operations : Map<Text, Index>;
+        populate_index_batches : Map<Nat, BatchPopulateIndex>;
 
         field_constraints : Map<Text, [SchemaFieldConstraint]>;
-        unique_constraints : [([Text], Index)];
+        unique_constraints : [([Text], CompositeIndex)];
         fields_with_unique_constraints : Map<Text, Set<Nat>>; // the value is the index of the unique constraint in the unique_constraints list
 
         // reference to the freed btrees to the same variable in
@@ -172,6 +208,7 @@ module T {
         freed_btrees : Vector.Vector<MemoryBTree.StableMemoryBTree>;
         logger : Logger;
         memory_type : MemoryType;
+        is_running_locally : Bool;
     };
 
     type NestedCandid = {
@@ -199,6 +236,7 @@ module T {
         // the ZenDB database document
         freed_btrees : Vector.Vector<MemoryBTree.StableMemoryBTree>;
         logger : Logger;
+        is_running_locally : Bool;
     };
 
     public type StableStore = {
@@ -212,6 +250,7 @@ module T {
         memory_type : MemoryType;
         freed_btrees : Vector.Vector<MemoryBTree.StableMemoryBTree>;
         logger : Logger;
+        is_running_locally : Bool;
     };
 
     public type LogLevel = {
@@ -504,7 +543,7 @@ module T {
     };
 
     public type BestIndexResult = {
-        index : T.Index;
+        index : T.CompositeIndex;
         requires_additional_sorting : Bool;
         requires_additional_filtering : Bool;
         sorted_in_reverse : Bool;
@@ -570,4 +609,11 @@ module T {
     //     #candid_map : { get : () -> () }; // placeholder for map type
 
     // };
+
+    public type Token = (Text, [(start : Nat, end : Nat)]);
+
+    public type Tokenizer = {
+        #basic;
+    };
+
 };

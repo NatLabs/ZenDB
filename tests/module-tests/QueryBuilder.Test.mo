@@ -349,14 +349,14 @@ suite(
         test(
             "AndQuery combines with existing conditions",
             func() {
-                let builder1 = Query.QueryBuilder().Where("age", #gte(#Nat(18)));
+                let builder1 = Query.QueryBuilder().Where("age", #gte(#Nat(18))).Or("status", #eq(#Text("admin")));
 
                 let builder2 = Query.QueryBuilder();
                 let result = builder2.Where("name", #eq(#Text("Alice"))).AndQuery(builder1).build();
 
                 let expected = #And([
                     #Operation("name", #eq(#Text("Alice"))),
-                    #And([#Operation("age", #gte(#Nat(18)))]),
+                    #Or([#Operation("age", #gte(#Nat(18))), #Operation("status", #eq(#Text("admin")))]),
                 ]);
 
                 assert result.query_operations == expected;
@@ -407,5 +407,12 @@ suite(
                 assert result.query_operations == expected;
             },
         );
+        // test(
+        //     "",
+        //     func(){
+        //         let builder = Query.QueryBuilder().Where();
+
+        //     }
+        // )
     },
 );

@@ -30,81 +30,78 @@ module {
 
     public class QueryBuilder() = self {
 
-        var opt_nested_query : ?ZenQueryLang = null;
-        var is_and : Bool = true;
-        var buffer = Buffer.Buffer<ZenQueryLang>(8);
-        var pagination_cursor : ?Cursor = null;
-        var pagination_limit : ?Nat = null;
-        var pagination_skip : ?Nat = null; // skip from beginning of the query
-        var _cursor_offset = 0;
-        var _direction : PaginationDirection = #Forward;
-        var sort_by : ?(Text, T.SortDirection) = null; // only support sorting by one field for now
+        public var _opt_nested_query : ?ZenQueryLang = null;
+        public var _is_and : Bool = true;
+        public var _buffer = Buffer.Buffer<ZenQueryLang>(8);
+        public var _pagination_cursor : ?Cursor = null;
+        public var _pagination_limit : ?Nat = null;
+        public var _pagination_skip : ?Nat = null; // skip from beginning of the query
+        public var _cursor_offset = 0;
+        public var _direction : PaginationDirection = #Forward;
+        public var _sort_by : ?(Text, T.SortDirection) = null; // only support sorting by one field for now
 
         func update_query(new_is_and : Bool) {
-            let old_is_and = is_and;
+            let old_is_and = _is_and;
 
-            if (buffer.size() > 0 and old_is_and != new_is_and) {
+            if (_buffer.size() > 0 and old_is_and != new_is_and) {
                 // Debug.print("(old_is_and, new_is_and): " # debug_show (old_is_and, new_is_and));
                 // Debug.print("old nested query: " # debug_show opt_nested_query);
-                switch (opt_nested_query) {
+                switch (_opt_nested_query) {
                     case (null) {
-                        if (buffer.size() == 1) {
-                            opt_nested_query := ?(buffer.get(0));
+                        if (_buffer.size() == 1) {
+                            _opt_nested_query := ?(_buffer.get(0));
                         } else if (old_is_and) {
-                            opt_nested_query := ?(#And(Buffer.toArray(buffer)));
+                            _opt_nested_query := ?(#And(Buffer.toArray(_buffer)));
                         } else {
-                            opt_nested_query := ?(#Or(Buffer.toArray(buffer)));
+                            _opt_nested_query := ?(#Or(Buffer.toArray(_buffer)));
                         };
                     };
                     case (?nested_query) {
-                        buffer.insert(0, nested_query);
+                        _buffer.insert(0, nested_query);
 
                         if (old_is_and) {
-                            opt_nested_query := ?(#And(Buffer.toArray(buffer)));
+                            _opt_nested_query := ?(#And(Buffer.toArray(_buffer)));
                         } else {
-                            opt_nested_query := ?(#Or(Buffer.toArray(buffer)));
+                            _opt_nested_query := ?(#Or(Buffer.toArray(_buffer)));
                         };
                     };
                 };
 
                 // Debug.print("new nested query: " # debug_show opt_nested_query);
 
-                buffer.clear();
+                _buffer.clear();
             };
 
-            is_and := new_is_and;
+            _is_and := new_is_and;
         };
 
         func handle_not(key : Text, not_op : ZqlOperators) {
             switch (not_op) {
                 case (#eq(value)) {
                     // #not_(#eq(x)) -> #Or([#lt(x), #gt(x)])
-                    ignore Or(key, #lt(value));
-                    ignore Or(key, #gt(value));
-
+                    _buffer.add(#Or([#Operation(key, #lt(value)), #Operation(key, #gt(value))]));
                 };
                 case (#lt(value)) {
                     // #not_(#lt(x)) -> #gte(x)
-                    buffer.add(#Operation(key, #gte(value)));
+                    _buffer.add(#Operation(key, #gte(value)));
                 };
                 case (#gt(value)) {
                     // #not_(#gt(x) )-> #lte(x)
-                    buffer.add(#Operation(key, #lte(value)));
+                    _buffer.add(#Operation(key, #lte(value)));
                 };
                 case (#lte(value)) {
                     // #not_(#lte(x)) -> #gt(x)
-                    buffer.add(#Operation(key, #gt(value)));
+                    _buffer.add(#Operation(key, #gt(value)));
                 };
                 case (#gte(value)) {
                     // #not_(#gte(x)) -> #lt(x)
-                    buffer.add(#Operation(key, #lt(value)));
+                    _buffer.add(#Operation(key, #lt(value)));
                 };
                 case (#between(min, max)) {
                     // #not_(#between(min, max))
                     // -> #not_(#And([#gte(min), #lte(max)]))
                     // -> #Or([#lt(min), #gt(max)])
-                    ignore Or(key, #lt(min));
-                    ignore Or(key, #gt(max));
+                    _buffer.add(#Or([#Operation(key, #lt(min)), #Operation(key, #gt(max))]));
                 };
                 case (#exists) {
                     // #not_(#exists)
@@ -120,8 +117,7 @@ module {
                     // #not_(#startsWith(prefix))
                     // -> #not_(#between(prefix_lower_bound, prefix_upper_bound))
                     // -> #Or([#lt(prefix_lower_bound), #gt(prefix_upper_bound)])
-                    ignore Or(key, #lt(prefix_lower_bound));
-                    ignore Or(key, #gt(prefix_upper_bound));
+                    _buffer.add(#Or([#Operation(key, #lt(prefix_lower_bound)), #Operation(key, #gt(prefix_upper_bound))]));
 
                 };
                 case (#anyOf(values)) {
@@ -129,15 +125,18 @@ module {
                     // -> #And([#not_(x), #not_(y), #not_(z)])
                     // -> #And([#Or([#lt(x), #gt(x)]), #Or([#lt(y), #gt(y)]), #Or([#lt(z), #gt(z)])])
 
-                    update_query(true);
-                    for (value in values.vals()) {
-                        buffer.add(#Or([#Operation(key, #lt(value)), #Operation(key, #gt(value))]));
+                    if (values.size() > 0) {
+                        update_query(true);
+                        for (value in values.vals()) {
+                            _buffer.add(#Or([#Operation(key, #lt(value)), #Operation(key, #gt(value))]));
+                        };
+
                     };
 
                 };
                 case (#not_(nested_op)) {
                     // #not_(#not_(x)) -> x
-                    buffer.add(#Operation(key, nested_op));
+                    _buffer.add(#Operation(key, nested_op));
                 };
             };
         };
@@ -146,17 +145,28 @@ module {
             switch (op) {
                 // aliases
                 case (#anyOf(values)) {
-                    update_query(false);
-                    for (value in values.vals()) {
-                        buffer.add(#Operation(key, #eq(value : T.Candid)));
+                    // #anyOf([x, y, z]) -> #Or([#eq(x), #eq(y), #eq(z)])
+                    if (values.size() > 0) {
+                        _buffer.add(
+                            #Or(
+                                Array.map(
+                                    values,
+                                    func(value : T.Candid) : ZenQueryLang {
+                                        #Operation(key, #eq(value));
+                                    },
+                                )
+                            )
+                        );
                     };
+
                 };
                 case (#not_(not_op)) {
                     handle_not(key, not_op);
                 };
                 case (#between(min, max)) {
-                    ignore And(key, #gte(min));
-                    ignore And(key, #lte(max));
+                    // #between(min, max) -> #And([#gte(min), #lte(max)])
+
+                    _buffer.add(#And([#Operation(key, #gte(min)), #Operation(key, #lte(max))]));
                 };
                 case (#startsWith(prefix)) {
                     let prefix_lower_bound = prefix;
@@ -169,14 +179,14 @@ module {
                 };
                 // core operations
                 case (_) {
-                    buffer.add(#Operation(key, op));
+                    _buffer.add(#Operation(key, op));
                 };
             };
         };
 
         public func RawQuery(query_lang : T.ZenQueryLang) : QueryBuilder {
             update_query(true);
-            buffer.add(query_lang);
+            _buffer.add(query_lang);
 
             self;
 
@@ -205,7 +215,7 @@ module {
             update_query(false);
 
             let nested_query = new_query.build();
-            buffer.add(nested_query.query_operations);
+            _buffer.add(nested_query.query_operations);
 
             self;
         };
@@ -214,43 +224,43 @@ module {
             update_query(true);
 
             let nested_query = new_query.build();
-            buffer.add(nested_query.query_operations);
+            _buffer.add(nested_query.query_operations);
 
             self;
         };
 
         public func Sort(key : Text, direction : T.SortDirection) : QueryBuilder {
-            sort_by := ?(key, direction);
+            _sort_by := ?(key, direction);
             self;
         };
 
         public func Pagination(cursor : ?Cursor, limit : Nat) : QueryBuilder {
-            pagination_cursor := cursor;
-            pagination_limit := ?limit;
+            _pagination_cursor := cursor;
+            _pagination_limit := ?limit;
             self;
         };
 
         // public func Cursor(cursor : ?Cursor, direction : PaginationDirection) : QueryBuilder {
-        //     pagination_cursor := cursor;
+        //     _pagination_cursor := cursor;
         //     // _cursor_offset := cursor_offset;
         //     _direction := direction;
         //     self;
         // };
 
         public func Limit(limit : Nat) : QueryBuilder {
-            pagination_limit := ?limit;
+            _pagination_limit := ?limit;
             self;
         };
 
         public func Skip(skip : Nat) : QueryBuilder {
-            pagination_skip := ?skip;
+            _pagination_skip := ?skip;
             self;
         };
 
         public func build() : StableQuery {
-            update_query(not is_and); // flushes buffer because the state is switched
+            update_query(not _is_and); // flushes _buffer because the state is switched
 
-            let resolved_query = switch (opt_nested_query) {
+            let resolved_query = switch (_opt_nested_query) {
                 case (null) #And([]);
                 case (?#Operation(op)) #And([#Operation(op)]);
                 case (?nested_query) nested_query;
@@ -259,17 +269,35 @@ module {
             // Debug.print("Query: " # debug_show resolved_query);
 
             {
-                query_operations = resolved_query;
-                sort_by;
+                query_operations = flattenQuery(resolved_query);
+                sort_by = _sort_by;
                 pagination = {
-                    cursor = switch (pagination_cursor) {
+                    cursor = switch (_pagination_cursor) {
                         case (?cursor) ?(cursor, _direction);
                         case (_) null;
                     };
-                    limit = pagination_limit;
-                    skip = pagination_skip;
+                    limit = _pagination_limit;
+                    skip = _pagination_skip;
                 };
             };
+        };
+
+        public func clone() : QueryBuilder {
+            let new_builder = QueryBuilder();
+
+            new_builder._opt_nested_query := _opt_nested_query;
+            new_builder._is_and := _is_and;
+            for (item in _buffer.vals()) {
+                new_builder._buffer.add(item);
+            };
+            new_builder._pagination_cursor := _pagination_cursor;
+            new_builder._pagination_limit := _pagination_limit;
+            new_builder._pagination_skip := _pagination_skip;
+            new_builder._cursor_offset := _cursor_offset;
+            new_builder._direction := _direction;
+            new_builder._sort_by := _sort_by;
+
+            new_builder;
         };
 
     };
@@ -401,5 +429,64 @@ module {
         };
 
     };
+
+    // Flatten nested #And or #Or operations in a query
+    // Example: #And([#Operation(...), #And([...])]) -> #And([#Operation(...), ...])
+    public func flattenQuery(zendb_query : T.ZenQueryLang) : T.ZenQueryLang {
+
+        func flattenAnd(queries : [ZenQueryLang]) : [ZenQueryLang] {
+            let buffer = Buffer.Buffer<ZenQueryLang>(queries.size());
+
+            for (q in queries.vals()) {
+                switch (flattenQuery(q)) {
+                    case (#And(nested)) {
+                        // Flatten nested #And by merging its contents
+                        for (nested_q in nested.vals()) {
+                            buffer.add(nested_q);
+                        };
+                    };
+                    case (other) {
+                        buffer.add(other);
+                    };
+                };
+            };
+
+            Buffer.toArray(buffer);
+        };
+
+        func flattenOr(queries : [ZenQueryLang]) : [ZenQueryLang] {
+            let buffer = Buffer.Buffer<ZenQueryLang>(queries.size());
+
+            for (q in queries.vals()) {
+                switch (flattenQuery(q)) {
+                    case (#Or(nested)) {
+                        // Flatten nested #Or by merging its contents
+                        for (nested_q in nested.vals()) {
+                            buffer.add(nested_q);
+                        };
+                    };
+                    case (other) {
+                        buffer.add(other);
+                    };
+                };
+            };
+
+            Buffer.toArray(buffer);
+        };
+
+        switch (zendb_query) {
+            case (#Operation(field, op)) {
+                #Operation(field, op);
+            };
+            case (#And(queries)) {
+                #And(flattenAnd(queries));
+            };
+            case (#Or(queries)) {
+                #Or(flattenOr(queries));
+            };
+        };
+    };
+
+    // public func optimizeQuery()
 
 };

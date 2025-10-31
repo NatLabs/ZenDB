@@ -335,14 +335,19 @@ module {
         };
 
         public func replaceDocs(documents : [(T.DocumentId, Record)]) : T.Result<(), Text> {
-            for ((id, document) in documents.vals()) {
-                switch (replace(id, document)) {
-                    case (#ok(_)) {};
-                    case (#err(err)) return #err(err);
-                };
-            };
-
-            #ok();
+            handleResult(
+                StableCollection.replace_docs(
+                    collection,
+                    main_btree_utils,
+                    Array.map<(T.DocumentId, Record), (T.DocumentId, Blob)>(
+                        documents,
+                        func((id, doc) : (T.DocumentId, Record)) : (T.DocumentId, Blob) {
+                            (id, blobify.to_blob(doc))
+                        },
+                    ),
+                ),
+                "Failed to replace documents",
+            );
         };
 
         /// Updates a document by its id with the given update operations.
@@ -354,29 +359,10 @@ module {
         };
 
         public func update(query_builder : QueryBuilder, update_operations : [(Text, T.FieldUpdateOperations)]) : T.Result<Nat, Text> {
-            let documents_iter = switch (
-                handleResult(
-                    StableCollection.internal_search(collection, query_builder.build()),
-                    "Failed to find documents to update",
-                )
-            ) {
-                case (#err(err)) return #err(err);
-                case (#ok(documents_iter)) documents_iter;
-            };
-
-            var total_updated = 0;
-
-            for (id in documents_iter) {
-                switch (StableCollection.update_by_id(collection, main_btree_utils, id, update_operations)) {
-                    case (#ok(_)) total_updated += 1;
-                    case (#err(err)) {
-                        Logger.lazyError(collection.logger, func() = "Failed to update document with id: " # debug_show (id) # ": " # err);
-                        return #err("Failed to update document with id: " # debug_show (id) # ": " # err);
-                    };
-                };
-            };
-
-            #ok(total_updated);
+            handleResult(
+                StableCollection.update_documents(collection, main_btree_utils, query_builder, update_operations),
+                "Failed to update documents",
+            );
         };
 
         public func deleteById(id : T.DocumentId) : T.Result<Record, Text> {
@@ -395,31 +381,10 @@ module {
         };
 
         public func delete(query_builder : QueryBuilder) : T.Result<[(T.DocumentId, Record)], Text> {
-            let internal_search_res = handleResult(
-                StableCollection.internal_search(collection, query_builder.build()),
-                "Failed to find documents to delete",
+            handleResult(
+                StableCollection.delete_documents(collection, main_btree_utils, blobify, query_builder),
+                "Failed to delete documents",
             );
-
-            let results_iter = switch (internal_search_res) {
-                case (#err(err)) return #err(err);
-                case (#ok(documents_iter)) documents_iter;
-            };
-
-            // need to convert the iterator to an array before deleting
-            // to avoid invalidating the iterator as its reference in the btree
-            // might slide when elements are deleted.
-
-            let results = Iter.toArray(results_iter);
-
-            let buffer = Buffer.Buffer<(T.DocumentId, Record)>(8);
-            for ((id) in results.vals()) {
-                switch (deleteById(id)) {
-                    case (#ok(document)) buffer.add(id, document);
-                    case (#err(err)) return #err(err);
-                };
-            };
-
-            #ok(Buffer.toArray(buffer));
         };
 
         public func filterIter(condition : (Record) -> Bool) : Iter<Record> {
@@ -473,38 +438,8 @@ module {
         };
 
         public func batchPopulateIndexes(index_names : [Text]) : T.Result<(batch_id : Nat), Text> {
-
-            var error : ?Text = null;
-
-            let index_configs = Array.map<Text, T.CreateIndexBatchConfig>(
-                index_names,
-                func(name : Text) : T.CreateIndexBatchConfig {
-                    switch (Map.get(collection.indexes, T.thash, name)) {
-                        case (?index) switch (index) {
-                            case (#composite_index(composite_index)) {
-                                (name, composite_index.key_details, composite_index.is_unique, composite_index.used_internally);
-                            };
-                            case (#text_index(text_index)) {
-                                (text_index.internal_index.name, text_index.internal_index.key_details, text_index.internal_index.is_unique, text_index.internal_index.used_internally);
-                            };
-                        };
-                        case (null) {
-                            error := ?("Could not find index with name: " # name);
-                            ("", [], false, false); // dummy return to satisfy the type checker
-                        };
-                    };
-
-                },
-
-            );
-
-            switch (error) {
-                case (?err) return #err(err);
-                case (null) {};
-            };
-
             handleResult(
-                StableCollection.create_populate_indexes_batch(collection, index_configs, null),
+                StableCollection.batch_populate_indexes_from_names(collection, index_names),
                 "Failed to create populate index batch",
             );
         };

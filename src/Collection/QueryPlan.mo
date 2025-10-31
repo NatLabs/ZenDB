@@ -134,19 +134,10 @@ module {
             };
         };
 
-        // consider query: (0 < x < 5 or y = 6) and (x = 3)
-        // we want to reduce the query so the scan size of the #Or operations are smaller
-        // so apply the #And operations on the #Or operations to get:
-        //  -> (0 < x < 5 and x = 3) or (y = 6 and x = 3)
-        // which then can be reduced to:
-        //  -> (x = 3) or (y = 6 and x = 3 )
-        //
-        // in terms of size of each operation, the first statement has been reduced from scanning a range of 5 values to only scanning 1 value in the btree
-        //
         // the actual feature for reducing the query is implemented in the from_or_operation function where the parent_simple_and_operations from this function is passed in. Here we just remove dangling #And operations that will be applied to the #Or operations, by leaving scans empty
-        // consider query: (0 < x < 5 or y = 6) and (x = 3)
-        // we want to reduce the query so the scan size of the #Or operations are smaller
-        // so apply the #And operations on the #Or operations to get:
+        // consider query the query below. we want to reduce the query so the scan size of the #Or operations are smaller
+        //  -> (0 < x < 5 or y = 6) and (x = 3)
+        // so apply the #And operations to the #Or operations to get:
         //  -> (0 < x < 5 and x = 3) or (y = 6 and x = 3)
         // which then can be reduced to:
         //  -> (x = 3) or (y = 6 and x = 3 )
