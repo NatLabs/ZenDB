@@ -51,6 +51,7 @@ import Logger "../Logger";
 import SchemaMap "SchemaMap";
 import BTree "../BTree";
 import DocumentStore "DocumentStore";
+
 module CollectionUtils {
 
     public type Result<A, B> = Result.Result<A, B>;

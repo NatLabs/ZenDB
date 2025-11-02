@@ -23,8 +23,8 @@ import Char "mo:base@0.16.0/Char";
 import Result "mo:base@0.16.0/Result";
 
 import ZenDB "../../src";
-import CompositeIndex "../../src/Collection/Index/CompositeIndex";
-import Utils "../../src/Utils";
+import CompositeIndex "../../src/EmbeddedInstance/Collection/Index/CompositeIndex";
+import Utils "../../src/EmbeddedInstance/Utils";
 
 import { test; suite } "mo:test";
 import Itertools "mo:itertools@0.2.2/Iter";

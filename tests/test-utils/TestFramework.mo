@@ -8,10 +8,10 @@ import Option "mo:base@0.16.0/Option";
 import Principal "mo:base@0.16.0/Principal";
 
 import ZenDB "../../src";
-import CollectionUtils "../../src/Collection/CollectionUtils";
-import StableCollection "../../src/Collection/StableCollection";
-import CommonIndexFns "../../src/Collection/Index/CommonIndexFns";
-import TypeMigrations "../../src/TypeMigrations";
+import CollectionUtils "../../src/EmbeddedInstance/Collection/CollectionUtils";
+import StableCollection "../../src/EmbeddedInstance/Collection/StableCollection";
+import CommonIndexFns "../../src/EmbeddedInstance/Collection/Index/CommonIndexFns";
+import TypeMigrations "../../src/EmbeddedInstance/TypeMigrations";
 
 import { test; suite } "mo:test";
 import Itertools "mo:itertools@0.2.2/Iter";

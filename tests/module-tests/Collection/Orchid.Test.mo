@@ -28,12 +28,12 @@ import BpTree "mo:augmented-btrees@0.7.1/BpTree";
 import Cmp "mo:augmented-btrees@0.7.1/Cmp";
 
 import ZenDB "../../../src";
-import Orchid "../../../src/Collection/Orchid";
+import Orchid "../../../src/EmbeddedInstance/Collection/Orchid";
 import Fuzz "mo:fuzz";
-import CandidMap "../../../src/CandidMap";
-import SchemaMap "../../../src/Collection/SchemaMap";
-import Schema "../../../src/Collection/Schema";
-import Utils "../../../src/Utils";
+import CandidMap "../../../src/EmbeddedInstance/CandidMap";
+import SchemaMap "../../../src/EmbeddedInstance/Collection/SchemaMap";
+import Schema "../../../src/EmbeddedInstance/Collection/Schema";
+import Utils "../../../src/EmbeddedInstance/Utils";
 
 let T = ZenDB.Types;
 

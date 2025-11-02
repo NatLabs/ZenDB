@@ -6,7 +6,7 @@ import Char "mo:base/Char";
 import { test; suite } "mo:test";
 import Fuzz "mo:fuzz";
 
-import BasicTokenizer "../../../src/Collection/Index/Tokenizers/BasicTokenizer";
+import BasicTokenizer "../../../src/EmbeddedInstance/Collection/Index/Tokenizers/BasicTokenizer";
 
 let fuzz = Fuzz.fromSeed(0x12345678);
 

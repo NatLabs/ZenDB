@@ -14,10 +14,10 @@ import Map "mo:map@9.0.1/Map";
 import Fuzz "mo:fuzz";
 
 import ZenDB "../../src";
-import CollectionUtils "../../src/Collection/CollectionUtils";
-import CandidMap "../../src/CandidMap";
-import CompositeIndex "../../src/Collection/Index/CompositeIndex";
-import Utils "../../src/Utils";
+import CollectionUtils "../../src/EmbeddedInstance/Collection/CollectionUtils";
+import CandidMap "../../src/EmbeddedInstance/CandidMap";
+import CompositeIndex "../../src/EmbeddedInstance/Collection/Index/CompositeIndex";
+import Utils "../../src/EmbeddedInstance/Utils";
 
 import ZenDBSuite "../test-utils/TestFramework";
 

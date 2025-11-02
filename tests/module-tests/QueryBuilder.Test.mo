@@ -5,9 +5,9 @@ import Char "mo:base@0.16.0/Char";
 
 import { test; suite } "mo:test";
 
-import Query "../../src/Query";
-import T "../../src/Types";
-import Utils "../../src/Utils";
+import Query "../../src/EmbeddedInstance/Query";
+import T "../../src/EmbeddedInstance/Types";
+import Utils "../../src/EmbeddedInstance/Utils";
 
 suite(
     "QueryBuilder",

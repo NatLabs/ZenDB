@@ -133,6 +133,7 @@ module {
                 case (null) null;
             };
         };
+        public func get_schema() : T.Schema { collection.schema };
 
         /// Returns the total number of documents in the collection.
         public func size() : Nat = StableCollection.size(collection);

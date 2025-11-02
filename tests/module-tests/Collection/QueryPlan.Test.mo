@@ -14,10 +14,10 @@ import Map "mo:map@9.0.1/Map";
 import Fuzz "mo:fuzz";
 
 import ZenDB "../../../src";
-import QueryPlan "../../../src/Collection/QueryPlan";
-import CollectionUtils "../../../src/Collection/CollectionUtils";
-import CandidMap "../../../src/CandidMap";
-import CompositeIndex "../../../src/Collection/Index/CompositeIndex";
+import QueryPlan "../../../src/EmbeddedInstance/Collection/QueryPlan";
+import CollectionUtils "../../../src/EmbeddedInstance/Collection/CollectionUtils";
+import CandidMap "../../../src/EmbeddedInstance/CandidMap";
+import CompositeIndex "../../../src/EmbeddedInstance/Collection/Index/CompositeIndex";
 
 let fuzz = Fuzz.fromSeed(0x7eadbeef);
 

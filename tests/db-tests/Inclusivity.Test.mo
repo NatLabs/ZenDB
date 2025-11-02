@@ -18,11 +18,11 @@ import Fuzz "mo:fuzz";
 import Candid "mo:serde@3.3.3/Candid";
 
 import ZenDB "../../src";
-import SchemaMap "../../src/Collection/SchemaMap";
-import CandidMap "../../src/CandidMap";
-import { Orchid } "../../src/Collection/Orchid";
+import SchemaMap "../../src/EmbeddedInstance/Collection/SchemaMap";
+import CandidMap "../../src/EmbeddedInstance/CandidMap";
+import { Orchid } "../../src/EmbeddedInstance/Collection/Orchid";
 import ZenDBSuite "../test-utils/TestFramework";
-import Utils "../../src/Utils";
+import Utils "../../src/EmbeddedInstance/Utils";
 
 let fuzz = Fuzz.fromSeed(0x7eadbeef);
 let { QueryBuilder } = ZenDB;

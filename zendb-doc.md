@@ -547,7 +547,7 @@ The query planner automatically uses these indexes when they match your query pa
 
 ### Index Encoding Format
 
-ZenDB uses a custom binary encoding format, defined in the "[Orchid](./src/Collection/Orchid.mo)" module, to store composite index keys efficiently in B-tree structures. This encoding ensures proper sorting order while maintaining compact storage.
+ZenDB uses a custom binary encoding format, defined in the "[Orchid](./src/EmbeddedInstance/Collection/Orchid.mo)" module, to store composite index keys efficiently in B-tree structures. This encoding ensures proper sorting order while maintaining compact storage.
 
 #### Encoding Structure
 

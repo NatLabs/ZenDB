@@ -6,8 +6,8 @@ import Map "mo:map@9.0.1/Map";
 
 import { test; suite } "mo:test";
 import Candid "mo:serde@3.3.3/Candid";
-import SchemaMap "../../../src/Collection/SchemaMap";
-import T "../../../src/Types";
+import SchemaMap "../../../src/EmbeddedInstance/Collection/SchemaMap";
+import T "../../../src/EmbeddedInstance/Types";
 import ZenDB "../../../src";
 
 suite(

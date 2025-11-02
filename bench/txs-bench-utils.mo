@@ -15,7 +15,7 @@ import Itertools "mo:itertools@0.2.2/Iter";
 import BitMap "mo:bit-map@0.1.2";
 
 import ZenDB "../src";
-import Utils "../src/Utils";
+import Utils "../src/EmbeddedInstance/Utils";
 
 module TxsBenchUtils {
 

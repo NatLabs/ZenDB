@@ -615,6 +615,12 @@ module T {
 
     } or Candid;
 
+    public type CrossCanisterRecordsCursor = {
+        collection_name : Text;
+        collection_query : T.StableQuery;
+        results : T.Result<[(T.DocumentId, T.CandidBlob)], Text>;
+    };
+
     public type SchemaFieldConstraint = {
         #Min : Float;
         #Max : Float;

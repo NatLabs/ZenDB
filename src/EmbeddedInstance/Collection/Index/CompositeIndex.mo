@@ -433,7 +433,7 @@ module CompositeIndex {
 
         };
 
-        // filter null entries and update the last entry to be inclusive by replacing it with the next or previous value
+        // filter null entries and update the last entry to be inclusive or exclusive by keeping it's value or replacing it with the next or previous value respectively
         func format_query_entries(query_entries : [(Text, ?T.CandidInclusivityQuery)], is_lower_bound : Bool) : [T.CandidQuery] {
             if (query_entries.size() == 0) return [];
 
@@ -444,16 +444,14 @@ module CompositeIndex {
                 },
             );
 
-            switch (opt_index_of_first_null) {
+            let index_of_first_null = switch (opt_index_of_first_null) {
                 case (?0) {
                     // the first null value was found at index 0
                     return [if (is_lower_bound) #Minimum else #Maximum];
                 };
-                case (_) {};
-
+                case (?n) n;
+                case (null) query_entries.size();
             };
-
-            let index_of_first_null = Option.get(opt_index_of_first_null, 0);
 
             func get_new_value_at_index(i : Nat) : T.CandidQuery {
                 switch (query_entries[i]) {
@@ -473,7 +471,7 @@ module CompositeIndex {
             };
 
             Array.tabulate<T.CandidQuery>(
-                Nat.min(index_of_first_null + 2, query_entries.size()),
+                Nat.min(index_of_first_null, query_entries.size()),
                 func(i : Nat) : T.CandidQuery {
                     let (_field, inclusivity_query) = query_entries[i];
 

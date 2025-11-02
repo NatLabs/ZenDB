@@ -5,8 +5,8 @@ import Array "mo:base/Array";
 import Bench "mo:bench";
 import Fuzz "mo:fuzz";
 
-import Orchid "../src/Collection/Orchid";
-import T "../src/Types";
+import Orchid "../src/EmbeddedInstance/Collection/Orchid";
+import T "../src/EmbeddedInstance/Types";
 
 module {
     type CandidQuery = T.CandidQuery;

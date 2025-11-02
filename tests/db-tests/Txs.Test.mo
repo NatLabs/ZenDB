@@ -18,7 +18,7 @@ import BitMap "mo:bit-map@0.1.2";
 import ZenDB "../../src";
 import TestUtils "../test-utils/TestUtils";
 import ZenDBSuite "../test-utils/TestFramework";
-import Utils "../../src/Utils";
+import Utils "../../src/EmbeddedInstance/Utils";
 
 let fuzz = Fuzz.fromSeed(0x7eadbeef);
 let { QueryBuilder } = ZenDB;
