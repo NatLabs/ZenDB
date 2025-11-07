@@ -350,6 +350,10 @@ module T {
         filter_bounds : Bounds;
         simple_operations : [(Text, T.ZqlOperators)];
     };
+
+    public type IndexIntersectionDetails = {
+
+    };
     public type ScanDetails = {
         #IndexScan : IndexScanDetails;
         #FullScan : FullScanDetails;
@@ -577,6 +581,12 @@ module T {
         sorted_in_reverse : Bool;
         fully_covered_equality_and_range_fields : Set.Set<Text>;
         score : Float;
+
+        fully_covered_equal_fields : Set.Set<Text>;
+        fully_covered_sort_fields : Set.Set<Text>;
+        fully_covered_range_fields : Set.Set<Text>;
+
+        interval : T.Interval; // (start, end) range of matching entries in the index
     };
 
     public type FieldUpdateOperations = {
@@ -648,6 +658,46 @@ module T {
 
     public type Tokenizer = {
         #basic;
+    };
+
+    public type CompareFunc<K> = (K, K) -> Order;
+
+    // Custom result types for operations that include instruction counts
+    public type SearchResult<Record> = {
+        documents : [WrapId<Record>];
+        instructions : Nat;
+    };
+
+    public type CountResult = {
+        count : Nat;
+        instructions : Nat;
+    };
+
+    public type UpdateByIdResult = {
+        instructions : Nat;
+    };
+
+    public type UpdateResult = {
+        updated_count : Nat;
+        instructions : Nat;
+    };
+
+    public type ReplaceByIdResult = {
+        instructions : Nat;
+    };
+
+    public type ReplaceDocsResult = {
+        instructions : Nat;
+    };
+
+    public type DeleteByIdResult<Record> = {
+        deleted_document : Record;
+        instructions : Nat;
+    };
+
+    public type DeleteResult<Record> = {
+        deleted_documents : [(DocumentId, Record)];
+        instructions : Nat;
     };
 
 };

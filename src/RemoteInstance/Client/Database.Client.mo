@@ -27,5 +27,10 @@ module {
             CollectionClient.CollectionClient<Record>(canister_db, db_name, collection_name, candify);
         };
 
+        /// Get database statistics
+        public func stats() : async* ZT.DatabaseStats {
+            await canister_db.zendb_database_stats(db_name);
+        };
+
     };
 };

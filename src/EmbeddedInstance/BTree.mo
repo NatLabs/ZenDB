@@ -370,7 +370,13 @@ module BTree {
             case (null) MemoryBTree.size(btree);
         };
 
-        (start_rank, end_rank);
+        if (start_rank > end_rank) {
+            // the data is sorted in reverse order
+            // (end_rank, start_rank);
+            Debug.trap("Invalid scan interval: start_rank > end_rank");
+        } else {
+            (start_rank, end_rank);
+        };
 
     };
 

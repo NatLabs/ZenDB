@@ -38,31 +38,25 @@ This architecture allows ZenDB to handle complex queries efficiently, even with 
 ### Installation
 
 - Requires `moc` version `0.14.13` or higher to run.
-- Install with mops: `mops toolchain use moc 0.14.13`  .
-
-#### Install Directly from Mops (Recommended)
+- Install with mops: `mops toolchain use moc 0.14.13`.
 
 ```bash
 mops add zendb
-```
-
-#### Install Specific Github Branch/Commit
-- Replace the value after the pound sign `#` with the branch or the commit hash
-
-```bash
-mops add https://github.com/NatLabs/ZenDB#<branch/commit-hash>
 ```
 
 ### Canister Configuration
 Canisters have a limit of how much stable memory they can use. This limit can be set in the `dfx.json` file in the root of your project. By default, the limit is set to 4GB, but for larger datasets, you can increase it up to 500GB.
 This measurement is in pages, where each page is 64KiB. For a 200GB limit, the limit would be `200 * (1024 * 1024) / 64 = 3276800` pages.
 
+In addition to setting the stable memory limit, it's recommended to use legacy persistence instead of EOP to limit heap allocations. I found that legacy persistence uses 2x less heap allocations and costs 4x less cycles to run for stable memory heavy applications.
+
 ```json
   "canisters": {
     "stress-test" : {
       "type": "motoko",
-      "main": "./tests/Stress.Test.mo",
-      "args": "--max-stable-pages 3276800" 
+      "main": "main.mo",
+      "args": "--max-stable-pages 3276800 --legacy-persistence --force-gc --generational-gc",
+      "optimize": "O3"
     }
   },
 ```
@@ -169,7 +163,8 @@ let #ok(queryResults) = users.search(
     .Limit(10)
 );
 
-assert queryResults == [user];
+// Search returns a SearchResult with documents and instruction count
+assert queryResults.documents == [(userId, user)];
 ```
 
 #### 5. Field Updates & Transformations
@@ -230,7 +225,7 @@ let stats = users.stats();
 
 ```motoko
 // Find active premium users who joined recently
-let #ok(activeRecentPremiumUsers) = users.search(
+let #ok(search_result) = users.search(
   ZenDB.QueryBuilder()
     .Where("status", #eq(#Text("active")))
     .And("account_type", #eq(#Text("premium")))
@@ -239,8 +234,10 @@ let #ok(activeRecentPremiumUsers) = users.search(
     .Limit(25)
 );
 
+let activeRecentPremiumUsers = search_result.documents;
+
 // Find users matching any of several criteria
-let #ok(specialCaseUsers) = users.search(
+let #ok(search_result2) = users.search(
   ZenDB.QueryBuilder()
     .Where("role", #eq(#Text("admin")))
     .OrQuery(
@@ -319,6 +316,20 @@ let #ok(_) = users.createIndex(
   ]
 );
 ```
+
+### Search Result Type
+
+The `search()` method returns a `Result<SearchResult<Record>, Text>` where `SearchResult` contains:
+- **`documents`**: An array of tuples `[(DocumentId, Document)]` - the document ID and the document itself
+- **`instructions`**: The number of instructions used to execute the query
+
+```motoko
+let #ok(search_result) = users.search(query);
+let documents = search_result.documents;
+let instructions_used = search_result.instructions;
+```
+
+This allows you to monitor query performance and access both the results and execution metrics.
 
 ## Limitations
 

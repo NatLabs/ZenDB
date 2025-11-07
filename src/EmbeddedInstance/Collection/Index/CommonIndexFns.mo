@@ -500,26 +500,60 @@ module {
             interval;
         } = index_details;
 
+        // Base scores for field coverage
         let range_score = num_of_range_fields * 50;
         let sort_score = num_of_sort_fields * 75;
         let equality_score = num_of_equal_fields * 100;
-
-        let additional_filter_score = 0;
-        let additional_sort_score = 0;
 
         var score = Float.fromInt(
             range_score + sort_score + equality_score
         );
 
+        // Calculate result set size
         let size = Float.fromInt(interval.1 - interval.0);
+
+        // Size-based scoring calibrated to known safe limits:
+        // MAX_IN_MEMORY_FILTER_ENTRIES = 70,000
+        // MAX_IN_MEMORY_SORT_ENTRIES = 7,000
 
         var size_score = 300 - Float.min(Utils.log2(size) * 20, 300);
 
-        if (requires_additional_filtering) {
-            size_score *= 0.7;
-        };
+        // Apply penalties for additional operations using size-based regression
+        // Key insight: When both filtering and sorting are needed, filtering happens first
+        // and can significantly reduce the dataset. The risk scales with the initial size.
+        if (requires_additional_filtering and requires_additional_sorting) {
+            // Combined case: penalty scales smoothly from 0.45 (small) to 0.21 (large)
+            // Uses logistic-like regression based on filter limit (70,000)
+            let filter_limit : Float = 70_000;
+            let sort_limit : Float = 7_000;
 
-        if (requires_additional_sorting) {
+            // Calculate normalized size relative to sort limit (0 to 1+ range)
+            let normalized_size = Float.min(size / filter_limit, 2.0);
+
+            // Penalty function: starts at ~0.45 for small sizes, approaches 0.21 for large sizes
+            // Formula: 0.21 + (0.24 * e^(-3 * normalized_size))
+            // Approximation using available operations: linear interpolation with decay
+            let penalty = if (size <= sort_limit) {
+                0.45 // Small size: filtering likely produces sortable result
+            } else if (size <= sort_limit * 5) {
+                // Gradual transition zone (7K - 35K)
+                let t = (size - sort_limit) / (sort_limit * 4);
+                0.45 - (t * 0.15) // Interpolate from 0.45 to 0.30
+            } else if (size <= filter_limit) {
+                // Approaching filter limit (35K - 70K)
+                let t = (size - sort_limit * 5) / (filter_limit - sort_limit * 5);
+                0.30 - (t * 0.06) // Interpolate from 0.30 to 0.24
+            } else {
+                // Beyond safe limit: use harshest penalty
+                0.21 // Same as original 0.7 * 0.3
+            };
+
+            size_score *= penalty;
+        } else if (requires_additional_filtering) {
+            // Filtering only: must scan entire interval
+            size_score *= 0.7;
+        } else if (requires_additional_sorting) {
+            // Sorting only: dataset size is known and fixed
             size_score *= 0.3;
         };
 
@@ -546,6 +580,345 @@ module {
                 case (_) ignore Set.put(range_fields, Map.thash, field);
             };
         };
+    };
+
+    public func get_best_indexes_to_intersect(collection : T.StableCollection, operations : [(Text, T.ZqlOperators)], sort_field : ?(Text, T.SortDirection)) : [T.BestIndexResult] {
+
+        // Memory limits for index intersection
+        let MAX_BITMAP_ENTRIES : Nat = 500_000;
+        let MAX_SORTED_ENTRIES : Nat = 500_000;
+
+        let results = Buffer.Buffer<T.BestIndexResult>(3);
+
+        // Get the best single index first
+        let best_index = switch (get_best_index(collection, operations, sort_field)) {
+            case (null) return [];
+            case (?index) index;
+        };
+
+        results.add(best_index);
+
+        // If the best index fully covers the query, we're done
+        if (not best_index.requires_additional_sorting and not best_index.requires_additional_filtering) {
+            return Buffer.toArray(results);
+        };
+
+        // Track which fields still need coverage
+        let uncovered_equal_fields = Set.new<Text>();
+        let uncovered_range_fields = Set.new<Text>();
+        var needs_sorting = best_index.requires_additional_sorting;
+
+        // Populate uncovered fields from the original query
+        for ((field, op) in operations.vals()) {
+            switch (op) {
+                case (#eq(_)) {
+                    if (not Set.has(best_index.fully_covered_equal_fields, Map.thash, field)) {
+                        ignore Set.put(uncovered_equal_fields, Map.thash, field);
+                    };
+                };
+                case (_) {
+                    if (not Set.has(best_index.fully_covered_range_fields, Map.thash, field)) {
+                        ignore Set.put(uncovered_range_fields, Map.thash, field);
+                    };
+                };
+            };
+        };
+
+        // Calculate total entries from best_index using interval
+        let best_index_size = best_index.interval.1 - best_index.interval.0;
+        var total_bitmap_entries : Nat = best_index_size;
+        var total_sorted_entries : Nat = if (best_index.requires_additional_sorting) 0 else best_index_size;
+
+        // Helper function to try a combination of operations
+        func try_combination(combo_operations : [(Text, T.ZqlOperators)], combo_sort : ?(Text, T.SortDirection)) : ?T.BestIndexResult {
+            let candidate = get_best_index(collection, combo_operations, combo_sort);
+
+            switch (candidate) {
+                case (null) null;
+                case (?idx) {
+                    let idx_size = idx.interval.1 - idx.interval.0;
+
+                    // Check if adding this index would exceed memory limits
+                    let fits_in_bitmap = total_bitmap_entries + idx_size <= MAX_BITMAP_ENTRIES;
+                    let fits_in_sorted = if (not idx.requires_additional_sorting) {
+                        total_sorted_entries + idx_size <= MAX_SORTED_ENTRIES;
+                    } else { true };
+
+                    if (fits_in_bitmap and fits_in_sorted) {
+                        ?idx;
+                    } else {
+                        null;
+                    };
+                };
+            };
+        };
+
+        // Build list of covered fields from best_index, categorized by selectivity
+        let covered_range_fields = Buffer.Buffer<Text>(8);
+        let covered_equal_fields = Buffer.Buffer<Text>(8);
+
+        for (field in Set.keys(best_index.fully_covered_range_fields)) {
+            covered_range_fields.add(field);
+        };
+
+        for (field in Set.keys(best_index.fully_covered_equal_fields)) {
+            covered_equal_fields.add(field);
+        };
+
+        // Build arrays of uncovered fields
+        let uncovered_range_array = Buffer.Buffer<Text>(8);
+        let uncovered_equal_array = Buffer.Buffer<Text>(8);
+
+        for (field in Set.keys(uncovered_range_fields)) {
+            uncovered_range_array.add(field);
+        };
+
+        for (field in Set.keys(uncovered_equal_fields)) {
+            uncovered_equal_array.add(field);
+        };
+
+        // Helper to build combination operations: covered fields EXCEPT popped_field, PLUS added_field
+        func build_combination(popped_field : Text, added_field : Text) : [(Text, T.ZqlOperators)] {
+            let combo_ops = Buffer.Buffer<(Text, T.ZqlOperators)>(operations.size());
+
+            // Add all operations for fields that are:
+            // 1. Covered by best_index (except the popped_field), OR
+            // 2. The added_field
+            for ((field, op) in operations.vals()) {
+                let is_covered_equal = Set.has(best_index.fully_covered_equal_fields, Map.thash, field);
+                let is_covered_range = Set.has(best_index.fully_covered_range_fields, Map.thash, field);
+                let is_covered = is_covered_equal or is_covered_range;
+
+                if (field == added_field) {
+                    combo_ops.add((field, op));
+                } else if (is_covered and field != popped_field) {
+                    combo_ops.add((field, op));
+                };
+            };
+
+            Buffer.toArray(combo_ops);
+        };
+
+        // Strategy: Start with least selective (range), swap with uncovered fields
+        // Phase 1: Try swapping covered range fields with uncovered fields
+        label phase1 for (covered_field in covered_range_fields.vals()) {
+            // Try each uncovered range field
+            for (uncovered_field in uncovered_range_array.vals()) {
+                let combo_ops = build_combination(covered_field, uncovered_field);
+
+                // Try this combination with and without sort requirement
+                let candidate = if (needs_sorting) {
+                    // First try with sorting to potentially solve both problems
+                    switch (try_combination(combo_ops, sort_field)) {
+                        case (?idx) {
+                            if (not idx.requires_additional_sorting) {
+                                needs_sorting := false; // Found sorting solution!
+                            };
+                            ?idx;
+                        };
+                        case (null) {
+                            // Try without sort requirement
+                            try_combination(combo_ops, null);
+                        };
+                    };
+                } else {
+                    try_combination(combo_ops, null);
+                };
+
+                switch (candidate) {
+                    case (null) {};
+                    case (?idx) {
+                        results.add(idx);
+                        let idx_size = idx.interval.1 - idx.interval.0;
+                        total_bitmap_entries += idx_size;
+                        if (not idx.requires_additional_sorting) {
+                            total_sorted_entries += idx_size;
+                        };
+
+                        // Mark fields as covered
+                        for (field in Set.keys(idx.fully_covered_range_fields)) {
+                            Set.delete(uncovered_range_fields, Map.thash, field);
+                        };
+                        for (field in Set.keys(idx.fully_covered_equal_fields)) {
+                            Set.delete(uncovered_equal_fields, Map.thash, field);
+                        };
+
+                        // If all covered, we're done
+                        if (
+                            Set.size(uncovered_range_fields) == 0 and
+                            Set.size(uncovered_equal_fields) == 0 and
+                            not needs_sorting
+                        ) {
+                            return Buffer.toArray(results);
+                        };
+                    };
+                };
+            };
+
+            // Try each uncovered equality field with this covered range field
+            for (uncovered_field in uncovered_equal_array.vals()) {
+                let combo_ops = build_combination(covered_field, uncovered_field);
+
+                let candidate = if (needs_sorting) {
+                    switch (try_combination(combo_ops, sort_field)) {
+                        case (?idx) {
+                            if (not idx.requires_additional_sorting) {
+                                needs_sorting := false;
+                            };
+                            ?idx;
+                        };
+                        case (null) try_combination(combo_ops, null);
+                    };
+                } else {
+                    try_combination(combo_ops, null);
+                };
+
+                switch (candidate) {
+                    case (null) {};
+                    case (?idx) {
+                        results.add(idx);
+                        let idx_size = idx.interval.1 - idx.interval.0;
+                        total_bitmap_entries += idx_size;
+                        if (not idx.requires_additional_sorting) {
+                            total_sorted_entries += idx_size;
+                        };
+
+                        for (field in Set.keys(idx.fully_covered_range_fields)) {
+                            Set.delete(uncovered_range_fields, Map.thash, field);
+                        };
+                        for (field in Set.keys(idx.fully_covered_equal_fields)) {
+                            Set.delete(uncovered_equal_fields, Map.thash, field);
+                        };
+
+                        if (
+                            Set.size(uncovered_range_fields) == 0 and
+                            Set.size(uncovered_equal_fields) == 0 and
+                            not needs_sorting
+                        ) {
+                            return Buffer.toArray(results);
+                        };
+                    };
+                };
+            };
+        };
+
+        // Phase 2: Try swapping covered equality fields with uncovered fields
+        label phase2 for (covered_field in covered_equal_fields.vals()) {
+            // Try each uncovered range field
+            for (uncovered_field in uncovered_range_array.vals()) {
+                let combo_ops = build_combination(covered_field, uncovered_field);
+
+                let candidate = if (needs_sorting) {
+                    switch (try_combination(combo_ops, sort_field)) {
+                        case (?idx) {
+                            if (not idx.requires_additional_sorting) {
+                                needs_sorting := false;
+                            };
+                            ?idx;
+                        };
+                        case (null) try_combination(combo_ops, null);
+                    };
+                } else {
+                    try_combination(combo_ops, null);
+                };
+
+                switch (candidate) {
+                    case (null) {};
+                    case (?idx) {
+                        results.add(idx);
+                        let idx_size = idx.interval.1 - idx.interval.0;
+                        total_bitmap_entries += idx_size;
+                        if (not idx.requires_additional_sorting) {
+                            total_sorted_entries += idx_size;
+                        };
+
+                        for (field in Set.keys(idx.fully_covered_range_fields)) {
+                            Set.delete(uncovered_range_fields, Map.thash, field);
+                        };
+                        for (field in Set.keys(idx.fully_covered_equal_fields)) {
+                            Set.delete(uncovered_equal_fields, Map.thash, field);
+                        };
+
+                        if (
+                            Set.size(uncovered_range_fields) == 0 and
+                            Set.size(uncovered_equal_fields) == 0 and
+                            not needs_sorting
+                        ) {
+                            return Buffer.toArray(results);
+                        };
+                    };
+                };
+            };
+
+            // Try each uncovered equality field
+            for (uncovered_field in uncovered_equal_array.vals()) {
+                let combo_ops = build_combination(covered_field, uncovered_field);
+
+                let candidate = if (needs_sorting) {
+                    switch (try_combination(combo_ops, sort_field)) {
+                        case (?idx) {
+                            if (not idx.requires_additional_sorting) {
+                                needs_sorting := false;
+                            };
+                            ?idx;
+                        };
+                        case (null) try_combination(combo_ops, null);
+                    };
+                } else {
+                    try_combination(combo_ops, null);
+                };
+
+                switch (candidate) {
+                    case (null) {};
+                    case (?idx) {
+                        results.add(idx);
+                        let idx_size = idx.interval.1 - idx.interval.0;
+                        total_bitmap_entries += idx_size;
+                        if (not idx.requires_additional_sorting) {
+                            total_sorted_entries += idx_size;
+                        };
+
+                        for (field in Set.keys(idx.fully_covered_range_fields)) {
+                            Set.delete(uncovered_range_fields, Map.thash, field);
+                        };
+                        for (field in Set.keys(idx.fully_covered_equal_fields)) {
+                            Set.delete(uncovered_equal_fields, Map.thash, field);
+                        };
+
+                        if (
+                            Set.size(uncovered_range_fields) == 0 and
+                            Set.size(uncovered_equal_fields) == 0 and
+                            not needs_sorting
+                        ) {
+                            return Buffer.toArray(results);
+                        };
+                    };
+                };
+            };
+        };
+
+        // Phase 3: If we still need sorting, specifically look for an index that provides it
+        if (needs_sorting) {
+            switch (sort_field) {
+                case (null) {};
+                case (?sort_field_info) {
+                    let sort_candidate = try_combination([], ?sort_field_info);
+                    switch (sort_candidate) {
+                        case (null) {};
+                        case (?idx) {
+                            if (not idx.requires_additional_sorting) {
+                                results.add(idx);
+                                let idx_size = idx.interval.1 - idx.interval.0;
+                                total_sorted_entries += idx_size;
+                                needs_sorting := false;
+                            };
+                        };
+                    };
+                };
+            };
+        };
+
+        Buffer.toArray(results);
     };
 
     public func get_best_index(collection : T.StableCollection, operations : [(Text, T.ZqlOperators)], sort_field : ?(Text, T.SortDirection)) : ?T.BestIndexResult {
@@ -739,7 +1112,26 @@ module {
                     requires_additional_filtering;
                     fully_covered_equality_and_range_fields;
                     sorted_in_reverse;
+                    num_of_sort_fields;
                 } = best_index_details;
+
+                let fully_covered_range_fields = Set.new<Text>();
+                let fully_covered_sort_fields = Set.new<Text>();
+                let fully_covered_equal_fields = Set.new<Text>();
+
+                for ((field, _) in index.key_details.vals()) {
+                    if (Set.has(range_fields, Set.thash, field) and Set.has(fully_covered_equality_and_range_fields, Set.thash, field)) {
+                        ignore Set.put(fully_covered_range_fields, Set.thash, field);
+                    };
+
+                    if (Set.has(equal_fields, Set.thash, field) and Set.has(fully_covered_equality_and_range_fields, Set.thash, field)) {
+                        ignore Set.put(fully_covered_equal_fields, Set.thash, field);
+                    };
+
+                    for (_ in Itertools.range(0, num_of_sort_fields)) {
+                        ignore Set.put(fully_covered_sort_fields, Set.thash, field);
+                    };
+                };
 
                 let best_index_result : T.BestIndexResult = {
                     index;
@@ -748,6 +1140,12 @@ module {
                     sorted_in_reverse = sorted_in_reverse;
                     fully_covered_equality_and_range_fields;
                     score = calculate_score(best_index_details, false);
+
+                    fully_covered_equal_fields;
+                    fully_covered_sort_fields;
+                    fully_covered_range_fields;
+
+                    interval = best_index_details.interval;
                 };
 
                 return ?best_index_result;

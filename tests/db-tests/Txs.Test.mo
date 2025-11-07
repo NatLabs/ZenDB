@@ -15,7 +15,7 @@ import Candid "mo:serde@3.3.3/Candid";
 import Itertools "mo:itertools@0.2.2/Iter";
 import BitMap "mo:bit-map@0.1.2";
 
-import ZenDB "../../src";
+import ZenDB "../../src/EmbeddedInstance";
 import TestUtils "../test-utils/TestUtils";
 import ZenDBSuite "../test-utils/TestFramework";
 import Utils "../../src/EmbeddedInstance/Utils";
@@ -164,7 +164,7 @@ let input_txs = Buffer.fromArray<Tx>(
 
 ZenDBSuite.newSuite(
     "Txs tests",
-    ?ZenDBSuite.onlyWithIndex, // too slow to run with no index
+    ?{ ZenDBSuite.onlyWithIndex with log_level = #Error }, // too slow to run with no index
     func txs_tests(zendb : ZenDB.Database, suite_utils : ZenDBSuite.SuiteUtils) {
 
         let #ok(txs) = zendb.createCollection<Tx>("transactions", TxSchema, candify_tx, null) else return assert false;
@@ -296,18 +296,18 @@ ZenDBSuite.newSuite(
             let Query = options_to_query(options);
 
             let query_res = txs.search(Query);
-            let #ok(matching_txs) = query_res else Debug.trap("get_txs failed: " # debug_show query_res);
+            let #ok(result) = query_res else Debug.trap("get_txs failed: " # debug_show query_res);
 
-            matching_txs;
+            result.documents;
 
         };
 
         func get_txs_from_query(db_query : ZenDB.QueryBuilder) : [(ZenDB.Types.DocumentId, Tx)] {
 
             let query_res = txs.search(db_query);
-            let #ok(matching_txs) = query_res else Debug.trap("get_txs failed: " # debug_show query_res);
+            let #ok(result) = query_res else Debug.trap("get_txs failed: " # debug_show query_res);
 
-            matching_txs;
+            result.documents;
 
         };
 
@@ -315,8 +315,8 @@ ZenDBSuite.newSuite(
 
             ignore db_query.Limit(pagination_limit);
             let #ok(matching_txs) = txs.search(db_query);
-            let bitmap = BitMap.fromIter(Iter.map(matching_txs.vals(), func((id, _) : (ZenDB.Types.DocumentId, Tx)) : Nat = Utils.convert_last_8_bytes_to_nat(id)));
-            let documents = Buffer.fromArray<ZenDB.Types.WrapId<Tx>>(matching_txs);
+            let bitmap = BitMap.fromIter(Iter.map(matching_txs.documents.vals(), func((id, _) : (ZenDB.Types.DocumentId, Tx)) : Nat = Utils.convert_last_8_bytes_to_nat(id)));
+            let documents = Buffer.fromArray<ZenDB.Types.WrapId<Tx>>(matching_txs.documents);
             var batch_size = documents.size();
 
             label skip_limit_pagination while (batch_size > 0) {
@@ -328,10 +328,10 @@ ZenDBSuite.newSuite(
                 let #ok(matching_txs) = txs.search(db_query);
                 // Debug.print("matching_txs: " # debug_show matching_txs);
 
-                assert matching_txs.size() <= pagination_limit;
-                batch_size := matching_txs.size();
+                assert matching_txs.documents.size() <= pagination_limit;
+                batch_size := matching_txs.documents.size();
 
-                for ((id, tx) in matching_txs.vals()) {
+                for ((id, tx) in matching_txs.documents.vals()) {
                     documents.add((id, tx));
                     let nat_id = Utils.convert_last_8_bytes_to_nat(id);
 
@@ -356,7 +356,7 @@ ZenDBSuite.newSuite(
         //     let #ok(matching_txs) = txs.search(db_query);
         //     // Debug.print("matching_txs: " # debug_show matching_txs);
         //     let documents = Buffer.fromArray<(Nat, Tx)>(matching_txs);
-        //     let bitmap = BitMap.fromIter(Iter.map<(Nat, Tx), Nat>(matching_txs.vals(), func((id, _) : (Nat, Tx)) : Nat = id));
+        //     let bitmap = BitMap.fromIter(Iter.map<(Nat, Tx), Nat>(matching_txs.documents.vals(), func((id, _) : (Nat, Tx)) : Nat = id));
         //     var batch_size = documents.size();
 
         //     var opt_cursor : ?Nat = null;
@@ -379,10 +379,10 @@ ZenDBSuite.newSuite(
         //         let #ok(matching_txs) = txs.search(db_query);
         //         Debug.print("matching_txs: " # debug_show matching_txs);
 
-        //         assert matching_txs.size() <= pagination_limit;
-        //         batch_size := matching_txs.size();
+        //         assert matching_txs.documents.size() <= pagination_limit;
+        //         batch_size := matching_txs.documents.size();
 
-        //         for ((id, tx) in matching_txs.vals()) {
+        //         for ((id, tx) in matching_txs.documents.vals()) {
         //             documents.add((id, tx));
 
         //             if (bitmap.get(id)) {

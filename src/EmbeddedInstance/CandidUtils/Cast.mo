@@ -20,6 +20,7 @@ import Bool "mo:base@0.16.0/Bool";
 import Char "mo:base@0.16.0/Char";
 
 import T "../Types";
+import MergeSort "../MergeSort";
 
 module Cast {
     type CandidType = T.CandidType;
@@ -536,14 +537,14 @@ module Cast {
                     return #err("Record size mismatch: " # debug_show (("schema", fields.size()), ("document", documents.size())));
                 };
 
-                let sorted_fields = Array.sort(
+                let sorted_fields = MergeSort.sort(
                     fields,
                     func(a : (Text, Schema), b : (Text, Schema)) : T.Order {
                         Text.compare(a.0, b.0);
                     },
                 );
 
-                let sorted_records = Array.sort(
+                let sorted_records = MergeSort.sort(
                     documents,
                     func(a : (Text, Candid), b : (Text, Candid)) : T.Order {
                         Text.compare(a.0, b.0);

@@ -198,7 +198,10 @@ Here's an example of how to use the tuple schema types in a collection:
 
     let #ok(id) = tuples.insert(ZenDB.Tuple(42, "hello")) else return assert false;
     assert tuples.size() == 1;
-    assert tuples.search(ZenDB.QueryBuilder().Where("0", #eq(#Nat(42)))) == #ok([(0, ZenDB.Tuple(42, "hello"))]);
+    
+    let #ok(search_result) = tuples.search(ZenDB.QueryBuilder().Where("0", #eq(#Nat(42))));
+    assert search_result.documents == [(0, ZenDB.Tuple(42, "hello"))];
+    
     assert tuples.get(id) == ?(ZenDB.Tuple(42, "hello"));
     assert tuples.get(id) == ?({ _0_ = 42; _1_ = "hello" });
     assert switch (tuples.get(id)) {
@@ -348,6 +351,29 @@ assert user == ?{
 };
 ```
 
+#### Replacing Documents
+The `replaceById()` method allows you to completely replace a document with a new one:
+
+```motoko
+let new_user : User = {
+  id = Principal.fromText("2vxsx-fae");
+  name = "Alice Smith";
+  age = 31;
+};
+
+let #ok(replace_result) = users_collection.replaceById(userId, new_user);
+// replace_result.instructions contains the instruction count
+```
+
+**Important:** Replace operations completely replace the document with the new value. If you only want to update specific fields, use `updateById()` instead.
+
+##### ReplaceByIdResult Type
+
+The `replaceById()` method returns a `Result<ReplaceByIdResult, Text>` where `ReplaceByIdResult` contains:
+- **`instructions`**: `Nat` - Instructions consumed during the replace operation
+};
+```
+
 #### Updating Documents
 ZenDB provides powerful update capabilities through two methods:
 - `updateById()` - Updates a specific document by its ID
@@ -440,7 +466,7 @@ let #ok(results) = users_collection.search(
 
 #### Advanced Query Example
 ```motoko
-let #ok(results) = users_collection.search(
+let #ok(search_result) = users_collection.search(
   ZenDB.QueryBuilder()
     .Where("status", #eq(#Text("active")))
     .And("age", #between(#Nat(25), #Nat(50)))
@@ -455,7 +481,11 @@ let #ok(results) = users_collection.search(
 );
 ```
 
-The `search` method returns a list of tuples containing the document ID and the document itself: `[(DocumentId, Document)]`. Query execution is automatically optimized by the internal query planner, which analyzes available indexes and determines the most efficient execution path.
+The `search` method returns a `SearchResult` object containing:
+- **`documents`**: An array of tuples with the document ID and document itself: `[(DocumentId, Document)]`
+- **`instructions`**: The number of instructions used to execute the query
+
+Query execution is automatically optimized by the internal query planner, which analyzes available indexes and determines the most efficient execution path.
 
 #### Nested Field Queries
 ZenDB also supports querying nested fields using dot notation:
@@ -466,7 +496,33 @@ let #ok(results) = users_collection.search(
     .Where("profile.address.city", #eq(#Text("New York")))
     .And("profile.preferences.notifications", #eq(#Bool(true)))
 );
+
+// Access the results
+let results = search_result.documents;
 ```
+
+### Count Operations
+
+The `count()` method allows you to count documents matching a query without retrieving the actual documents. This is more efficient than using `search()` when you only need the count.
+
+```motoko
+let #ok(count_result) = users_collection.count(
+  ZenDB.QueryBuilder()
+    .Where("status", #eq(#Text("active")))
+    .And("age", #gte(#Nat(18)))
+);
+
+Debug.print("Active adult users: " # Nat.toText(count_result.count));
+Debug.print("Query used: " # Nat.toText(count_result.instructions) # " instructions");
+```
+
+#### CountResult Type
+
+The `count()` method returns a `Result<CountResult, Text>` where `CountResult` contains:
+- **`count`**: `Nat` - The number of documents matching the query
+- **`instructions`**: `Nat` - Instructions consumed during the count operation
+
+Note that `count()` ignores `.Limit()` and `.Skip()` parameters in the query builder, as it counts all matching documents.
 
 ### QueryBuilder Methods
 

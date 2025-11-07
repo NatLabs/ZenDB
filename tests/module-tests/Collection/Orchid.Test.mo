@@ -27,7 +27,7 @@ import PeekableIter "mo:itertools@0.2.2/PeekableIter";
 import BpTree "mo:augmented-btrees@0.7.1/BpTree";
 import Cmp "mo:augmented-btrees@0.7.1/Cmp";
 
-import ZenDB "../../../src";
+import ZenDB "../../../src/EmbeddedInstance";
 import Orchid "../../../src/EmbeddedInstance/Collection/Orchid";
 import Fuzz "mo:fuzz";
 import CandidMap "../../../src/EmbeddedInstance/CandidMap";

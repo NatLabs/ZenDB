@@ -161,6 +161,92 @@ module Logger {
         lazyLogAtLevel(logger, #Error, msgFn);
     };
 
+    /// A convenience class that wraps a Logger and namespace to reduce verbosity
+    /// in logging calls. Instead of repeatedly passing the logger and formatting
+    /// the namespace, you can create a NamespacedLogger once and use it throughout
+    /// a module or function.
+    ///
+    /// Example usage:
+    /// ```motoko
+    /// let log = Logger.NamespacedLogger(collection.logger, "MyModule.myFunction");
+    /// log.logDebug("Processing started");
+    /// log.logInfo("Found " # Nat.toText(count) # " items");
+    /// log.logError("Operation failed");
+    /// ```
+    public class NamespacedLogger(logger : Logger, namespace : Text) {
+
+        /// Log a debug message
+        public func logDebug(msg : Text) {
+            debugMsg(logger, namespace # ": " # msg);
+        };
+
+        /// Log a debug message with lazy evaluation
+        public func lazyDebug(msgFn : () -> Text) {
+            lazyLogAtLevel(logger, #Debug, func() { namespace # ": " # msgFn() });
+        };
+
+        /// Log an info message
+        public func logInfo(msg : Text) {
+            Logger.info(logger, namespace # ": " # msg);
+        };
+
+        /// Log an info message with lazy evaluation
+        public func lazyInfo(msgFn : () -> Text) {
+            lazyLogAtLevel(logger, #Info, func() { namespace # ": " # msgFn() });
+        };
+
+        /// Log a warning message
+        public func logWarn(msg : Text) {
+            Logger.warn(logger, namespace # ": " # msg);
+        };
+
+        /// Log a warning message with lazy evaluation
+        public func lazyWarn(msgFn : () -> Text) {
+            lazyLogAtLevel(logger, #Warn, func() { namespace # ": " # msgFn() });
+        };
+
+        /// Log an error message
+        public func logError(msg : Text) {
+            Logger.error(logger, namespace # ": " # msg);
+        };
+
+        /// Log an error message with lazy evaluation
+        public func lazyError(msgFn : () -> Text) {
+            lazyLogAtLevel(logger, #Error, func() { namespace # ": " # msgFn() });
+        };
+
+        /// Log at a specific level
+        public func log(log_level : LogLevel, msg : Text) {
+            Logger.logAtLevel(logger, log_level, namespace # ": " # msg);
+        };
+
+        /// Log at a specific level with lazy evaluation
+        public func lazyLog(log_level : LogLevel, msgFn : () -> Text) {
+            Logger.lazyLogAtLevel(logger, log_level, func() { namespace # ": " # msgFn() });
+        };
+
+        public func trap(msg : Text) : None {
+            Debug.trap(namespace # ": " # msg);
+        };
+
+        /// Create a sub-namespaced logger by appending to the current namespace
+        /// Example: if current namespace is "Module", calling subnamespace("function")
+        /// creates a logger with namespace "Module.function"
+        public func subnamespace(name : Text) : NamespacedLogger {
+            NamespacedLogger(logger, namespace # "." # name);
+        };
+
+        /// Get the current namespace
+        public func getNamespace() : Text {
+            namespace;
+        };
+
+        /// Get the underlying logger
+        public func getLogger() : Logger {
+            logger;
+        };
+    };
+
     public class Thread(logger : Logger, name : Text, parent_thread_id : ?Nat) {
         let thread_id = logger.next_thread_id;
         logger.next_thread_id += 1;

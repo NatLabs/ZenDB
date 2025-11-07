@@ -18,6 +18,8 @@ import SchemaMap "Collection/SchemaMap";
 import CandidUtils "CandidUtils";
 
 module {
+    let LOGGER_NAMESPACE = "Query";
+
 
     public type ZqlOperators = T.ZqlOperators;
     public type ZenQueryLang = T.ZenQueryLang;
@@ -351,14 +353,12 @@ module {
 
     // Process the query and convert it to a format most suitable for the collection
     public func processQuery(collection : T.StableCollection, zendb_query : T.ZenQueryLang) : T.Result<T.ZenQueryLang, Text> {
+        let log = Logger.NamespacedLogger(collection.logger, LOGGER_NAMESPACE).subnamespace("processQuery");
 
         func handle_operation(field : Text, op : T.ZqlOperators) : T.Result<T.ZenQueryLang, Text> {
             // Debug.print(debug_show (Set.toArray(collection.schema_keys_set)));
             let ?candid_type = SchemaMap.get(collection.schema_map, field) else {
-                Logger.lazyDebug(
-                    collection.logger,
-                    func() = "Field '" # field # "' not found in schema",
-                );
+                log.lazyDebug(func() = "Field '" # field # "' not found in schema");
                 return #err("Field '" # field # "' not found in schema");
             };
 

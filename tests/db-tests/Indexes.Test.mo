@@ -22,7 +22,7 @@ import Array "mo:base@0.16.0/Array";
 import Char "mo:base@0.16.0/Char";
 import Result "mo:base@0.16.0/Result";
 
-import ZenDB "../../src";
+import ZenDB "../../src/EmbeddedInstance";
 import CompositeIndex "../../src/EmbeddedInstance/Collection/Index/CompositeIndex";
 import Utils "../../src/EmbeddedInstance/Utils";
 
@@ -268,7 +268,7 @@ ZenDBSuite.newSuite(
                     return sorted_ids.size() == limit and Itertools.all(
                         Itertools.zip(
                             Iter.map(
-                                results.vals(),
+                                results.documents.vals(),
                                 func((id, _) : (ZenDB.Types.DocumentId, SupportedIndexTypes)) : ZenDB.Types.DocumentId {
                                     return id;
                                 },
@@ -317,7 +317,7 @@ ZenDBSuite.newSuite(
                         // Debug.print("Looking for id " # debug_show id # " with document " # debug_show r);
 
                         // assert Itertools.any(
-                        //     results.vals(),
+                        //     results.documents.vals(),
                         //     func((search_id, document) : (Nat, SupportedIndexTypes)) : Bool {
                         //         return search_id == id;
                         //     },
@@ -405,7 +405,7 @@ ZenDBSuite.newSuite(
         //                 );
 
         //                 assert Itertools.any(
-        //                     results.vals(),
+        //                     results.documents.vals(),
         //                     func((search_id, document) : (Nat, SupportedIndexTypes)) : Bool {
         //                         return search_id == id;
         //                     },
@@ -723,9 +723,10 @@ ZenDBSuite.newSuite(
                 let #ok(id3) = test.insert({ opt_nat = null }) else return assert false;
                 let #ok(id4) = test.insert({ opt_nat = null }) else return assert false; // should succeed
 
-                assert test.search(
+                let #ok(result1) = test.search(
                     QueryBuilder().Where("opt_nat", #eq(#Null))
-                ) == #ok([(id3, { opt_nat = null }), (id4, { opt_nat = null })]);
+                ) else return assert false;
+                assert result1.documents == [(id3, { opt_nat = null }), (id4, { opt_nat = null })];
 
                 assert test.size() == 4;
 
@@ -733,9 +734,10 @@ ZenDBSuite.newSuite(
 
                 assert test.size() == 4;
 
-                assert test.search(
+                let #ok(result2) = test.search(
                     QueryBuilder().Where("opt_nat", #not_(#eq(#Null)))
-                ) == #ok([(id1, { opt_nat = ?1 }), (id2, { opt_nat = ?2 })]);
+                ) else return assert false;
+                assert result2.documents == [(id1, { opt_nat = ?1 }), (id2, { opt_nat = ?2 })];
 
             },
         );
@@ -799,8 +801,8 @@ ZenDBSuite.newSuite(
                             QueryBuilder().Where("first", #eq(#Nat(10)))
                         );
 
-                        assert results.size() == 3;
-                        for ((_, document) in results.vals()) {
+                        assert results.documents.size() == 3;
+                        for ((_, document) in results.documents.vals()) {
                             assert document.first == 10;
                         };
                     },
@@ -815,8 +817,8 @@ ZenDBSuite.newSuite(
                             QueryBuilder().Where("first", #eq(#Nat(10))).Where("second", #gt(#Text("a")))
                         );
 
-                        assert results.size() == 1;
-                        assert results[0].1.first == 10 and results[0].1.second == "b";
+                        assert results.documents.size() == 1;
+                        assert results.documents[0].1.first == 10 and results.documents[0].1.second == "b";
                     },
                 );
             },
@@ -872,8 +874,8 @@ ZenDBSuite.newSuite(
                             QueryBuilder().Where("nat_val", #gt(#Nat 0))
                         );
 
-                        assert results.size() == 1;
-                        assert results[0].1.nat_val == 1;
+                        assert results.documents.size() == 1;
+                        assert results.documents[0].1.nat_val == 1;
                     },
                 );
 
@@ -884,8 +886,8 @@ ZenDBSuite.newSuite(
                             QueryBuilder().Where("text_val", #gt(#Text("")))
                         );
 
-                        assert results.size() == 1;
-                        assert results[0].1.text_val == "\00";
+                        assert results.documents.size() == 1;
+                        assert results.documents[0].1.text_val == "\00";
                     },
                 );
 
@@ -896,8 +898,8 @@ ZenDBSuite.newSuite(
                             QueryBuilder().Where("blob_val", #gt(#Blob(Blob.fromArray([]))))
                         );
 
-                        assert results.size() == 1;
-                        assert Blob.equal(results[0].1.blob_val, Blob.fromArray([0]));
+                        assert results.documents.size() == 1;
+                        assert Blob.equal(results.documents[0].1.blob_val, Blob.fromArray([0]));
                     },
                 );
 
@@ -920,8 +922,8 @@ ZenDBSuite.newSuite(
                             QueryBuilder().Where("blob_val", #gt(#Blob(Blob.fromArray([0, 0]))))
                         );
 
-                        assert results.size() == 1;
-                        assert Blob.equal(results[0].1.blob_val, Blob.fromArray([0, 1]));
+                        assert results.documents.size() == 1;
+                        assert Blob.equal(results.documents[0].1.blob_val, Blob.fromArray([0, 1]));
                     },
                 );
             },

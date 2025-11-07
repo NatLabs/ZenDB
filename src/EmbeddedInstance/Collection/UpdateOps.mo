@@ -11,6 +11,8 @@ import Utils "../Utils";
 import Logger "../Logger";
 
 module {
+    let LOGGER_NAMESPACE = "UpdateOps";
+
 
     func handle_multi_field_update_operations(
         collection : T.StableCollection,
@@ -253,21 +255,19 @@ module {
         field_value : T.Candid,
         op : T.FieldUpdateOperations,
     ) : T.Result<T.Candid, Text> {
+        let log = Logger.NamespacedLogger(collection.logger, LOGGER_NAMESPACE).subnamespace("handle_field_update_operation_helper");
 
         if (is_candid(op)) {
-            Logger.lazyDebug(collection.logger, func() = "handle_field_update_operation_helper: op is candid: " # debug_show (op));
+            log.lazyDebug(func() = "op is candid: " # debug_show (op));
             return to_candid_value(op);
         } else if (is_single_operation(op)) {
-            Logger.lazyDebug(collection.logger, func() = "handle_field_update_operation_helper: op is single operation: " # debug_show (op));
+            log.lazyDebug(func() = "op is single operation: " # debug_show (op));
             let res = handle_single_field_update_operation(collection, candid_map, field_type, field_value, op);
-            Logger.lazyDebug(
-                collection.logger,
-                func() = "res: " # debug_show (res),
-            );
+            log.lazyDebug(func() = "res: " # debug_show (res));
             return res;
         };
 
-        Logger.lazyDebug(collection.logger, func() = "handle_field_update_operation_helper: op is multi operation: " # debug_show (op));
+        log.lazyDebug(func() = "op is multi operation: " # debug_show (op));
         handle_multi_field_update_operations(collection, candid_map, field_type, field_value, op)
 
     };

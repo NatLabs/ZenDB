@@ -17,7 +17,7 @@ import Bench "mo:bench";
 import Fuzz "mo:fuzz";
 import Candid "mo:serde@3.3.3/Candid";
 
-import ZenDB "../../src";
+import ZenDB "../../src/EmbeddedInstance";
 import SchemaMap "../../src/EmbeddedInstance/Collection/SchemaMap";
 import CandidMap "../../src/EmbeddedInstance/CandidMap";
 import { Orchid } "../../src/EmbeddedInstance/Collection/Orchid";
@@ -335,18 +335,18 @@ ZenDBSuite.newSuite(
                             QueryBuilder().Where("id", #eq(#Nat(5)))
                         );
                         assert Result.isOk(result1);
-                        let #ok(data1) = result1 else return assert false;
-                        assert data1.size() == 1;
-                        assert data1[0].0 == numeric_id_2;
+                        let #ok(search_result1) = result1 else return assert false;
+                        assert search_result1.documents.size() == 1;
+                        assert search_result1.documents[0].0 == numeric_id_2;
 
                         // Test equality on non-indexed fields
                         let result2 = numeric_collection.search(
                             QueryBuilder().Where("unindexed_nat", #eq(#Nat(5)))
                         );
                         assert Result.isOk(result2);
-                        let #ok(data2) = result2 else return assert false;
-                        assert data2.size() == 1;
-                        assert data2[0].0 == numeric_id_2;
+                        let #ok(search_result2) = result2 else return assert false;
+                        assert search_result2.documents.size() == 1;
+                        assert search_result2.documents[0].0 == numeric_id_2;
                     },
                 );
 
@@ -358,11 +358,11 @@ ZenDBSuite.newSuite(
                             QueryBuilder().Where("id", #not_(#eq(#Nat(5))))
                         );
                         assert Result.isOk(result1);
-                        let #ok(data1) = result1 else return assert false;
-                        assert data1.size() == 4;
+                        let #ok(search_result1) = result1 else return assert false;
+                        assert search_result1.documents.size() == 4;
                         assert Array.find<ZenDB.Types.DocumentId>(
                             Array.map<ZenDB.Types.WrapId<NumericDoc>, ZenDB.Types.DocumentId>(
-                                data1,
+                                search_result1.documents,
                                 func((id, _)) { id },
                             ),
                             func(id) { id == numeric_id_2 },
@@ -378,11 +378,11 @@ ZenDBSuite.newSuite(
                             QueryBuilder().Where("id", #lt(#Nat(5)))
                         );
                         assert Result.isOk(result);
-                        let #ok(data) = result else return assert false;
-                        assert data.size() == 2;
+                        let #ok(search_result) = result else return assert false;
+                        assert search_result.documents.size() == 2;
 
                         let ids = Array.map<ZenDB.Types.WrapId<NumericDoc>, ZenDB.Types.DocumentId>(
-                            data,
+                            search_result.documents,
                             func((id, _)) { id },
                         );
 
@@ -399,11 +399,11 @@ ZenDBSuite.newSuite(
                             QueryBuilder().Where("id", #lte(#Nat(5)))
                         );
                         assert Result.isOk(result);
-                        let #ok(data) = result else return assert false;
-                        assert data.size() == 3;
+                        let #ok(search_result) = result else return assert false;
+                        assert search_result.documents.size() == 3;
 
                         let ids = Array.map<ZenDB.Types.WrapId<NumericDoc>, ZenDB.Types.DocumentId>(
-                            data,
+                            search_result.documents,
                             func((id, _)) { id },
                         );
 
@@ -421,11 +421,11 @@ ZenDBSuite.newSuite(
                             QueryBuilder().Where("id", #gt(#Nat(5)))
                         );
                         assert Result.isOk(result);
-                        let #ok(data) = result else return assert false;
-                        assert data.size() == 2;
+                        let #ok(search_result) = result else return assert false;
+                        assert search_result.documents.size() == 2;
 
                         let ids = Array.map<ZenDB.Types.WrapId<NumericDoc>, ZenDB.Types.DocumentId>(
-                            data,
+                            search_result.documents,
                             func((id, _)) { id },
                         );
 
@@ -442,11 +442,11 @@ ZenDBSuite.newSuite(
                             QueryBuilder().Where("id", #gte(#Nat(5)))
                         );
                         assert Result.isOk(result);
-                        let #ok(data) = result else return assert false;
-                        assert data.size() == 3;
+                        let #ok(search_result) = result else return assert false;
+                        assert search_result.documents.size() == 3;
 
                         let ids = Array.map<ZenDB.Types.WrapId<NumericDoc>, ZenDB.Types.DocumentId>(
-                            data,
+                            search_result.documents,
                             func((id, _)) { id },
                         );
 
@@ -465,12 +465,12 @@ ZenDBSuite.newSuite(
                         );
 
                         assert Result.isOk(result);
-                        let #ok(data) = result else return assert false;
-                        Debug.print(debug_show ({ data = data }));
-                        assert data.size() == 3;
+                        let #ok(search_result) = result else return assert false;
+                        Debug.print(debug_show ({ data = search_result.documents }));
+                        assert search_result.documents.size() == 3;
 
                         let ids = Array.map<ZenDB.Types.WrapId<NumericDoc>, ZenDB.Types.DocumentId>(
-                            data,
+                            search_result.documents,
                             func((id, _)) { id },
                         );
 
@@ -491,11 +491,11 @@ ZenDBSuite.newSuite(
                         );
 
                         assert Result.isOk(result);
-                        let #ok(data) = result else return assert false;
-                        assert data.size() == 3; // ids 1, 2, and 3
+                        let #ok(search_result) = result else return assert false;
+                        assert search_result.documents.size() == 3; // ids 1, 2, and 3
 
                         let ids = Array.map<ZenDB.Types.WrapId<NumericDoc>, ZenDB.Types.DocumentId>(
-                            data,
+                            search_result.documents,
                             func((id, _)) { id },
                         );
 
@@ -518,26 +518,26 @@ ZenDBSuite.newSuite(
                             QueryBuilder().Where("text_val", #eq(#Text("")))
                         );
                         assert Result.isOk(result1);
-                        let #ok(data1) = result1 else return assert false;
-                        assert data1.size() == 1;
-                        assert data1[0].0 == text_id_0;
+                        let #ok(search_result1) = result1 else return assert false;
+                        assert search_result1.documents.size() == 1;
+                        assert search_result1.documents[0].0 == text_id_0;
 
                         // Test case sensitivity
                         let result2 = text_collection.search(
                             QueryBuilder().Where("case_sensitive", #eq(#Text("A")))
                         );
                         assert Result.isOk(result2);
-                        let #ok(data2) = result2 else return assert false;
-                        assert data2.size() == 1;
-                        assert data2[0].0 == text_id_3;
+                        let #ok(search_result2) = result2 else return assert false;
+                        assert search_result2.documents.size() == 1;
+                        assert search_result2.documents[0].0 == text_id_3;
 
                         let result3 = text_collection.search(
                             QueryBuilder().Where("case_sensitive", #eq(#Text("a")))
                         );
                         assert Result.isOk(result3);
-                        let #ok(data3) = result3 else return assert false;
-                        assert data3.size() == 1;
-                        assert data3[0].0 == text_id_1;
+                        let #ok(search_result3) = result3 else return assert false;
+                        assert search_result3.documents.size() == 1;
+                        assert search_result3.documents[0].0 == text_id_1;
                     },
                 );
 
@@ -550,13 +550,13 @@ ZenDBSuite.newSuite(
                         );
 
                         assert Result.isOk(result1);
-                        let #ok(data1) = result1 else return assert false;
+                        let #ok(search_result1) = result1 else return assert false;
 
-                        Debug.print(debug_show { data1 = data1 });
-                        assert data1.size() == 4; // "", "a", "A", "!@#$%^"
+                        Debug.print(debug_show { data1 = search_result1.documents });
+                        assert search_result1.documents.size() == 4; // "", "a", "A", "!@#$%^"
 
                         let ids = Array.map<ZenDB.Types.WrapId<TextDoc>, ZenDB.Types.DocumentId>(
-                            data1,
+                            search_result1.documents,
                             func((id, _)) { id },
                         );
 
@@ -570,13 +570,13 @@ ZenDBSuite.newSuite(
                             QueryBuilder().Where("text_val", #gt(#Text("a")))
                         );
                         assert Result.isOk(result2);
-                        let #ok(data2) = result2 else return assert false;
+                        let #ok(search_result2) = result2 else return assert false;
 
                         // Should include "b"
-                        assert data2.size() > 0;
+                        assert search_result2.documents.size() > 0;
                         assert Array.find<ZenDB.Types.DocumentId>(
                             Array.map<ZenDB.Types.WrapId<TextDoc>, ZenDB.Types.DocumentId>(
-                                data2,
+                                search_result2.documents,
                                 func((id, _)) { id },
                             ),
                             func(id) { id == text_id_2 }, // "b"
@@ -593,11 +593,11 @@ ZenDBSuite.newSuite(
                         );
 
                         assert Result.isOk(result);
-                        let #ok(data) = result else return assert false;
-                        assert data.size() == 2; // "a" and "b"
+                        let #ok(search_result) = result else return assert false;
+                        assert search_result.documents.size() == 2; // "a" and "b"
 
                         let ids = Array.map<ZenDB.Types.WrapId<TextDoc>, ZenDB.Types.DocumentId>(
-                            data,
+                            search_result.documents,
                             func((id, _)) { id },
                         );
 
@@ -614,9 +614,9 @@ ZenDBSuite.newSuite(
                             QueryBuilder().Where("text_val", #eq(#Text("!@#$%^")))
                         );
                         assert Result.isOk(result);
-                        let #ok(data) = result else return assert false;
-                        assert data.size() == 1;
-                        assert data[0].0 == text_id_4;
+                        let #ok(search_result) = result else return assert false;
+                        assert search_result.documents.size() == 1;
+                        assert search_result.documents[0].0 == text_id_4;
                     },
                 );
             },
@@ -634,8 +634,8 @@ ZenDBSuite.newSuite(
                         );
 
                         assert Result.isOk(result);
-                        let #ok(data) = result else return assert false;
-                        Debug.print(debug_show { data = data });
+                        let #ok(search_result) = result else return assert false;
+                        Debug.print(debug_show { data = search_result.documents });
 
                         for (doc in edge_collection.vals()) {
                             let blob = candify_edge.to_blob(doc);
@@ -649,8 +649,8 @@ ZenDBSuite.newSuite(
 
                         };
 
-                        assert data.size() == 1;
-                        assert data[0].0 == edge_id_0;
+                        assert search_result.documents.size() == 1;
+                        assert search_result.documents[0].0 == edge_id_0;
                     },
                 );
 
@@ -662,12 +662,12 @@ ZenDBSuite.newSuite(
                             QueryBuilder().Where("text_field", #eq(#Text(" ")))
                         );
                         assert Result.isOk(result);
-                        let #ok(data) = result else return assert false;
-                        Debug.print(debug_show ({ data = data }));
+                        let #ok(search_result) = result else return assert false;
+                        Debug.print(debug_show ({ data = search_result.documents }));
 
-                        assert data.size() == 1;
-                        assert data[0].0 == edge_id_1;
-                        assert data[0].1.text_field == " ";
+                        assert search_result.documents.size() == 1;
+                        assert search_result.documents[0].0 == edge_id_1;
+                        assert search_result.documents[0].1.text_field == " ";
                     },
                 );
 
@@ -679,11 +679,11 @@ ZenDBSuite.newSuite(
                             QueryBuilder().Where("zero_val", #eq(#Nat(0)))
                         );
                         assert Result.isOk(result);
-                        let #ok(data) = result else return assert false;
-                        assert data.size() == 2;
+                        let #ok(search_result) = result else return assert false;
+                        assert search_result.documents.size() == 2;
 
                         let ids = Array.map<ZenDB.Types.WrapId<EdgeDoc>, ZenDB.Types.DocumentId>(
-                            data,
+                            search_result.documents,
                             func((id, _)) { id },
                         );
 
@@ -700,18 +700,18 @@ ZenDBSuite.newSuite(
                             QueryBuilder().Where("min_int", #lt(#Int(-1000)))
                         );
                         assert Result.isOk(result1);
-                        let #ok(data1) = result1 else return assert false;
-                        assert data1.size() == 1;
-                        assert data1[0].0 == edge_id_0;
+                        let #ok(search_result1) = result1 else return assert false;
+                        assert search_result1.documents.size() == 1;
+                        assert search_result1.documents[0].0 == edge_id_0;
 
                         // Test with extreme max value
                         let result2 = edge_collection.search(
                             QueryBuilder().Where("max_int", #gt(#Int(1000)))
                         );
                         assert Result.isOk(result2);
-                        let #ok(data2) = result2 else return assert false;
-                        assert data2.size() == 1;
-                        assert data2[0].0 == edge_id_0;
+                        let #ok(search_result2) = result2 else return assert false;
+                        assert search_result2.documents.size() == 1;
+                        assert search_result2.documents[0].0 == edge_id_0;
                     },
                 );
 
@@ -723,14 +723,14 @@ ZenDBSuite.newSuite(
                             QueryBuilder().Where("text_field", #lt(#Text("abc"))).Sort("text_field", #Descending)
                         );
                         assert Result.isOk(result);
-                        let #ok(data) = result else return assert false;
+                        let #ok(search_result) = result else return assert false;
 
-                        assert data.size() == 2;
+                        assert search_result.documents.size() == 2;
 
-                        assert data[0].0 == edge_id_0;
-                        assert data[0].1.text_field == "abbbbbbbbbbbbbbbb";
+                        assert search_result.documents[0].0 == edge_id_0;
+                        assert search_result.documents[0].1.text_field == "abbbbbbbbbbbbbbbb";
 
-                        assert data[1].0 == edge_id_1;
+                        assert search_result.documents[1].0 == edge_id_1;
                     },
                 );
             },
@@ -748,11 +748,11 @@ ZenDBSuite.newSuite(
                         );
 
                         assert Result.isOk(result);
-                        let #ok(data) = result else return assert false;
-                        assert data.size() == 2; // ids 2 and 4
+                        let #ok(search_result) = result else return assert false;
+                        assert search_result.documents.size() == 2; // ids 2 and 4
 
                         let ids = Array.map<ZenDB.Types.WrapId<NumericDoc>, ZenDB.Types.DocumentId>(
-                            data,
+                            search_result.documents,
                             func((id, _)) { id },
                         );
 
@@ -770,11 +770,11 @@ ZenDBSuite.newSuite(
                         );
 
                         assert Result.isOk(result);
-                        let #ok(data) = result else return assert false;
-                        assert data.size() == 2; // ids 0 and 4
+                        let #ok(search_result) = result else return assert false;
+                        assert search_result.documents.size() == 2; // ids 0 and 4
 
                         let ids = Array.map<ZenDB.Types.WrapId<NumericDoc>, ZenDB.Types.DocumentId>(
-                            data,
+                            search_result.documents,
                             func((id, _)) { id },
                         );
 
@@ -792,11 +792,11 @@ ZenDBSuite.newSuite(
                         );
 
                         assert Result.isOk(result);
-                        let #ok(data) = result else return assert false;
-                        assert data.size() == 3;
+                        let #ok(search_result) = result else return assert false;
+                        assert search_result.documents.size() == 3;
 
                         let ids = Array.map<ZenDB.Types.WrapId<NumericDoc>, ZenDB.Types.DocumentId>(
-                            data,
+                            search_result.documents,
                             func((id, _)) { id },
                         );
 
@@ -821,14 +821,14 @@ ZenDBSuite.newSuite(
                         );
 
                         assert Result.isOk(result);
-                        let #ok(data) = result else return assert false;
-                        Debug.print(debug_show ({ gt_nat_data = data }));
+                        let #ok(search_result) = result else return assert false;
+                        Debug.print(debug_show ({ gt_nat_data = search_result }));
 
                         // Should include A-10 and A-15, but not A-5 or A-7
-                        assert data.size() == 2;
+                        assert search_result.documents.size() == 2;
 
                         let ids = Array.map<ZenDB.Types.WrapId<CompositeDoc>, ZenDB.Types.DocumentId>(
-                            data,
+                            search_result.documents,
                             func((id, _)) { id },
                         );
 
@@ -847,14 +847,14 @@ ZenDBSuite.newSuite(
                         );
 
                         assert Result.isOk(result);
-                        let #ok(data) = result else return assert false;
-                        Debug.print(debug_show ({ lt_nat_data = data }));
+                        let #ok(search_result) = result else return assert false;
+                        Debug.print(debug_show ({ lt_nat_data = search_result }));
 
                         // Should include A-5 and A-7, but not A-10 or A-15
-                        assert data.size() == 2;
+                        assert search_result.documents.size() == 2;
 
                         let ids = Array.map<ZenDB.Types.WrapId<CompositeDoc>, ZenDB.Types.DocumentId>(
-                            data,
+                            search_result.documents,
                             func((id, _)) { id },
                         );
 
@@ -874,14 +874,14 @@ ZenDBSuite.newSuite(
                         );
 
                         assert Result.isOk(result);
-                        let #ok(data) = result else return assert false;
-                        Debug.print(debug_show ({ gt_blob_data = data }));
+                        let #ok(search_result) = result else return assert false;
+                        Debug.print(debug_show ({ gt_blob_data = search_result }));
 
                         // Should include [12, 32, 45, 0], [12, 32, 45, 1] but not [12, 32, 44]
-                        assert data.size() == 2;
+                        assert search_result.documents.size() == 2;
 
                         let ids = Array.map<ZenDB.Types.WrapId<CompositeDoc>, ZenDB.Types.DocumentId>(
-                            data,
+                            search_result.documents,
                             func((id, _)) { id },
                         );
 
@@ -900,14 +900,14 @@ ZenDBSuite.newSuite(
                         );
 
                         assert Result.isOk(result);
-                        let #ok(data) = result else return assert false;
-                        Debug.print(debug_show ({ lt_blob_data = data }));
+                        let #ok(search_result) = result else return assert false;
+                        Debug.print(debug_show ({ lt_blob_data = search_result }));
 
-                        // Should include [12, 32, 44] but not [12, 32, 45, x]
-                        assert data.size() == 1;
+                        // Should only include [12, 32, 44], which is less than [12, 32, 45]
+                        assert search_result.documents.size() == 1;
 
                         let ids = Array.map<ZenDB.Types.WrapId<CompositeDoc>, ZenDB.Types.DocumentId>(
-                            data,
+                            search_result.documents,
                             func((id, _)) { id },
                         );
 
@@ -925,14 +925,14 @@ ZenDBSuite.newSuite(
                         );
 
                         assert Result.isOk(result);
-                        let #ok(data) = result else return assert false;
-                        Debug.print(debug_show ({ lt_blob_zero_data = data }));
+                        let #ok(search_result) = result else return assert false;
+                        Debug.print(debug_show ({ lt_blob_zero_data = search_result }));
 
                         // Should include [12, 32, 44] and [12, 32, 45] but not [12, 32, 45, x]
-                        assert data.size() == 2;
+                        assert search_result.documents.size() == 2;
 
                         let ids = Array.map<ZenDB.Types.WrapId<CompositeDoc>, ZenDB.Types.DocumentId>(
-                            data,
+                            search_result.documents,
                             func((id, _)) { id },
                         );
 
@@ -951,14 +951,14 @@ ZenDBSuite.newSuite(
                         );
 
                         assert Result.isOk(result);
-                        let #ok(data) = result else return assert false;
-                        Debug.print(debug_show ({ range_query_data = data }));
+                        let #ok(search_result) = result else return assert false;
+                        Debug.print(debug_show ({ range_query_data = search_result }));
 
                         // Should include only A-7 and A-10
-                        assert data.size() == 2;
+                        assert search_result.documents.size() == 2;
 
                         let ids = Array.map<ZenDB.Types.WrapId<CompositeDoc>, ZenDB.Types.DocumentId>(
-                            data,
+                            search_result.documents,
                             func((id, _)) { id },
                         );
 
