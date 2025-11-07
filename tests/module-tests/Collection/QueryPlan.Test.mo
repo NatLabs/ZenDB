@@ -13,7 +13,7 @@ import Itertools "mo:itertools@0.2.2/Iter";
 import Map "mo:map@9.0.1/Map";
 import Fuzz "mo:fuzz";
 
-import ZenDB "../../../src";
+import ZenDB "../../../src/EmbeddedInstance";
 import QueryPlan "../../../src/EmbeddedInstance/Collection/QueryPlan";
 import CollectionUtils "../../../src/EmbeddedInstance/Collection/CollectionUtils";
 import CandidMap "../../../src/EmbeddedInstance/CandidMap";

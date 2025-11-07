@@ -13,7 +13,7 @@ import Itertools "mo:itertools@0.2.2/Iter";
 import Map "mo:map@9.0.1/Map";
 import Fuzz "mo:fuzz";
 
-import ZenDB "../../src";
+import ZenDB "../../src/EmbeddedInstance";
 import CollectionUtils "../../src/EmbeddedInstance/Collection/CollectionUtils";
 import CandidMap "../../src/EmbeddedInstance/CandidMap";
 import CompositeIndex "../../src/EmbeddedInstance/Collection/Index/CompositeIndex";
@@ -180,7 +180,7 @@ ZenDBSuite.newSuite(
                                 ) else return assert false;
 
                                 // Debug.print("Search result for field " # field # ": " # debug_show (document) # " -> " # debug_show (found_document));
-                                assert results[0] == (id, document);
+                                assert results.documents[0] == (id, document);
                             };
 
                         };

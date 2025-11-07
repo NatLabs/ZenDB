@@ -53,6 +53,8 @@ import BTree "../BTree";
 import DocumentStore "DocumentStore";
 
 module CollectionUtils {
+    let LOGGER_NAMESPACE = "CollectionUtils";
+
 
     public type Result<A, B> = Result.Result<A, B>;
     public type Buffer<A> = Buffer.Buffer<A>;
@@ -125,6 +127,7 @@ module CollectionUtils {
     };
 
     public func getIndexColumns(collection : T.StableCollection, index_key_details : [(Text, SortDirection)], document_id : T.DocumentId, candid_map : T.CandidMap) : ?[Candid] {
+        let log = Logger.NamespacedLogger(collection.logger, LOGGER_NAMESPACE).subnamespace("getIndexColumns");
         let buffer = Buffer.Buffer<Candid>(8);
 
         var field_columns_excluding_document_id = 0;
@@ -183,11 +186,10 @@ module CollectionUtils {
 
         let indexKeyValues = Buffer.toArray(buffer);
 
-        Logger.lazyDebug(
-            collection.logger,
+        log.lazyDebug(
             func() : Text {
                 "Retrieved index key values (" # debug_show (indexKeyValues) # ") for index key details (" # debug_show (index_key_details) # ") for id [" # debug_show document_id # "] in collection (" # debug_show collection.name # ")";
-            },
+            }
         );
 
         ?indexKeyValues;

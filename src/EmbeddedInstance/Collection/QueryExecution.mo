@@ -27,6 +27,7 @@ import Utils "../Utils";
 import C "../Constants";
 import Logger "../Logger";
 import BTree "../BTree";
+import MergeSort "../MergeSort";
 
 import CompositeIndex "Index/CompositeIndex";
 import CommonIndexFns "Index/CommonIndexFns";
@@ -38,6 +39,9 @@ import QueryPlan "QueryPlan";
 import DocumentStore "DocumentStore";
 
 module {
+
+    let LOGGER_NAMESPACE = "QueryExecution";
+
     public type Map<K, V> = Map.Map<K, V>;
     public type Set<K> = Set.Set<K>;
     let { thash; nhash; bhash } = Map;
@@ -81,12 +85,13 @@ module {
         bitmap_cache : Map<Text, BitMap.BitMap>,
         query_plan : T.QueryPlan,
     ) : EvalResult {
-        Logger.lazyDebug(
-            collection.logger,
-            func() = "QueryExecution.get_unique_document_ids(): Processing query plan with "
+        let log = Logger.NamespacedLogger(collection.logger, LOGGER_NAMESPACE).subnamespace("get_unique_document_ids_from_query_plan");
+
+        log.lazyDebug(
+            func() = "Processing query plan with "
             # debug_show query_plan.scans.size() # " scans and "
             # debug_show query_plan.subplans.size() # " subplans"
-            # ", operation type: " # (if (query_plan.is_and_operation) "AND" else "OR"),
+            # ", operation type: " # (if (query_plan.is_and_operation) "AND" else "OR")
         );
 
         if (query_plan.scans.size() == 1 and query_plan.subplans.size() == 0) {
@@ -101,17 +106,16 @@ module {
                         filter_bounds;
                     } = index_scan_details;
                     if (not requires_additional_filtering and not requires_additional_sorting) {
-                        Logger.lazyDebug(
-                            collection.logger,
-                            func() = "QueryExecution.get_unique_document_ids(): Direct interval access on index '"
-                            # index_name # "', interval: " # debug_show interval,
+                        log.lazyDebug(
+                            func() = "Direct interval access on index '"
+                            # index_name # "', interval: " # debug_show interval
                         );
                         return #Interval(index_name, [interval], index_scan_details.sorted_in_reverse);
                     };
                 };
                 case (#FullScan({ filter_bounds; requires_additional_filtering; requires_additional_sorting })) {
                     if (not requires_additional_filtering and not requires_additional_sorting) {
-                        Logger.lazyDebug(collection.logger, func() = "QueryExecution.get_unique_document_ids(): Full scan with no filtering or sorting");
+                        log.lazyDebug(func() = "Full scan with no filtering or sorting");
                         return #Interval(C.DOCUMENT_ID, [(0, DocumentStore.size(collection.documents))], false);
                     };
                 };
@@ -124,12 +128,12 @@ module {
         label evaluating_query_plan for (scan_details in query_plan.scans.vals()) {
             let document_ids_iter = switch (scan_details) {
                 case (#FullScan({ filter_bounds; requires_additional_filtering })) {
-                    Logger.lazyDebug(collection.logger, func() = "QueryExecution.get_unique_document_ids(): Processing full scan");
+                    log.lazyDebug(func() = "Processing full scan");
                     let main_btree_utils = CollectionUtils.getMainBtreeUtils(collection);
                     let full_scan_iter = DocumentStore.keys(collection.documents, main_btree_utils);
 
                     if (requires_additional_filtering) {
-                        Logger.lazyDebug(collection.logger, func() = "QueryExecution.get_unique_document_ids(): Applying filters to full scan");
+                        log.lazyDebug(func() = "Applying filters to full scan");
                         CollectionUtils.multiFilter(collection, full_scan_iter, Buffer.fromArray([(filter_bounds)]), query_plan.is_and_operation);
                     } else {
                         full_scan_iter;
@@ -143,17 +147,16 @@ module {
                         filter_bounds;
                     } = index_scan_details;
 
-                    Logger.lazyDebug(
-                        collection.logger,
-                        func() = "QueryExecution.get_unique_document_ids(): Processing index scan on '" #
+                    log.lazyDebug(
+                        func() = "Processing index scan on '" #
                         index_name # "', requires_additional_filtering: " #
-                        debug_show requires_additional_filtering,
+                        debug_show requires_additional_filtering
                     );
 
                     let index_data_utils = CompositeIndex.get_index_data_utils(collection);
 
                     if (requires_additional_filtering) {
-                        Logger.lazyDebug(collection.logger, func() = "QueryExecution.get_unique_document_ids(): Attempting index-based filtering");
+                        log.lazyDebug(func() = "Attempting index-based filtering");
 
                         // index based filtering improves the worst case scenario of filtering intervas
                         // by using intersecting bitmaps with document ids instead of accessing the
@@ -170,10 +173,10 @@ module {
                         // let { intervals_by_index; opt_filter_bounds } = get_index_based_filtering_intervals(collection, filter_bounds, index_scan_details.simple_operations);
                         switch (index_based_interval_filtering(collection, bitmap_cache, index_scan_details)) {
                             case (?{ bitmap; opt_filter_bounds }) {
-                                Logger.lazyDebug(collection.logger, func() = "QueryExecution.get_unique_document_ids(): Successfully applied index-based filtering");
+                                log.lazyDebug(func() = "Successfully applied index-based filtering");
                                 switch (opt_filter_bounds) {
                                     case (?filter_bounds) {
-                                        Logger.lazyDebug(collection.logger, func() = "QueryExecution.get_unique_document_ids(): Applying additional post-filtering");
+                                        log.lazyDebug(func() = "Applying additional post-filtering");
                                         let document_ids = Iter.map<Nat, T.DocumentId>(
                                             bitmap.vals(),
                                             func(n : Nat) : T.DocumentId {
@@ -189,16 +192,15 @@ module {
                                         );
                                     };
                                     case (null) {
-                                        Logger.lazyDebug(collection.logger, func() = "QueryExecution.get_unique_document_ids(): No additional filtering needed, adding bitmap directly");
+                                        log.lazyDebug(func() = "No additional filtering needed, adding bitmap directly");
                                         bitmaps.add(bitmap);
                                         continue evaluating_query_plan;
                                     };
                                 };
                             };
                             case (null) {
-                                Logger.lazyDebug(
-                                    collection.logger,
-                                    func() = "QueryExecution.get_unique_document_ids(): CompositeIndex-based filtering not applicable, falling back to standard approach",
+                                log.lazyDebug(
+                                    func() = "CompositeIndex-based filtering not applicable, falling back to standard approach"
                                 );
                                 let document_ids = Intervals.document_ids_from_index_intervals(collection, index_name, [interval], false);
                                 CollectionUtils.multiFilter(collection, document_ids, Buffer.fromArray([filter_bounds]), query_plan.is_and_operation);
@@ -206,10 +208,9 @@ module {
                         };
 
                     } else {
-                        Logger.lazyDebug(
-                            collection.logger,
-                            func() = "QueryExecution.get_unique_document_ids(): Adding direct interval from index '" #
-                            index_name # "': " # debug_show interval,
+                        log.lazyDebug(
+                            func() = "Adding direct interval from index '" #
+                            index_name # "': " # debug_show interval
                         );
                         add_interval(intervals_by_index, index_name, interval, false);
                         continue evaluating_query_plan;
@@ -217,115 +218,104 @@ module {
                 };
             };
 
-            Logger.lazyDebug(collection.logger, func() = "QueryExecution.get_unique_document_ids(): Creating bitmap from document IDs iterator");
+            log.lazyDebug(func() = "Creating bitmap from document IDs iterator");
             bitmaps.add(
                 BitMap.fromIter(Iter.map(document_ids_iter, Utils.convert_last_8_bytes_to_nat))
             );
         };
 
-        Logger.lazyDebug(
-            collection.logger,
-            func() = "QueryExecution.get_unique_document_ids(): Processing " #
-            Nat.toText(query_plan.subplans.size()) # " subplans",
+        log.lazyDebug(
+            func() = "Processing " #
+            Nat.toText(query_plan.subplans.size()) # " subplans"
         );
 
         for (or_operation_subplan in query_plan.subplans.vals()) {
-            Logger.lazyDebug(collection.logger, func() = "QueryExecution.get_unique_document_ids(): Recursively processing subplan");
+            log.lazyDebug(func() = "Recursively processing subplan");
             let eval_result = get_unique_document_ids_from_query_plan(collection, bitmap_cache, or_operation_subplan);
 
             switch (eval_result) {
                 case (#Empty) {
-                    Logger.lazyDebug(collection.logger, func() = "QueryExecution.get_unique_document_ids(): Subplan returned empty result");
+                    log.lazyDebug(func() = "Subplan returned empty result");
                     if (query_plan.is_and_operation) {
-                        Logger.lazyDebug(collection.logger, func() = "QueryExecution.get_unique_document_ids(): Early return with empty result due to AND with empty set");
+                        log.lazyDebug(func() = "Early return with empty result due to AND with empty set");
                         return #Empty;
                     };
                 };
                 case (#Ids(document_ids_iter)) {
-                    Logger.lazyDebug(collection.logger, func() = "QueryExecution.get_unique_document_ids(): Subplan returned document IDs iterator");
+                    log.lazyDebug(func() = "Subplan returned document IDs iterator");
                     bitmaps.add(
                         BitMap.fromIter(Iter.map(document_ids_iter, Utils.convert_last_8_bytes_to_nat))
                     );
                 };
                 case (#BitMap(sub_bitmap)) {
-                    Logger.lazyDebug(
-                        collection.logger,
-                        func() = "QueryExecution.get_unique_document_ids(): Subplan returned bitmap with " #
-                        Nat.toText(sub_bitmap.size()) # " documents",
+                    log.lazyDebug(
+                        func() = "Subplan returned bitmap with " #
+                        Nat.toText(sub_bitmap.size()) # " documents"
                     );
                     bitmaps.add(sub_bitmap);
                 };
                 case (#Interval(index_name, intervals, is_reversed)) {
-                    Logger.lazyDebug(
-                        collection.logger,
-                        func() = "QueryExecution.get_unique_document_ids(): Subplan returned interval on index '" #
-                        index_name # "' with " # Nat.toText(intervals.size()) # " ranges",
+                    log.lazyDebug(
+                        func() = "Subplan returned interval on index '" #
+                        index_name # "' with " # Nat.toText(intervals.size()) # " ranges"
                     );
                     add_interval(intervals_by_index, index_name, intervals.get(0), is_reversed);
                 };
             };
         };
 
-        Logger.lazyDebug(
-            collection.logger,
-            func() = "QueryExecution.get_unique_document_ids(): Processing " #
-            Nat.toText(Map.size(intervals_by_index)) # " interval sets from different indexes",
+        log.lazyDebug(
+            func() = "Processing " #
+            Nat.toText(Map.size(intervals_by_index)) # " interval sets from different indexes"
         );
 
         for ((index_name, interval_details) in Map.entries(intervals_by_index)) {
-            Logger.lazyDebug(
-                collection.logger,
-                func() = "QueryExecution.get_unique_document_ids(): Processing intervals for index '" #
-                index_name # "' with " # Nat.toText(interval_details.intervals.size()) # " intervals",
+            log.lazyDebug(
+                func() = "Processing intervals for index '" #
+                index_name # "' with " # Nat.toText(interval_details.intervals.size()) # " intervals"
             );
 
             if (query_plan.is_and_operation) {
                 switch (Intervals.intersect(interval_details.intervals)) {
                     case (?interval) {
-                        Logger.lazyDebug(
-                            collection.logger,
-                            func() = "QueryExecution.get_unique_document_ids(): Intersected " #
+                        log.lazyDebug(
+                            func() = "Intersected " #
                             Nat.toText(interval_details.intervals.size()) #
-                            " intervals to single interval " # debug_show interval,
+                            " intervals to single interval " # debug_show interval
                         );
                         interval_details.intervals.clear();
                         interval_details.intervals.add(interval);
                     };
                     case (null) {
-                        Logger.lazyDebug(
-                            collection.logger,
-                            func() = "QueryExecution.get_unique_document_ids(): Intervals have empty intersection for index '" #
-                            index_name # "', removing from consideration",
+                        log.lazyDebug(
+                            func() = "Intervals have empty intersection for index '" #
+                            index_name # "', removing from consideration"
                         );
                         ignore Map.remove(intervals_by_index, Map.thash, index_name);
                     };
                 };
             } else {
-                Logger.lazyDebug(
-                    collection.logger,
-                    func() = "QueryExecution.get_unique_document_ids(): Merging overlapping intervals for index '" # index_name # "'",
+                log.lazyDebug(
+                    func() = "Merging overlapping intervals for index '" # index_name # "'"
                 );
                 Intervals.union(interval_details.intervals);
-                Logger.lazyDebug(
-                    collection.logger,
-                    func() = "QueryExecution.get_unique_document_ids(): After union operation, index '" # index_name #
-                    "' has " # Nat.toText(interval_details.intervals.size()) # " intervals",
+                log.lazyDebug(
+                    func() = "After union operation, index '" # index_name #
+                    "' has " # Nat.toText(interval_details.intervals.size()) # " intervals"
                 );
             };
         };
 
         if (Map.size(intervals_by_index) > 1) {
-            Logger.lazyDebug(
-                collection.logger,
-                func() = "QueryExecution.get_unique_document_ids(): Converting " #
-                Nat.toText(Map.size(intervals_by_index)) # " index intervals to bitmaps",
+            log.lazyDebug(
+                func() = "Converting " #
+                Nat.toText(Map.size(intervals_by_index)) # " index intervals to bitmaps"
             );
 
             for ((index_name, interval_details) in Map.entries(intervals_by_index)) {
                 let ?_index = Map.get(collection.indexes, Map.thash, index_name) else {
-                    Logger.lazyError(
-                        collection.logger,
-                        func() = "QueryExecution.get_unique_document_ids(): CompositeIndex not found: " # index_name,
+                    log.lazyError(
+                        func() = "CompositeIndex not found: " # index_name
                     );
                     Debug.trap("Unreachable: IndexMap not found for index: " # index_name);
                 };
@@ -336,10 +326,9 @@ module {
                     assert interval_details.intervals.size() == 1;
                 };
 
-                Logger.lazyDebug(
-                    collection.logger,
-                    func() = "QueryExecution.get_unique_document_ids(): Creating bitmap from intervals on index '" #
-                    index_name # "'",
+                log.lazyDebug(
+                    func() = "Creating bitmap from intervals on index '" #
+                    index_name # "'"
                 );
 
                 let bitmap = BitMap.BitMap(1024);
@@ -359,9 +348,8 @@ module {
 
         let result = if (bitmaps.size() == 0 and Map.size(intervals_by_index) == 1) {
             let ?(index_name, interval_details) = Map.entries(intervals_by_index).next() else {
-                Logger.lazyError(
-                    collection.logger,
-                    func() = "QueryExecution.get_unique_document_ids(): No elements in map when size is greater than 0",
+                log.lazyError(
+                    func() = "No elements in map when size is greater than 0"
                 );
                 Debug.trap("No elements in map when size is greater than 0");
             };
@@ -371,36 +359,32 @@ module {
                 case (null) false;
             };
 
-            Logger.lazyDebug(
-                collection.logger,
-                func() = "QueryExecution.get_unique_document_ids(): Using direct interval result from index '" #
-                index_name # "' with " # Nat.toText(interval_details.intervals.size()) # " intervals",
+            log.lazyDebug(
+                func() = "Using direct interval result from index '" #
+                index_name # "' with " # Nat.toText(interval_details.intervals.size()) # " intervals"
             );
 
             #Interval(index_name, Buffer.toArray(interval_details.intervals), sorted_in_reverse);
         } else if (bitmaps.size() == 0) {
-            Logger.lazyDebug(collection.logger, func() = "QueryExecution.get_unique_document_ids(): No results match the query");
+            log.lazyDebug(func() = "No results match the query");
             #Empty;
         } else {
             if (bitmaps.size() == 1) {
-                Logger.lazyDebug(
-                    collection.logger,
-                    func() = "QueryExecution.get_unique_document_ids(): Using single bitmap with " #
-                    Nat.toText(bitmaps.get(0).size()) # " documents",
+                log.lazyDebug(
+                    func() = "Using single bitmap with " #
+                    Nat.toText(bitmaps.get(0).size()) # " documents"
                 );
                 #BitMap(bitmaps.get(0));
             } else if (query_plan.is_and_operation) {
-                Logger.lazyDebug(
-                    collection.logger,
-                    func() = "QueryExecution.get_unique_document_ids(): Intersecting " #
-                    Nat.toText(bitmaps.size()) # " bitmaps for AND operation",
+                log.lazyDebug(
+                    func() = "Intersecting " #
+                    Nat.toText(bitmaps.size()) # " bitmaps for AND operation"
                 );
                 #BitMap(BitMap.multiIntersect(bitmaps.vals()));
             } else {
-                Logger.lazyDebug(
-                    collection.logger,
-                    func() = "QueryExecution.get_unique_document_ids(): Merging " #
-                    Nat.toText(bitmaps.size()) # " bitmaps for OR operation",
+                log.lazyDebug(
+                    func() = "Merging " #
+                    Nat.toText(bitmaps.size()) # " bitmaps for OR operation"
                 );
                 #BitMap(BitMap.multiUnion(bitmaps.vals()));
             };
@@ -410,36 +394,37 @@ module {
 
         switch (result) {
             case (#Empty) {
-                Logger.lazyDebug(
-                    collection.logger,
-                    func() = "QueryExecution.get_unique_document_ids(): Query returned empty result set in "
-                    # debug_show elapsed # " instructions",
+                log.lazyDebug(
+                    func() = "Query returned empty result set in "
+                    # debug_show elapsed # " instructions"
                 );
             };
             case (#BitMap(bitmap)) {
-                Logger.lazyDebug(
-                    collection.logger,
-                    func() = "QueryExecution.get_unique_document_ids(): Query returned bitmap with "
-                    # debug_show bitmap.size() # " documents in " # debug_show elapsed # " instructions",
+                log.lazyDebug(
+                    func() = "Query returned bitmap with "
+                    # debug_show bitmap.size() # " documents in " # debug_show elapsed # " instructions"
                 );
             };
             case (#Ids(iter)) {
-                Logger.lazyDebug(
-                    collection.logger,
-                    func() = "QueryExecution.get_unique_document_ids(): Query returned documents iterator in "
-                    # debug_show elapsed # " instructions",
+                log.lazyDebug(
+                    func() = "Query returned documents iterator in "
+                    # debug_show elapsed # " instructions"
                 );
             };
             case (#Interval(index_name, intervals, _)) {
+                log.lazyDebug(
+                    func() = "Query returned intervals on index '"
+                    # index_name # "': " # debug_show (intervals)
+                );
+
                 var total_size = 0;
                 for (interval in intervals.vals()) {
                     total_size += interval.1 - interval.0;
                 };
-                Logger.lazyDebug(
-                    collection.logger,
-                    func() = "QueryExecution.get_unique_document_ids(): Query returned intervals on index '"
+                log.lazyDebug(
+                    func() = "Query returned intervals on index '"
                     # index_name # "' with " # debug_show intervals.size() # " intervals containing "
-                    # debug_show total_size # " documents in " # debug_show elapsed # " instructions",
+                    # debug_show total_size # " documents in " # debug_show elapsed # " instructions"
                 );
             };
         };
@@ -484,7 +469,15 @@ module {
     };
 
     public func get_index_based_filtering_intervals(collection : T.StableCollection, filter_bounds : T.Bounds, operations : [(Text, T.ZqlOperators)]) : IndexIntervalFilterDetails {
-        Logger.lazyDebug(collection.logger, func() = "QueryExecution.get_index_based_filtering_intervals(): Finding best indexes for filtering");
+        let log = Logger.NamespacedLogger(collection.logger, LOGGER_NAMESPACE).subnamespace("get_index_based_filtering_intervals");
+
+        log.lazyDebug(func() = "Finding best indexes for filtering");
+        log.lazyDebug(
+            func() = "Initial filter bounds: " # debug_show filter_bounds
+        );
+        log.lazyDebug(
+            func() = "Filter operations: " # debug_show operations
+        );
 
         var prev = filter_bounds;
         var curr = filter_bounds;
@@ -498,10 +491,9 @@ module {
                 Set.add(fields, Map.thash, field);
             };
 
-            Logger.lazyDebug(
-                collection.logger,
-                func() = "QueryExecution.get_index_based_filtering_intervals(): Processing " #
-                Nat.toText(Set.size(fields)) # " unique fields",
+            log.lazyDebug(
+                func() = "Processing " #
+                Nat.toText(Set.size(fields)) # " unique fields"
             );
 
             let filter_operations = Buffer.Buffer<(Text, T.ZqlOperators)>(8);
@@ -512,10 +504,9 @@ module {
                 };
             };
 
-            Logger.lazyDebug(
-                collection.logger,
-                func() = "QueryExecution.get_index_based_filtering_intervals(): Found " #
-                Nat.toText(filter_operations.size()) # " applicable filter operations",
+            log.lazyDebug(
+                func() = "Found " #
+                Nat.toText(filter_operations.size()) # " applicable filter operations"
             );
 
             let {
@@ -523,9 +514,8 @@ module {
                 fully_covered_equality_and_range_fields;
             } = switch (CommonIndexFns.get_best_index(collection, Buffer.toArray(filter_operations), null)) {
                 case (null) {
-                    Logger.lazyDebug(
-                        collection.logger,
-                        func() = "QueryExecution.get_index_based_filtering_intervals(): No suitable index found for filtering",
+                    log.lazyDebug(
+                        func() = "No suitable index found for filtering"
                     );
                     return {
                         intervals_map;
@@ -533,10 +523,9 @@ module {
                     };
                 };
                 case (?best_index_details) {
-                    Logger.lazyDebug(
-                        collection.logger,
-                        func() = "QueryExecution.get_index_based_filtering_intervals(): Selected index '" #
-                        best_index_details.index.name # "' for filtering",
+                    log.lazyDebug(
+                        func() = "Selected index '" #
+                        best_index_details.index.name # "' for filtering"
                     );
                     best_index_details;
                 };
@@ -564,36 +553,37 @@ module {
                 };
             };
 
-            let (scan_bounds, filter_bounds) = CommonIndexFns.extract_bounds(lower_map, upper_map, ?index.key_details, ?fully_covered_equality_and_range_fields);
+            let (scan_bounds, filter_bounds) = CommonIndexFns.convert_simple_ops_to_bounds(
+                false,
+                Buffer.toArray(filter_operations),
+                ?index.key_details,
+                ?fully_covered_equality_and_range_fields,
+            );
 
-            Logger.lazyDebug(
-                collection.logger,
-                func() = "QueryExecution.get_index_based_filtering_intervals(): Extracted scan bounds for index '" #
-                index.name # "'",
+            log.lazyDebug(
+                func() = "Extracted scan bounds for index '" #
+                index.name # "'"
             );
 
             let interval = CompositeIndex.scan(collection, index, scan_bounds.0, scan_bounds.1, null);
 
-            Logger.lazyDebug(
-                collection.logger,
-                func() = "QueryExecution.get_index_based_filtering_intervals(): Generated interval " #
-                debug_show interval # " for index '" # index.name # "'",
+            log.lazyDebug(
+                func() = "Generated interval " #
+                debug_show interval # " for index '" # index.name # "'"
             );
 
             switch (Map.get(intervals_map, Map.thash, index.name)) {
                 case (?intervals) {
-                    Logger.lazyDebug(
-                        collection.logger,
-                        func() = "QueryExecution.get_index_based_filtering_intervals(): Adding interval to existing set for index '" #
-                        index.name # "'",
+                    log.lazyDebug(
+                        func() = "Adding interval to existing set for index '" #
+                        index.name # "'"
                     );
                     intervals.add(interval);
                 };
                 case (null) {
-                    Logger.lazyDebug(
-                        collection.logger,
-                        func() = "QueryExecution.get_index_based_filtering_intervals(): Creating new interval set for index '" #
-                        index.name # "'",
+                    log.lazyDebug(
+                        func() = "Creating new interval set for index '" #
+                        index.name # "'"
                     );
                     ignore Map.put(intervals_map, Map.thash, index.name, Buffer.fromArray<T.Interval>([interval]));
                 };
@@ -602,10 +592,9 @@ module {
             prev := curr;
             curr := filter_bounds;
 
-            Logger.lazyDebug(
-                collection.logger,
-                func() = "QueryExecution.get_index_based_filtering_intervals(): Filter bounds narrowed from " #
-                Nat.toText(prev.0.size()) # " to " # Nat.toText(curr.0.size()) # " lower bounds",
+            log.lazyDebug(
+                func() = "Filter bounds narrowed from " #
+                Nat.toText(prev.0.size()) # " to " # Nat.toText(curr.0.size()) # " lower bounds"
             );
 
         } while (prev.0.size() > curr.0.size() and curr.0.size() > 0);
@@ -615,12 +604,11 @@ module {
             opt_filter_bounds = if (curr.0.size() == 0) ?curr else null;
         };
 
-        Logger.lazyDebug(
-            collection.logger,
-            func() = "QueryExecution.get_index_based_filtering_intervals(): Completed with " #
+        log.lazyDebug(
+            func() = "Completed with " #
             Nat.toText(Map.size(intervals_map)) # " index interval sets and " #
             (if (Option.isSome(result.opt_filter_bounds)) "additional" else "no additional") #
-            " filter bounds",
+            " filter bounds"
         );
 
         result;
@@ -632,31 +620,30 @@ module {
         sorted_in_reverse : Bool,
         combine_intervals_in_same_index : Bool,
     ) : Buffer<Iter<T.DocumentId>> {
-        Logger.lazyDebug(
-            collection.logger,
-            func() = "QueryExecution.retrieve_all_index_interval_iterators(): Retrieving iterators for " #
+        let log = Logger.NamespacedLogger(collection.logger, LOGGER_NAMESPACE).subnamespace("retrieve_all_index_interval_iterators");
+
+        log.lazyDebug(
+            func() = "Retrieving iterators for " #
             Nat.toText(Map.size(index_intervals)) # " index interval sets, combine_intervals=" #
-            debug_show combine_intervals_in_same_index,
+            debug_show combine_intervals_in_same_index
         );
 
         let iterators = Buffer.Buffer<Iter<T.DocumentId>>(8);
 
         for ((index_name, intervals) in Map.entries(index_intervals)) {
             if (combine_intervals_in_same_index) {
-                Logger.lazyDebug(
-                    collection.logger,
-                    func() = "QueryExecution.retrieve_all_index_interval_iterators(): Retrieving combined document IDs for " #
-                    Nat.toText(intervals.size()) # " intervals on index '" # index_name # "'",
+                log.lazyDebug(
+                    func() = "Retrieving combined document IDs for " #
+                    Nat.toText(intervals.size()) # " intervals on index '" # index_name # "'"
                 );
 
                 let document_ids = Intervals.document_ids_from_index_intervals(collection, index_name, Buffer.toArray(intervals), sorted_in_reverse);
                 iterators.add(document_ids);
 
             } else {
-                Logger.lazyDebug(
-                    collection.logger,
-                    func() = "QueryExecution.retrieve_all_index_interval_iterators(): Retrieving separate iterators for " #
-                    Nat.toText(intervals.size()) # " intervals on index '" # index_name # "'",
+                log.lazyDebug(
+                    func() = "Retrieving separate iterators for " #
+                    Nat.toText(intervals.size()) # " intervals on index '" # index_name # "'"
                 );
 
                 for (interval in intervals.vals()) {
@@ -666,10 +653,9 @@ module {
             };
         };
 
-        Logger.lazyDebug(
-            collection.logger,
-            func() = "QueryExecution.retrieve_all_index_interval_iterators(): Created " #
-            Nat.toText(iterators.size()) # " iterators",
+        log.lazyDebug(
+            func() = "Created " #
+            Nat.toText(iterators.size()) # " iterators"
         );
 
         iterators;
@@ -685,9 +671,10 @@ module {
         bitmap_cache : Map<Text, BitMap.BitMap>,
         index_scan_details : T.IndexScanDetails,
     ) : ?IndexBasedFilteringResult {
-        Logger.lazyDebug(
-            collection.logger,
-            func() = "QueryExecution.indexBasedIntervalFiltering (): Evaluating index-based filtering options",
+        let log = Logger.NamespacedLogger(collection.logger, LOGGER_NAMESPACE).subnamespace("index_based_interval_filtering");
+
+        log.lazyDebug(
+            func() = "Evaluating index-based filtering options"
         );
 
         let {
@@ -699,13 +686,15 @@ module {
 
         let original_interval_count = interval.1 - interval.0;
 
-        Logger.lazyDebug(
-            collection.logger,
-            func() = "QueryExecution.indexBasedIntervalFiltering (): Original interval has " #
-            Nat.toText(original_interval_count) # " documents",
+        log.lazyDebug(
+            func() = "Original interval has " #
+            Nat.toText(original_interval_count) # " documents"
         );
 
-        let { intervals_map; opt_filter_bounds } = get_index_based_filtering_intervals(collection, filter_bounds, operations);
+        let {
+            intervals_map;
+            opt_filter_bounds;
+        } = get_index_based_filtering_intervals(collection, filter_bounds, operations);
 
         var filtering_intervals_count = 0;
 
@@ -717,37 +706,33 @@ module {
             };
         };
 
-        Logger.lazyDebug(
-            collection.logger,
-            func() = "QueryExecution.indexBasedIntervalFiltering (): Max filtering interval count: " #
+        log.lazyDebug(
+            func() = "Max filtering interval count: " #
             Nat.toText(filtering_intervals_count) # ", original interval count: " #
-            Nat.toText(original_interval_count),
+            Nat.toText(original_interval_count)
         );
 
         if (filtering_intervals_count > (original_interval_count * 10)) {
-            Logger.lazyDebug(
-                collection.logger,
-                func() = "QueryExecution.indexBasedIntervalFiltering (): Filtering intervals too large compared to original, " #
-                "falling back to standard filtering approach",
+            log.lazyDebug(
+                func() = "Filtering intervals too large compared to original, " #
+                "falling back to standard filtering approach"
             );
             return null;
         };
 
         switch (Map.get(intervals_map, Map.thash, index_name)) {
             case (?intervals) {
-                Logger.lazyError(
-                    collection.logger,
-                    func() = "QueryExecution.indexBasedIntervalFiltering (): Filtering index same as scanning index: " #
-                    index_name,
+                log.lazyError(
+                    func() = "Filtering index same as scanning index: " #
+                    index_name
                 );
                 Debug.trap("QueryExecution.indexBasedIntervalFiltering : this is interesting, why would the filtering index be the same as the scanning index?");
                 intervals.add(interval);
             };
             case (null) {
-                Logger.lazyDebug(
-                    collection.logger,
-                    func() = "QueryExecution.indexBasedIntervalFiltering (): Adding original scan interval for index '" #
-                    index_name # "'",
+                log.lazyDebug(
+                    func() = "Adding original scan interval for index '" #
+                    index_name # "'"
                 );
 
                 ignore Map.put(
@@ -759,27 +744,24 @@ module {
             };
         };
 
-        Logger.lazyDebug(
-            collection.logger,
-            func() = "QueryExecution.indexBasedIntervalFiltering (): Intersecting intervals across all indexes",
+        log.lazyDebug(
+            func() = "Intersecting intervals across all indexes"
         );
 
         for ((index_name, intervals) in Map.entries(intervals_map)) {
             switch (Intervals.intersect(intervals)) {
                 case (?interval) {
-                    Logger.lazyDebug(
-                        collection.logger,
-                        func() = "QueryExecution.indexBasedIntervalFiltering (): Intervals for index '" #
-                        index_name # "' intersect to " # debug_show interval,
+                    log.lazyDebug(
+                        func() = "Intervals for index '" #
+                        index_name # "' intersect to " # debug_show interval
                     );
                     intervals.clear();
                     intervals.add(interval);
                 };
                 case (null) {
-                    Logger.lazyDebug(
-                        collection.logger,
-                        func() = "QueryExecution.indexBasedIntervalFiltering (): Intervals for index '" #
-                        index_name # "' have empty intersection, removing index",
+                    log.lazyDebug(
+                        func() = "Intervals for index '" #
+                        index_name # "' have empty intersection, removing index"
                     );
                     ignore Map.remove(intervals_map, Map.thash, index_name);
                 };
@@ -788,34 +770,30 @@ module {
 
         let bitmaps = Buffer.Buffer<T.BitMap>(8);
 
-        Logger.lazyDebug(
-            collection.logger,
-            func() = "QueryExecution.indexBasedIntervalFiltering (): Creating bitmaps from " #
-            Nat.toText(Map.size(intervals_map)) # " index interval sets",
+        log.lazyDebug(
+            func() = "Creating bitmaps from " #
+            Nat.toText(Map.size(intervals_map)) # " index interval sets"
         );
 
         for ((index_name, intervals) in Map.entries(intervals_map)) {
             let interval = intervals.get(0);
             let interval_cache_key = index_name # debug_show (Buffer.toArray(intervals));
 
-            Logger.lazyDebug(
-                collection.logger,
-                func() = "QueryExecution.indexBasedIntervalFiltering (): Processing interval for index '" #
-                index_name # "'",
+            log.lazyDebug(
+                func() = "Processing interval for index '" #
+                index_name # "'"
             );
 
             let bitmap = switch (Map.get(bitmap_cache, Map.thash, interval_cache_key)) {
                 case (?bitmap) {
-                    Logger.lazyDebug(
-                        collection.logger,
-                        func() = "QueryExecution.indexBasedIntervalFiltering (): Using cached bitmap for interval",
+                    log.lazyDebug(
+                        func() = "Using cached bitmap for interval"
                     );
                     bitmap;
                 };
                 case (null) {
-                    Logger.lazyDebug(
-                        collection.logger,
-                        func() = "QueryExecution.indexBasedIntervalFiltering (): Creating new bitmap for interval",
+                    log.lazyDebug(
+                        func() = "Creating new bitmap for interval"
                     );
 
                     let document_ids = Intervals.document_ids_from_index_intervals(collection, index_name, [interval], false);
@@ -829,18 +807,16 @@ module {
             bitmaps.add(bitmap);
         };
 
-        Logger.lazyDebug(
-            collection.logger,
-            func() = "QueryExecution.indexBasedIntervalFiltering (): Intersecting " #
-            Nat.toText(bitmaps.size()) # " bitmaps",
+        log.lazyDebug(
+            func() = "Intersecting " #
+            Nat.toText(bitmaps.size()) # " bitmaps"
         );
 
         let bitmap = BitMap.multiIntersect(bitmaps.vals());
 
-        Logger.lazyDebug(
-            collection.logger,
-            func() = "QueryExecution.indexBasedIntervalFiltering (): Final bitmap contains " #
-            Nat.toText(bitmap.size()) # " document IDs",
+        log.lazyDebug(
+            func() = "Final bitmap contains " #
+            Nat.toText(bitmap.size()) # " document IDs"
         );
 
         ?{ bitmap; opt_filter_bounds };
@@ -873,7 +849,7 @@ module {
         };
 
         let iterators = Buffer.Buffer<Iter<T.DocumentId>>(8);
-        let sorted_documents_from_iter = Buffer.Buffer<T.DocumentId>(8);
+        var sorted_documents_array : [T.DocumentId] = [];
         let intervals_by_index = Map.new<Text, IndexDetails>();
         let full_scan_details_buffer = Buffer.Buffer<T.FullScanDetails>(8);
         let bitmaps = Buffer.Buffer<T.BitMap>(8);
@@ -903,11 +879,10 @@ module {
                     };
 
                     if (requires_additional_sorting) {
-                        if (sorted_documents_from_iter.size() == 0) {
-                            Utils.add_all(sorted_documents_from_iter, document_ids);
-
-                            sorted_documents_from_iter.sort(sort_documents_by_field_cmp);
-                            document_ids := sorted_documents_from_iter.vals();
+                        if (sorted_documents_array.size() == 0) {
+                            let arr = Utils.iter_to_array(document_ids);
+                            sorted_documents_array := MergeSort.sort(arr, sort_documents_by_field_cmp);
+                            document_ids := sorted_documents_array.vals();
                         };
 
                     };
@@ -990,15 +965,15 @@ module {
 
             let document_ids = Intervals.document_ids_from_index_intervals(collection, index.name, [interval], sorted_in_reverse);
 
-            if (requires_sorting and sorted_documents_from_iter.size() == 0) {
+            if (requires_sorting and sorted_documents_array.size() == 0) {
 
-                for (id in document_ids) {
-                    sorted_documents_from_iter.add(id);
-                };
+                let arr = Utils.iter_to_array(document_ids);
 
-                if (sorted_documents_from_iter.size() == 0) return #Empty;
+                if (arr.size() == 0) return #Empty;
 
-                iterators.add(sorted_documents_from_iter.vals());
+                sorted_documents_array := MergeSort.sort(arr, sort_documents_by_field_cmp);
+
+                iterators.add(sorted_documents_array.vals());
 
             } else {
                 let bitmap = BitMap.fromIter(Iter.map(document_ids, Utils.convert_last_8_bytes_to_nat));
@@ -1060,24 +1035,22 @@ module {
                 let filtered_ids = CollectionUtils.multiFilter(collection, document_ids_in_interval, full_scan_filter_bounds, query_plan.is_and_operation);
             };
 
-            if (requires_sorting and sorted_documents_from_iter.size() == 0) {
+            if (requires_sorting and sorted_documents_array.size() == 0) {
                 assert iterators.size() == 0;
                 assert bitmaps.size() == 0;
                 assert Map.size(intervals_by_index) == 0;
 
                 // we need to sort the filtered_ids
-                // the other document ids loaded into the buffer were sorted because they were from nested operations
+                // the other document ids loaded into the array were sorted because they were from nested operations
                 // however, a full scan is a new operation that is not sorted by default
 
-                for (id in filtered_ids) {
-                    sorted_documents_from_iter.add(id);
-                };
+                let arr = Utils.iter_to_array(filtered_ids);
 
-                if (sorted_documents_from_iter.size() == 0) return #Empty;
+                if (arr.size() == 0) return #Empty;
 
-                sorted_documents_from_iter.sort(sort_documents_by_field_cmp);
+                let sorted = MergeSort.sort(arr, sort_documents_by_field_cmp);
 
-                return #Ids(sorted_documents_from_iter.vals());
+                return #Ids(sorted.vals());
 
             };
 
@@ -1096,22 +1069,23 @@ module {
         };
 
         if (iterators.size() > 1) {
-            var fill_sorted_documents_from_iter = if (sorted_documents_from_iter.size() > 0) {
+            var fill_sorted_documents_array = if (sorted_documents_array.size() > 0) {
                 false;
             } else { true };
 
             for (_iter in iterators.vals()) {
-                let iter = if (fill_sorted_documents_from_iter) {
-                    for (id in _iter) {
-                        sorted_documents_from_iter.add(id);
+                let iter = if (fill_sorted_documents_array) {
+                    let arr = Utils.iter_to_array(_iter);
+                    if (arr.size() > 0) {
+                        sorted_documents_array := MergeSort.sort(arr, sort_documents_by_field_cmp);
                     };
-                    sorted_documents_from_iter.vals();
+                    sorted_documents_array.vals();
                 } else { _iter };
 
                 let bitmap = BitMap.fromIter(Iter.map(iter, Utils.convert_last_8_bytes_to_nat));
                 bitmaps.add(bitmap);
 
-                fill_sorted_documents_from_iter := false;
+                fill_sorted_documents_array := false;
             };
 
         };
@@ -1124,9 +1098,9 @@ module {
             bitmaps.get(0);
         } else { BitMap.multiIntersect(bitmaps.vals()) };
 
-        if (sorted_documents_from_iter.size() > 0) {
+        if (sorted_documents_array.size() > 0) {
             let sorted_bitmap_vals = Iter.filter<T.DocumentId>(
-                sorted_documents_from_iter.vals(),
+                sorted_documents_array.vals(),
                 func(id : T.DocumentId) : Bool = bitmap.get(Utils.convert_last_8_bytes_to_nat(id)),
             );
 
@@ -1181,14 +1155,10 @@ module {
 
                     if (requires_additional_sorting) {
 
-                        let buffer = Buffer.Buffer<T.DocumentId>(8);
+                        let arr = Utils.iter_to_array(document_ids);
+                        let sorted = MergeSort.sort(arr, sort_documents_by_field_cmp);
 
-                        for (id in document_ids) {
-                            buffer.add(id);
-                        };
-
-                        buffer.sort(sort_documents_by_field_cmp);
-                        document_ids := buffer.vals();
+                        document_ids := sorted.vals();
 
                     };
 
@@ -1312,13 +1282,10 @@ module {
             let filtered_ids = CollectionUtils.multiFilter(collection, document_ids, full_scan_filter_bounds, query_plan.is_and_operation);
 
             if (requires_sorting) {
-                let buffer = Buffer.Buffer<T.DocumentId>(8);
-                for (id in filtered_ids) {
-                    buffer.add(id);
-                };
+                let arr = Utils.iter_to_array(filtered_ids);
+                let sorted = MergeSort.sort(arr, sort_documents_by_field_cmp);
 
-                buffer.sort(sort_documents_by_field_cmp);
-                iterators.add(buffer.vals());
+                iterators.add(sorted.vals());
 
             } else {
                 let bitmap = BitMap.fromIter(Iter.map(filtered_ids, Utils.convert_last_8_bytes_to_nat));
@@ -1379,8 +1346,10 @@ module {
         sort_documents_by_field_cmp : (T.DocumentId, T.DocumentId) -> Order,
     ) : EvalResult {
 
-        Logger.lazyInfo(collection.logger, func() = "QueryExecution.generate_document_ids_for_query_plan(): Generating document IDs for query plan");
-        Logger.debugMsg(collection.logger, "QueryExecution.generate_document_ids_for_query_plan(): Query plan: " # debug_show query_plan);
+        let log = Logger.NamespacedLogger(collection.logger, LOGGER_NAMESPACE).subnamespace("generate_document_ids_for_query_plan");
+
+        log.lazyInfo(func() = "Generating document IDs for query plan");
+        log.logDebug("QueryExecution.generate_document_ids_for_query_plan(): Query plan: " # debug_show query_plan);
 
         let result = if (query_plan.is_and_operation) {
             generate_document_ids_for_and_operation(collection, query_plan, opt_sort_column, sort_documents_by_field_cmp);
@@ -1392,24 +1361,21 @@ module {
 
         switch (result) {
             case (#Empty) {
-                Logger.lazyInfo(
-                    collection.logger,
-                    func() = "QueryExecution.generate_document_ids_for_query_plan(): Query returned empty result in "
-                    # debug_show elapsed # " instructions",
+                log.lazyInfo(
+                    func() = "Query returned empty result in "
+                    # debug_show elapsed # " instructions"
                 );
             };
             case (#BitMap(bitmap)) {
-                Logger.lazyInfo(
-                    collection.logger,
-                    func() = "QueryExecution.generate_document_ids_for_query_plan(): Query returned "
-                    # debug_show bitmap.size() # " documents in bitmap in " # debug_show elapsed # " instructions",
+                log.lazyInfo(
+                    func() = "Query returned "
+                    # debug_show bitmap.size() # " documents in bitmap in " # debug_show elapsed # " instructions"
                 );
             };
             case (#Ids(iter)) {
-                Logger.lazyInfo(
-                    collection.logger,
-                    func() = "QueryExecution.generate_document_ids_for_query_plan(): Query returned iterator in "
-                    # debug_show elapsed # " instructions",
+                log.lazyInfo(
+                    func() = "Query returned iterator in "
+                    # debug_show elapsed # " instructions"
                 );
             };
             case (#Interval(index_name, intervals, is_reversed)) {
@@ -1418,13 +1384,12 @@ module {
                     total += interval.1 - interval.0;
                 };
 
-                Logger.lazyInfo(
-                    collection.logger,
-                    func() = "QueryExecution.generate_document_ids_for_query_plan(): Query returned "
+                log.lazyInfo(
+                    func() = "Query returned "
                     # debug_show total # " documents from " # debug_show intervals
                     # " intervals on index '" # index_name # "'"
                     # (if (is_reversed) " (reversed order)" else "")
-                    # " in " # debug_show elapsed # " instructions",
+                    # " in " # debug_show elapsed # " instructions"
                 );
 
             };

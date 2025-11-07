@@ -42,6 +42,11 @@ module Client {
             await canister_db.zendb_canister_stats();
         };
 
+        /// Get instance statistics
+        public func stats() : async* ZT.InstanceStats {
+            await canister_db.zendb_stats();
+        };
+
         /// Grant a role to a principal
         public func grant_role(target : Principal, role : Text) : async* ZT.Result<(), Text> {
             await canister_db.grant_role(target, role);

@@ -3,7 +3,7 @@ import Array "mo:base@0.16.0/Array";
 
 import Itertools "mo:itertools@0.2.2/Iter";
 
-import ZenDB "../../src";
+import ZenDB "../../src/EmbeddedInstance";
 
 shared ({ caller = owner }) actor class Notes() {
     stable let zendb = ZenDB.newStableStore(null);

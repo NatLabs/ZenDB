@@ -1,5 +1,7 @@
 /// A collection is a set of documents of the same type.
 
+import Prim "mo:prim";
+
 import Principal "mo:base@0.16.0/Principal";
 import Array "mo:base@0.16.0/Array";
 import Debug "mo:base@0.16.0/Debug";
@@ -81,18 +83,30 @@ module {
 
     public type IndexKeyFields = T.IndexKeyFields;
 
+    // Reference custom result types from Types module
+    public type SearchResult<Record> = T.SearchResult<Record>;
+    public type CountResult = T.CountResult;
+    public type UpdateByIdResult = T.UpdateByIdResult;
+    public type UpdateResult = T.UpdateResult;
+    public type ReplaceByIdResult = T.ReplaceByIdResult;
+    public type ReplaceDocsResult = T.ReplaceDocsResult;
+    public type DeleteByIdResult<Record> = T.DeleteByIdResult<Record>;
+    public type DeleteResult<Record> = T.DeleteResult<Record>;
+
     public class Collection<Record>(
         collection_name : Text,
         collection : T.StableCollection,
         blobify : T.InternalCandify<Record>,
     ) = self {
+        let LOGGER_NAMESPACE = "Collection";
 
         /// Generic helper function to handle Result types with consistent error logging
         private func handleResult<T>(res : T.Result<T, Text>, context : Text) : T.Result<T, Text> {
+            let log = Logger.NamespacedLogger(collection.logger, LOGGER_NAMESPACE).subnamespace("handleResult");
             switch (res) {
                 case (#ok(success)) #ok(success);
                 case (#err(errorMsg)) {
-                    Logger.lazyError(collection.logger, func() = context # ": " # errorMsg);
+                    log.lazyError(func() = context # ": " # errorMsg);
                     #err(errorMsg);
                 };
             };
@@ -115,7 +129,7 @@ module {
         public func getSchema() : T.Schema { collection.schema };
 
         public func listIndexes() : [Text] {
-            Iter.toArray(Map.keys(collection.indexes));
+            Utils.iter_to_array(Map.keys(collection.indexes));
         };
 
         public func getIndexes() : [(Text, T.IndexStats)] {
@@ -299,18 +313,25 @@ module {
         /// @returns A Result containing an array of tuples containing the id and the document for all matching documents.
         /// If the search fails, an error message will be returned.
 
-        public func search(query_builder : QueryBuilder) : T.Result<[T.WrapId<Record>], Text> {
+        public func search(query_builder : QueryBuilder) : T.Result<SearchResult<Record>, Text> {
+            let main_btree_utils = DocumentStore.getBtreeUtils(collection.documents);
+
             switch (
-                handleResult(
-                    StableCollection.internal_search(collection, query_builder.build()),
-                    "Failed to execute search",
-                )
+                StableCollection.search(collection, main_btree_utils, query_builder.build())
             ) {
                 case (#err(err)) return #err(err);
-                case (#ok(document_ids_iter)) {
-                    let document_iter = StableCollection.ids_to_documents(collection, blobify, document_ids_iter);
-                    let documents = Iter.toArray(document_iter);
-                    #ok(documents);
+                case (#ok(result)) {
+                    let documents = Array.map<T.WrapId<T.CandidBlob>, T.WrapId<Record>>(
+                        result.documents,
+                        func((id, candid_blob) : T.WrapId<T.CandidBlob>) : T.WrapId<Record> {
+                            (id, blobify.from_blob(candid_blob));
+                        },
+                    );
+
+                    #ok({
+                        documents = documents;
+                        instructions = result.instructions;
+                    });
                 };
             };
         };
@@ -321,21 +342,21 @@ module {
 
         /// Returns the total number of documents that match the query.
         /// This ignores the limit and skip parameters.
-        public func count(query_builder : QueryBuilder) : T.Result<Nat, Text> {
+        public func count(query_builder : QueryBuilder) : T.Result<CountResult, Text> {
             handleResult(
-                StableCollection.count(collection, query_builder),
+                StableCollection.count(collection, query_builder.build()),
                 "Failed to count documents",
             );
         };
 
-        public func replace(id : T.DocumentId, document : Record) : T.Result<(), Text> {
+        public func replace(id : T.DocumentId, document : Record) : T.Result<ReplaceByIdResult, Text> {
             handleResult(
                 StableCollection.replace_by_id(collection, main_btree_utils, id, blobify.to_blob(document)),
                 "Failed to replace document with id: " # debug_show (id),
             );
         };
 
-        public func replaceDocs(documents : [(T.DocumentId, Record)]) : T.Result<(), Text> {
+        public func replaceDocs(documents : [(T.DocumentId, Record)]) : T.Result<ReplaceDocsResult, Text> {
             handleResult(
                 StableCollection.replace_docs(
                     collection,
@@ -343,7 +364,7 @@ module {
                     Array.map<(T.DocumentId, Record), (T.DocumentId, Blob)>(
                         documents,
                         func((id, doc) : (T.DocumentId, Record)) : (T.DocumentId, Blob) {
-                            (id, blobify.to_blob(doc))
+                            (id, blobify.to_blob(doc));
                         },
                     ),
                 ),
@@ -352,21 +373,21 @@ module {
         };
 
         /// Updates a document by its id with the given update operations.
-        public func updateById(id : T.DocumentId, update_operations : [(Text, T.FieldUpdateOperations)]) : T.Result<(), Text> {
+        public func updateById(id : T.DocumentId, update_operations : [(Text, T.FieldUpdateOperations)]) : T.Result<UpdateByIdResult, Text> {
             handleResult(
                 StableCollection.update_by_id(collection, main_btree_utils, id, update_operations),
                 "Failed to update document with id: " # debug_show (id),
             );
         };
 
-        public func update(query_builder : QueryBuilder, update_operations : [(Text, T.FieldUpdateOperations)]) : T.Result<Nat, Text> {
+        public func update(query_builder : QueryBuilder, update_operations : [(Text, T.FieldUpdateOperations)]) : T.Result<UpdateResult, Text> {
             handleResult(
-                StableCollection.update_documents(collection, main_btree_utils, query_builder, update_operations),
+                StableCollection.update_documents(collection, main_btree_utils, query_builder.build(), update_operations),
                 "Failed to update documents",
             );
         };
 
-        public func deleteById(id : T.DocumentId) : T.Result<Record, Text> {
+        public func deleteById(id : T.DocumentId) : T.Result<DeleteByIdResult<Record>, Text> {
             switch (
                 handleResult(
                     StableCollection.delete_by_id(collection, main_btree_utils, id),
@@ -374,16 +395,19 @@ module {
                 )
             ) {
                 case (#err(err)) return #err(err);
-                case (#ok(document_details)) {
-                    let document = blobify.from_blob(document_details);
-                    #ok(document);
+                case (#ok(result)) {
+                    let document = blobify.from_blob(result.deleted_document);
+                    #ok({
+                        deleted_document = document;
+                        instructions = result.instructions;
+                    });
                 };
             };
         };
 
-        public func delete(query_builder : QueryBuilder) : T.Result<[(T.DocumentId, Record)], Text> {
+        public func delete(query_builder : QueryBuilder) : T.Result<DeleteResult<Record>, Text> {
             handleResult(
-                StableCollection.delete_documents(collection, main_btree_utils, blobify, query_builder),
+                StableCollection.delete_documents(collection, main_btree_utils, blobify, query_builder.build()),
                 "Failed to delete documents",
             );
         };
@@ -402,7 +426,7 @@ module {
         };
 
         public func filter(condition : (Record) -> Bool) : [Record] {
-            Iter.toArray(filterIter(condition));
+            Utils.iter_to_array(filterIter(condition));
         };
 
         /// Clear all the data in the collection.
