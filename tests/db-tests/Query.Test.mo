@@ -12,7 +12,7 @@ import Fuzz "mo:fuzz";
 import Candid "mo:serde@3.3.3/Candid";
 import Record "mo:serde@3.3.3/Candid/Text/Parser/Record";
 import Itertools "mo:itertools@0.2.2/Iter";
-import ZenDB "../../src";
+import ZenDB "../../src/EmbeddedInstance";
 import ZenDBSuite "../test-utils/TestFramework";
 
 let fuzz = Fuzz.fromSeed(0x7eadbeef);
@@ -67,7 +67,8 @@ ZenDBSuite.newSuite(
 
                     Debug.print(debug_show (results));
 
-                    assert results == #ok([(text_a_id, { value = "a" })]);
+                    let #ok(res) = results else return assert false;
+                    assert res.documents == [(text_a_id, { value = "a" })];
                 },
             );
 
@@ -83,14 +84,15 @@ ZenDBSuite.newSuite(
                         )
                     );
 
-                    assert texts.search(
+                    let #ok(res) = texts.search(
                         QueryBuilder().Where("value", #gt(#Text("and")))
-                    ) == #ok([
+                    ) else return assert false;
+                    assert res.documents == [
                         (text_anderson_id, { value = "anderson" }),
                         (text_b_id, { value = "b" }),
                         (text_berry_id, { value = "berry" }),
                         (text_c_id, { value = "c" }),
-                    ]);
+                    ];
 
                     Debug.print(
                         debug_show (
@@ -100,83 +102,90 @@ ZenDBSuite.newSuite(
                         )
                     );
 
-                    assert texts.search(
+                    let #ok(result) = texts.search(
                         QueryBuilder().Where("value", #not_(#gt(#Text("and"))))
-                    ) == #ok([
+                    ) else return assert false;
+                    assert result.documents == [
                         (text_a_id, { value = "a" }),
                         (text_alphabet_id, { value = "alphabet" }),
                         (text_alphabetical_id, { value = "alphabetical" }),
                         (text_and_id, { value = "and" }),
-                    ]);
+                    ];
                 },
             );
 
             test(
                 "#gte",
                 func() {
-                    assert texts.search(
+                    let #ok(result1) = texts.search(
                         QueryBuilder().Where("value", #gte(#Text("and")))
-                    ) == #ok([
+                    ) else return assert false;
+                    assert result1.documents == [
                         (text_and_id, { value = "and" }),
                         (text_anderson_id, { value = "anderson" }),
                         (text_b_id, { value = "b" }),
                         (text_berry_id, { value = "berry" }),
                         (text_c_id, { value = "c" }),
-                    ]);
+                    ];
 
-                    assert texts.search(
+                    let #ok(result2) = texts.search(
                         QueryBuilder().Where("value", #not_(#gte(#Text("and"))))
-                    ) == #ok([
+                    ) else return assert false;
+                    assert result2.documents == [
                         (text_a_id, { value = "a" }),
                         (text_alphabet_id, { value = "alphabet" }),
                         (text_alphabetical_id, { value = "alphabetical" }),
-                    ]);
+                    ];
                 },
             );
 
             test(
                 "#lt",
                 func() {
-                    assert texts.search(
+                    let #ok(result1) = texts.search(
                         QueryBuilder().Where("value", #lt(#Text("and")))
-                    ) == #ok([
+                    ) else return assert false;
+                    assert result1.documents == [
                         (text_a_id, { value = "a" }),
                         (text_alphabet_id, { value = "alphabet" }),
                         (text_alphabetical_id, { value = "alphabetical" }),
-                    ]);
+                    ];
 
-                    assert texts.search(
+                    let #ok(result2) = texts.search(
                         QueryBuilder().Where("value", #not_(#lt(#Text("and"))))
-                    ) == #ok([
+                    ) else return assert false;
+                    assert result2.documents == [
                         (text_and_id, { value = "and" }),
                         (text_anderson_id, { value = "anderson" }),
                         (text_b_id, { value = "b" }),
                         (text_berry_id, { value = "berry" }),
                         (text_c_id, { value = "c" }),
-                    ]);
+                    ];
                 },
             );
 
             test(
                 "#lte",
                 func() {
-                    assert texts.search(
+                    let #ok(result1) = texts.search(
                         QueryBuilder().Where("value", #lte(#Text("and")))
-                    ) == #ok([
+                    ) else return assert false;
+                    assert result1.documents == [
                         (text_a_id, { value = "a" }),
                         (text_alphabet_id, { value = "alphabet" }),
                         (text_alphabetical_id, { value = "alphabetical" }),
                         (text_and_id, { value = "and" }),
-                    ]);
+                    ];
 
-                    assert texts.search(
+                    let #ok(result2) = texts.search(
                         QueryBuilder().Where("value", #not_(#lte(#Text("and"))))
-                    ) == #ok([
+                    ) else return assert false;
+                    assert result2.documents == [
                         (text_anderson_id, { value = "anderson" }),
                         (text_b_id, { value = "b" }),
                         (text_berry_id, { value = "berry" }),
                         (text_c_id, { value = "c" }),
-                    ]);
+                    ];
                 },
             );
 
@@ -188,11 +197,12 @@ ZenDBSuite.newSuite(
                         QueryBuilder().Where("value", #anyOf([#Text("a"), #Text("b"), #Text("c")]))
                     );
 
-                    assert res == #ok([
+                    let #ok(res_result) = res else return assert false;
+                    assert res_result.documents == [
                         (text_a_id, { value = "a" }),
                         (text_b_id, { value = "b" }),
                         (text_c_id, { value = "c" }),
-                    ]);
+                    ];
 
                     //! Executes very slowly
                     // assert texts.search(
@@ -271,71 +281,79 @@ ZenDBSuite.newSuite(
 
                     Debug.print(debug_show { res });
 
-                    assert res == #ok([
+                    let #ok(res_result) = res else return assert false;
+                    assert res_result.documents == [
                         (text_a_id, { value = "a" }),
                         (text_alphabet_id, { value = "alphabet" }),
                         (text_alphabetical_id, { value = "alphabetical" }),
                         (text_and_id, { value = "and" }),
                         (text_anderson_id, { value = "anderson" }),
-                    ]);
+                    ];
 
-                    assert texts.search(
+                    let #ok(result2) = texts.search(
                         QueryBuilder().Where("value", #not_(#startsWith(#Text("a"))))
-                    ) == #ok([
+                    ) else return assert false;
+                    assert result2.documents == [
                         (text_b_id, { value = "b" }),
                         (text_berry_id, { value = "berry" }),
                         (text_c_id, { value = "c" }),
-                    ]);
+                    ];
 
                     let res2 = texts.search(
                         QueryBuilder().Where("value", #startsWith(#Text("al")))
                     );
 
-                    assert res2 == #ok([
+                    let #ok(res2_result) = res2 else return assert false;
+                    assert res2_result.documents == [
                         (text_alphabet_id, { value = "alphabet" }),
                         (text_alphabetical_id, { value = "alphabetical" }),
-                    ]);
+                    ];
 
-                    assert texts.search(
+                    let #ok(result3) = texts.search(
                         QueryBuilder().Where("value", #not_(#startsWith(#Text("al"))))
-                    ) == #ok([
+                    ) else return assert false;
+                    assert result3.documents == [
                         (text_a_id, { value = "a" }),
                         (text_and_id, { value = "and" }),
                         (text_anderson_id, { value = "anderson" }),
                         (text_b_id, { value = "b" }),
                         (text_berry_id, { value = "berry" }),
                         (text_c_id, { value = "c" }),
-                    ]);
+                    ];
 
                     let res3 = texts.search(
                         QueryBuilder().Where("value", #startsWith(#Text("and")))
                     );
 
-                    assert res3 == #ok([
+                    let #ok(res3_result) = res3 else return assert false;
+                    assert res3_result.documents == [
                         (text_and_id, { value = "and" }),
                         (text_anderson_id, { value = "anderson" }),
-                    ]);
+                    ];
 
-                    assert texts.search(
+                    let #ok(result4) = texts.search(
                         QueryBuilder().Where("value", #not_(#startsWith(#Text("and"))))
-                    ) == #ok([
+                    ) else return assert false;
+                    assert result4.documents == [
                         (text_a_id, { value = "a" }),
                         (text_alphabet_id, { value = "alphabet" }),
                         (text_alphabetical_id, { value = "alphabetical" }),
                         (text_b_id, { value = "b" }),
                         (text_berry_id, { value = "berry" }),
                         (text_c_id, { value = "c" }),
-                    ]);
+                    ];
 
                     let res4 = texts.search(
                         QueryBuilder().Where("value", #startsWith(#Text("ben")))
                     );
 
-                    assert res4 == #ok([]);
+                    let #ok(res4_result) = res4 else return assert false;
+                    assert res4_result.documents == [];
 
-                    assert texts.search(
+                    let #ok(result5) = texts.search(
                         QueryBuilder().Where("value", #not_(#startsWith(#Text("ben"))))
-                    ) == #ok([
+                    ) else return assert false;
+                    assert result5.documents == [
                         (text_a_id, { value = "a" }),
                         (text_alphabet_id, { value = "alphabet" }),
                         (text_alphabetical_id, { value = "alphabetical" }),
@@ -344,7 +362,7 @@ ZenDBSuite.newSuite(
                         (text_b_id, { value = "b" }),
                         (text_berry_id, { value = "berry" }),
                         (text_c_id, { value = "c" }),
-                    ]);
+                    ];
 
                 },
             );
@@ -357,7 +375,8 @@ ZenDBSuite.newSuite(
                         QueryBuilder().Where("value", #exists)
                     );
 
-                    assert res == #ok([
+                    let #ok(res_result) = res else return assert false;
+                    assert res_result.documents == [
                         (text_a_id, { value = "a" }),
                         (text_alphabet_id, { value = "alphabet" }),
                         (text_alphabetical_id, { value = "alphabetical" }),
@@ -366,7 +385,7 @@ ZenDBSuite.newSuite(
                         (text_b_id, { value = "b" }),
                         (text_berry_id, { value = "berry" }),
                         (text_c_id, { value = "c" }),
-                    ]);
+                    ];
 
                 },
             );
@@ -375,9 +394,9 @@ ZenDBSuite.newSuite(
                 "Negative Query Test",
                 func() {
                     let db_query = QueryBuilder().Where("value", #eq(#Text("item-not-in-store")));
-                    let #ok(documents) = texts.search(db_query) else return assert false;
+                    let #ok(result) = texts.search(db_query) else return assert false;
 
-                    assert documents == [];
+                    assert result.documents == [];
                 },
             );
 

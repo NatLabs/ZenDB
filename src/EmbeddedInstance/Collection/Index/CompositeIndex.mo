@@ -36,8 +36,11 @@ import Schema "../Schema";
 
 import SchemaMap "../SchemaMap";
 import DocumentStore "../DocumentStore";
+import MergeSort "../../MergeSort";
 
 module CompositeIndex {
+
+    let LOGGER_NAMESPACE = "CompositeIndex";
 
     type BestIndexResult = T.BestIndexResult;
 
@@ -146,6 +149,7 @@ module CompositeIndex {
         values : [T.CandidQuery],
     ) : T.Result<(), Text> {
 
+        let log = Logger.NamespacedLogger(collection.logger, LOGGER_NAMESPACE).subnamespace("insert");
         let index_data_utils = get_index_data_utils(collection);
 
         switch (BTree.put(index.data, index_data_utils, values, id)) {
@@ -159,15 +163,14 @@ module CompositeIndex {
             };
         };
 
-        Logger.lazyDebug(
-            collection.logger,
+        log.lazyDebug(
             func() = "Storing document with id " # debug_show id # " in index " # index.name # ", originally "
             # debug_show (values) # ", now encoded as " # (
                 switch (index_data_utils) {
                     case (#stableMemory(utils)) debug_show utils.key.blobify.to_blob(values);
                     case (#heap(utils)) debug_show utils.blobify.to_blob(values);
                 }
-            ),
+            )
         );
 
         #ok()
@@ -181,12 +184,13 @@ module CompositeIndex {
         candid_map : T.CandidMap,
     ) : T.Result<(), Text> {
 
+        let log = Logger.NamespacedLogger(collection.logger, LOGGER_NAMESPACE).subnamespace("insertWithCandidMap");
+
         let index_key_values = switch (CollectionUtils.getIndexColumns(collection, index.key_details, document_id, candid_map)) {
             case (?index_key_values) index_key_values;
             case (null) {
-                Logger.lazyDebug(
-                    collection.logger,
-                    func() = "Skipping indexing for document with id " # debug_show document_id # " because it does not have any values in the index",
+                log.lazyDebug(
+                    func() = "Skipping indexing for document with id " # debug_show document_id # " because it does not have any values in the index"
                 );
 
                 return #ok();
@@ -199,12 +203,13 @@ module CompositeIndex {
 
     public func removeWithCandidMap(collection : T.StableCollection, index : CompositeIndex, document_id : T.DocumentId, prev_candid_map : T.CandidMap) : T.Result<(), Text> {
 
+        let log = Logger.NamespacedLogger(collection.logger, LOGGER_NAMESPACE).subnamespace("removeWithCandidMap");
+
         let index_key_values = switch (CollectionUtils.getIndexColumns(collection, index.key_details, document_id, prev_candid_map)) {
             case (?index_key_values) index_key_values;
             case (null) {
-                Logger.lazyDebug(
-                    collection.logger,
-                    func() = "Skipping indexing for document with id " # debug_show document_id # " because it does not have any values in the index",
+                log.lazyDebug(
+                    func() = "Skipping indexing for document with id " # debug_show document_id # " because it does not have any values in the index"
                 );
 
                 return #ok();
@@ -380,6 +385,7 @@ module CompositeIndex {
         // Debug.print("start_query: " # debug_show start_query);
         // Debug.print("end_query: " # debug_show end_query);
 
+        let log = Logger.NamespacedLogger(collection.logger, LOGGER_NAMESPACE).subnamespace("scan");
         let index_data_utils = get_index_data_utils(collection);
 
         func sort_by_key_details(a : (Text, Any), b : (Text, Any)) : Order {
@@ -403,7 +409,7 @@ module CompositeIndex {
             opt_cursor : ?(T.DocumentId, T.PaginationDirection),
             is_lower_bound : Bool,
         ) : [(Text, ?T.CandidInclusivityQuery)] {
-            let sorted = Array.sort(query_entries, sort_by_key_details);
+            let sorted = MergeSort.sort(query_entries, sort_by_key_details);
 
             Array.tabulate<(Text, ?T.CandidInclusivityQuery)>(
                 index.key_details.size(),
@@ -492,33 +498,28 @@ module CompositeIndex {
         let sorted_start_query = sort_and_fill_query_entries(start_query, opt_cursor_with_direction, true);
         let sorted_end_query = sort_and_fill_query_entries(end_query, opt_cursor_with_direction, false);
 
-        Logger.lazyDebug(
-            collection.logger,
-            func() = "scan after sort and fill: " # debug_show (sorted_start_query, sorted_end_query),
+        log.lazyDebug(
+            func() = "scan after sort and fill: " # debug_show (sorted_start_query, sorted_end_query)
         );
 
         let start_query_values = format_query_entries(sorted_start_query, true);
         let end_query_values = format_query_entries(sorted_end_query, false);
 
-        Logger.lazyDebug(
-            collection.logger,
-            func() = "scan after format: " # debug_show (start_query_values, end_query_values),
+        log.lazyDebug(
+            func() = "scan after format: " # debug_show (start_query_values, end_query_values)
         );
 
-        Logger.lazyDebug(
-            collection.logger,
-            func() = "encoded start_query_values: " # debug_show (Orchid.blobify.to_blob(start_query_values)),
+        log.lazyDebug(
+            func() = "encoded start_query_values: " # debug_show (Orchid.blobify.to_blob(start_query_values))
         );
-        Logger.lazyDebug(
-            collection.logger,
-            func() = "encoded end_query_values: " # debug_show (Orchid.blobify.to_blob(end_query_values)),
+        log.lazyDebug(
+            func() = "encoded end_query_values: " # debug_show (Orchid.blobify.to_blob(end_query_values))
         );
 
         let scans = CompositeIndex.scan_with_bounds(collection, index, start_query_values, end_query_values);
 
-        Logger.lazyDebug(
-            collection.logger,
-            func() = "scan interval results: " # debug_show scans # "\nindex size: " # debug_show BTree.size(index.data),
+        log.lazyDebug(
+            func() = "scan interval results: " # debug_show scans # "\nindex size: " # debug_show BTree.size(index.data)
         );
 
         scans;
@@ -560,7 +561,6 @@ module CompositeIndex {
         index : CompositeIndex,
     ) : T.RevIter<([T.CandidQuery], T.DocumentId)> {
         let index_data_utils = get_index_data_utils(collection);
-
         BTree.entries<[T.CandidQuery], T.DocumentId>(index.data, index_data_utils);
     };
 

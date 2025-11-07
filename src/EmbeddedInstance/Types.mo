@@ -166,11 +166,16 @@ module T {
 
     public type DocumentStore = BTree<DocumentId, Document>;
 
-    public type CreateIndexBatchConfig = (
+    public type CreateIndexParams = (
         name : Text,
         key_details : [(field : Text, SortDirection)],
-        is_unique : Bool,
-        used_internally : Bool,
+        create_index_options : ?T.CreateIndexOptions,
+    );
+
+    public type CreateInternalIndexParams = (
+        name : Text,
+        key_details : [(field : Text, SortDirection)],
+        create_index_options : T.CreateIndexInternalOptions,
     );
 
     public type BatchPopulateIndex = {
@@ -350,6 +355,10 @@ module T {
         filter_bounds : Bounds;
         simple_operations : [(Text, T.ZqlOperators)];
     };
+
+    public type IndexIntersectionDetails = {
+
+    };
     public type ScanDetails = {
         #IndexScan : IndexScanDetails;
         #FullScan : FullScanDetails;
@@ -380,6 +389,17 @@ module T {
 
         public func to_internal_default(options : CreateIndexOptions) : CreateIndexInternalOptions {
             { is_unique = options.is_unique; used_internally = false };
+        };
+
+        public func internal_from_opt(opt_options : ?CreateIndexOptions) : CreateIndexInternalOptions {
+            switch (opt_options) {
+                case (?options) {
+                    to_internal_default(options);
+                };
+                case (null) {
+                    internal_default();
+                };
+            };
         };
     };
 
@@ -565,7 +585,7 @@ module T {
 
     public type EvalResult = {
         #Empty;
-        #Ids : Iter<DocumentId>;
+        #Ids : Iter<(DocumentId, ?[(Text, Candid)])>; // todo: returned the assumed size with the iterator, can help in choosing the smallest set of ids
         #BitMap : T.BitMap;
         #Interval : (index : Text, interval : [Interval], is_reversed : Bool);
     };
@@ -577,6 +597,12 @@ module T {
         sorted_in_reverse : Bool;
         fully_covered_equality_and_range_fields : Set.Set<Text>;
         score : Float;
+
+        fully_covered_equal_fields : Set.Set<Text>;
+        fully_covered_sort_fields : Set.Set<Text>;
+        fully_covered_range_fields : Set.Set<Text>;
+
+        interval : T.Interval; // (start, end) range of matching entries in the index
     };
 
     public type FieldUpdateOperations = {
@@ -648,6 +674,46 @@ module T {
 
     public type Tokenizer = {
         #basic;
+    };
+
+    public type CompareFunc<K> = (K, K) -> Order;
+
+    // Custom result types for operations that include instruction counts
+    public type SearchResult<Record> = {
+        documents : [WrapId<Record>];
+        instructions : Nat;
+    };
+
+    public type CountResult = {
+        count : Nat;
+        instructions : Nat;
+    };
+
+    public type UpdateByIdResult = {
+        instructions : Nat;
+    };
+
+    public type UpdateResult = {
+        updated_count : Nat;
+        instructions : Nat;
+    };
+
+    public type ReplaceByIdResult = {
+        instructions : Nat;
+    };
+
+    public type ReplaceDocsResult = {
+        instructions : Nat;
+    };
+
+    public type DeleteByIdResult<Record> = {
+        deleted_document : Record;
+        instructions : Nat;
+    };
+
+    public type DeleteResult<Record> = {
+        deleted_documents : [(DocumentId, Record)];
+        instructions : Nat;
     };
 
 };

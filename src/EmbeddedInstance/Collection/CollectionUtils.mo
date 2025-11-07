@@ -53,6 +53,7 @@ import BTree "../BTree";
 import DocumentStore "DocumentStore";
 
 module CollectionUtils {
+    let LOGGER_NAMESPACE = "CollectionUtils";
 
     public type Result<A, B> = Result.Result<A, B>;
     public type Buffer<A> = Buffer.Buffer<A>;
@@ -125,6 +126,7 @@ module CollectionUtils {
     };
 
     public func getIndexColumns(collection : T.StableCollection, index_key_details : [(Text, SortDirection)], document_id : T.DocumentId, candid_map : T.CandidMap) : ?[Candid] {
+        let log = Logger.NamespacedLogger(collection.logger, LOGGER_NAMESPACE).subnamespace("getIndexColumns");
         let buffer = Buffer.Buffer<Candid>(8);
 
         var field_columns_excluding_document_id = 0;
@@ -183,11 +185,10 @@ module CollectionUtils {
 
         let indexKeyValues = Buffer.toArray(buffer);
 
-        Logger.lazyDebug(
-            collection.logger,
+        log.lazyDebug(
             func() : Text {
                 "Retrieved index key values (" # debug_show (indexKeyValues) # ") for index key details (" # debug_show (index_key_details) # ") for id [" # debug_show document_id # "] in collection (" # debug_show collection.name # ")";
-            },
+            }
         );
 
         ?indexKeyValues;
@@ -219,9 +220,7 @@ module CollectionUtils {
         ?candid;
     };
 
-    public func candidMapFilterCondition(collection : T.StableCollection, id : T.DocumentId, candid_document : Candid.Candid, lower : [(Text, ?T.CandidInclusivityQuery)], upper : [(Text, ?T.CandidInclusivityQuery)]) : Bool {
-
-        let candid_map = CandidMap.new(collection.schema_map, id, candid_document);
+    public func candidMapFilterCondition(collection : T.StableCollection, id : T.DocumentId, candid_map : T.CandidMap, lower : [(Text, ?T.CandidInclusivityQuery)], upper : [(Text, ?T.CandidInclusivityQuery)]) : Bool {
 
         for (((key, opt_lower_val), (upper_key, opt_upper_val)) in Itertools.zip(lower.vals(), upper.vals())) {
             assert key == upper_key;
@@ -265,6 +264,36 @@ module CollectionUtils {
 
     };
 
+    func candid_map_multi_filter_condition(
+        collection : T.StableCollection,
+        id : T.DocumentId,
+        candid_map : T.CandidMap,
+        bounds : Buffer.Buffer<(lower : [(Text, ?T.CandidInclusivityQuery)], upper : [(Text, ?T.CandidInclusivityQuery)])>,
+        is_and : Bool,
+    ) : Bool {
+
+        func filter_fn(
+            (lower, upper) : (([(Text, ?T.CandidInclusivityQuery)], [(Text, ?T.CandidInclusivityQuery)]))
+        ) : Bool {
+            let res = candidMapFilterCondition(collection, id, candid_map, lower, upper);
+            res;
+        };
+
+        if (is_and) {
+            Itertools.all(bounds.vals(), filter_fn);
+        } else {
+            Itertools.any(bounds.vals(), filter_fn);
+        };
+    };
+
+    public func get_composite_index(collection : T.StableCollection, index_name : Text) : T.CompositeIndex {
+        let ?index = Map.get(collection.indexes, Map.thash, index_name) else Debug.trap("Unreachable: IndexMap not found for index: " # index_name);
+        let internal_index = switch (index) {
+            case (#text_index(text_index)) text_index.internal_index;
+            case (#composite_index(composite_index)) composite_index;
+        };
+    };
+
     public func multiFilter(
         collection : T.StableCollection,
         documents : Iter<T.DocumentId>,
@@ -276,23 +305,141 @@ module CollectionUtils {
             documents,
             func(id : T.DocumentId) : Bool {
                 let ?candid = CollectionUtils.lookupCandidDocument(collection, id) else Debug.trap("multiFilter: candid_map_bytes not found");
+                let candid_map = CandidMap.new(collection.schema_map, id, candid);
 
-                func filter_fn(
-                    (lower, upper) : (([(Text, ?T.CandidInclusivityQuery)], [(Text, ?T.CandidInclusivityQuery)]))
-                ) : Bool {
+                candid_map_multi_filter_condition(collection, id, candid_map, bounds, is_and);
+            },
+        );
+    };
 
-                    let res = candidMapFilterCondition(collection, id, candid, lower, upper);
+    // Helper function to check if all filter bounds can be satisfied by indexed fields
+    public func can_use_indexed_fields_for_filtering(
+        indexed_fields : [(Text, Any)],
+        bounds : Buffer.Buffer<(lower : [(Text, ?T.CandidInclusivityQuery)], upper : [(Text, ?T.CandidInclusivityQuery)])>,
+    ) : Bool {
 
-                    res;
+        let indexed_fields_map = Set.new<Text>();
+        for ((field_name, _) in indexed_fields.vals()) {
+            ignore Set.put(indexed_fields_map, Set.thash, field_name);
+        };
+
+        // Check if all fields in bounds are present in indexed fields
+        for ((lower, upper) in bounds.vals()) {
+            for ((field_name, _) in lower.vals()) {
+                switch (Set.has(indexed_fields_map, Set.thash, field_name)) {
+                    case (false) return false; // Field not in indexed fields
+                    case (true) {};
+                };
+            };
+
+            // todo: might be redundant to check upper again, but safer to do so
+            for ((field_name, _) in upper.vals()) {
+                switch (Set.has(indexed_fields_map, Set.thash, field_name)) {
+                    case (false) return false; // Field not in indexed fields
+                    case (true) {};
+                };
+            };
+        };
+
+        true;
+    };
+
+    // Helper function to filter using only indexed fields (without deserializing the full document)
+    // Precondition: All fields required by bounds are present in indexed_fields_map
+    public func filter_with_indexed_fields(
+        collection : T.StableCollection,
+        id : T.DocumentId,
+        indexed_fields_map : Map.Map<Text, T.Candid>,
+        bounds : Buffer.Buffer<(lower : [(Text, ?T.CandidInclusivityQuery)], upper : [(Text, ?T.CandidInclusivityQuery)])>,
+        is_and : Bool,
+    ) : Bool {
+
+        func filter_fn(
+            (lower, upper) : (([(Text, ?T.CandidInclusivityQuery)], [(Text, ?T.CandidInclusivityQuery)]))
+        ) : Bool {
+            for (((key, opt_lower_val), (upper_key, opt_upper_val)) in Itertools.zip(lower.vals(), upper.vals())) {
+                assert key == upper_key;
+
+                // Caller should have verified all fields are present - trap if not to catch bugs
+                let ?field_value = Map.get(indexed_fields_map, Map.thash, key) else Debug.trap("filter_with_indexed_fields: field '" # key # "' not found in indexed_fields_map. This indicates a bug in the precondition check.");
+
+                var res = true;
+
+                switch (opt_lower_val) {
+                    case (?(#Inclusive(lower_val))) {
+                        if (Schema.cmp_candid_ignore_option(collection.schema, field_value, lower_val) == -1) res := false;
+                    };
+                    case (?(#Exclusive(lower_val))) {
+                        if (Schema.cmp_candid_ignore_option(collection.schema, field_value, lower_val) < 1) res := false;
+                    };
+                    case (null) {};
                 };
 
-                let res = if (is_and) {
-                    Itertools.all(bounds.vals(), filter_fn);
+                switch (opt_upper_val) {
+                    case (?(#Inclusive(upper_val))) {
+                        if (Schema.cmp_candid_ignore_option(collection.schema, field_value, upper_val) == 1) res := false;
+                    };
+                    case (?(#Exclusive(upper_val))) {
+                        if (Schema.cmp_candid_ignore_option(collection.schema, field_value, upper_val) > -1) res := false;
+                    };
+                    case (null) {};
+                };
+
+                if (not res) return res;
+            };
+
+            true;
+        };
+
+        if (is_and) {
+            Itertools.all(bounds.vals(), filter_fn);
+        } else {
+            Itertools.any(bounds.vals(), filter_fn);
+        };
+    };
+
+    // Optimized multiFilter that uses indexed fields when available to avoid document deserialization
+    public func multiFilterWithIndexedFields(
+        collection : T.StableCollection,
+        documents : Iter<(T.DocumentId, ?[(Text, T.Candid)])>,
+
+        // todo: how do we check if we can solely use the indexed fields for this operation, if we have an iterator merged from multiple indexes with different indexed fiedls
+        bounds : Buffer.Buffer<(lower : [(Text, ?T.CandidInclusivityQuery)], upper : [(Text, ?T.CandidInclusivityQuery)])>,
+        is_and : Bool,
+    ) : Iter<(T.DocumentId, ?[(Text, T.Candid)])> {
+
+        let indexed_fields_map = Map.new<Text, T.Candid>();
+
+        Iter.filter<(T.DocumentId, ?[(Text, T.Candid)])>(
+            documents,
+            func((id, opt_indexed_fields) : (T.DocumentId, ?[(Text, T.Candid)])) : Bool {
+                Map.clear(indexed_fields_map);
+
+                // Check if indexed fields are available and contain all required fields
+                let use_indexed_fields = switch (opt_indexed_fields) {
+                    case (?indexed_fields) {
+                        can_use_indexed_fields_for_filtering(indexed_fields, bounds);
+                    };
+                    case (null) false;
+                };
+
+                if (use_indexed_fields) {
+                    // Populate indexed fields map for filtering
+                    let ?indexed_fields = opt_indexed_fields else Debug.trap("multiFilterWithIndexedFields: indexed_fields should be present");
+                    for ((field_name, candid_value) in indexed_fields.vals()) {
+                        ignore Map.put(indexed_fields_map, Map.thash, field_name, candid_value);
+                    };
+
+                    // Use indexed fields for filtering
+                    filter_with_indexed_fields(collection, id, indexed_fields_map, bounds, is_and);
                 } else {
-                    Itertools.any(bounds.vals(), filter_fn);
-                };
+                    // Indexed fields not available or incomplete, fall back to loading full document
+                    let ?candid = CollectionUtils.lookupCandidDocument(collection, id) else Debug.trap("multiFilterWithIndexedFields: document not found for id: " # debug_show id);
+                    let candid_map = CandidMap.new(collection.schema_map, id, candid);
 
-                res;
+                    candid_map_multi_filter_condition(collection, id, candid_map, bounds, is_and);
+
+                };
             },
         );
     };

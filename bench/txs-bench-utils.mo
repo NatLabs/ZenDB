@@ -342,11 +342,11 @@ module TxsBenchUtils {
 
                     case ("create and populate indexes") {
                         // Create batch for indexes
-                        let index_configs = Array.tabulate<ZenDB.Types.CreateIndexBatchConfig>(
+                        let index_configs = Array.tabulate<ZenDB.Types.CreateIndexParams>(
                             indexes.size(),
-                            func(i : Nat) : ZenDB.Types.CreateIndexBatchConfig {
+                            func(i : Nat) : ZenDB.Types.CreateIndexParams {
                                 let index_name = "index_" # debug_show (i);
-                                (index_name, indexes[i], false, false); // name, key_details, is_unique, used_internally
+                                (index_name, indexes[i], null); // name, key_details, ?options
                             },
                         );
 
@@ -855,17 +855,17 @@ module TxsBenchUtils {
 
         func skip_limit_paginated_query(db_query : ZenDB.QueryBuilder) {
             ignore db_query.Limit(pagination_limit);
-            let #ok(matching_txs) = txs.search(db_query);
-            var documents = matching_txs;
+            let #ok(result) = txs.search(db_query) else return;
+            var documents = result.documents;
             var skip = 0;
             var opt_cursor : ?Nat = null;
 
             label pagination while (documents.size() > 0) {
                 ignore db_query.Skip(skip).Limit(pagination_limit);
 
-                let #ok(matching_txs) = txs.search(db_query);
+                let #ok(result) = txs.search(db_query) else return;
 
-                documents := matching_txs;
+                documents := result.documents;
 
             };
 
@@ -875,21 +875,21 @@ module TxsBenchUtils {
         func skip_limit_skip_limit_paginated_query(db_query : ZenDB.QueryBuilder, pagination_limit : Nat) : [(Blob, Tx)] {
 
             ignore db_query.Limit(pagination_limit);
-            let #ok(matching_txs) = txs.search(db_query);
-            let bitmap = BitMap.fromIter(Iter.map<(Blob, Tx), Nat>(matching_txs.vals(), func((id, _) : (Blob, Tx)) : Nat = Utils.nat_from_12_byte_blob(id)));
-            let documents = Buffer.fromArray<(Blob, Tx)>(matching_txs);
-            var batch_size = documents.size();
+            let #ok(result) = txs.search(db_query) else Prelude.unreachable();
+            let bitmap = BitMap.fromIter(Iter.map<(Blob, Tx), Nat>(result.documents.vals(), func((id, _) : (Blob, Tx)) : Nat = Utils.nat_from_12_byte_blob(id)));
+            let documents = Buffer.fromArray<(Blob, Tx)>(result.documents);
+            var batch_size = result.documents.size();
 
             label skip_limit_pagination while (batch_size > 0) {
                 ignore db_query.Skip(documents.size()).Limit(pagination_limit);
 
-                let #ok(matching_txs) = txs.search(db_query);
-                // Debug.print("matching_txs: " # debug_show matching_txs);
+                let #ok(result) = txs.search(db_query) else Prelude.unreachable();
+                // Debug.print("matching_txs: " # debug_show result.documents);
 
-                assert matching_txs.size() <= pagination_limit;
-                batch_size := matching_txs.size();
+                assert result.documents.size() <= pagination_limit;
+                batch_size := result.documents.size();
 
-                for ((id, tx) in matching_txs.vals()) {
+                for ((id, tx) in result.documents.vals()) {
                     documents.add((id, tx));
 
                     if (bitmap.get(Utils.nat_from_12_byte_blob(id))) {

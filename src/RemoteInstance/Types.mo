@@ -101,7 +101,7 @@ module {
         zendb_create_database : shared (Text) -> async (ZT.Result<(), Text>);
 
         /// Creates a new collection and returns the collection name.
-        zendb_create_collection : shared (Text, Text, ZT.Schema) -> async (ZT.Result<(), Text>);
+        zendb_create_collection : shared (Text, Text, ZT.Schema, ?ZT.CreateCollectionOptions) -> async (ZT.Result<(), Text>);
 
         /// Deletes a collection from the database.
         zendb_delete_collection : shared (Text, Text) -> async (ZT.Result<(), Text>);
@@ -115,34 +115,55 @@ module {
         /// Get document from a collection in the cluster.
         zendb_collection_get_document : shared query (Text, Text, ZT.DocumentId) -> async (ZT.Result<ZT.CandidBlob, Text>);
 
-        /// Search documents in a collection in the cluster.
-        zendb_collection_search : shared query (Text, Text, ZT.StableQuery) -> async (ZT.Result<[(ZT.DocumentId, ZT.CandidBlob)], Text>);
+        /// Get document from a collection in the cluster (composite query).
+        zendb_collection_get_document_composite_query : shared composite query (Text, Text, ZT.DocumentId) -> async (ZT.Result<ZT.CandidBlob, Text>);
 
-        /// Search documents in a collection using composite query.
-        zendb_collection_search_composite_query : shared composite query (Text, Text, ZT.StableQuery) -> async (ZT.Result<[(ZT.DocumentId, ZT.CandidBlob)], Text>);
+        /// Search documents in a collection in the cluster.
+        zendb_collection_search : shared (Text, Text, ZT.StableQuery) -> async (ZT.Result<ZT.SearchResult<ZT.CandidBlob>, Text>);
+
+        /// Search documents in a collection in the cluster (query).
+        zendb_collection_search_query : shared query (Text, Text, ZT.StableQuery) -> async (ZT.Result<ZT.SearchResult<ZT.CandidBlob>, Text>);
+
+        /// Search documents in a collection in the cluster (composite query).
+        zendb_collection_search_composite_query : shared composite query (Text, Text, ZT.StableQuery) -> async (ZT.Result<ZT.SearchResult<ZT.CandidBlob>, Text>);
 
         zendb_collection_size : shared query (Text, Text) -> async (Nat);
 
-        // /// Get instance statistics.
-        // zendb_stats : shared query () -> async ZT.InstanceStats;
+        /// Get collection size (composite query).
+        zendb_collection_size_composite_query : shared composite query (Text, Text) -> async (Nat);
+
+        /// Returns the total number of documents that match the query.
+        /// This ignores the limit and skip parameters.
+        zendb_collection_count : shared (Text, Text, ZT.StableQuery) -> async (ZT.CountResult);
+
+        /// Returns the total number of documents that match the query (query).
+        /// This ignores the limit and skip parameters.
+        zendb_collection_count_query : shared query (Text, Text, ZT.StableQuery) -> async (ZT.CountResult);
+
+        /// Returns the total number of documents that match the query (composite query).
+        /// This ignores the limit and skip parameters.
+        zendb_collection_count_composite_query : shared composite query (Text, Text, ZT.StableQuery) -> async (ZT.CountResult);
 
         /// Get collection schema.
         zendb_collection_get_schema : shared query (Text, Text) -> async (ZT.Result<ZT.Schema, Text>);
 
+        /// Get collection schema (composite query).
+        zendb_collection_get_schema_composite_query : shared composite query (Text, Text) -> async (ZT.Result<ZT.Schema, Text>);
+
         /// Replace document in a collection.
-        zendb_collection_replace_document : shared (Text, Text, ZT.DocumentId, Blob) -> async (ZT.Result<(), Text>);
+        zendb_collection_replace_document : shared (Text, Text, ZT.DocumentId, Blob) -> async (ZT.Result<ZT.ReplaceByIdResult, Text>);
 
         /// Delete document by id from a collection.
-        zendb_collection_delete_document_by_id : shared (Text, Text, ZT.DocumentId) -> async (ZT.Result<(Blob), Text>);
+        zendb_collection_delete_document_by_id : shared (Text, Text, ZT.DocumentId) -> async (ZT.Result<ZT.DeleteByIdResult<Blob>, Text>);
 
         /// Delete documents matching query from a collection.
-        zendb_collection_delete_documents : shared (Text, Text, ZT.StableQuery) -> async (ZT.Result<[(ZT.DocumentId, ZT.CandidBlob)], Text>);
+        zendb_collection_delete_documents : shared (Text, Text, ZT.StableQuery) -> async (ZT.Result<ZT.DeleteResult<Blob>, Text>);
 
         /// Update document by id in a collection.
-        zendb_collection_update_document_by_id : shared (Text, Text, ZT.DocumentId, [(Text, ZT.FieldUpdateOperations)]) -> async (ZT.Result<(), Text>);
+        zendb_collection_update_document_by_id : shared (Text, Text, ZT.DocumentId, [(Text, ZT.FieldUpdateOperations)]) -> async (ZT.Result<ZT.UpdateByIdResult, Text>);
 
         /// Update documents matching query in a collection.
-        zendb_collection_update_documents : shared (Text, Text, ZT.StableQuery, [(Text, ZT.FieldUpdateOperations)]) -> async (ZT.Result<[ZT.DocumentId], Text>);
+        zendb_collection_update_documents : shared (Text, Text, ZT.StableQuery, [(Text, ZT.FieldUpdateOperations)]) -> async (ZT.Result<ZT.UpdateResult, Text>);
 
         /// Create index on a collection.
         zendb_collection_create_index : shared (Text, Text, Text, [(Text, ZT.SortDirection)], ?ZT.CreateIndexOptions) -> async (ZT.Result<(), Text>);
@@ -153,8 +174,11 @@ module {
         /// Repopulate index in a collection.
         zendb_collection_repopulate_index : shared query (Text, Text, Text) -> async (ZT.Result<(), Text>);
 
+        /// Repopulate index in a collection (composite query).
+        zendb_collection_repopulate_index_composite_query : shared composite query (Text, Text, Text) -> async (ZT.Result<(), Text>);
+
         /// Batch create indexes on a collection.
-        zendb_collection_batch_create_indexes : shared (Text, Text, [ZT.CreateIndexBatchConfig]) -> async (ZT.Result<Nat, Text>);
+        zendb_collection_batch_create_indexes : shared (Text, Text, [ZT.CreateIndexParams]) -> async (ZT.Result<Nat, Text>);
 
         /// Batch populate indexes on a collection.
         zendb_collection_batch_populate_indexes : shared (Text, Text, [Text]) -> async (ZT.Result<Nat, Text>);
@@ -164,72 +188,32 @@ module {
 
         /// List Canisters in the cluster
         zendb_list_canisters : shared query () -> async [CanisterInfo];
+
+        /// List Canisters in the cluster (composite query)
+        zendb_list_canisters_composite_query : shared composite query () -> async [CanisterInfo];
+
         zendb_canister_stats : shared query () -> async ([ZT.InstanceStats]);
+
+        /// Get canister stats (composite query)
+        zendb_canister_stats_composite_query : shared composite query () -> async ([ZT.InstanceStats]);
+
+        /// Get instance statistics
+        zendb_stats : shared query () -> async ZT.InstanceStats;
+
+        /// Get instance statistics (composite query)
+        zendb_stats_composite_query : shared composite query () -> async ZT.InstanceStats;
+
+        /// Get database statistics
+        zendb_database_stats : shared query (Text) -> async ZT.DatabaseStats;
+
+        /// Get database statistics (composite query)
+        zendb_database_stats_composite_query : shared composite query (Text) -> async ZT.DatabaseStats;
+
+        /// Get collection statistics
+        zendb_collection_stats : shared query (Text, Text) -> async ZT.CollectionStats;
+
+        /// Get collection statistics (composite query)
+        zendb_collection_stats_composite_query : shared composite query (Text, Text) -> async ZT.CollectionStats;
     };
 
-    /// The canister acts as a database service.
-    ///
-    /// no intercanister query calls since they can't be called in update calls
-    /// and these functions (query and update) might be called in a function which
-    /// is only allowed in update calls.
-    public type Service = actor {
-        zendb_api_version : shared query () -> async Text;
-
-        /// Get database name.
-        // zendb_get_database_name : shared query () -> async Text;
-
-        // /// Deletes a collection.
-        // zendb_delete_collection : shared Text -> async (ZT.Result<(), Text>);
-
-        // /// Get collection size.
-        // zendb_collection_size : shared query Text -> async (Nat);
-
-        // /// Get collection schema.
-        // zendb_collection_schema : shared query Text -> async ZT.Result<(ZT.Schema), Text>;
-
-        // /// Clear a collection.
-        // zendb_collection_clear : shared Text -> async (ZT.Result<(), Text>);
-
-        // /// Get collection stats
-        // zendb_collection_stats : shared query Text -> async (ZT.Result<ZT.CollectionStats, Text>);
-
-        // /// Get collection indexes.
-        // zendb_collection_get_indexes : shared query Text -> async ([(indexed_keys : [Text])]);
-
-        /// Create an index on a collection.
-        // zendb_create_collection_index : shared (Text, [Text]) -> async (ZT.Result<(), Text>);
-
-        // /// Delete an index from a collection.
-        // zendb_collection_delete_index : shared (Text, [Text]) -> async (ZT.Result<(), Text>);
-
-        // /// Inserts a record into a collection.
-        // zendb_collection_insert_record : shared (Text, ZT.Candid) -> async (ZT.Result<ZT.DocumentId, Text>);
-
-        // /// Insers a record with a specific id into a collection.
-        // zendb_collection_insert_record_with_id : shared (Text, ZT.DocumentId, ZT.Candid) -> async (ZT.Result<(), Text>);
-
-        // /// Deletes a record from a collection.
-        // zendb_collection_delete_record_by_id : shared (Text, ZT.DocumentId) -> async (ZT.Result<(), Text>);
-
-        // /// Updates a record in a collection.
-        // zendb_collection_update_record_by_id : shared (Text, ZT.DocumentId, ZT.Candid) -> async (ZT.Result<(), Text>);
-
-        // /// Get a record from a collection.
-        // zendb_collection_get_record : shared query (Text, ZT.DocumentId) -> async (ZT.Result<ZT.CandidBlob, Text>);
-
-        // /// Find records that match a query.
-        // zendb_collection_find_records : shared query (Text, ZT.StableQuery) -> async (ZT.Result<CrossCanisterRecordsCursor, Text>);
-
-        // /// Find one record that matches a query.
-        // zendb_collection_find_one_record : shared query (Text, ZT.StableQuery) -> async (ZT.Result<(ZT.DocumentId, ZT.CandidBlob), Text>);
-
-        // /// Updates all records that match a query.
-        // zendb_collection_update_all_records : shared (Text, ZT.StableQuery, ZT.Candid) -> async (ZT.Result<[ZT.DocumentId], Text>);
-
-        // /// Deletes all records that match a query.
-        // zendb_collection_delete_all_record : shared (Text, ZT.StableQuery) -> async (ZT.Result<[ZT.DocumentId], Text>);
-
-        // /// Count all records that match a query.
-        // zendb_collection_count_records : shared query (Text, ZT.StableQuery) -> async (ZT.Result<Nat, Text>);
-    };
 };

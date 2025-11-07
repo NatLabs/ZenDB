@@ -7,7 +7,7 @@ import Array "mo:base@0.16.0/Array";
 import Option "mo:base@0.16.0/Option";
 import Principal "mo:base@0.16.0/Principal";
 
-import ZenDB "../../src";
+import ZenDB "../../src/EmbeddedInstance";
 import CollectionUtils "../../src/EmbeddedInstance/Collection/CollectionUtils";
 import StableCollection "../../src/EmbeddedInstance/Collection/StableCollection";
 import CommonIndexFns "../../src/EmbeddedInstance/Collection/Index/CommonIndexFns";

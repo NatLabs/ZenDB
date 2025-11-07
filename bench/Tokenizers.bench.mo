@@ -9,7 +9,7 @@ import Char "mo:base/Char";
 import Bench "mo:bench";
 import Fuzz "mo:fuzz";
 
-import BasicTokenizer "../src/Tokenizers/BasicTokenizer";
+import BasicTokenizer "../src/EmbeddedInstance/Collection/Index/Tokenizers/BasicTokenizer";
 
 module {
 

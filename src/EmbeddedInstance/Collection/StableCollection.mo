@@ -62,6 +62,7 @@ import UpdateOps "UpdateOps";
 import BTree "../BTree";
 
 module StableCollection {
+    let LOGGER_NAMESPACE = "StableCollection";
 
     public type Map<K, V> = Map.Map<K, V>;
     public type Set<K> = Set.Set<K>;
@@ -203,36 +204,25 @@ module StableCollection {
         is_unique : Bool,
         used_internally : Bool,
     ) : T.Result<T.CompositeIndex, Text> {
+        let log = Logger.NamespacedLogger(collection.logger, LOGGER_NAMESPACE).subnamespace("create_index_internal");
 
         switch (Map.get(collection.indexes, Map.thash, index_name)) {
             case (?index) {
-                Logger.lazyInfo(
-                    collection.logger,
-                    func() = "CompositeIndex '" # index_name # "' already exists",
-                );
+                log.lazyInfo(func() = "CompositeIndex '" # index_name # "' already exists");
                 let internal_index = CommonIndexFns.get_internal_index(index);
                 return #ok(internal_index);
             };
             case (null) {};
         };
 
-        Logger.lazyInfo(
-            collection.logger,
-            func() = "Creating index '" # index_name # "' with key details: " # debug_show index_key_details,
-        );
-        Logger.lazyDebug(
-            collection.logger,
-            func() = "index_key_details: " # debug_show (index_key_details),
-        );
+        log.lazyInfo(func() = "Creating index '" # index_name # "' with key details: " # debug_show index_key_details);
+        log.lazyDebug(func() = "index_key_details: " # debug_show (index_key_details));
 
         let index = CompositeIndex.new(collection, index_name, index_key_details, is_unique, used_internally);
 
         ignore Map.put(collection.indexes, Map.thash, index_name, #composite_index(index));
 
-        Logger.lazyInfo(
-            collection.logger,
-            func() = "Successfully created index: " # index_name,
-        );
+        log.lazyInfo(func() = "Successfully created index: " # index_name);
 
         #ok(index);
     };
@@ -244,6 +234,7 @@ module StableCollection {
         _index_key_details : [(Text, SortDirection)],
         is_unique : Bool,
     ) : T.Result<(T.CompositeIndex), Text> {
+        let log = Logger.NamespacedLogger(collection.logger, LOGGER_NAMESPACE).subnamespace("create_composite_index");
 
         let index_creation_response = StableCollection.create_index_internal(collection, index_name, _index_key_details, is_unique, false);
 
@@ -257,10 +248,7 @@ module StableCollection {
             case (#err(err_msg)) return #err("Failed to create index '" # index_name # "': " # err_msg);
         };
 
-        Logger.lazyInfo(
-            collection.logger,
-            func() = "Successfully created and populated index: " # index_name,
-        );
+        log.lazyInfo(func() = "Successfully created and populated index: " # index_name);
 
         #ok(index)
 
@@ -286,12 +274,13 @@ module StableCollection {
 
     public func create_populate_indexes_batch(
         collection : StableCollection,
-        index_configs : [T.CreateIndexBatchConfig],
+        index_configs : [T.CreateInternalIndexParams],
         opt_performance_init : ?Nat,
     ) : T.Result<(batch_id : Nat), Text> {
+        let log = Logger.NamespacedLogger(collection.logger, LOGGER_NAMESPACE).subnamespace("create_populate_indexes_batch");
 
         let performance = Performance(collection.is_running_locally, opt_performance_init);
-        let index_names = Array.map(index_configs, func(config : T.CreateIndexBatchConfig) : Text = config.0);
+        let index_names = Array.map(index_configs, func(config : T.CreateInternalIndexParams) : Text = config.0);
 
         // then check if there any of those indexes are currently being populated or created
         let existing_indexes_in_batch_operations = get_existing_keys(collection.indexes_in_batch_operations, index_names);
@@ -303,12 +292,9 @@ module StableCollection {
 
         let newly_created_indexes = Buffer.Buffer<T.Index>(index_configs.size());
 
-        for ((index_name, index_key_details, is_unique, used_internally) in index_configs.vals()) {
-            Logger.lazyInfo(
-                collection.logger,
-                func() = "Creating indexes: " # debug_show (index_name, index_key_details),
-            );
-            let composite_index = CompositeIndex.new(collection, index_name, index_key_details, is_unique, used_internally);
+        for ((index_name, index_key_details, options) in index_configs.vals()) {
+            log.lazyInfo(func() = "Creating indexes: " # debug_show (index_name, index_key_details));
+            let composite_index = CompositeIndex.new(collection, index_name, index_key_details, options.is_unique, options.used_internally);
             let index = #composite_index(composite_index);
             ignore Map.put(collection.indexes_in_batch_operations, Map.thash, index_name, index);
             newly_created_indexes.add(index);
@@ -343,10 +329,7 @@ module StableCollection {
         // store the batch in the stable store
         ignore Map.put<Nat, T.BatchPopulateIndex>(collection.populate_index_batches, Map.nhash, batch.id, batch);
 
-        Logger.lazyInfo(
-            collection.logger,
-            func() = "Created Batch with id: " # debug_show (batch.id),
-        );
+        log.lazyInfo(func() = "Created Batch with id: " # debug_show (batch.id));
 
         #ok(batch.id)
 
@@ -354,7 +337,7 @@ module StableCollection {
 
     public func batch_create_indexes(
         collection : StableCollection,
-        index_configs : [(name : Text, [(field : Text, SortDirection)], is_unique : Bool, used_internally : Bool)],
+        index_configs : [T.CreateInternalIndexParams],
     ) : Result<(batch_id : Nat), Text> {
         if (index_configs.size() == 0) {
             return #err("No index configurations provided");
@@ -363,7 +346,7 @@ module StableCollection {
         let performance = Performance(collection.is_running_locally, null);
 
         // first check if any of the indexes already exist, fail if they do
-        let index_names = Array.map(index_configs, func(config : T.CreateIndexBatchConfig) : Text = config.0);
+        let index_names = Array.map(index_configs, func(config : T.CreateInternalIndexParams) : Text = config.0);
         let existing_indexes = get_existing_keys(collection.indexes, index_names);
         if (existing_indexes.size() > 0) {
             return #err(
@@ -454,11 +437,9 @@ module StableCollection {
         collection : StableCollection,
         batch_id : Nat,
     ) : Result<(), Text> {
+        let log = Logger.NamespacedLogger(collection.logger, LOGGER_NAMESPACE).subnamespace("commit_batch_populate_indexes");
 
-        Logger.lazyInfo(
-            collection.logger,
-            func() = "Committing batch with id " # debug_show batch_id,
-        );
+        log.lazyInfo(func() = "Committing batch with id " # debug_show batch_id);
         let ?batch = Map.get(collection.populate_index_batches, Map.nhash, batch_id) else {
             return #err("Batch with id " # debug_show batch_id # " not found");
         };
@@ -525,11 +506,16 @@ module StableCollection {
 
     };
 
+    class Cycles(is_running_locally : Bool) {
+
+    };
+
     public func populate_indexes_in_batch(
         collection : StableCollection,
         batch_id : Nat,
         opt_performance_init : ?Nat,
     ) : Result<(Bool), Text> {
+        let log = Logger.NamespacedLogger(collection.logger, LOGGER_NAMESPACE).subnamespace("populate_indexes_in_batch");
 
         let MAX_INSTRUCTIONS = Nat64.toNat(C.MAX_UPDATE_INSTRUCTIONS * 80 / 100);
 
@@ -543,14 +529,8 @@ module StableCollection {
 
         var error : ?Text = null;
 
-        Logger.lazyDebug(
-            collection.logger,
-            func() = "total expected documents in batch: " # debug_show (batch.total_documents),
-        );
-        Logger.lazyDebug(
-            collection.logger,
-            func() = "total documents in collection: " # debug_show (StableCollection.size(collection)),
-        );
+        log.lazyDebug(func() = "total expected documents in batch: " # debug_show (batch.total_documents));
+        log.lazyDebug(func() = "total documents in collection: " # debug_show (StableCollection.size(collection)));
         var documents_to_process = 100; // Start with initial calibration batch size
         var multiplier : Float = 2.0;
 
@@ -560,15 +540,9 @@ module StableCollection {
                 (performance.total_instructions_used() + (batch.avg_instructions_per_document * documents_to_process)) < MAX_INSTRUCTIONS and
                 not batch.done_processing
             ) {
-                Logger.lazyDebug(
-                    collection.logger,
-                    func() = "Calibrating batch size, trying: " # debug_show documents_to_process,
-                );
+                log.lazyDebug(func() = "Calibrating batch size, trying: " # debug_show documents_to_process);
 
-                Logger.lazyDebug(
-                    collection.logger,
-                    func() = "Starting document id: " # debug_show (batch.next_document_to_process),
-                );
+                log.lazyDebug(func() = "Starting document id: " # debug_show (batch.next_document_to_process));
 
                 switch (process_index_population_batch(collection, batch, batch.next_document_to_process, documents_to_process)) {
                     case (#err(err)) error := ?err;
@@ -576,21 +550,12 @@ module StableCollection {
                 };
 
                 batch.total_instructions_used += performance.instructions_used_since_last_call();
-                Logger.lazyDebug(
-                    collection.logger,
-                    func() = " batch.total_instructions_used: " # debug_show (batch.total_instructions_used),
-                );
+                log.lazyDebug(func() = " batch.total_instructions_used: " # debug_show (batch.total_instructions_used));
 
-                Logger.lazyDebug(
-                    collection.logger,
-                    func() = " batch.indexed_documents: " # debug_show (batch.indexed_documents),
-                );
+                log.lazyDebug(func() = " batch.indexed_documents: " # debug_show (batch.indexed_documents));
 
                 batch.avg_instructions_per_document := batch.total_instructions_used / (if (batch.indexed_documents == 0) 1 else batch.indexed_documents);
-                Logger.lazyDebug(
-                    collection.logger,
-                    func() = " batch.avg_instructions_per_document: " # debug_show (batch.avg_instructions_per_document),
-                );
+                log.lazyDebug(func() = " batch.avg_instructions_per_document: " # debug_show (batch.avg_instructions_per_document));
 
                 switch (error) {
                     case (?err) {
@@ -599,15 +564,9 @@ module StableCollection {
                     case (null) {};
                 };
 
-                Logger.lazyDebug(
-                    collection.logger,
-                    func() = "was there an error? " # debug_show (error),
-                );
+                log.lazyDebug(func() = "was there an error? " # debug_show (error));
 
-                Logger.lazyDebug(
-                    collection.logger,
-                    func() = "done processing? " # debug_show (batch.done_processing),
-                );
+                log.lazyDebug(func() = "done processing? " # debug_show (batch.done_processing));
 
                 if (batch.done_processing) {
                     batch.num_documents_to_process_per_batch := ?batch.indexed_documents;
@@ -630,9 +589,9 @@ module StableCollection {
         collection : StableCollection,
         batch_id : Nat,
     ) : Result<(), Text> {
-        Logger.info(
-            collection.logger,
-            "Rolling back batch populate indexes with id: " # debug_show batch_id,
+        let log = Logger.NamespacedLogger(collection.logger, LOGGER_NAMESPACE).subnamespace("rollback_and_delete_batch_populate_indexes");
+        log.logInfo(
+            "Rolling back batch populate indexes with id: " # debug_show batch_id
         );
 
         // Get the batch from storage
@@ -646,10 +605,7 @@ module StableCollection {
 
             switch (Map.remove(collection.indexes_in_batch_operations, Map.thash, index_name)) {
                 case (?removed_index) {
-                    Logger.lazyDebug(
-                        collection.logger,
-                        func() = "Deallocating index: " # index_name,
-                    );
+                    log.lazyDebug(func() = "Deallocating index: " # index_name);
                     CommonIndexFns.deallocate(collection, removed_index);
                 };
                 case (null) {
@@ -661,10 +617,7 @@ module StableCollection {
         // Remove the batch from storage
         ignore Map.remove<Nat, T.BatchPopulateIndex>(collection.populate_index_batches, Map.nhash, batch_id);
 
-        Logger.lazyInfo(
-            collection.logger,
-            func() = "Successfully rolled back batch populate indexes with id: " # debug_show batch_id,
-        );
+        log.lazyInfo(func() = "Successfully rolled back batch populate indexes with id: " # debug_show batch_id);
 
         #ok();
     };
@@ -677,7 +630,7 @@ module StableCollection {
     ) : T.Result<(), Text> {
 
         let performance = Performance(collection.is_running_locally, null);
-        let index_config = [(index_name, index_key_details, options.is_unique, options.used_internally)];
+        let index_config = [(index_name, index_key_details, options)];
 
         let batch_id = switch (batch_create_indexes(collection, index_config)) {
             case (#ok(batch_id)) batch_id;
@@ -705,6 +658,7 @@ module StableCollection {
         field : Text,
         tokenizer : T.Tokenizer,
     ) : T.Result<T.TextIndex, Text> {
+        let log = Logger.NamespacedLogger(collection.logger, LOGGER_NAMESPACE).subnamespace("create_text_index");
 
         let text_index = TextIndex.new(
             collection,
@@ -716,10 +670,7 @@ module StableCollection {
         // todo: wip
         ignore Map.put<Text, T.Index>(collection.indexes, Map.thash, index_name, #text_index(text_index));
 
-        Logger.lazyInfo(
-            collection.logger,
-            func() = "Successfully created text index: " # index_name,
-        );
+        log.lazyInfo(func() = "Successfully created text index: " # index_name);
 
         #ok(text_index);
     };
@@ -751,10 +702,8 @@ module StableCollection {
         indexes : Buffer.Buffer<T.Index>,
         entries : Iter<(T.DocumentId, Blob)>,
     ) : T.Result<(), Text> {
-        Logger.lazyInfo(
-            collection.logger,
-            func() = "Populating " # debug_show indexes.size() # " indexes",
-        );
+        let log = Logger.NamespacedLogger(collection.logger, LOGGER_NAMESPACE).subnamespace("internal_populate_indexes");
+        log.lazyInfo(func() = "Populating " # debug_show indexes.size() # " indexes");
 
         var count = 0;
         for ((id, candid_blob) in entries) {
@@ -772,10 +721,7 @@ module StableCollection {
             count += 1;
         };
 
-        Logger.lazyInfo(
-            collection.logger,
-            func() = "Successfully populated indexes with " # debug_show count # " documents",
-        );
+        log.lazyInfo(func() = "Successfully populated indexes with " # debug_show count # " documents");
         #ok();
     };
 
@@ -806,11 +752,9 @@ module StableCollection {
         _main_btree_utils : T.BTreeUtils<T.DocumentId, T.Document>,
         index_names : [Text],
     ) : T.Result<(), Text> {
+        let log = Logger.NamespacedLogger(collection.logger, LOGGER_NAMESPACE).subnamespace("repopulate_indexes");
 
-        Logger.lazyInfo(
-            collection.logger,
-            func() = "Starting to populate indexes: " # debug_show index_names,
-        );
+        log.lazyInfo(func() = "Starting to populate indexes: " # debug_show index_names);
 
         let indexes = Buffer.Buffer<T.Index>(index_names.size());
 
@@ -822,10 +766,7 @@ module StableCollection {
             indexes.add(index);
         };
 
-        Logger.lazyDebug(
-            collection.logger,
-            func() = "Collected " # debug_show indexes.size() # " indexes to populate",
-        );
+        log.lazyDebug(func() = "Collected " # debug_show indexes.size() # " indexes to populate");
 
         CommonIndexFns.populate_indexes(collection, Buffer.toArray(indexes));
 
@@ -835,7 +776,8 @@ module StableCollection {
         collection : T.StableCollection,
         index_name : Text,
     ) : T.Result<(), Text> {
-        Logger.info(collection.logger, "Deleting index: " # index_name);
+        let log = Logger.NamespacedLogger(collection.logger, LOGGER_NAMESPACE).subnamespace("delete_index");
+        log.logInfo("Deleting index: " # index_name);
 
         let opt_index = Map.get(collection.indexes, Map.thash, index_name);
 
@@ -859,10 +801,7 @@ module StableCollection {
             return #err("CompositeIndex '" # index_name # "' cannot be deleted because it is used internally");
         };
 
-        Logger.lazyDebug(
-            collection.logger,
-            func() = "Clearing and recycling BTree for index: " # index_name,
-        );
+        log.lazyDebug(func() = "Clearing and recycling BTree for index: " # index_name);
 
         BTree.clear(composite_index.data);
 
@@ -882,14 +821,15 @@ module StableCollection {
     let MAX_UPDATE_INSTRUCTIONS : Nat64 = 40_000_000_000;
 
     func paginate(collection : T.StableCollection, eval : EvalResult, skip : Nat, opt_limit : ?Nat) : Iter<T.DocumentId> {
+        let log = Logger.NamespacedLogger(collection.logger, LOGGER_NAMESPACE).subnamespace("paginate");
 
         let iter = switch (eval) {
             case (#Empty) {
-                Logger.lazyDebug(collection.logger, func() = "paginate(): Empty iterator");
+                log.lazyDebug(func() = "Empty iterator");
                 return Itertools.empty<T.DocumentId>();
             };
             case (#BitMap(bitmap)) {
-                Logger.lazyDebug(collection.logger, func() = "paginate(): Bitmap iterator");
+                log.lazyDebug(func() = "Bitmap iterator");
                 let document_ids = Iter.map<Nat, T.DocumentId>(
                     bitmap.vals(),
                     func(n : Nat) : T.DocumentId {
@@ -898,11 +838,11 @@ module StableCollection {
                 );
             };
             case (#Ids(iter)) {
-                Logger.lazyDebug(collection.logger, func() = "paginate(): Ids iterator");
-                iter;
+                log.lazyDebug(func() = "Ids iterator");
+                Iter.map<(T.DocumentId, ?[(Text, T.Candid)]), T.DocumentId>(iter, func((id, _)) : T.DocumentId { id });
             };
             case (#Interval(index_name, _intervals, sorted_in_reverse)) {
-                Logger.lazyDebug(collection.logger, func() = "paginate(): Interval iterator");
+                log.lazyDebug(func() = "Interval iterator");
 
                 if (sorted_in_reverse) {
                     return Intervals.extract_document_ids_in_pagination_range_for_reversed_intervals(collection, skip, opt_limit, index_name, _intervals, sorted_in_reverse);
@@ -934,6 +874,7 @@ module StableCollection {
         candid_map : T.CandidMap,
         opt_updated_fields : ?[Text],
     ) : T.Result<(), Text> {
+        let log = Logger.NamespacedLogger(collection.logger, LOGGER_NAMESPACE).subnamespace("validate_schema_constraints_on_updated_fields");
 
         let field_constraints_iter = switch (opt_updated_fields) {
             case (?updated_fields) {
@@ -1087,10 +1028,7 @@ module StableCollection {
 
             let ?compsite_field_values = CollectionUtils.getIndexColumns(collection, index.key_details, document_id, candid_map) else continue validating_unique_constraints;
             let index_data_utils = CompositeIndex.get_index_data_utils(collection);
-            Logger.lazyDebug(
-                collection.logger,
-                func() = "compsite_field_values: " # debug_show compsite_field_values,
-            );
+            log.lazyDebug(func() = "compsite_field_values: " # debug_show compsite_field_values);
 
             let opt_prev_document_id = BTree.get(index.data, index_data_utils, compsite_field_values);
 
@@ -1118,8 +1056,11 @@ module StableCollection {
         main_btree_utils : T.BTreeUtils<T.DocumentId, T.Document>,
         document_id : T.DocumentId,
         new_candid_blob : T.CandidBlob,
-    ) : T.Result<(), Text> {
-        Logger.info(collection.logger, "Replacing document with id: " # debug_show document_id);
+    ) : T.Result<T.ReplaceByIdResult, Text> {
+        let log = Logger.NamespacedLogger(collection.logger, LOGGER_NAMESPACE).subnamespace("replace_by_id");
+        let performance = Performance(collection.is_running_locally, null);
+
+        log.logInfo("Replacing document with id: " # debug_show document_id);
 
         let ?prev_candid_blob = DocumentStore.get(collection.documents, main_btree_utils, document_id) else return #err("Record for id '" # debug_show (document_id) # "' not found");
         let prev_candid = CollectionUtils.decodeCandidBlob(collection, prev_candid_blob);
@@ -1151,15 +1092,18 @@ module StableCollection {
             };
         };
 
-        Logger.lazyInfo(
-            collection.logger,
-            func() = "Successfully replaced document with id: " # debug_show document_id,
-        );
-        #ok();
+        log.lazyInfo(func() = "Successfully replaced document with id: " # debug_show document_id);
+
+        let instructions = performance.total_instructions_used();
+
+        #ok({
+            instructions = instructions;
+        });
     };
 
     func partially_update_doc(collection : T.StableCollection, candid_map : T.CandidMap, update_operations : [(Text, T.FieldUpdateOperations)]) : T.Result<Candid, Text> {
-        Logger.lazyInfo(collection.logger, func() = "Partially updating document with operations: " # debug_show update_operations);
+        let log = Logger.NamespacedLogger(collection.logger, LOGGER_NAMESPACE).subnamespace("partially_update_doc");
+        log.lazyInfo(func() = "Partially updating document with operations: " # debug_show update_operations);
 
         for ((field_name, op) in update_operations.vals()) {
             let ?field_type = SchemaMap.get(collection.schema_map, field_name) else return #err("Field type '" # field_name # "' not found in document");
@@ -1178,10 +1122,7 @@ module StableCollection {
             };
         };
 
-        Logger.lazyDebug(
-            collection.logger,
-            func() = "Updated candid map, about to extract candid",
-        );
+        log.lazyDebug(func() = "Updated candid map, about to extract candid");
 
         let candid = CandidMap.extract_candid(candid_map);
 
@@ -1195,6 +1136,7 @@ module StableCollection {
         new_document_candid_map : T.CandidMap,
         opt_prev_document_candid_map : ?T.CandidMap,
     ) : T.Result<(), Text> {
+        let log = Logger.NamespacedLogger(collection.logger, LOGGER_NAMESPACE).subnamespace("update_indexed_document_fields");
 
         ignore do ? {
             let prev_document_candid_map = opt_prev_document_candid_map!;
@@ -1208,10 +1150,7 @@ module StableCollection {
 
         };
 
-        Logger.lazyDebug(
-            collection.logger,
-            func() = "Updating index for id: " # debug_show document_id,
-        );
+        log.lazyDebug(func() = "Updating index for id: " # debug_show document_id);
 
         switch (CommonIndexFns.insertWithCandidMap(collection, index, document_id, new_document_candid_map)) {
             case (#err(err)) {
@@ -1242,11 +1181,11 @@ module StableCollection {
         #ok;
     };
 
-    public func update_by_id<Record>(collection : T.StableCollection, main_btree_utils : T.BTreeUtils<T.DocumentId, T.Document>, id : T.DocumentId, field_updates : [(Text, T.FieldUpdateOperations)]) : T.Result<(), Text> {
-        Logger.lazyInfo(
-            collection.logger,
-            func() = "Updating document with id: " # debug_show id,
-        );
+    public func update_by_id<Record>(collection : T.StableCollection, main_btree_utils : T.BTreeUtils<T.DocumentId, T.Document>, id : T.DocumentId, field_updates : [(Text, T.FieldUpdateOperations)]) : T.Result<T.UpdateByIdResult, Text> {
+        let log = Logger.NamespacedLogger(collection.logger, LOGGER_NAMESPACE).subnamespace("update_by_id");
+        let performance = Performance(collection.is_running_locally, null);
+
+        log.lazyInfo(func() = "Updating document with id: " # debug_show id);
 
         let ?prev_candid_blob = DocumentStore.get(collection.documents, main_btree_utils, id) else return #err("Record for id '" # debug_show (id) # "' not found");
 
@@ -1255,10 +1194,7 @@ module StableCollection {
 
         let fields_with_updates = Array.map<(Text, T.FieldUpdateOperations), Text>(field_updates, func(k, _) = k);
 
-        Logger.lazyDebug(
-            collection.logger,
-            func() = "Performing partial update on fields: " # debug_show (fields_with_updates),
-        );
+        log.lazyDebug(func() = "Performing partial update on fields: " # debug_show (fields_with_updates));
 
         let new_candid_map = CandidMap.clone(prev_candid_map, collection.schema_map);
 
@@ -1269,10 +1205,7 @@ module StableCollection {
             };
         };
 
-        Logger.lazyDebug(
-            collection.logger,
-            func() = "Updated candid map: " # debug_show new_candid_document,
-        );
+        log.lazyDebug(func() = "Updated candid map: " # debug_show new_candid_document);
 
         switch (Schema.validate(collection.schema, new_candid_document)) {
             case (#err(msg)) {
@@ -1307,30 +1240,29 @@ module StableCollection {
             return #err("Failed to update index data");
         };
 
-        Logger.lazyInfo(
-            collection.logger,
-            func() = "Successfully updated document with id: " # debug_show id,
+        log.lazyInfo(
+            func() = "Successfully updated document with id: " # debug_show id
         );
-        #ok();
+
+        let instructions = performance.total_instructions_used();
+
+        #ok({
+            instructions = instructions;
+        });
     };
 
     public func insert(collection : T.StableCollection, main_btree_utils : T.BTreeUtils<T.DocumentId, T.Document>, candid_blob : T.CandidBlob) : T.Result<T.DocumentId, Text> {
+        let log = Logger.NamespacedLogger(collection.logger, LOGGER_NAMESPACE).subnamespace("insert");
 
         let next_id = Ids.next(collection.ids);
         let next_id_as_blob = Blob.fromArray(ByteUtils.BigEndian.fromNat64(Nat64.fromNat(next_id)));
         let document_id = Utils.concat_blob(collection.instance_id, next_id_as_blob);
 
-        Logger.lazyInfo(
-            collection.logger,
-            func() = "ZenDB Collection.put(): Inserting document with id " # debug_show document_id,
-        );
+        log.lazyInfo(func() = "ZenDB Collection.put(): Inserting document with id " # debug_show document_id);
 
         let candid = CollectionUtils.decodeCandidBlob(collection, candid_blob);
 
-        Logger.lazyDebug(
-            collection.logger,
-            func() = "ZenDB Collection.put(): Inserting document with id " # debug_show document_id # " and candid " # debug_show candid,
-        );
+        log.lazyDebug(func() = "ZenDB Collection.put(): Inserting document with id " # debug_show document_id # " and candid " # debug_show candid);
 
         switch (Schema.validate(collection.schema, candid)) {
             case (#ok(_)) {};
@@ -1359,9 +1291,8 @@ module StableCollection {
             };
         };
 
-        Logger.lazyDebug(
-            collection.logger,
-            func() = "Total indexes: " # debug_show (Map.size(collection.indexes)),
+        log.lazyDebug(
+            func() = "Total indexes: " # debug_show (Map.size(collection.indexes))
         );
 
         if (Map.size(collection.indexes) == 0) return #ok(document_id);
@@ -1395,6 +1326,7 @@ module StableCollection {
         main_btree_utils : T.BTreeUtils<T.DocumentId, T.Document>,
         documents : [T.CandidBlob],
     ) : Result<[T.DocumentId], Text> {
+        let log = Logger.NamespacedLogger(collection.logger, LOGGER_NAMESPACE).subnamespace("insert_docs");
         let ids = Buffer.Buffer<T.DocumentId>(documents.size());
 
         for (document in documents.vals()) {
@@ -1406,7 +1338,7 @@ module StableCollection {
                         switch (delete_by_id(collection, main_btree_utils, id)) {
                             case (#ok(_)) {};
                             case (#err(err)) {
-                                Logger.lazyError(collection.logger, func() = "Failed to rollback document with id: " # debug_show (id) # ": " # err);
+                                log.lazyError(func() = "Failed to rollback document with id: " # debug_show (id) # ": " # err);
                             };
                         };
                     };
@@ -1435,11 +1367,11 @@ module StableCollection {
         collection : T.StableCollection,
         main_btree_utils : T.BTreeUtils<T.DocumentId, T.Document>,
         stable_query : T.StableQuery,
-    ) : T.Result<[(T.WrapId<T.CandidBlob>)], Text> {
-        Logger.lazyDebug(
-            collection.logger,
-            func() = "Executing search with query: " # debug_show (stable_query),
-        );
+    ) : T.Result<T.SearchResult<T.CandidBlob>, Text> {
+        let log = Logger.NamespacedLogger(collection.logger, LOGGER_NAMESPACE).subnamespace("search");
+        let performance = Performance(collection.is_running_locally, null);
+
+        log.lazyDebug(func() = "Executing search with query: " # debug_show (stable_query));
 
         switch (internal_search(collection, stable_query)) {
             case (#err(err)) {
@@ -1448,20 +1380,21 @@ module StableCollection {
             case (#ok(document_ids_iter)) {
                 let candid_blob_iter = ids_to_candid_blobs(collection, document_ids_iter);
                 let candid_blobs = Iter.toArray(candid_blob_iter);
-                Logger.lazyDebug(
-                    collection.logger,
-                    func() = "Search completed, found " # debug_show (candid_blobs.size()) # " results",
-                );
-                #ok(candid_blobs);
+                log.lazyDebug(func() = "Search completed, found " # debug_show (candid_blobs.size()) # " results");
+
+                let instructions = performance.total_instructions_used();
+
+                #ok({
+                    documents = candid_blobs;
+                    instructions = instructions;
+                });
             };
         };
     };
 
     public func evaluate_query(collection : T.StableCollection, stable_query : T.StableQuery) : T.Result<Iter<T.DocumentId>, Text> {
-        Logger.lazyDebug(
-            collection.logger,
-            func() = "Evaluating query with operations: " # debug_show (stable_query.query_operations),
-        );
+        let log = Logger.NamespacedLogger(collection.logger, LOGGER_NAMESPACE).subnamespace("evaluate_query");
+        log.lazyDebug(func() = "Evaluating query with operations: " # debug_show (stable_query.query_operations));
 
         let query_operations = stable_query.query_operations;
         let sort_by = stable_query.sort_by;
@@ -1499,9 +1432,8 @@ module StableCollection {
             };
         };
 
-        Logger.lazyDebug(
-            collection.logger,
-            func() = "Formatted query operations: " # debug_show formatted_query_operations,
+        log.lazyDebug(
+            func() = "Formatted query operations: " # debug_show formatted_query_operations
         );
 
         let query_plan : T.QueryPlan = QueryPlan.create_query_plan(
@@ -1514,16 +1446,13 @@ module StableCollection {
 
         let sort_documents_by_field_cmp = switch (sort_by) {
             case (?sort_by) get_document_field_cmp(collection, sort_by);
-            case (null) func(_ : T.DocumentId, _ : T.DocumentId) : Order = #equal;
+            case (null) func(_ : (T.DocumentId, ?[(Text, T.Candid)]), _ : (T.DocumentId, ?[(Text, T.Candid)])) : Order = #equal;
         };
 
         let eval = QueryExecution.generate_document_ids_for_query_plan(collection, query_plan, sort_by, sort_documents_by_field_cmp);
         let iter = paginate(collection, eval, Option.get(pagination.skip, 0), pagination.limit);
 
-        Logger.lazyDebug(
-            collection.logger,
-            func() = "Query evaluation completed",
-        );
+        log.lazyDebug(func() = "Query evaluation completed");
         return #ok((iter));
     };
 
@@ -1558,9 +1487,9 @@ module StableCollection {
     public func search_iter(
         collection : T.StableCollection,
         main_btree_utils : T.BTreeUtils<T.DocumentId, T.Document>,
-        query_builder : QueryBuilder,
+        stable_query : T.StableQuery,
     ) : T.Result<Iter<T.WrapId<T.CandidBlob>>, Text> {
-        switch (internal_search(collection, query_builder.build())) {
+        switch (internal_search(collection, stable_query)) {
             case (#err(err)) return #err(err);
             case (#ok(document_ids_iter)) {
                 let document_iter = ids_to_candid_blobs(collection, document_ids_iter);
@@ -1572,52 +1501,47 @@ module StableCollection {
     public func get_document_field_cmp(
         collection : T.StableCollection,
         sort_field : (Text, T.SortDirection),
-    ) : (T.DocumentId, T.DocumentId) -> Order {
+    ) : ((T.DocumentId, ?[(Text, T.Candid)]), (T.DocumentId, ?[(Text, T.Candid)])) -> Order {
 
-        let deserialized_documents_map = Map.new<T.DocumentId, Candid.Candid>();
+        let candid_map_cache = Map.new<T.DocumentId, T.CandidMap>();
 
-        func get_candid_map_bytes(id : T.DocumentId) : Candid.Candid {
-            switch (Map.get(deserialized_documents_map, Map.bhash, id)) {
+        func get_candid_map(id : T.DocumentId) : T.CandidMap {
+            switch (Map.get(candid_map_cache, Map.bhash, id)) {
                 case (?candid) candid;
                 case (null) {
-                    let ?candid = CollectionUtils.lookupCandidDocument(collection, id) else Debug.trap("Couldn't find document with id: " # debug_show id);
-                    candid;
+                    let ?candid_document = CollectionUtils.lookupCandidDocument(collection, id) else Debug.trap("Couldn't find document with id: " # debug_show id);
+                    let candid_map = CandidMap.new(collection.schema_map, id, candid_document);
+                    // ignore Map.put(candid_map_cache, Map.bhash, id, candid_map);
+                    candid_map;
                 };
             };
         };
 
-        let opt_candid_map_a : ?T.CandidMap = null;
-        let opt_candid_map_b : ?T.CandidMap = null;
+        func sort_documents_by_field_cmp(a : (T.DocumentId, ?[(Text, T.Candid)]), b : (T.DocumentId, ?[(Text, T.Candid)])) : Order {
 
-        func sort_documents_by_field_cmp(a : T.DocumentId, b : T.DocumentId) : Order {
-
-            let document_a = get_candid_map_bytes(a);
-            let document_b = get_candid_map_bytes(b);
-
-            let candid_map_a : T.CandidMap = switch (opt_candid_map_a) {
-                case (?candid_map) {
-                    CandidMap.reload(candid_map, collection.schema_map, a, document_a);
-                    candid_map;
+            func get_value((id, opt_sort_value) : (T.DocumentId, ?[(Text, T.Candid)])) : T.Candid {
+                switch (opt_sort_value) {
+                    case (?fields) {
+                        // Find the field matching sort_field.0
+                        let opt_entry = Array.find<(Text, T.Candid)>(fields, func((key, _)) : Bool { key == sort_field.0 });
+                        switch (opt_entry) {
+                            case (?candid_value) return candid_value.1;
+                            case (null) {};
+                        };
+                    };
+                    case (null) {};
                 };
-                case (null) {
-                    let candid_map = CandidMap.new(collection.schema_map, a, document_a);
-                    candid_map;
+
+                // Sort field not in indexed fields, fetch from document
+                let ?candid_value = CandidMap.get(get_candid_map(id), collection.schema_map, sort_field.0) else {
+                    Debug.trap("Couldn't get value from CandidMap for key: " # sort_field.0);
                 };
+
+                candid_value;
             };
 
-            let candid_map_b : T.CandidMap = switch (opt_candid_map_b) {
-                case (?candid_map) {
-                    CandidMap.reload(candid_map, collection.schema_map, b, document_b);
-                    candid_map;
-                };
-                case (null) {
-                    let candid_map = CandidMap.new(collection.schema_map, b, document_b);
-                    candid_map;
-                };
-            };
-
-            let ?value_a = CandidMap.get(candid_map_a, collection.schema_map, sort_field.0) else Debug.trap("Couldn't get value from CandidMap for key: " # sort_field.0);
-            let ?value_b = CandidMap.get(candid_map_b, collection.schema_map, sort_field.0) else Debug.trap("Couldn't get value from CandidMap for key: " # sort_field.0);
+            let value_a = get_value(a);
+            let value_b = get_value(b);
 
             let order_num = Schema.cmp_candid(#Empty, value_a, value_b);
 
@@ -1629,6 +1553,7 @@ module StableCollection {
 
             order_variant;
         };
+
         sort_documents_by_field_cmp;
     };
 
@@ -1691,8 +1616,11 @@ module StableCollection {
         collection_stats;
     };
 
-    public func count(collection : T.StableCollection, query_builder : QueryBuilder) : T.Result<Nat, Text> {
-        let stable_query = query_builder.build();
+    public func count(collection : T.StableCollection, stable_query : T.StableQuery) : T.Result<T.CountResult, Text> {
+        let log = Logger.NamespacedLogger(collection.logger, LOGGER_NAMESPACE).subnamespace("count");
+        let performance = Performance(collection.is_running_locally, null);
+
+        log.lazyDebug(func() = "Counting documents with query: " # debug_show (stable_query));
 
         let query_plan = QueryPlan.create_query_plan(
             collection,
@@ -1718,8 +1646,12 @@ module StableCollection {
             };
         };
 
-        #ok(count);
+        let instructions = performance.total_instructions_used();
 
+        #ok({
+            count = count;
+            instructions = instructions;
+        });
     };
 
     public func exists(collection : T.StableCollection, query_builder : QueryBuilder) : T.Result<Bool, Text> {
@@ -1732,7 +1664,7 @@ module StableCollection {
             null,
         );
 
-        let sort_documents_by_field_cmp = func(_ : T.DocumentId, _ : T.DocumentId) : Order = #equal;
+        let sort_documents_by_field_cmp = func(_ : (T.DocumentId, ?[(Text, T.Candid)]), _ : (T.DocumentId, ?[(Text, T.Candid)])) : Order = #equal;
 
         let eval = QueryExecution.generate_document_ids_for_query_plan(collection, query_plan, null, sort_documents_by_field_cmp);
 
@@ -1757,11 +1689,11 @@ module StableCollection {
 
     };
 
-    public func delete_by_id(collection : T.StableCollection, main_btree_utils : T.BTreeUtils<T.DocumentId, T.Document>, id : T.DocumentId) : T.Result<(T.CandidBlob), Text> {
-        Logger.lazyInfo(
-            collection.logger,
-            func() = "Deleting document with id: " # debug_show id,
-        );
+    public func delete_by_id(collection : T.StableCollection, main_btree_utils : T.BTreeUtils<T.DocumentId, T.Document>, id : T.DocumentId) : T.Result<T.DeleteByIdResult<T.CandidBlob>, Text> {
+        let log = Logger.NamespacedLogger(collection.logger, LOGGER_NAMESPACE).subnamespace("delete_by_id");
+        let performance = Performance(collection.is_running_locally, null);
+
+        log.lazyInfo(func() = "Deleting document with id: " # debug_show id);
 
         let ?prev_candid_blob = DocumentStore.remove(collection.documents, main_btree_utils, id) else {
             return #err("Record not found");
@@ -1782,15 +1714,20 @@ module StableCollection {
 
         let candid_blob = prev_candid_blob;
 
-        Logger.lazyInfo(
-            collection.logger,
-            func() = "Successfully deleted document with id: " # debug_show id,
-        );
-        #ok(candid_blob);
+        log.lazyInfo(func() = "Successfully deleted document with id: " # debug_show id);
+
+        let instructions = performance.total_instructions_used();
+
+        #ok({
+            deleted_document = candid_blob;
+            instructions = instructions;
+        });
     };
 
     public func deallocate(collection : T.StableCollection) : () {
-        Logger.info(collection.logger, "Deallocating collection: " # collection.name);
+        let log = Logger.NamespacedLogger(collection.logger, LOGGER_NAMESPACE).subnamespace("deallocate");
+
+        log.logInfo("Deallocating collection: " # collection.name);
 
         for (index in Itertools.chain(Map.vals(collection.indexes), Map.vals(collection.indexes_in_batch_operations))) {
             CommonIndexFns.deallocate(collection, index);
@@ -1805,7 +1742,7 @@ module StableCollection {
             case (#heap(_)) {};
         };
 
-        Logger.info(collection.logger, "Successfully deallocated collection: " # collection.name);
+        log.logInfo("Successfully deallocated collection: " # collection.name);
 
     };
 
@@ -1813,12 +1750,15 @@ module StableCollection {
     public func update_documents(
         collection : StableCollection,
         main_btree_utils : T.BTreeUtils<T.DocumentId, T.Document>,
-        query_builder : QueryBuilder,
+        stable_query : T.StableQuery,
         update_operations : [(Text, T.FieldUpdateOperations)],
-    ) : Result<Nat, Text> {
-        let documents_iter = switch (internal_search(collection, query_builder.build())) {
+    ) : Result<T.UpdateResult, Text> {
+        let log = Logger.NamespacedLogger(collection.logger, LOGGER_NAMESPACE).subnamespace("update_documents");
+        let performance = Performance(collection.is_running_locally, null);
+
+        let documents_iter = switch (internal_search(collection, stable_query)) {
             case (#err(err)) {
-                Logger.lazyError(collection.logger, func() = "Failed to find documents to update: " # err);
+                log.lazyError(func() = "Failed to find documents to update: " # err);
                 return #err("Failed to find documents to update: " # err);
             };
             case (#ok(documents_iter)) documents_iter;
@@ -1830,13 +1770,18 @@ module StableCollection {
             switch (update_by_id(collection, main_btree_utils, id, update_operations)) {
                 case (#ok(_)) total_updated += 1;
                 case (#err(err)) {
-                    Logger.lazyError(collection.logger, func() = "Failed to update document with id: " # debug_show (id) # ": " # err);
+                    log.lazyError(func() = "Failed to update document with id: " # debug_show (id) # ": " # err);
                     return #err("Failed to update document with id: " # debug_show (id) # ": " # err);
                 };
             };
         };
 
-        #ok(total_updated);
+        let instructions = performance.total_instructions_used();
+
+        #ok({
+            updated_count = total_updated;
+            instructions = instructions;
+        });
     };
 
     /// Replaces multiple documents by their ids
@@ -1844,7 +1789,9 @@ module StableCollection {
         collection : StableCollection,
         main_btree_utils : T.BTreeUtils<T.DocumentId, T.Document>,
         documents : [(T.DocumentId, Blob)],
-    ) : Result<(), Text> {
+    ) : Result<T.ReplaceDocsResult, Text> {
+        let performance = Performance(collection.is_running_locally, null);
+
         for ((id, candid_blob) in documents.vals()) {
             switch (replace_by_id(collection, main_btree_utils, id, candid_blob)) {
                 case (#ok(_)) {};
@@ -1852,7 +1799,11 @@ module StableCollection {
             };
         };
 
-        #ok();
+        let instructions = performance.total_instructions_used();
+
+        #ok({
+            instructions = instructions;
+        });
     };
 
     /// Deletes multiple documents matching a query
@@ -1860,11 +1811,14 @@ module StableCollection {
         collection : StableCollection,
         main_btree_utils : T.BTreeUtils<T.DocumentId, T.Document>,
         blobify : T.InternalCandify<Record>,
-        query_builder : QueryBuilder,
-    ) : Result<[(T.DocumentId, Record)], Text> {
-        let results_iter = switch (internal_search(collection, query_builder.build())) {
+        stable_query : T.StableQuery,
+    ) : Result<T.DeleteResult<Record>, Text> {
+        let log = Logger.NamespacedLogger(collection.logger, LOGGER_NAMESPACE).subnamespace("delete_documents");
+        let performance = Performance(collection.is_running_locally, null);
+
+        let results_iter = switch (internal_search(collection, stable_query)) {
             case (#err(err)) {
-                Logger.lazyError(collection.logger, func() = "Failed to find documents to delete: " # err);
+                log.lazyError(func() = "Failed to find documents to delete: " # err);
                 return #err("Failed to find documents to delete: " # err);
             };
             case (#ok(documents_iter)) documents_iter;
@@ -1878,15 +1832,20 @@ module StableCollection {
         let buffer = Buffer.Buffer<(T.DocumentId, Record)>(8);
         for (id in results.vals()) {
             switch (delete_by_id(collection, main_btree_utils, id)) {
-                case (#ok(candid_blob)) {
-                    let document = blobify.from_blob(candid_blob);
+                case (#ok(result)) {
+                    let document = blobify.from_blob(result.deleted_document);
                     buffer.add(id, document);
                 };
                 case (#err(err)) return #err(err);
             };
         };
 
-        #ok(Buffer.toArray(buffer));
+        let instructions = performance.total_instructions_used();
+
+        #ok({
+            deleted_documents = Buffer.toArray(buffer);
+            instructions = instructions;
+        });
     };
 
     /// Creates a batch populate operation from index names
@@ -1894,23 +1853,38 @@ module StableCollection {
         collection : StableCollection,
         index_names : [Text],
     ) : Result<(batch_id : Nat), Text> {
+        let log = Logger.NamespacedLogger(collection.logger, LOGGER_NAMESPACE).subnamespace("batch_populate_indexes_from_names");
         var error : ?Text = null;
 
-        let index_configs = Array.map<Text, T.CreateIndexBatchConfig>(
+        let index_configs = Array.map<Text, T.CreateInternalIndexParams>(
             index_names,
-            func(name : Text) : T.CreateIndexBatchConfig {
+            func(name : Text) : T.CreateInternalIndexParams {
                 switch (Map.get(collection.indexes, Map.thash, name)) {
                     case (?index) switch (index) {
                         case (#composite_index(composite_index)) {
-                            (name, composite_index.key_details, composite_index.is_unique, composite_index.used_internally);
+                            (
+                                name,
+                                composite_index.key_details,
+                                {
+                                    is_unique = composite_index.is_unique;
+                                    used_internally = composite_index.used_internally;
+                                },
+                            );
                         };
                         case (#text_index(text_index)) {
-                            (text_index.internal_index.name, text_index.internal_index.key_details, text_index.internal_index.is_unique, text_index.internal_index.used_internally);
+                            (
+                                text_index.internal_index.name,
+                                text_index.internal_index.key_details,
+                                {
+                                    is_unique = text_index.internal_index.is_unique;
+                                    used_internally = text_index.internal_index.used_internally;
+                                },
+                            );
                         };
                     };
                     case (null) {
                         error := ?("Could not find index with name: " # name);
-                        ("", [], false, false); // dummy return to satisfy the type checker
+                        ("", [], T.CreateIndexOptions.internal_default()); // dummy return to satisfy the type checker
                     };
                 };
             },
@@ -1923,7 +1897,7 @@ module StableCollection {
 
         switch (create_populate_indexes_batch(collection, index_configs, null)) {
             case (#err(err)) {
-                Logger.lazyError(collection.logger, func() = "Failed to create populate index batch: " # err);
+                log.lazyError(func() = "Failed to create populate index batch: " # err);
                 #err("Failed to create populate index batch: " # err);
             };
             case (#ok(batch_id)) #ok(batch_id);

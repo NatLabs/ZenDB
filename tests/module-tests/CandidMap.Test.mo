@@ -9,7 +9,7 @@ import Map "mo:map@9.0.1/Map";
 
 import SchemaMap "../../src/EmbeddedInstance/Collection/SchemaMap";
 import CandidMap "../../src/EmbeddedInstance/CandidMap";
-import ZenDB "../../src";
+import ZenDB "../../src/EmbeddedInstance";
 import Constants "../../src/EmbeddedInstance/Constants";
 import Utils "../../src/EmbeddedInstance/Utils";
 

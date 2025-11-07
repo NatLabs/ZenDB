@@ -34,6 +34,7 @@ import T "Types";
 import ByteUtils "mo:byte-utils@0.1.1";
 
 module {
+    let LOGGER_NAMESPACE = "Utils";
     type Order = Order.Order;
 
     public let TypeUtils = _TypeUtils;
@@ -207,10 +208,11 @@ module {
 
     /// Generic helper function to handle Result types with consistent error logging
     public func handle_result<T>(logger : T.Logger, res : T.Result<T, Text>, context : Text) : T.Result<T, Text> {
+        let log = Logger.NamespacedLogger(logger, LOGGER_NAMESPACE).subnamespace("handle_result");
         switch (res) {
             case (#ok(success)) #ok(success);
             case (#err(errorMsg)) {
-                Logger.lazyError(logger, func() = context # ": " # errorMsg);
+                log.lazyError(func() = context # ": " # errorMsg);
                 #err(errorMsg);
             };
         };
@@ -226,6 +228,97 @@ module {
             case (null) text;
         };
     };
+
+    public func iter_to_array<A>(iter : Iter.Iter<A>) : [A] {
+        var items = 0;
+
+        let buckets = Buffer.Buffer<[var ?A]>(8);
+
+        var terminate_loop = false;
+        var bucket_init_size = 8;
+
+        while (not terminate_loop) {
+
+            buckets.add(
+                Array.tabulateVar<?A>(
+                    bucket_init_size,
+                    func(i : Nat) : ?A {
+                        if (terminate_loop) null else (
+                            switch (iter.next()) {
+                                case (?elem) { items += 1; ?elem };
+                                case (null) { terminate_loop := true; null };
+                            }
+                        );
+                    },
+                )
+            );
+
+            bucket_init_size *= 2;
+
+        };
+
+        var current_bucket_idx = 0;
+        var offset = 0;
+
+        Array.tabulate(
+            items,
+            func(i : Nat) : A {
+                if (current_bucket_idx < buckets.size() and i >= offset + buckets.get(current_bucket_idx).size()) {
+                    offset += buckets.get(current_bucket_idx).size();
+                    current_bucket_idx += 1;
+
+                };
+
+                let res = buckets.get(current_bucket_idx)[Int.abs(i - offset)];
+
+                switch (res) {
+                    case (?elem) elem;
+                    case (null) Debug.trap("iter_to_array: unexpected null value at index " # debug_show i # " in bucket " # debug_show current_bucket_idx # " (offset: " # debug_show offset # ", expected total items: " # debug_show items # ")");
+                };
+            },
+        );
+    };
+
+    // public func kmerge<A>(iters : [Iter.Iter<A>], cmp : (A, A) -> Order.Order) : Iter.Iter<A> {
+    //     type Index<A> = (A, Nat);
+
+    //     let cmpIters = func(a : Index<A>, b : Index<A>) : Order.Order {
+    //         cmp(a.0, b.0);
+    //     };
+
+    //     let heap = Heap.Heap<Index<A>>(cmpIters);
+
+    //     for ((i, iter) in enumerate(iters.vals())) {
+    //         switch (iter.next()) {
+    //             case (?a) {
+    //                 heap.put((a, i));
+    //             };
+    //             case (_) {
+
+    //             };
+    //         };
+    //     };
+
+    //     object {
+    //         public func next() : ?A {
+    //             switch (heap.removeMin()) {
+    //                 case (?(min, i)) {
+    //                     switch (iters[i].next()) {
+    //                         case (?a) {
+    //                             heap.put((a, i));
+    //                         };
+    //                         case (_) {};
+    //                     };
+
+    //                     ?min;
+    //                 };
+    //                 case (_) {
+    //                     null;
+    //                 };
+    //             };
+    //         };
+    //     };
+    // };
 
     public func concat_freeze<A>(buffers : [Buffer.Buffer<A>]) : [A] {
         var i = 0;
@@ -309,22 +402,23 @@ module {
     };
 
     public func log_error_msg<A>(logger : T.Logger, err_msg : Text) : T.Result<A, Text> {
-        Logger.error(logger, err_msg);
+        let log = Logger.NamespacedLogger(logger, LOGGER_NAMESPACE).subnamespace("log_error_msg");
+        log.logError(err_msg);
         #err(err_msg);
     };
 
     public func log_error<A>(logger : T.Logger, res : T.Result<A, Text>, opt_prefix_msg : ?Text) : T.Result<A, Text> {
+        let log = Logger.NamespacedLogger(logger, LOGGER_NAMESPACE).subnamespace("log_error");
         switch (res) {
             case (#ok(success)) #ok(success);
             case (#err(errorMsg)) {
-                Logger.lazyError(
-                    logger,
+                log.lazyError(
                     func() {
                         switch (opt_prefix_msg) {
                             case (?prefix) prefix # ": " # errorMsg;
                             case (null) errorMsg;
                         };
-                    },
+                    }
                 );
                 #err(errorMsg);
             };

@@ -181,6 +181,21 @@ module {
             case (#Bool(b)) #Bool(b);
             case (#Null) #Null;
             case (#Empty) #Empty;
+            case (#Option(n)) #Option(fromCandidQuery(n));
+            case (#Array(arr)) #Array(Array.tabulate<T.Candid>(arr.size(), func(i : Nat) : T.Candid = fromCandidQuery(arr[i])));
+            case (#Record(fields)) #Record(
+                Array.tabulate<(Text, T.Candid)>(
+                    fields.size(),
+                    func(i : Nat) : (Text, T.Candid) {
+                        let (field_name, field_value) = fields[i];
+                        (field_name, fromCandidQuery(field_value));
+                    },
+                )
+            );
+            case (#Variant(field_name, field_value)) #Variant(
+                field_name,
+                fromCandidQuery(field_value),
+            );
             case (_candid_value) Debug.trap("fromCandidQuery(): Does not support this type: " # debug_show (_candid_value));
         };
     };

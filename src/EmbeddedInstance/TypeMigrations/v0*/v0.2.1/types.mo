@@ -162,7 +162,7 @@ module T {
 
     public type DocumentStore = BTree<DocumentId, Document>;
 
-    public type CreateIndexBatchConfig = (
+    public type CreateIndexParams = (
         name : Text,
         key_details : [(field : Text, SortDirection)],
         is_unique : Bool,
@@ -614,6 +614,46 @@ module T {
 
     public type Tokenizer = {
         #basic;
+    };
+
+    public type CompareFunc<K> = (K, K) -> Order;
+
+    // Custom result types for operations that include instruction counts
+    public type SearchResult<Record> = {
+        documents : [WrapId<Record>];
+        instructions : Nat;
+    };
+
+    public type CountResult = {
+        count : Nat;
+        instructions : Nat;
+    };
+
+    public type UpdateByIdResult = {
+        instructions : Nat;
+    };
+
+    public type UpdateResult = {
+        updated_count : Nat;
+        instructions : Nat;
+    };
+
+    public type ReplaceByIdResult = {
+        instructions : Nat;
+    };
+
+    public type ReplaceDocsResult = {
+        instructions : Nat;
+    };
+
+    public type DeleteByIdResult<Record> = {
+        deleted_document : Record;
+        instructions : Nat;
+    };
+
+    public type DeleteResult<Record> = {
+        deleted_documents : [(DocumentId, Record)];
+        instructions : Nat;
     };
 
 };

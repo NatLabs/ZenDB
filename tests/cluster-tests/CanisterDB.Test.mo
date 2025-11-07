@@ -33,7 +33,7 @@ persistent actor {
                     ("is_active", #Bool),
                 ]);
 
-                let #ok(_) = await canister_db.zendb_create_collection("default", "users", schema) else return assert false;
+                let #ok(_) = await canister_db.zendb_create_collection("default", "users", schema, null) else return assert false;
 
                 let user_blob = to_candid ({
                     name = "Alice";
@@ -54,7 +54,14 @@ persistent actor {
                     ).build(),
                 );
 
-                assert query_results == #ok([(user_id, user_blob)]);
+                switch (query_results) {
+                    case (#ok(result)) {
+                        assert result.documents == [(user_id, user_blob)];
+                    };
+                    case (#err(err)) {
+                        Debug.trap("Search failed: " # err);
+                    };
+                };
 
                 Debug.print("Search results: " # debug_show (query_results));
 

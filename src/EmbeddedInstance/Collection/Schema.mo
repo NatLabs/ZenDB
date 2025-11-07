@@ -29,6 +29,7 @@ import { sort_candid_type } "mo:serde@3.3.3/Candid/Blob/CandidUtils";
 
 import T "../Types";
 import Utils "../Utils";
+import MergeSort "../MergeSort";
 
 module {
 
@@ -83,7 +84,7 @@ module {
                 true;
             };
             case (#Record(fields_curr), #Record(fields_new)) {
-                let sorted_fields_new = Array.sort(
+                let sorted_fields_new = MergeSort.sort(
                     fields_new,
                     func(a : (Text, Schema), b : (Text, Schema)) : Order {
                         let ?i = Array.indexOf<(Text, Schema)>(a, fields_curr, func(a : (Text, Schema), b : (Text, Schema)) : Bool { a.0 == b.0 }) else return #greater;
@@ -110,16 +111,6 @@ module {
                 true;
             };
             case (#Variant(variants_curr), #Variant(variants_new)) {
-
-                let sorted_variants_new = Array.sort(
-                    variants_new,
-                    func(a : (Text, Schema), b : (Text, Schema)) : Order {
-                        let ?i = Array.indexOf(a, variants_curr, func(a : (Text, Schema), b : (Text, Schema)) : Bool { a.0 == b.0 }) else return #greater;
-                        let ?j = Array.indexOf(b, variants_curr, func(a : (Text, Schema), b : (Text, Schema)) : Bool { a.0 == b.0 }) else return #less;
-
-                        Nat.compare(i, j);
-                    },
-                );
 
                 for (i in Itertools.range(0, variants_curr.size())) {
                     let (name_curr, schema_curr) = variants_curr[i];
@@ -207,14 +198,14 @@ module {
                     return #err("Record size mismatch: " # debug_show (("schema", fields.size()), ("document", documents.size())));
                 };
 
-                let sorted_fields = Array.sort(
+                let sorted_fields = MergeSort.sort(
                     fields,
                     func(a : (Text, Schema), b : (Text, Schema)) : Order {
                         Text.compare(a.0, b.0);
                     },
                 );
 
-                let sorted_records = Array.sort(
+                let sorted_records = MergeSort.sort(
                     documents,
                     func(a : (Text, Candid), b : (Text, Candid)) : Order {
                         Text.compare(a.0, b.0);

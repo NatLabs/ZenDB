@@ -39,6 +39,8 @@ import BTree "../BTree";
 
 module {
 
+    let LOGGER_NAMESPACE = "StableDatabase";
+
     let { log_error_msg } = Utils;
 
     public type InternalCandify<T> = T.InternalCandify<T>;
@@ -54,8 +56,9 @@ module {
     public type StableCollection = T.StableCollection;
 
     public func size(db : T.StableDatabase) : Nat {
+        let log = Logger.NamespacedLogger(db.logger, LOGGER_NAMESPACE).subnamespace("size");
         let size = Map.size<Text, StableCollection>(db.collections);
-        Logger.lazyInfo(db.logger, func() = "StableDatabase.size(): Number of collections: " # debug_show size);
+        log.lazyInfo(func() = "Number of collections: " # debug_show size);
         size;
     };
 
@@ -67,16 +70,16 @@ module {
 
     public func create_collection(db : T.StableDatabase, name : Text, schema : T.Schema, options : ?T.CreateCollectionOptions) : T.Result<StableCollection, Text> {
 
-        Logger.lazyInfo(
-            db.logger,
-            func() = "StableDatabase.create_collection(): Creating collection '" # name # "'",
+        let log = Logger.NamespacedLogger(db.logger, LOGGER_NAMESPACE).subnamespace("create_collection");
+
+        log.lazyInfo(
+            func() = "Creating collection '" # name # "'"
         );
 
         switch (Schema.validate_schema(schema)) {
             case (#ok(_)) {
-                Logger.lazyInfo(
-                    db.logger,
-                    func() = "StableDatabase.create_collection(): Schema validation passed for collection '" # name # "'",
+                log.lazyInfo(
+                    func() = "Schema validation passed for collection '" # name # "'"
                 );
             };
             case (#err(msg)) {
@@ -89,29 +92,25 @@ module {
 
         switch (Map.get<Text, StableCollection>(db.collections, Map.thash, name)) {
             case (?stable_collection) {
-                Logger.lazyDebug(
-                    db.logger,
-                    func() = "StableDatabase.create_collection(): Collection '" # name # "' already exists, checking schema compatibility",
+                log.lazyDebug(
+                    func() = "Collection '" # name # "' already exists, checking schema compatibility"
                 );
 
                 if (stable_collection.schema != processed_schema) {
-                    Logger.lazyError(
-                        db.logger,
-                        func() = "StableDatabase.create_collection(): Schema mismatch for existing collection '" # name # "'",
+                    log.lazyError(
+                        func() = "Schema mismatch for existing collection '" # name # "'"
                     );
                     return log_error_msg(db.logger, "Schema error: collection already exists with different schema");
                 };
 
-                Logger.lazyInfo(
-                    db.logger,
-                    func() = "StableDatabase.create_collection(): Returning existing collection '" # name # "'",
+                log.lazyInfo(
+                    func() = "Returning existing collection '" # name # "'"
                 );
                 return #ok(stable_collection);
             };
             case (null) {
-                Logger.lazyDebug(
-                    db.logger,
-                    func() = "StableDatabase.create_collection(): Collection '" # name # "' does not exist, creating new one",
+                log.lazyDebug(
+                    func() = "Collection '" # name # "' does not exist, creating new one"
                 );
             };
         };
@@ -191,9 +190,8 @@ module {
 
             let index : T.CompositeIndex = switch (index_res) {
                 case (#ok(index)) {
-                    Logger.lazyInfo(
-                        db.logger,
-                        func() = "StableDatabase.create_collection(): Created index for unique constraint on fields: " # debug_show unique_field_names,
+                    log.lazyInfo(
+                        func() = "Created index for unique constraint on fields: " # debug_show unique_field_names
                     );
 
                     index;
@@ -230,38 +228,24 @@ module {
 
         ignore Map.put<Text, StableCollection>(db.collections, Map.thash, name, stable_collection);
 
-        Logger.lazyInfo(
-            db.logger,
-            func() = "StableDatabase.create_collection(): Created collection '" # name # "' successfully",
-        );
-        Logger.lazyDebug(
-            db.logger,
-            func() = "StableDatabase.create_collection(): Schema for collection '" # name # "': " # debug_show schema,
-        );
+        log.lazyInfo(func() = "Created collection '" # name # "' successfully");
+        log.lazyDebug(func() = "Schema for collection '" # name # "': " # debug_show schema);
 
         #ok(stable_collection);
 
     };
 
     public func get_collection(db : T.StableDatabase, name : Text) : T.Result<StableCollection, Text> {
-        Logger.lazyDebug(
-            db.logger,
-            func() = "StableDatabase.get_collection(): Getting collection '" # name # "'",
-        );
+        let log = Logger.NamespacedLogger(db.logger, LOGGER_NAMESPACE).subnamespace("get_collection");
+        log.lazyDebug(func() = "Getting collection '" # name # "'");
 
         let stable_collection = switch (Map.get<Text, StableCollection>(db.collections, Map.thash, name)) {
             case (?collection) {
-                Logger.lazyDebug(
-                    db.logger,
-                    func() = "StableDatabase.get_collection(): Found collection '" # name # "'",
-                );
+                log.lazyDebug(func() = "Found collection '" # name # "'");
                 collection;
             };
             case (null) {
-                Logger.lazyWarn(
-                    db.logger,
-                    func() = "StableDatabase.get_collection(): Collection '" # name # "' not found",
-                );
+                log.lazyWarn(func() = "Collection '" # name # "' not found");
                 return log_error_msg(db.logger, "ZenDB Database.get_collection(): Collection " # debug_show name # " not found");
             };
         };
@@ -270,16 +254,11 @@ module {
     };
 
     public func rename_collection(db : T.StableDatabase, old_name : Text, new_name : Text) : T.Result<(), Text> {
-        Logger.lazyInfo(
-            db.logger,
-            func() = "StableDatabase.rename_collection(): Renaming collection '" # old_name # "' to '" # new_name # "'",
-        );
+        let log = Logger.NamespacedLogger(db.logger, LOGGER_NAMESPACE).subnamespace("rename_collection");
+        log.lazyInfo(func() = "Renaming collection '" # old_name # "' to '" # new_name # "'");
 
         if (old_name == new_name) {
-            Logger.lazyInfo(
-                db.logger,
-                func() = "StableDatabase.rename_collection(): Old name and new name are the same, no action taken",
-            );
+            log.lazyInfo(func() = "Old name and new name are the same, no action taken");
             return #ok(());
         };
 
@@ -304,19 +283,14 @@ module {
         let renamed_collection = { stable_collection with name = new_name };
         ignore Map.put<Text, StableCollection>(db.collections, Map.thash, new_name, renamed_collection);
 
-        Logger.lazyInfo(
-            db.logger,
-            func() = "StableDatabase.rename_collection(): Renamed collection '" # old_name # "' to '" # new_name # "' successfully",
-        );
+        log.lazyInfo(func() = "Renamed collection '" # old_name # "' to '" # new_name # "' successfully");
 
         #ok(());
     };
 
     public func delete_collection(db : T.StableDatabase, name : Text) : T.Result<(), Text> {
-        Logger.lazyInfo(
-            db.logger,
-            func() = "StableDatabase.delete_collection(): Deleting collection '" # name # "'",
-        );
+        let log = Logger.NamespacedLogger(db.logger, LOGGER_NAMESPACE).subnamespace("delete_collection");
+        log.lazyInfo(func() = "Deleting collection '" # name # "'");
 
         let collection = switch (Map.get<Text, StableCollection>(db.collections, Map.thash, name)) {
             case (?collection) { collection };
@@ -329,10 +303,7 @@ module {
         StableCollection.deallocate(collection);
         ignore Map.remove<Text, StableCollection>(db.collections, Map.thash, name);
 
-        Logger.lazyInfo(
-            db.logger,
-            func() = "StableDatabase.delete_collection(): Deleted collection '" # name # "' successfully",
-        );
+        log.lazyInfo(func() = "Deleted collection '" # name # "' successfully");
 
         #ok(());
     };
