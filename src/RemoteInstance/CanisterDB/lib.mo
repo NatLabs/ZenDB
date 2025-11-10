@@ -15,6 +15,7 @@ import ZenDB "../../EmbeddedInstance";
 import RolesAuth "../RolesAuth";
 
 import ZT "../../EmbeddedInstance/Types";
+import EmbeddedInstance "../../EmbeddedInstance";
 import StableDatabase "../../EmbeddedInstance/Database/StableDatabase";
 import StableCollection "../../EmbeddedInstance/Collection/StableCollection";
 import CollectionUtils "../../EmbeddedInstance/Collection/CollectionUtils";
@@ -144,7 +145,7 @@ shared ({ caller = owner }) persistent actor class CanisterDB() = this_canister 
         );
     };
 
-    public shared ({ caller }) func zendb_create_collection(db_name : Text, collection_name : Text, schema : ZT.Schema) : async (ZT.Result<(), Text>) {
+    public shared ({ caller }) func zendb_create_collection(db_name : Text, collection_name : Text, schema : ZT.Schema, opt_options : ?ZT.CreateCollectionOptions) : async (ZT.Result<(), Text>) {
         auth.allow_rs(
             caller,
             Permissions.MANAGE,
@@ -154,7 +155,7 @@ shared ({ caller = owner }) persistent actor class CanisterDB() = this_canister 
                     return #err("Database '" # db_name # "' does not exist");
                 };
 
-                let collection = StableDatabase.create_collection(db, collection_name, schema, null);
+                let collection = StableDatabase.create_collection(db, collection_name, schema, opt_options);
 
                 Result.mapOk<ZT.StableCollection, (), Text>(collection, func(_) { () });
             },
@@ -485,20 +486,20 @@ shared ({ caller = owner }) persistent actor class CanisterDB() = this_canister 
         );
     };
 
-    // public shared ({ caller }) func zendb_collection_update_documents(db_name : Text, collection_name : Text, stable_query : ZT.StableQuery, update_operations : [(Text, ZT.FieldUpdateOperations)]) : async ZT.Result<[ZT.DocumentId], Text> {
-    //     auth.allow(
-    //         caller,
-    //         Permissions.WRITE,
-    //         func() : (ZT.Result<[ZT.DocumentId], Text>) {
-    //             let collection_res = get_collection(db_name, collection_name);
-    //             let #ok(collection) = collection_res else return Utils.send_error(collection_res);
+    public shared ({ caller }) func zendb_collection_update_documents(db_name : Text, collection_name : Text, stable_query : ZT.StableQuery, update_operations : [(Text, ZT.FieldUpdateOperations)]) : async ZT.Result<ZT.UpdateResult, Text> {
+        auth.allow_rs(
+            caller,
+            Permissions.WRITE,
+            func() : (ZT.Result<ZT.UpdateResult, Text>) {
+                let collection_res = get_collection(db_name, collection_name);
+                let #ok(collection) = collection_res else return Utils.send_error(collection_res);
 
-    //             let main_btree_utils = CollectionUtils.getMainBtreeUtils(collection);
+                let main_btree_utils = CollectionUtils.getMainBtreeUtils(collection);
 
-    //             StableCollection.update(collection, main_btree_utils, stable_query, update_operations);
-    //         },
-    //     );
-    // };
+                StableCollection.update_documents(collection, main_btree_utils, stable_query, update_operations);
+            },
+        );
+    };
 
     public shared ({ caller }) func zendb_collection_create_index(db_name : Text, collection_name : Text, index_name : Text, index_fields : [(Text, ZT.SortDirection)], options : ?ZT.CreateIndexOptions) : async ZT.Result<(), Text> {
         auth.allow_rs(
@@ -507,16 +508,11 @@ shared ({ caller = owner }) persistent actor class CanisterDB() = this_canister 
             func() : (ZT.Result<(), Text>) {
                 let #ok(collection) = get_collection(db_name, collection_name) else return Utils.send_error(get_collection(db_name, collection_name));
 
-                let internal_options : ZT.CreateIndexInternalOptions = switch (options) {
-                    case (?opts) ZT.CreateIndexOptions.to_internal_default(opts);
-                    case (null) ZT.CreateIndexOptions.internal_default();
-                };
-
                 StableCollection.create_and_populate_index_in_one_call(
                     collection,
                     index_name,
                     index_fields,
-                    internal_options,
+                    ZT.CreateIndexOptions.internal_from_opt(options),
                 );
             },
         );
@@ -556,14 +552,25 @@ shared ({ caller = owner }) persistent actor class CanisterDB() = this_canister 
         _zendb_collection_repopulate_index(caller, db_name, collection_name, index_name);
     };
 
-    public shared ({ caller }) func zendb_collection_batch_create_indexes(db_name : Text, collection_name : Text, index_configs : [ZT.CreateIndexBatchConfig]) : async ZT.Result<Nat, Text> {
+    public shared ({ caller }) func zendb_collection_batch_create_indexes(db_name : Text, collection_name : Text, index_configs : [ZT.CreateIndexParams]) : async ZT.Result<Nat, Text> {
         auth.allow_rs(
             caller,
             Permissions.MANAGE,
             func() : (ZT.Result<Nat, Text>) {
                 let #ok(collection) = get_collection(db_name, collection_name) else return Utils.send_error(get_collection(db_name, collection_name));
 
-                StableCollection.batch_create_indexes(collection, index_configs);
+                let internal_index_configs = Array.map<ZT.CreateIndexParams, ZT.CreateInternalIndexParams>(
+                    index_configs,
+                    func(config : ZT.CreateIndexParams) : ZT.CreateInternalIndexParams {
+                        (
+                            config.0,
+                            config.1,
+                            ZT.CreateIndexOptions.internal_from_opt(config.2),
+                        );
+                    },
+                );
+
+                StableCollection.batch_create_indexes(collection, internal_index_configs);
             },
         );
     };

@@ -24,6 +24,7 @@ import Serde "mo:serde@3.3.3";
 import Decoder "mo:serde@3.3.3/Candid/Blob/Decoder";
 import Candid "mo:serde@3.3.3/Candid";
 import Itertools "mo:itertools@0.2.2/Iter";
+import PeekableIter "mo:itertools@0.2.2/PeekableIter";
 import RevIter "mo:itertools@0.2.2/RevIter";
 import Logger "Logger";
 
@@ -32,6 +33,7 @@ import Int8Cmp "mo:memory-collection@0.3.2/TypeUtils/Int8Cmp";
 
 import T "Types";
 import ByteUtils "mo:byte-utils@0.1.1";
+import MinHeap "MinHeap";
 
 module {
     let LOGGER_NAMESPACE = "Utils";
@@ -277,6 +279,47 @@ module {
                 };
             },
         );
+    };
+
+    public func kmerge<A>(iters : [Iter.Iter<A>], cmp : (A, A) -> Order.Order) : Iter.Iter<A> {
+        type Ref<A> = (A, Nat);
+
+        let cmpIters = func(a : Ref<A>, b : Ref<A>) : Order.Order {
+            cmp(a.0, b.0);
+        };
+
+        let heap = MinHeap.newWithCapacity<Ref<A>>(iters.size());
+
+        for ((i, iter) in Itertools.enumerate(iters.vals())) {
+            switch (iter.next()) {
+                case (?a) {
+                    MinHeap.put(heap, (a, i), cmpIters);
+                };
+                case (_) {
+
+                };
+            };
+        };
+
+        object {
+            public func next() : ?A {
+                switch (MinHeap.removeMin(heap, cmpIters)) {
+                    case (?(min, i)) {
+                        switch (iters[i].next()) {
+                            case (?a) {
+                                MinHeap.put(heap, (a, i), cmpIters);
+                            };
+                            case (_) {};
+                        };
+
+                        ?min;
+                    };
+                    case (_) {
+                        null;
+                    };
+                };
+            };
+        };
     };
 
     public func concat_freeze<A>(buffers : [Buffer.Buffer<A>]) : [A] {

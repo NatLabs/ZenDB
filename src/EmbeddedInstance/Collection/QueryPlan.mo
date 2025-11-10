@@ -231,8 +231,6 @@ module {
             }
         );
 
-        // Debug.print("CompositeIndex entries: " # debug_show (Utils.iter_to_array(CompositeIndex.entries(collection, index))));
-
         if (requires_additional_filtering) {
             // we need to do index interval intersection with the filter bounds
             log.logDebug("Additional filtering required with filter bounds");

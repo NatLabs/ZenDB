@@ -274,13 +274,13 @@ module StableCollection {
 
     public func create_populate_indexes_batch(
         collection : StableCollection,
-        index_configs : [T.CreateIndexBatchConfig],
+        index_configs : [T.CreateInternalIndexParams],
         opt_performance_init : ?Nat,
     ) : T.Result<(batch_id : Nat), Text> {
         let log = Logger.NamespacedLogger(collection.logger, LOGGER_NAMESPACE).subnamespace("create_populate_indexes_batch");
 
         let performance = Performance(collection.is_running_locally, opt_performance_init);
-        let index_names = Array.map(index_configs, func(config : T.CreateIndexBatchConfig) : Text = config.0);
+        let index_names = Array.map(index_configs, func(config : T.CreateInternalIndexParams) : Text = config.0);
 
         // then check if there any of those indexes are currently being populated or created
         let existing_indexes_in_batch_operations = get_existing_keys(collection.indexes_in_batch_operations, index_names);
@@ -292,9 +292,9 @@ module StableCollection {
 
         let newly_created_indexes = Buffer.Buffer<T.Index>(index_configs.size());
 
-        for ((index_name, index_key_details, is_unique, used_internally) in index_configs.vals()) {
+        for ((index_name, index_key_details, options) in index_configs.vals()) {
             log.lazyInfo(func() = "Creating indexes: " # debug_show (index_name, index_key_details));
-            let composite_index = CompositeIndex.new(collection, index_name, index_key_details, is_unique, used_internally);
+            let composite_index = CompositeIndex.new(collection, index_name, index_key_details, options.is_unique, options.used_internally);
             let index = #composite_index(composite_index);
             ignore Map.put(collection.indexes_in_batch_operations, Map.thash, index_name, index);
             newly_created_indexes.add(index);
@@ -337,7 +337,7 @@ module StableCollection {
 
     public func batch_create_indexes(
         collection : StableCollection,
-        index_configs : [(name : Text, [(field : Text, SortDirection)], is_unique : Bool, used_internally : Bool)],
+        index_configs : [T.CreateInternalIndexParams],
     ) : Result<(batch_id : Nat), Text> {
         if (index_configs.size() == 0) {
             return #err("No index configurations provided");
@@ -346,7 +346,7 @@ module StableCollection {
         let performance = Performance(collection.is_running_locally, null);
 
         // first check if any of the indexes already exist, fail if they do
-        let index_names = Array.map(index_configs, func(config : T.CreateIndexBatchConfig) : Text = config.0);
+        let index_names = Array.map(index_configs, func(config : T.CreateInternalIndexParams) : Text = config.0);
         let existing_indexes = get_existing_keys(collection.indexes, index_names);
         if (existing_indexes.size() > 0) {
             return #err(
@@ -630,7 +630,7 @@ module StableCollection {
     ) : T.Result<(), Text> {
 
         let performance = Performance(collection.is_running_locally, null);
-        let index_config = [(index_name, index_key_details, options.is_unique, options.used_internally)];
+        let index_config = [(index_name, index_key_details, options)];
 
         let batch_id = switch (batch_create_indexes(collection, index_config)) {
             case (#ok(batch_id)) batch_id;
@@ -839,7 +839,7 @@ module StableCollection {
             };
             case (#Ids(iter)) {
                 log.lazyDebug(func() = "Ids iterator");
-                iter;
+                Iter.map<(T.DocumentId, ?[(Text, T.Candid)]), T.DocumentId>(iter, func((id, _)) : T.DocumentId { id });
             };
             case (#Interval(index_name, _intervals, sorted_in_reverse)) {
                 log.lazyDebug(func() = "Interval iterator");
@@ -1379,7 +1379,7 @@ module StableCollection {
             };
             case (#ok(document_ids_iter)) {
                 let candid_blob_iter = ids_to_candid_blobs(collection, document_ids_iter);
-                let candid_blobs = Utils.iter_to_array(candid_blob_iter);
+                let candid_blobs = Iter.toArray(candid_blob_iter);
                 log.lazyDebug(func() = "Search completed, found " # debug_show (candid_blobs.size()) # " results");
 
                 let instructions = performance.total_instructions_used();
@@ -1446,7 +1446,7 @@ module StableCollection {
 
         let sort_documents_by_field_cmp = switch (sort_by) {
             case (?sort_by) get_document_field_cmp(collection, sort_by);
-            case (null) func(_ : T.DocumentId, _ : T.DocumentId) : Order = #equal;
+            case (null) func(_ : (T.DocumentId, ?[(Text, T.Candid)]), _ : (T.DocumentId, ?[(Text, T.Candid)])) : Order = #equal;
         };
 
         let eval = QueryExecution.generate_document_ids_for_query_plan(collection, query_plan, sort_by, sort_documents_by_field_cmp);
@@ -1501,7 +1501,7 @@ module StableCollection {
     public func get_document_field_cmp(
         collection : T.StableCollection,
         sort_field : (Text, T.SortDirection),
-    ) : (T.DocumentId, T.DocumentId) -> Order {
+    ) : ((T.DocumentId, ?[(Text, T.Candid)]), (T.DocumentId, ?[(Text, T.Candid)])) -> Order {
 
         let candid_map_cache = Map.new<T.DocumentId, T.CandidMap>();
 
@@ -1510,21 +1510,38 @@ module StableCollection {
                 case (?candid) candid;
                 case (null) {
                     let ?candid_document = CollectionUtils.lookupCandidDocument(collection, id) else Debug.trap("Couldn't find document with id: " # debug_show id);
-                    CandidMap.new(collection.schema_map, id, candid_document);
+                    let candid_map = CandidMap.new(collection.schema_map, id, candid_document);
+                    // ignore Map.put(candid_map_cache, Map.bhash, id, candid_map);
+                    candid_map;
                 };
             };
         };
 
-        let opt_candid_map_a : ?T.CandidMap = null;
-        let opt_candid_map_b : ?T.CandidMap = null;
+        func sort_documents_by_field_cmp(a : (T.DocumentId, ?[(Text, T.Candid)]), b : (T.DocumentId, ?[(Text, T.Candid)])) : Order {
 
-        func sort_documents_by_field_cmp(a : T.DocumentId, b : T.DocumentId) : Order {
+            func get_value((id, opt_sort_value) : (T.DocumentId, ?[(Text, T.Candid)])) : T.Candid {
+                switch (opt_sort_value) {
+                    case (?fields) {
+                        // Find the field matching sort_field.0
+                        let opt_entry = Array.find<(Text, T.Candid)>(fields, func((key, _)) : Bool { key == sort_field.0 });
+                        switch (opt_entry) {
+                            case (?candid_value) return candid_value.1;
+                            case (null) {};
+                        };
+                    };
+                    case (null) {};
+                };
 
-            let candid_map_a = get_candid_map(a);
-            let candid_map_b = get_candid_map(b);
+                // Sort field not in indexed fields, fetch from document
+                let ?candid_value = CandidMap.get(get_candid_map(id), collection.schema_map, sort_field.0) else {
+                    Debug.trap("Couldn't get value from CandidMap for key: " # sort_field.0);
+                };
 
-            let ?value_a = CandidMap.get(candid_map_a, collection.schema_map, sort_field.0) else Debug.trap("Couldn't get value from CandidMap for key: " # sort_field.0);
-            let ?value_b = CandidMap.get(candid_map_b, collection.schema_map, sort_field.0) else Debug.trap("Couldn't get value from CandidMap for key: " # sort_field.0);
+                candid_value;
+            };
+
+            let value_a = get_value(a);
+            let value_b = get_value(b);
 
             let order_num = Schema.cmp_candid(#Empty, value_a, value_b);
 
@@ -1647,7 +1664,7 @@ module StableCollection {
             null,
         );
 
-        let sort_documents_by_field_cmp = func(_ : T.DocumentId, _ : T.DocumentId) : Order = #equal;
+        let sort_documents_by_field_cmp = func(_ : (T.DocumentId, ?[(Text, T.Candid)]), _ : (T.DocumentId, ?[(Text, T.Candid)])) : Order = #equal;
 
         let eval = QueryExecution.generate_document_ids_for_query_plan(collection, query_plan, null, sort_documents_by_field_cmp);
 
@@ -1839,21 +1856,35 @@ module StableCollection {
         let log = Logger.NamespacedLogger(collection.logger, LOGGER_NAMESPACE).subnamespace("batch_populate_indexes_from_names");
         var error : ?Text = null;
 
-        let index_configs = Array.map<Text, T.CreateIndexBatchConfig>(
+        let index_configs = Array.map<Text, T.CreateInternalIndexParams>(
             index_names,
-            func(name : Text) : T.CreateIndexBatchConfig {
+            func(name : Text) : T.CreateInternalIndexParams {
                 switch (Map.get(collection.indexes, Map.thash, name)) {
                     case (?index) switch (index) {
                         case (#composite_index(composite_index)) {
-                            (name, composite_index.key_details, composite_index.is_unique, composite_index.used_internally);
+                            (
+                                name,
+                                composite_index.key_details,
+                                {
+                                    is_unique = composite_index.is_unique;
+                                    used_internally = composite_index.used_internally;
+                                },
+                            );
                         };
                         case (#text_index(text_index)) {
-                            (text_index.internal_index.name, text_index.internal_index.key_details, text_index.internal_index.is_unique, text_index.internal_index.used_internally);
+                            (
+                                text_index.internal_index.name,
+                                text_index.internal_index.key_details,
+                                {
+                                    is_unique = text_index.internal_index.is_unique;
+                                    used_internally = text_index.internal_index.used_internally;
+                                },
+                            );
                         };
                     };
                     case (null) {
                         error := ?("Could not find index with name: " # name);
-                        ("", [], false, false); // dummy return to satisfy the type checker
+                        ("", [], T.CreateIndexOptions.internal_default()); // dummy return to satisfy the type checker
                     };
                 };
             },

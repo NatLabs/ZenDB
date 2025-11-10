@@ -2,7 +2,7 @@
 name = "zendb"
 version = "0.1.0"
 description = "A high-performance document database built for the Internet Computer ecosystem."
-keywords = [ "database", "candid", "stable-memory" ]
+keywords = ["database", "candid", "stable-memory"]
 license = "AGPL-3.0-or-later"
 repository = "https://github.com/NatLabs/ZenDB"
 

@@ -142,6 +142,20 @@ module CompositeIndex {
 
     };
 
+    // public func get_index_candid_data_utils(collection : T.StableCollection) : T.BTreeUtils<[T.Candid], T.DocumentId> {
+    //     switch (collection.memory_type) {
+    //         case (#stableMemory(_)) {
+    //             #stableMemory(MemoryBTree.createUtils<[T.Candid], T.DocumentId>(Orchid, TypeUtils.Blob));
+    //         };
+    //         case (#heap(_)) {
+    //             #heap({
+    //                 blobify = Orchid.blobify;
+    //                 cmp = Orchid.btree_cmp;
+    //             });
+    //         };
+    //     };
+    // };
+
     public func insert(
         collection : T.StableCollection,
         index : CompositeIndex,
@@ -561,7 +575,6 @@ module CompositeIndex {
         index : CompositeIndex,
     ) : T.RevIter<([T.CandidQuery], T.DocumentId)> {
         let index_data_utils = get_index_data_utils(collection);
-
         BTree.entries<[T.CandidQuery], T.DocumentId>(index.data, index_data_utils);
     };
 
