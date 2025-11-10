@@ -51,7 +51,7 @@ let candify_user2 = {
 
 ZenDBSuite.newSuite(
     "Simple Record Tests",
-    ?{ ZenDBSuite.withAndWithoutIndex with log_level = #Error },
+    ?{ ZenDBSuite.withAndWithoutIndex with log_level = #Debug },
     func suite_setup(zendb : ZenDB.Database, suite_utils : ZenDBSuite.SuiteUtils) {
         let #ok(users) = zendb.createCollection<User>("users", users_schema, candify_user, null) else return assert false;
 

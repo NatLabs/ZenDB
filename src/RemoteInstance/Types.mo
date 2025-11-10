@@ -101,7 +101,7 @@ module {
         zendb_create_database : shared (Text) -> async (ZT.Result<(), Text>);
 
         /// Creates a new collection and returns the collection name.
-        zendb_create_collection : shared (Text, Text, ZT.Schema) -> async (ZT.Result<(), Text>);
+        zendb_create_collection : shared (Text, Text, ZT.Schema, ?ZT.CreateCollectionOptions) -> async (ZT.Result<(), Text>);
 
         /// Deletes a collection from the database.
         zendb_delete_collection : shared (Text, Text) -> async (ZT.Result<(), Text>);
@@ -163,7 +163,7 @@ module {
         zendb_collection_update_document_by_id : shared (Text, Text, ZT.DocumentId, [(Text, ZT.FieldUpdateOperations)]) -> async (ZT.Result<ZT.UpdateByIdResult, Text>);
 
         /// Update documents matching query in a collection.
-        zendb_collection_update_documents : shared (Text, Text, ZT.StableQuery, [(Text, ZT.FieldUpdateOperations)]) -> async (ZT.Result<[ZT.DocumentId], Text>);
+        zendb_collection_update_documents : shared (Text, Text, ZT.StableQuery, [(Text, ZT.FieldUpdateOperations)]) -> async (ZT.Result<ZT.UpdateResult, Text>);
 
         /// Create index on a collection.
         zendb_collection_create_index : shared (Text, Text, Text, [(Text, ZT.SortDirection)], ?ZT.CreateIndexOptions) -> async (ZT.Result<(), Text>);
@@ -178,7 +178,7 @@ module {
         zendb_collection_repopulate_index_composite_query : shared composite query (Text, Text, Text) -> async (ZT.Result<(), Text>);
 
         /// Batch create indexes on a collection.
-        zendb_collection_batch_create_indexes : shared (Text, Text, [ZT.CreateIndexBatchConfig]) -> async (ZT.Result<Nat, Text>);
+        zendb_collection_batch_create_indexes : shared (Text, Text, [ZT.CreateIndexParams]) -> async (ZT.Result<Nat, Text>);
 
         /// Batch populate indexes on a collection.
         zendb_collection_batch_populate_indexes : shared (Text, Text, [Text]) -> async (ZT.Result<Nat, Text>);

@@ -342,11 +342,11 @@ module TxsBenchUtils {
 
                     case ("create and populate indexes") {
                         // Create batch for indexes
-                        let index_configs = Array.tabulate<ZenDB.Types.CreateIndexBatchConfig>(
+                        let index_configs = Array.tabulate<ZenDB.Types.CreateIndexParams>(
                             indexes.size(),
-                            func(i : Nat) : ZenDB.Types.CreateIndexBatchConfig {
+                            func(i : Nat) : ZenDB.Types.CreateIndexParams {
                                 let index_name = "index_" # debug_show (i);
-                                (index_name, indexes[i], false, false); // name, key_details, is_unique, used_internally
+                                (index_name, indexes[i], null); // name, key_details, ?options
                             },
                         );
 

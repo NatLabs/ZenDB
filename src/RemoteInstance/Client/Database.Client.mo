@@ -15,8 +15,8 @@ module {
             db_name;
         };
 
-        public func create_collection<Record>(collection_name : Text, schema : ZT.Schema) : async* (ZT.Result<(), Text>) {
-            await canister_db.zendb_create_collection(db_name, collection_name, schema);
+        public func create_collection<Record>(collection_name : Text, schema : ZT.Schema, opt_options : ?ZT.CreateCollectionOptions) : async* (ZT.Result<(), Text>) {
+            await canister_db.zendb_create_collection(db_name, collection_name, schema, opt_options);
         };
 
         public func delete_collection(collection_name : Text) : async* (ZT.Result<(), Text>) {

@@ -551,7 +551,7 @@ module CompositeIndex {
 
         let (start, end) = interval;
 
-        Utils.iter_to_array<([T.CandidQuery], T.DocumentId)>(
+        Iter.toArray<([T.CandidQuery], T.DocumentId)>(
             BTree.range<[T.CandidQuery], T.DocumentId>(index.data, index_data_utils, start, end)
         );
     };
@@ -561,7 +561,6 @@ module CompositeIndex {
         index : CompositeIndex,
     ) : T.RevIter<([T.CandidQuery], T.DocumentId)> {
         let index_data_utils = get_index_data_utils(collection);
-
         BTree.entries<[T.CandidQuery], T.DocumentId>(index.data, index_data_utils);
     };
 

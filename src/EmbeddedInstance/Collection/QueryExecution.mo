@@ -126,18 +126,25 @@ module {
         let intervals_by_index = Map.new<Text, IndexDetails>();
 
         label evaluating_query_plan for (scan_details in query_plan.scans.vals()) {
-            let document_ids_iter = switch (scan_details) {
+            let document_ids_iter : Iter<(T.DocumentId, ?[(Text, T.Candid)])> = switch (scan_details) {
                 case (#FullScan({ filter_bounds; requires_additional_filtering })) {
                     log.lazyDebug(func() = "Processing full scan");
                     let main_btree_utils = CollectionUtils.getMainBtreeUtils(collection);
                     let full_scan_iter = DocumentStore.keys(collection.documents, main_btree_utils);
 
-                    if (requires_additional_filtering) {
+                    let filtered_iter = if (requires_additional_filtering) {
                         log.lazyDebug(func() = "Applying filters to full scan");
                         CollectionUtils.multiFilter(collection, full_scan_iter, Buffer.fromArray([(filter_bounds)]), query_plan.is_and_operation);
                     } else {
                         full_scan_iter;
                     };
+
+                    Iter.map<T.DocumentId, (T.DocumentId, ?[(Text, T.Candid)])>(
+                        filtered_iter,
+                        func(id : T.DocumentId) : (T.DocumentId, ?[(Text, T.Candid)]) {
+                            (id, null);
+                        },
+                    );
                 };
                 case (#IndexScan(index_scan_details)) {
                     let {
@@ -184,12 +191,14 @@ module {
                                             },
                                         );
 
-                                        CollectionUtils.multiFilter(
+                                        let filtered = CollectionUtils.multiFilter(
                                             collection,
                                             document_ids,
                                             Buffer.fromArray([filter_bounds]),
                                             query_plan.is_and_operation,
                                         );
+
+                                        Iter.map<T.DocumentId, (T.DocumentId, ?[(Text, T.Candid)])>(filtered, func(id : T.DocumentId) : (T.DocumentId, ?[(Text, T.Candid)]) { (id, null) });
                                     };
                                     case (null) {
                                         log.lazyDebug(func() = "No additional filtering needed, adding bitmap directly");
@@ -202,8 +211,24 @@ module {
                                 log.lazyDebug(
                                     func() = "CompositeIndex-based filtering not applicable, falling back to standard approach"
                                 );
-                                let document_ids = Intervals.document_ids_from_index_intervals(collection, index_name, [interval], false);
-                                CollectionUtils.multiFilter(collection, document_ids, Buffer.fromArray([filter_bounds]), query_plan.is_and_operation);
+
+                                let index = CollectionUtils.get_composite_index(collection, index_name);
+                                let filter_bounds_buffer = Buffer.fromArray<T.Bounds>([filter_bounds]);
+
+                                let document_ids_with_fields = if (CollectionUtils.can_use_indexed_fields_for_filtering(index.key_details, filter_bounds_buffer)) {
+                                    Intervals.document_ids_and_indexed_fields_from_intervals(collection, index_name, [interval], false);
+                                } else {
+                                    let document_ids = Intervals.document_ids_from_index_intervals(collection, index_name, [interval], false);
+                                    Iter.map<T.DocumentId, (T.DocumentId, ?[(Text, T.Candid)])>(
+                                        document_ids,
+                                        func(id : T.DocumentId) : (T.DocumentId, ?[(Text, T.Candid)]) {
+                                            (id, null);
+                                        },
+                                    );
+                                };
+
+                                CollectionUtils.multiFilterWithIndexedFields(collection, document_ids_with_fields, filter_bounds_buffer, query_plan.is_and_operation);
+
                             };
                         };
 
@@ -220,7 +245,7 @@ module {
 
             log.lazyDebug(func() = "Creating bitmap from document IDs iterator");
             bitmaps.add(
-                BitMap.fromIter(Iter.map(document_ids_iter, Utils.convert_last_8_bytes_to_nat))
+                BitMap.fromIter(Iter.map(document_ids_iter, func((id, _)) : Nat { Utils.convert_last_8_bytes_to_nat(id) }))
             );
         };
 
@@ -244,7 +269,7 @@ module {
                 case (#Ids(document_ids_iter)) {
                     log.lazyDebug(func() = "Subplan returned document IDs iterator");
                     bitmaps.add(
-                        BitMap.fromIter(Iter.map(document_ids_iter, Utils.convert_last_8_bytes_to_nat))
+                        BitMap.fromIter(Iter.map(document_ids_iter, func((id, _) : (T.DocumentId, ?[(Text, T.Candid)])) : Nat { Utils.convert_last_8_bytes_to_nat(id) }))
                     );
                 };
                 case (#BitMap(sub_bitmap)) {
@@ -334,9 +359,9 @@ module {
                 let bitmap = BitMap.BitMap(1024);
 
                 for (interval in interval_details.intervals.vals()) {
-                    let document_ids = Intervals.document_ids_from_index_intervals(collection, index.name, [interval], false);
+                    let document_ids_with_fields = Intervals.document_ids_and_indexed_fields_from_intervals(collection, index.name, [interval], false);
 
-                    for (id in document_ids) {
+                    for ((id, _) in document_ids_with_fields) {
                         let id_as_nat = Utils.convert_last_8_bytes_to_nat(id);
                         bitmap.set(id_as_nat, true);
                     };
@@ -826,7 +851,7 @@ module {
         collection : T.StableCollection,
         query_plan : T.QueryPlan,
         opt_sort_column : ?(Text, T.SortDirection),
-        sort_documents_by_field_cmp : (T.DocumentId, T.DocumentId) -> Order,
+        sort_documents_by_field_cmp : ((T.DocumentId, ?[(Text, T.Candid)]), (T.DocumentId, ?[(Text, T.Candid)])) -> Order,
     ) : EvalResult {
         assert query_plan.is_and_operation;
         let requires_sorting = Option.isSome(opt_sort_column);
@@ -848,8 +873,8 @@ module {
             };
         };
 
-        let iterators = Buffer.Buffer<Iter<T.DocumentId>>(8);
-        var sorted_documents_array : [T.DocumentId] = [];
+        let iterators = Buffer.Buffer<Iter<(T.DocumentId, ?[(Text, T.Candid)])>>(8);
+        var sorted_documents_array : [(T.DocumentId, ?[(Text, T.Candid)])] = [];
         let intervals_by_index = Map.new<Text, IndexDetails>();
         let full_scan_details_buffer = Buffer.Buffer<T.FullScanDetails>(8);
         let bitmaps = Buffer.Buffer<T.BitMap>(8);
@@ -872,22 +897,44 @@ module {
 
                 if (requires_additional_sorting or requires_additional_filtering) {
 
-                    var document_ids : Iter<T.DocumentId> = Intervals.document_ids_from_index_intervals(collection, index_name, [interval], sorted_in_reverse);
+                    let index = CollectionUtils.get_composite_index(collection, index_name);
+
+                    let filter_bounds_buffer = Buffer.fromArray<T.Bounds>([filter_bounds]);
+
+                    var document_ids_with_fields = if (
+                        CollectionUtils.can_use_indexed_fields_for_filtering(index.key_details, filter_bounds_buffer) or
+                        (
+                            requires_sorting and
+                            Option.isSome(
+                                Array.find(index.key_details, func((key, _) : (Text, Any)) : Bool { key == Option.get(opt_sort_column, ("", #Ascending)).0 })
+                            )
+                        )
+                    ) {
+                        Intervals.document_ids_and_indexed_fields_from_intervals(collection, index_name, [interval], sorted_in_reverse);
+                    } else {
+                        let document_ids = Intervals.document_ids_from_index_intervals(collection, index_name, [interval], sorted_in_reverse);
+                        Iter.map<T.DocumentId, (T.DocumentId, ?[(Text, T.Candid)])>(
+                            document_ids,
+                            func(id : T.DocumentId) : (T.DocumentId, ?[(Text, T.Candid)]) {
+                                (id, null);
+                            },
+                        );
+                    };
 
                     if (requires_additional_filtering) {
-                        document_ids := CollectionUtils.multiFilter(collection, document_ids, Buffer.fromArray([filter_bounds]), query_plan.is_and_operation);
+                        document_ids_with_fields := CollectionUtils.multiFilterWithIndexedFields(collection, document_ids_with_fields, filter_bounds_buffer, query_plan.is_and_operation);
                     };
 
                     if (requires_additional_sorting) {
                         if (sorted_documents_array.size() == 0) {
-                            let arr = Utils.iter_to_array(document_ids);
+                            let arr = Iter.toArray(document_ids_with_fields);
                             sorted_documents_array := MergeSort.sort(arr, sort_documents_by_field_cmp);
-                            document_ids := sorted_documents_array.vals();
+                            document_ids_with_fields := sorted_documents_array.vals();
                         };
 
                     };
 
-                    iterators.add(document_ids);
+                    iterators.add(document_ids_with_fields);
 
                 } else {
                     add_interval(intervals_by_index, index_name, interval, sorted_in_reverse);
@@ -904,7 +951,7 @@ module {
                     if (requires_sorting) {
                         iterators.add(iter);
                     } else {
-                        let bitmap = BitMap.fromIter(Iter.map(iter, Utils.convert_last_8_bytes_to_nat));
+                        let bitmap = BitMap.fromIter(Iter.map(iter, func((id, _) : (T.DocumentId, ?[(Text, T.Candid)])) : Nat { Utils.convert_last_8_bytes_to_nat(id) }));
                         bitmaps.add(bitmap);
                     };
                 };
@@ -963,11 +1010,11 @@ module {
 
             let sorted_in_reverse = Option.get(interval_details.sorted_in_reverse, false);
 
-            let document_ids = Intervals.document_ids_from_index_intervals(collection, index.name, [interval], sorted_in_reverse);
+            let document_ids_with_fields = Intervals.document_ids_and_indexed_fields_from_intervals(collection, index.name, [interval], sorted_in_reverse);
 
             if (requires_sorting and sorted_documents_array.size() == 0) {
 
-                let arr = Utils.iter_to_array(document_ids);
+                let arr = Iter.toArray(document_ids_with_fields);
 
                 if (arr.size() == 0) return #Empty;
 
@@ -976,7 +1023,7 @@ module {
                 iterators.add(sorted_documents_array.vals());
 
             } else {
-                let bitmap = BitMap.fromIter(Iter.map(document_ids, Utils.convert_last_8_bytes_to_nat));
+                let bitmap = BitMap.fromIter(Iter.map(document_ids_with_fields, func((id, _) : (T.DocumentId, ?[(Text, T.Candid)])) : Nat { Utils.convert_last_8_bytes_to_nat(id) }));
                 bitmaps.add(bitmap);
 
             };
@@ -1021,18 +1068,41 @@ module {
                 full_scan_filter_bounds.add(full_scan_details.filter_bounds);
             };
 
-            let filtered_ids = if (smallest_interval_index == "") {
+            let filtered_ids : Iter<(T.DocumentId, ?[(Text, T.Candid)])> = if (smallest_interval_index == "") {
                 let main_btree_utils = CollectionUtils.getMainBtreeUtils(collection);
-                let filtered_ids = CollectionUtils.multiFilter(
+                let document_ids = DocumentStore.keys(collection.documents, main_btree_utils);
+                let filtered = CollectionUtils.multiFilter(
                     collection,
-                    DocumentStore.keys(collection.documents, main_btree_utils),
+                    document_ids,
                     full_scan_filter_bounds,
                     query_plan.is_and_operation,
                 );
+                Iter.map<T.DocumentId, (T.DocumentId, ?[(Text, T.Candid)])>(filtered, func(id : T.DocumentId) : (T.DocumentId, ?[(Text, T.Candid)]) { (id, null) });
             } else {
-                let document_ids_in_interval = Intervals.document_ids_from_index_intervals(collection, smallest_interval_index, [(smallest_interval_start, smallest_interval_end)], false);
+                let index = CollectionUtils.get_composite_index(collection, smallest_interval_index);
 
-                let filtered_ids = CollectionUtils.multiFilter(collection, document_ids_in_interval, full_scan_filter_bounds, query_plan.is_and_operation);
+                let document_ids_with_fields = if (
+                    CollectionUtils.can_use_indexed_fields_for_filtering(index.key_details, full_scan_filter_bounds) or
+                    (
+                        requires_sorting and
+                        Option.isSome(
+                            Array.find(index.key_details, func((key, _) : (Text, Any)) : Bool { key == Option.get(opt_sort_column, ("", #Ascending)).0 })
+                        )
+                    )
+                ) {
+                    Intervals.document_ids_and_indexed_fields_from_intervals(collection, smallest_interval_index, [(smallest_interval_start, smallest_interval_end)], false);
+                } else {
+                    let document_ids = Intervals.document_ids_from_index_intervals(collection, smallest_interval_index, [(smallest_interval_start, smallest_interval_end)], false);
+                    Iter.map<T.DocumentId, (T.DocumentId, ?[(Text, T.Candid)])>(
+                        document_ids,
+                        func(id : T.DocumentId) : (T.DocumentId, ?[(Text, T.Candid)]) {
+                            (id, null);
+                        },
+                    );
+
+                };
+
+                CollectionUtils.multiFilterWithIndexedFields(collection, document_ids_with_fields, full_scan_filter_bounds, query_plan.is_and_operation);
             };
 
             if (requires_sorting and sorted_documents_array.size() == 0) {
@@ -1044,7 +1114,7 @@ module {
                 // the other document ids loaded into the array were sorted because they were from nested operations
                 // however, a full scan is a new operation that is not sorted by default
 
-                let arr = Utils.iter_to_array(filtered_ids);
+                let arr = Iter.toArray(filtered_ids);
 
                 if (arr.size() == 0) return #Empty;
 
@@ -1059,7 +1129,7 @@ module {
             // Debug.print("query_plan.subplans.size() : " # debug_show query_plan.subplans.size());
             // Debug.print("query_plan.scans.size() : " # debug_show query_plan.scans.size());
 
-            let bitmap = BitMap.fromIter(Iter.map(filtered_ids, Utils.convert_last_8_bytes_to_nat));
+            let bitmap = BitMap.fromIter(Iter.map(filtered_ids, func((id, _) : (T.DocumentId, ?[(Text, T.Candid)])) : Nat { Utils.convert_last_8_bytes_to_nat(id) }));
             bitmaps.add(bitmap);
 
         };
@@ -1075,14 +1145,14 @@ module {
 
             for (_iter in iterators.vals()) {
                 let iter = if (fill_sorted_documents_array) {
-                    let arr = Utils.iter_to_array(_iter);
+                    let arr = Iter.toArray(_iter);
                     if (arr.size() > 0) {
                         sorted_documents_array := MergeSort.sort(arr, sort_documents_by_field_cmp);
                     };
                     sorted_documents_array.vals();
                 } else { _iter };
 
-                let bitmap = BitMap.fromIter(Iter.map(iter, Utils.convert_last_8_bytes_to_nat));
+                let bitmap = BitMap.fromIter(Iter.map(iter, func((id, _) : (T.DocumentId, ?[(Text, T.Candid)])) : Nat { Utils.convert_last_8_bytes_to_nat(id) }));
                 bitmaps.add(bitmap);
 
                 fill_sorted_documents_array := false;
@@ -1099,9 +1169,9 @@ module {
         } else { BitMap.multiIntersect(bitmaps.vals()) };
 
         if (sorted_documents_array.size() > 0) {
-            let sorted_bitmap_vals = Iter.filter<T.DocumentId>(
+            let sorted_bitmap_vals = Iter.filter<(T.DocumentId, ?[(Text, T.Candid)])>(
                 sorted_documents_array.vals(),
-                func(id : T.DocumentId) : Bool = bitmap.get(Utils.convert_last_8_bytes_to_nat(id)),
+                func((id, _) : (T.DocumentId, ?[(Text, T.Candid)])) : Bool = bitmap.get(Utils.convert_last_8_bytes_to_nat(id)),
             );
 
             #Ids(sorted_bitmap_vals);
@@ -1116,7 +1186,7 @@ module {
         collection : T.StableCollection,
         query_plan : T.QueryPlan,
         opt_sort_column : ?(Text, T.SortDirection),
-        sort_documents_by_field_cmp : (T.DocumentId, T.DocumentId) -> Order,
+        sort_documents_by_field_cmp : ((T.DocumentId, ?[(Text, T.Candid)]), (T.DocumentId, ?[(Text, T.Candid)])) -> Order,
     ) : EvalResult {
         assert not query_plan.is_and_operation;
         let requires_sorting = Option.isSome(opt_sort_column);
@@ -1124,7 +1194,7 @@ module {
         let bitmaps = Buffer.Buffer<T.BitMap>(8);
         let intervals_by_index = Map.new<Text, IndexDetails>();
 
-        let iterators = Buffer.Buffer<Iter<T.DocumentId>>(8);
+        let iterators = Buffer.Buffer<Iter<(T.DocumentId, ?[(Text, T.Candid)])>>(8);
         let full_scan_details_buffer = Buffer.Buffer<T.FullScanDetails>(8);
 
         for (scan_details in query_plan.scans.vals()) switch (scan_details) {
@@ -1147,23 +1217,44 @@ module {
                     add_interval(intervals_by_index, index_name, interval, sorted_in_reverse);
 
                 } else {
-                    var document_ids : Iter<T.DocumentId> = Intervals.document_ids_from_index_intervals(collection, index_name, [interval], sorted_in_reverse);
+
+                    let index = CollectionUtils.get_composite_index(collection, index_name);
+                    let filter_bounds_buffer = Buffer.fromArray<T.Bounds>([filter_bounds]);
+
+                    var document_ids_with_fields = if (
+                        CollectionUtils.can_use_indexed_fields_for_filtering(index.key_details, filter_bounds_buffer) or
+                        (
+                            requires_sorting and
+                            Option.isSome(
+                                Array.find(index.key_details, func((key, _) : (Text, Any)) : Bool { key == Option.get(opt_sort_column, ("", #Ascending)).0 })
+                            )
+                        )
+                    ) {
+                        Intervals.document_ids_and_indexed_fields_from_intervals(collection, index_name, [interval], sorted_in_reverse);
+                    } else {
+                        let document_ids = Intervals.document_ids_from_index_intervals(collection, index_name, [interval], sorted_in_reverse);
+                        Iter.map<T.DocumentId, (T.DocumentId, ?[(Text, T.Candid)])>(
+                            document_ids,
+                            func(id : T.DocumentId) : (T.DocumentId, ?[(Text, T.Candid)]) {
+                                (id, null);
+                            },
+                        );
+                    };
 
                     if (requires_additional_filtering) {
-                        document_ids := CollectionUtils.multiFilter(collection, document_ids, Buffer.fromArray([filter_bounds]), query_plan.is_and_operation);
+                        document_ids_with_fields := CollectionUtils.multiFilterWithIndexedFields(collection, document_ids_with_fields, filter_bounds_buffer, query_plan.is_and_operation);
                     };
 
                     if (requires_additional_sorting) {
 
-                        let arr = Utils.iter_to_array(document_ids);
+                        let arr = Iter.toArray(document_ids_with_fields);
                         let sorted = MergeSort.sort(arr, sort_documents_by_field_cmp);
 
-                        document_ids := sorted.vals();
+                        document_ids_with_fields := sorted.vals();
 
                     };
 
-                    iterators.add(document_ids);
-
+                    iterators.add(document_ids_with_fields);
                 };
 
             };
@@ -1178,7 +1269,7 @@ module {
                     if (requires_sorting) {
                         iterators.add(iter);
                     } else {
-                        let bitmap = BitMap.fromIter(Iter.map(iter, Utils.convert_last_8_bytes_to_nat));
+                        let bitmap = BitMap.fromIter(Iter.map(iter, func((id, _) : (T.DocumentId, ?[(Text, T.Candid)])) : Nat { Utils.convert_last_8_bytes_to_nat(id) }));
                         bitmaps.add(bitmap);
                     };
                 };
@@ -1200,6 +1291,7 @@ module {
             intervals : Buffer.Buffer<T.Interval>,
             opt_sort_column : ?(Text, T.SortDirection),
         ) : Bool {
+            if (not requires_sorting) return false;
             if (intervals.size() <= 1) return false;
 
             let ?_index = Map.get(collection.indexes, Map.thash, index_name) else Debug.trap("Unreachable: IndexMap not found for index: " # index_name);
@@ -1211,6 +1303,13 @@ module {
             };
 
             let index_key = index.key_details.get(0).0;
+
+            // we should retrieve the operation the interval was created for to better determine if it requires sorting
+            // this is an approximation that works in many cases, it fails and causes unnecessary sorting when:
+            // - the values for the prefix fields are the same across intervals
+            //   e.g. index on (age, name), sort by name, intervals:   (20, "A" to "C") or (20, "M" to "Z")
+            // - the sort field is an equality field in the index key (e.g. index on (age, name), sort by age, intervals: (20, ="A") or (25, ="A") or (30, ="B"))
+            // -
 
             sort_field != index_key;
         };
@@ -1245,7 +1344,7 @@ module {
                 return #Interval(index_name, intervals, is_reversed);
             };
 
-            // moves on to the next block to handle multiple intervals that require sorting
+            // moves on to the next block to handle multiple intervals that requir sorting
 
         };
 
@@ -1257,11 +1356,11 @@ module {
 
                 let sorted_in_reverse = Option.get(interval_details.sorted_in_reverse, false);
 
-                let document_ids = Intervals.document_ids_from_index_intervals(collection, index_name, [interval], sorted_in_reverse);
-
                 if (requires_sorting) {
-                    iterators.add(document_ids);
+                    let document_ids_with_fields = Intervals.document_ids_and_indexed_fields_from_intervals(collection, index_name, [interval], sorted_in_reverse);
+                    iterators.add(document_ids_with_fields);
                 } else {
+                    let document_ids = Intervals.document_ids_from_index_intervals(collection, index_name, [interval], sorted_in_reverse);
                     let bitmap = BitMap.fromIter(Iter.map(document_ids, Utils.convert_last_8_bytes_to_nat));
                     bitmaps.add(bitmap);
                 };
@@ -1282,32 +1381,33 @@ module {
             let filtered_ids = CollectionUtils.multiFilter(collection, document_ids, full_scan_filter_bounds, query_plan.is_and_operation);
 
             if (requires_sorting) {
-                let arr = Utils.iter_to_array(filtered_ids);
+                let filtered_ids_with_null_fields : Iter<(T.DocumentId, ?[(Text, T.Candid)])> = Iter.map<T.DocumentId, (T.DocumentId, ?[(Text, T.Candid)])>(filtered_ids, func(id : T.DocumentId) : (T.DocumentId, ?[(Text, T.Candid)]) { (id, null) });
+                let arr = Iter.toArray(filtered_ids_with_null_fields);
                 let sorted = MergeSort.sort(arr, sort_documents_by_field_cmp);
 
                 iterators.add(sorted.vals());
 
             } else {
-                let bitmap = BitMap.fromIter(Iter.map(filtered_ids, Utils.convert_last_8_bytes_to_nat));
+                let bitmap = BitMap.fromIter(Iter.map<T.DocumentId, Nat>(filtered_ids, Utils.convert_last_8_bytes_to_nat));
                 bitmaps.add(bitmap);
             };
 
         };
 
         func deduplicate_document_ids_iter(
-            document_ids_iter : Iter<T.DocumentId>
-        ) : Iter<T.DocumentId> {
+            document_ids_iter : Iter<(T.DocumentId, ?[(Text, T.Candid)])>
+        ) : Iter<(T.DocumentId, ?[(Text, T.Candid)])> {
             let dedup_bitmap = BitMap.BitMap(1024);
 
             object {
-                public func next() : ?T.DocumentId {
+                public func next() : ?(T.DocumentId, ?[(Text, T.Candid)]) {
                     loop switch (document_ids_iter.next()) {
                         case (null) return null;
-                        case (?id) {
+                        case (?(id, fields)) {
                             let nat_id = Utils.convert_last_8_bytes_to_nat(id);
                             if (not dedup_bitmap.get(nat_id)) {
                                 dedup_bitmap.set(nat_id, true);
-                                return ?id;
+                                return ?(id, fields);
                             };
                         };
                     };
@@ -1320,7 +1420,9 @@ module {
 
             if (iterators.size() == 0) return #Empty;
 
-            let merged_iterators = Itertools.kmerge<T.DocumentId>(Buffer.toArray(iterators), sort_documents_by_field_cmp);
+            // todo: we can optimize this further by eliminitating duplicates directly during the merge sort kmerge step without creating a separate dedup bitmap
+            // todo: another optimization is to check if the sort field is one of the index fields and leverage that to avoid lookups in the document store and deserialization
+            let merged_iterators = Itertools.kmerge<(T.DocumentId, ?[(Text, T.Candid)])>(Buffer.toArray(iterators), sort_documents_by_field_cmp);
 
             let deduped_iter = deduplicate_document_ids_iter(merged_iterators);
 
@@ -1343,7 +1445,7 @@ module {
         collection : T.StableCollection,
         query_plan : T.QueryPlan,
         opt_sort_column : ?(Text, T.SortDirection),
-        sort_documents_by_field_cmp : (T.DocumentId, T.DocumentId) -> Order,
+        sort_documents_by_field_cmp : ((T.DocumentId, ?[(Text, T.Candid)]), (T.DocumentId, ?[(Text, T.Candid)])) -> Order,
     ) : EvalResult {
 
         let log = Logger.NamespacedLogger(collection.logger, LOGGER_NAMESPACE).subnamespace("generate_document_ids_for_query_plan");

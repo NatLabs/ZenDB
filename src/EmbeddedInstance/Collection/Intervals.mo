@@ -20,6 +20,7 @@ import Vector "mo:vector@0.4.2";
 
 import TypeUtils "mo:memory-collection@0.3.2/TypeUtils";
 import Int8Cmp "mo:memory-collection@0.3.2/TypeUtils/Int8Cmp";
+import CandidUtils "../CandidUtils";
 
 import T "../Types";
 import Query "../Query";
@@ -415,6 +416,72 @@ module {
                     };
                     document_ids;
                 },
+            )
+        );
+    };
+
+    public func document_ids_and_indexed_fields_from_intervals(collection : T.StableCollection, index_name : Text, _intervals : [T.Interval], sorted_in_reverse : Bool) : Iter<(T.DocumentId, ?[(Text, T.Candid)])> {
+
+        let intervals = if (sorted_in_reverse) {
+            Array.reverse(_intervals);
+        } else {
+            _intervals;
+        };
+
+        if (index_name == C.DOCUMENT_ID) {
+            return Iter.map<T.DocumentId, (T.DocumentId, ?[(Text, T.Candid)])>(
+                document_ids_from_index_intervals(collection, index_name, intervals, sorted_in_reverse),
+                func(doc_id : T.DocumentId) : (T.DocumentId, ?[(Text, T.Candid)]) {
+                    (doc_id, null);
+                },
+            );
+        };
+
+        let ?index = Map.get(collection.indexes, Map.thash, index_name) else Debug.trap("Unreachable: IndexMap not found for index: " # index_name);
+
+        let internal_index = switch (index) {
+            case (#text_index(text_index)) text_index.internal_index;
+            case (#composite_index(composite_index)) composite_index;
+        };
+
+        let index_data_utils = CompositeIndex.get_index_data_utils(collection);
+
+        func process_index_interval(interval : T.Interval) : Iter<(T.DocumentId, ?[(Text, T.Candid)])> {
+            let entries = BTree.range(internal_index.data, index_data_utils, interval.0, interval.1);
+
+            let document_ids_with_fields = RevIter.map<([T.CandidQuery], T.DocumentId), (T.DocumentId, ?[(Text, T.Candid)])>(
+                entries,
+                func(entry : ([T.CandidQuery], T.DocumentId)) : (T.DocumentId, ?[(Text, T.Candid)]) {
+                    // extract_indexed_fields_from_btree_entry
+                    let (index_key_values, doc_id) = entry;
+
+                    // Check if we have valid data to extract
+                    if (internal_index.key_details.size() == 0) {
+                        return (doc_id, null);
+                    };
+
+                    let fields = Array.tabulate<(Text, T.Candid)>(
+                        internal_index.key_details.size(),
+                        func(i : Nat) : (Text, T.Candid) {
+                            let field_name = internal_index.key_details[i].0;
+                            let candid_value : T.Candid = CandidUtils.fromCandidQuery(index_key_values[i]);
+                            (field_name, candid_value);
+                        },
+                    );
+
+                    (doc_id, ?fields);
+                },
+            );
+
+            if (sorted_in_reverse) return document_ids_with_fields.rev();
+
+            document_ids_with_fields;
+        };
+
+        Itertools.flatten(
+            Iter.map(
+                intervals.vals(),
+                process_index_interval,
             )
         );
     };

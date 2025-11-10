@@ -117,9 +117,9 @@ module {
             await canister_db.zendb_collection_update_document_by_id(db_name, collection_name, document_id, updates);
         };
 
-        // public func update(db_query : ZT.StableQuery, updates : [(Text, ZT.FieldUpdateOperations)]) : async* (ZT.Result<[ZT.DocumentId], Text>) {
-        //     await canister_db.zendb_collection_update_documents(db_name, collection_name, db_query, updates);
-        // };
+        public func update(db_query : ZT.StableQuery, updates : [(Text, ZT.FieldUpdateOperations)]) : async* (ZT.Result<ZT.UpdateResult, Text>) {
+            await canister_db.zendb_collection_update_documents(db_name, collection_name, db_query, updates);
+        };
 
         public func get_schema() : async* (ZT.Result<ZT.Schema, Text>) {
             await canister_db.zendb_collection_get_schema(db_name, collection_name);
@@ -129,7 +129,7 @@ module {
             await canister_db.zendb_collection_create_index(db_name, collection_name, index_name, index_fields, options);
         };
 
-        public func batch_create_indexes(index_configs : [ZT.CreateIndexBatchConfig]) : async* (ZT.Result<Nat, Text>) {
+        public func batch_create_indexes(index_configs : [ZT.CreateIndexParams]) : async* (ZT.Result<Nat, Text>) {
             await canister_db.zendb_collection_batch_create_indexes(db_name, collection_name, index_configs);
         };
 

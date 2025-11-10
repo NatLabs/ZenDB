@@ -129,7 +129,7 @@ module {
         public func getSchema() : T.Schema { collection.schema };
 
         public func listIndexes() : [Text] {
-            Utils.iter_to_array(Map.keys(collection.indexes));
+            Iter.toArray(Map.keys(collection.indexes));
         };
 
         public func getIndexes() : [(Text, T.IndexStats)] {
@@ -426,7 +426,7 @@ module {
         };
 
         public func filter(condition : (Record) -> Bool) : [Record] {
-            Utils.iter_to_array(filterIter(condition));
+            Iter.toArray(filterIter(condition));
         };
 
         /// Clear all the data in the collection.
@@ -442,22 +442,29 @@ module {
         /// If `is_unique` is true, the index will be unique on the index keys and documents with duplicate index keys will be rejected.
         public func createIndex(name : Text, index_key_details : [(Text, SortDirection)], opt_options : ?T.CreateIndexOptions) : T.Result<(), Text> {
 
-            let internal_options : T.CreateIndexInternalOptions = switch (opt_options) {
-                case (?options) T.CreateIndexOptions.to_internal_default(options);
-                case (null) T.CreateIndexOptions.internal_default();
-            };
-
             StableCollection.create_and_populate_index_in_one_call(
                 collection,
                 name,
                 index_key_details,
-                internal_options,
+                T.CreateIndexOptions.internal_from_opt(opt_options),
             );
         };
 
-        public func batchCreateIndexes(index_configs : [T.CreateIndexBatchConfig]) : T.Result<(batch_id : Nat), Text> {
+        public func batchCreateIndexes(index_configs : [T.CreateIndexParams]) : T.Result<(batch_id : Nat), Text> {
+
+            let internal_index_configs = Array.map<T.CreateIndexParams, T.CreateInternalIndexParams>(
+                index_configs,
+                func(config : T.CreateIndexParams) : T.CreateInternalIndexParams {
+                    (
+                        config.0,
+                        config.1,
+                        T.CreateIndexOptions.internal_from_opt(config.2),
+                    );
+                },
+            );
+
             handleResult(
-                StableCollection.batch_create_indexes(collection, index_configs),
+                StableCollection.batch_create_indexes(collection, internal_index_configs),
                 "Failed to create index batch",
             );
         };

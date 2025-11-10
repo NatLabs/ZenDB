@@ -162,7 +162,7 @@ module T {
 
     public type DocumentStore = BTree<DocumentId, Document>;
 
-    public type CreateIndexBatchConfig = (
+    public type CreateIndexParams = (
         name : Text,
         key_details : [(field : Text, SortDirection)],
         is_unique : Bool,

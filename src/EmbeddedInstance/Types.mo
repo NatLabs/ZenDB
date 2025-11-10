@@ -166,11 +166,16 @@ module T {
 
     public type DocumentStore = BTree<DocumentId, Document>;
 
-    public type CreateIndexBatchConfig = (
+    public type CreateIndexParams = (
         name : Text,
         key_details : [(field : Text, SortDirection)],
-        is_unique : Bool,
-        used_internally : Bool,
+        create_index_options : ?T.CreateIndexOptions,
+    );
+
+    public type CreateInternalIndexParams = (
+        name : Text,
+        key_details : [(field : Text, SortDirection)],
+        create_index_options : T.CreateIndexInternalOptions,
     );
 
     public type BatchPopulateIndex = {
@@ -385,6 +390,17 @@ module T {
         public func to_internal_default(options : CreateIndexOptions) : CreateIndexInternalOptions {
             { is_unique = options.is_unique; used_internally = false };
         };
+
+        public func internal_from_opt(opt_options : ?CreateIndexOptions) : CreateIndexInternalOptions {
+            switch (opt_options) {
+                case (?options) {
+                    to_internal_default(options);
+                };
+                case (null) {
+                    internal_default();
+                };
+            };
+        };
     };
 
     public type CreateCollectionOptions = {
@@ -569,7 +585,7 @@ module T {
 
     public type EvalResult = {
         #Empty;
-        #Ids : Iter<DocumentId>;
+        #Ids : Iter<(DocumentId, ?[(Text, Candid)])>; // todo: returned the assumed size with the iterator, can help in choosing the smallest set of ids
         #BitMap : T.BitMap;
         #Interval : (index : Text, interval : [Interval], is_reversed : Bool);
     };

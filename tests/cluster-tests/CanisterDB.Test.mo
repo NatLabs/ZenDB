@@ -33,7 +33,7 @@ persistent actor {
                     ("is_active", #Bool),
                 ]);
 
-                let #ok(_) = await canister_db.zendb_create_collection("default", "users", schema) else return assert false;
+                let #ok(_) = await canister_db.zendb_create_collection("default", "users", schema, null) else return assert false;
 
                 let user_blob = to_candid ({
                     name = "Alice";

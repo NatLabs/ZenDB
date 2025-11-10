@@ -309,7 +309,7 @@ module {
     };
 
     public func list_collections(db : T.StableDatabase) : [Text] {
-        Utils.iter_to_array(Map.keys(db.collections));
+        Iter.toArray(Map.keys(db.collections));
     };
 
     public func stats(db : T.StableDatabase) : T.DatabaseStats {
