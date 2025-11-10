@@ -268,8 +268,7 @@ module CompositeIndex {
         let doc_store_utils = DocumentStore.getBtreeUtils(collection.documents);
 
         for ((document_id, candid_blob) in DocumentStore.entries(collection.documents, doc_store_utils)) {
-            let candid = CollectionUtils.decodeCandidBlob(collection, candid_blob);
-            let candid_map = CandidMap.new(collection.schema_map, document_id, candid);
+            let candid_map = CollectionUtils.get_candid_map_no_cache(collection, document_id, ?candid_blob);
 
             switch (CompositeIndex.insertWithCandidMap(collection, index, document_id, candid_map)) {
                 case (#err(err)) {
@@ -323,8 +322,8 @@ module CompositeIndex {
         let candid_map_document_entries = Iter.map<(T.DocumentId, T.CandidBlob), (T.DocumentId, T.CandidMap)>(
             DocumentStore.entries(collection.documents, DocumentStore.getBtreeUtils(collection.documents)),
             func((id, candid_blob) : (T.DocumentId, T.CandidBlob)) : (T.DocumentId, T.CandidMap) {
-                let candid = CollectionUtils.decodeCandidBlob(collection, candid_blob);
-                (id, CandidMap.new(collection.schema_map, id, candid));
+                let candid_map = CollectionUtils.get_candid_map_no_cache(collection, id, ?candid_blob);
+                (id, candid_map);
             },
         );
 
@@ -345,8 +344,8 @@ module CompositeIndex {
         let candid_map_document_entries = Iter.map<(T.DocumentId, T.CandidBlob), (T.DocumentId, T.CandidMap)>(
             DocumentStore.entries(collection.documents, DocumentStore.getBtreeUtils(collection.documents)),
             func((id, candid_blob) : (T.DocumentId, T.CandidBlob)) : (T.DocumentId, T.CandidMap) {
-                let candid = CollectionUtils.decodeCandidBlob(collection, candid_blob);
-                (id, CandidMap.new(collection.schema_map, id, candid));
+                let candid_map = CollectionUtils.get_candid_map_no_cache(collection, id, ?candid_blob);
+                (id, candid_map);
             },
         );
 

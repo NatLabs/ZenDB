@@ -51,6 +51,7 @@ import Logger "../Logger";
 import SchemaMap "SchemaMap";
 import BTree "../BTree";
 import DocumentStore "DocumentStore";
+import TwoQueueCache "../TwoQueueCache";
 
 module CollectionUtils {
     let LOGGER_NAMESPACE = "CollectionUtils";
@@ -304,9 +305,7 @@ module CollectionUtils {
         Iter.filter<T.DocumentId>(
             documents,
             func(id : T.DocumentId) : Bool {
-                let ?candid = CollectionUtils.lookupCandidDocument(collection, id) else Debug.trap("multiFilter: candid_map_bytes not found");
-                let candid_map = CandidMap.new(collection.schema_map, id, candid);
-
+                let candid_map = CollectionUtils.get_and_cache_candid_map(collection, id);
                 candid_map_multi_filter_condition(collection, id, candid_map, bounds, is_and);
             },
         );
@@ -434,14 +433,59 @@ module CollectionUtils {
                     filter_with_indexed_fields(collection, id, indexed_fields_map, bounds, is_and);
                 } else {
                     // Indexed fields not available or incomplete, fall back to loading full document
-                    let ?candid = CollectionUtils.lookupCandidDocument(collection, id) else Debug.trap("multiFilterWithIndexedFields: document not found for id: " # debug_show id);
-                    let candid_map = CandidMap.new(collection.schema_map, id, candid);
-
+                    let candid_map = CollectionUtils.get_and_cache_candid_map(collection, id);
                     candid_map_multi_filter_condition(collection, id, candid_map, bounds, is_and);
 
                 };
             },
         );
+    };
+
+    public func get_and_cache_candid_map(collection : T.StableCollection, id : T.DocumentId) : T.CandidMap {
+        func lookup_candid_map(id : T.DocumentId) : T.CandidMap {
+            let ?candid_document = CollectionUtils.lookupCandidDocument(collection, id) else Debug.trap("Couldn't find document with id: " # debug_show id);
+            CandidMap.new(collection.schema_map, id, candid_document);
+        };
+
+        // switch (TwoQueueCache.get(collection.candid_map_cache, Map.bhash, id, lookup_candid_map)) {
+        //     case (?candid) candid;
+        //     case (null) {
+        //         let candid_map = lookup_candid_map(id);
+        //         TwoQueueCache.put(collection.candid_map_cache, Map.bhash, id, candid_map);
+        //         candid_map;
+        //     };
+        // };
+
+        lookup_candid_map(id);
+
+    };
+
+    public func get_candid_map_no_cache(collection : T.StableCollection, id : T.DocumentId, opt_candid_blob : ?T.CandidBlob) : T.CandidMap {
+        func lookup_candid_map(id : T.DocumentId) : T.CandidMap {
+            let ?candid_document = CollectionUtils.lookupCandidDocument(collection, id) else Debug.trap("Couldn't find document with id: " # debug_show id);
+            CandidMap.new(collection.schema_map, id, candid_document);
+        };
+
+        switch (TwoQueueCache.peek(collection.candid_map_cache, Map.bhash, id)) {
+            case (?candid) candid;
+            case (null) switch (opt_candid_blob) {
+                case (?candid_blob) {
+                    let candid = CollectionUtils.decodeCandidBlob(collection, candid_blob);
+                    CandidMap.new(collection.schema_map, id, candid);
+                };
+                case (null) lookup_candid_map(id);
+            };
+        };
+
+    };
+
+    public func put_candid_map_in_cache(collection : T.StableCollection, id : T.DocumentId, candid_map : T.CandidMap) : () {
+        // TwoQueueCache.put(collection.candid_map_cache, Map.bhash, id, candid_map);
+    };
+
+    public func remove_candid_map_from_cache(collection : T.StableCollection, id : T.DocumentId) : ?T.CandidMap {
+        // TwoQueueCache.remove(collection.candid_map_cache, Map.bhash, id);
+        null;
     };
 
 };

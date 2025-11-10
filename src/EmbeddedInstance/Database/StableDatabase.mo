@@ -166,6 +166,7 @@ module {
             ids = db.ids;
             instance_id = db.instance_id;
             freed_btrees = db.freed_btrees;
+            candid_map_cache = db.candid_map_cache;
             logger = db.logger;
             memory_type = db.memory_type;
             is_running_locally = db.is_running_locally;

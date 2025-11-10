@@ -25,7 +25,7 @@ module {
             case (#v0(stable_store)) { V0.get_current_state(stable_store) };
             case (_) Debug.trap(
                 "
-                Invalid version of stable store" # debug_show (to_text(asset_versions)) # ". Please call upgrade() on the stable store.
+                Invalid Major Version " # debug_show (to_text(asset_versions)) # ". Expected #v0. Please call upgrade() on the stable store.
                 "
             );
         };

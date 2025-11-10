@@ -39,6 +39,7 @@ import StableDatabase "Database/StableDatabase";
 
 import T "Types";
 import C "Constants";
+import TwoQueueCache "TwoQueueCache";
 
 import TypeMigrations "TypeMigrations";
 
@@ -115,9 +116,11 @@ module {
             is_running_locally : Bool;
         };
         memory_type : ?T.MemoryType;
+        cache_capacity : ?Nat;
     };
 
     public let DefaultMemoryType = #stableMemory;
+    public let DefaultCacheCapacity : Nat = 100_000;
 
     public let defaultSettings : Settings = {
         logging = ?{
@@ -125,6 +128,7 @@ module {
             is_running_locally = false;
         };
         memory_type = ?(DefaultMemoryType);
+        cache_capacity = ?(DefaultCacheCapacity);
     };
 
     public func newStableStore(canister_id : Principal, opt_settings : ?Settings) : T.VersionedStableStore {
@@ -143,6 +147,9 @@ module {
             instance_id;
             ids = Ids.new();
             databases = Map.new<Text, T.StableDatabase>();
+            candid_map_cache = TwoQueueCache.new(
+                Option.get(settings.cache_capacity, DefaultCacheCapacity)
+            );
             memory_type = Option.get(settings.memory_type, DefaultMemoryType);
             freed_btrees = Vector.new<T.MemoryBTree>();
             logger = Logger.init(#Error, false);
@@ -157,6 +164,7 @@ module {
             ids = zendb.ids;
             instance_id = zendb.instance_id;
             collections = Map.new<Text, T.StableCollection>();
+            candid_map_cache = zendb.candid_map_cache;
             freed_btrees = zendb.freed_btrees;
             logger = zendb.logger;
             memory_type = zendb.memory_type;
@@ -199,6 +207,7 @@ module {
             ids = sstore.ids;
             instance_id = sstore.instance_id;
             collections = Map.new<Text, T.StableCollection>();
+            candid_map_cache = sstore.candid_map_cache;
             freed_btrees = sstore.freed_btrees;
             logger = sstore.logger;
             memory_type = sstore.memory_type;

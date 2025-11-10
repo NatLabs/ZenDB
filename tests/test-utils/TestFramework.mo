@@ -179,6 +179,7 @@ module TestFramework {
                                         is_running_locally = true;
                                     };
                                     memory_type = ?(#stableMemory);
+                                    cache_capacity = ?(10);
                                 },
                             );
 
@@ -197,6 +198,7 @@ module TestFramework {
                                         is_running_locally = true;
                                     };
                                     memory_type = ?(#heap);
+                                    cache_capacity = ?(10);
                                 },
                             );
                             run_suite_with_or_without_indexes("Heap Memory", zendb_sstore);
