@@ -30,11 +30,7 @@ import BpTree "mo:augmented-btrees@0.7.1/BpTree";
 import BpTreeTypes "mo:augmented-btrees@0.7.1/BpTree/Types";
 import LruCache "mo:lru-cache";
 
-import TypeMigrations "TypeMigrations";
-
 module T {
-
-    public type VersionedStableStore = TypeMigrations.VersionedStableStore;
 
     public type BitMap = BitMap.BitMap;
 
@@ -215,11 +211,11 @@ module T {
         indexes_in_batch_operations : Map<Text, Index>;
         populate_index_batches : Map<Nat, BatchPopulateIndex>;
 
-        candid_serializer : Candid.TypedSerializer;
-
         field_constraints : Map<Text, [SchemaFieldConstraint]>;
         unique_constraints : [([Text], CompositeIndex)];
         fields_with_unique_constraints : Map<Text, Set<Nat>>; // the value is the index of the unique constraint in the unique_constraints list
+
+        candid_serializer : Candid.TypedSerializer;
 
         // reference to the freed btrees to the same variable in
         // the ZenDB database document

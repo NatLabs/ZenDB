@@ -39,6 +39,7 @@ import StableDatabase "Database/StableDatabase";
 
 import T "Types";
 import C "Constants";
+import TwoQueueCache "TwoQueueCache";
 
 import TypeMigrations "TypeMigrations";
 
@@ -110,21 +111,21 @@ module {
     };
 
     public type Settings = {
-        logging : ?{
-            log_level : Logger.LogLevel;
-            is_running_locally : Bool;
-        };
+        log_level : ?Logger.LogLevel;
+        is_running_locally : ?Bool;
         memory_type : ?T.MemoryType;
+        cache_capacity : ?Nat;
     };
 
     public let DefaultMemoryType = #stableMemory;
+    public let DefaultCacheCapacity : Nat = 100_000;
+    public let DefaultLogLevel = #Warn;
 
     public let defaultSettings : Settings = {
-        logging = ?{
-            log_level = #Warn;
-            is_running_locally = false;
-        };
+        log_level = ?(DefaultLogLevel);
+        is_running_locally = ?false;
         memory_type = ?(DefaultMemoryType);
+        cache_capacity = ?(DefaultCacheCapacity);
     };
 
     public func newStableStore(canister_id : Principal, opt_settings : ?Settings) : T.VersionedStableStore {
@@ -138,18 +139,21 @@ module {
             canister_id_blob[3],
         ]);
 
+        let is_running_locally = Option.get(settings.is_running_locally, false);
+        let log_level = Option.get(settings.log_level, DefaultLogLevel);
+
         let zendb : T.StableStore = {
             canister_id;
             instance_id;
             ids = Ids.new();
             databases = Map.new<Text, T.StableDatabase>();
+            candid_map_cache = TwoQueueCache.new(
+                Option.get(settings.cache_capacity, DefaultCacheCapacity)
+            );
             memory_type = Option.get(settings.memory_type, DefaultMemoryType);
             freed_btrees = Vector.new<T.MemoryBTree>();
-            logger = Logger.init(#Error, false);
-            is_running_locally = Option.get(
-                Option.map(settings.logging, func(s : { is_running_locally : Bool }) : Bool = s.is_running_locally),
-                false,
-            );
+            logger = Logger.init(log_level, is_running_locally);
+            is_running_locally;
         };
 
         let default_db : T.StableDatabase = {
@@ -157,6 +161,7 @@ module {
             ids = zendb.ids;
             instance_id = zendb.instance_id;
             collections = Map.new<Text, T.StableCollection>();
+            candid_map_cache = zendb.candid_map_cache;
             freed_btrees = zendb.freed_btrees;
             logger = zendb.logger;
             memory_type = zendb.memory_type;
@@ -165,14 +170,12 @@ module {
 
         ignore Map.put(zendb.databases, T.thash, "default", default_db);
 
-        ignore do ? {
-            let log_settings = settings.logging!;
-
-            Logger.setLogLevel(zendb.logger, log_settings.log_level);
-            Logger.setIsRunLocally(zendb.logger, log_settings.is_running_locally);
-        };
-
         TypeMigrations.share_version(zendb);
+    };
+
+    public func updateCacheSize(versioned_sstore : T.VersionedStableStore, new_cache_size : Nat) {
+        let sstore = TypeMigrations.get_current_state(versioned_sstore);
+        TwoQueueCache.resize(sstore.candid_map_cache, new_cache_size);
     };
 
     public func upgrade(versioned_sstore : T.VersionedStableStore) : T.VersionedStableStore {
@@ -199,6 +202,7 @@ module {
             ids = sstore.ids;
             instance_id = sstore.instance_id;
             collections = Map.new<Text, T.StableCollection>();
+            candid_map_cache = sstore.candid_map_cache;
             freed_btrees = sstore.freed_btrees;
             logger = sstore.logger;
             memory_type = sstore.memory_type;

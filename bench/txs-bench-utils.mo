@@ -23,14 +23,16 @@ module TxsBenchUtils {
 
         // "#heap no index",
         "#stableMemory no index (sorted by ts)",
+        "#stableMemory no index (sorted by tx.amt)",
 
         // partially covered indexes sorted by tx.amt
-        // "#heap 7 single field indexes (sorted by timestamp)",
+        // "#heap 7 single field indexes (sorted by ts)",
         "#stableMemory 7 single field indexes (sorted by tx.amt)",
 
         // multi-field indexes sorted by timestamp
         // "#heap 6 fully covered indexes (sorted by ts)",
         "#stableMemory 6 fully covered indexes (sorted by ts)",
+        "#stableMemory 6 fully covered indexes (sorted by tx.amt)",
 
     ];
 
@@ -241,7 +243,7 @@ module TxsBenchUtils {
 
         let canister_id = fuzz.principal.randomPrincipal(29);
 
-        let heap_db_sstore = ZenDB.newStableStore(canister_id, ?{ ZenDB.defaultSettings with memory_type = ?(#heap) });
+        let heap_db_sstore = ZenDB.newStableStore(canister_id, ?{ ZenDB.defaultSettings with memory_type = ?(#heap); cache_capacity = ?(iteration_limit / 100) }); // 1% cache
         let heap_db = ZenDB.launchDefaultDB(heap_db_sstore);
         let #ok(heap_no_index) = heap_db.createCollection<Tx>("heap_no_index", TxSchema, candify_tx, null);
         let #ok(heap_single_field_indexes) = heap_db.createCollection<Tx>("heap_single_field_indexes", TxSchema, candify_tx, null);
@@ -250,7 +252,7 @@ module TxsBenchUtils {
         let #ok(heap_sorted_single_field_indexes) = heap_db.createCollection<Tx>("heap_sorted_single_field_indexes", TxSchema, candify_tx, null);
         let #ok(heap_sorted_fully_covered_indexes) = heap_db.createCollection<Tx>("heap_sorted_fully_covered_indexes", TxSchema, candify_tx, null);
 
-        let stable_memory_db_sstore = ZenDB.newStableStore(canister_id, ?{ ZenDB.defaultSettings with memory_type = ?(#stableMemory) });
+        let stable_memory_db_sstore = ZenDB.newStableStore(canister_id, ?{ ZenDB.defaultSettings with memory_type = ?(#stableMemory); cache_capacity = ?(iteration_limit / 100) }); // 1% cache
         let stable_memory_db = ZenDB.launchDefaultDB(stable_memory_db_sstore);
         let #ok(stable_memory_no_index) = stable_memory_db.createCollection<Tx>("stable_memory_no_index", TxSchema, candify_tx, null);
         let #ok(stable_memory_single_field_indexes) = stable_memory_db.createCollection<Tx>("stable_memory_single_field_indexes", TxSchema, candify_tx, null);
@@ -748,6 +750,18 @@ module TxsBenchUtils {
             iteration_limit,
         );
 
+        let stable_memory_sorted_single_field_indexes_by_amt_benchmark = CollectionBenchmark(
+            stable_memory_sorted_single_field_indexes,
+            single_field_indexes,
+            predefined_txs,
+            Buffer.Buffer<Nat>(iteration_limit),
+            principals,
+            candid_principals_0_10,
+            new_sorted_query("tx.amt", #Ascending),
+            fuzz,
+            iteration_limit,
+        );
+
         let heap_sorted_single_field_indexes_benchmark = CollectionBenchmark(
             heap_sorted_single_field_indexes,
             single_field_indexes,
@@ -784,6 +798,66 @@ module TxsBenchUtils {
             iteration_limit,
         );
 
+        let stable_memory_sorted_no_index_by_amt_benchmark = CollectionBenchmark(
+            stable_memory_sorted_no_index,
+            [],
+            predefined_txs,
+            Buffer.Buffer<Nat>(iteration_limit),
+            principals,
+            candid_principals_0_10,
+            new_sorted_query("tx.amt", #Ascending),
+            fuzz,
+            iteration_limit,
+        );
+
+        let stable_memory_sorted_fully_covered_indexes_by_amt_benchmark = CollectionBenchmark(
+            stable_memory_sorted_fully_covered_indexes,
+            fully_covered_indexes,
+            predefined_txs,
+            Buffer.Buffer<Nat>(iteration_limit),
+            principals,
+            candid_principals_0_10,
+            new_sorted_query("tx.amt", #Ascending),
+            fuzz,
+            iteration_limit,
+        );
+
+        let heap_sorted_no_index_by_amt_benchmark = CollectionBenchmark(
+            heap_sorted_no_index,
+            [],
+            predefined_txs,
+            Buffer.Buffer<Nat>(iteration_limit),
+            principals,
+            candid_principals_0_10,
+            new_sorted_query("tx.amt", #Ascending),
+            fuzz,
+            iteration_limit,
+        );
+
+        let heap_sorted_single_field_indexes_by_amt_benchmark = CollectionBenchmark(
+            heap_sorted_single_field_indexes,
+            single_field_indexes,
+            predefined_txs,
+            Buffer.Buffer<Nat>(iteration_limit),
+            principals,
+            candid_principals_0_10,
+            new_sorted_query("tx.amt", #Ascending),
+            fuzz,
+            iteration_limit,
+        );
+
+        let heap_sorted_fully_covered_indexes_by_amt_benchmark = CollectionBenchmark(
+            heap_sorted_fully_covered_indexes,
+            fully_covered_indexes,
+            predefined_txs,
+            Buffer.Buffer<Nat>(iteration_limit),
+            principals,
+            candid_principals_0_10,
+            new_sorted_query("tx.amt", #Ascending),
+            fuzz,
+            iteration_limit,
+        );
+
         public func run_benchmarks(row : Text, col : Text) {
             switch (row) {
                 case ("#heap no index") {
@@ -814,7 +888,7 @@ module TxsBenchUtils {
                     heap_sorted_no_index_benchmark.run_benchmark(col);
                 };
 
-                case ("#heap 7 single field indexes (sorted by timestamp)") {
+                case ("#heap 7 single field indexes (sorted by ts)") {
                     heap_sorted_single_field_indexes_benchmark.run_benchmark(col);
                 };
 
@@ -822,16 +896,40 @@ module TxsBenchUtils {
                     heap_sorted_fully_covered_indexes_benchmark.run_benchmark(col);
                 };
 
+                case ("#heap no index (sorted by tx.amt)") {
+                    heap_sorted_no_index_by_amt_benchmark.run_benchmark(col);
+                };
+
+                case ("#heap 7 single field indexes (sorted by tx.amt)") {
+                    heap_sorted_single_field_indexes_by_amt_benchmark.run_benchmark(col);
+                };
+
+                case ("#heap 6 fully covered indexes (sorted by tx.amt)") {
+                    heap_sorted_fully_covered_indexes_by_amt_benchmark.run_benchmark(col);
+                };
+
                 case ("#stableMemory no index (sorted by ts)") {
                     stable_memory_sorted_no_index_benchmark.run_benchmark(col);
                 };
 
-                case ("#stableMemory 7 single field indexes (sorted by tx.amt)") {
+                case ("#stableMemory no index (sorted by tx.amt)") {
+                    stable_memory_sorted_no_index_by_amt_benchmark.run_benchmark(col);
+                };
+
+                case ("#stableMemory 7 single field indexes (sorted by ts)") {
                     stable_memory_sorted_single_field_indexes_benchmark.run_benchmark(col);
+                };
+
+                case ("#stableMemory 7 single field indexes (sorted by tx.amt)") {
+                    stable_memory_sorted_single_field_indexes_by_amt_benchmark.run_benchmark(col);
                 };
 
                 case ("#stableMemory 6 fully covered indexes (sorted by ts)") {
                     stable_memory_sorted_fully_covered_indexes_benchmark.run_benchmark(col);
+                };
+
+                case ("#stableMemory 6 fully covered indexes (sorted by tx.amt)") {
+                    stable_memory_sorted_fully_covered_indexes_by_amt_benchmark.run_benchmark(col);
                 };
 
                 case (_) {

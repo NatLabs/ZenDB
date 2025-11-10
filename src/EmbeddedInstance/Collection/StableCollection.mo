@@ -382,8 +382,7 @@ module StableCollection {
         var processed_documents = 0;
 
         for ((document_id, candid_blob) in Itertools.take(entries_iter, num_documents_to_process)) {
-            let candid = CollectionUtils.decodeCandidBlob(collection, candid_blob);
-            let candid_map = CandidMap.new(collection.schema_map, document_id, candid);
+            let candid_map = CollectionUtils.get_candid_map_no_cache(collection, document_id, ?candid_blob);
 
             let processed_indexes = Buffer.Buffer<T.Index>(collection.indexes.size());
 
@@ -707,8 +706,7 @@ module StableCollection {
 
         var count = 0;
         for ((id, candid_blob) in entries) {
-            let candid = CollectionUtils.decodeCandidBlob(collection, candid_blob);
-            let candid_map = CandidMap.new(collection.schema_map, id, candid);
+            let candid_map = CollectionUtils.get_candid_map_no_cache(collection, id, ?candid_blob);
 
             for (index in indexes.vals()) {
                 switch (CommonIndexFns.insertWithCandidMap(collection, index, id, candid_map)) {
@@ -1062,9 +1060,7 @@ module StableCollection {
 
         log.logInfo("Replacing document with id: " # debug_show document_id);
 
-        let ?prev_candid_blob = DocumentStore.get(collection.documents, main_btree_utils, document_id) else return #err("Record for id '" # debug_show (document_id) # "' not found");
-        let prev_candid = CollectionUtils.decodeCandidBlob(collection, prev_candid_blob);
-        let prev_candid_map = CandidMap.new(collection.schema_map, document_id, prev_candid);
+        let prev_candid_map = CollectionUtils.get_candid_map_no_cache(collection, document_id, null);
 
         let new_candid_value = CollectionUtils.decodeCandidBlob(collection, new_candid_blob);
         let new_candid_map = CandidMap.new(collection.schema_map, document_id, new_candid_value);
@@ -1084,13 +1080,15 @@ module StableCollection {
             };
         };
 
-        assert ?prev_candid_blob == DocumentStore.put(collection.documents, main_btree_utils, document_id, new_candid_blob);
+        assert Option.isSome(DocumentStore.put(collection.documents, main_btree_utils, document_id, new_candid_blob));
 
         for (index in Map.vals(collection.indexes)) {
             let #ok(_) = update_indexed_document_fields(collection, index, document_id, new_candid_map, ?prev_candid_map) else {
                 return #err("Failed to update index data");
             };
         };
+
+        ignore CollectionUtils.remove_candid_map_from_cache(collection, document_id);
 
         log.lazyInfo(func() = "Successfully replaced document with id: " # debug_show document_id);
 
@@ -1107,9 +1105,9 @@ module StableCollection {
 
         for ((field_name, op) in update_operations.vals()) {
             let ?field_type = SchemaMap.get(collection.schema_map, field_name) else return #err("Field type '" # field_name # "' not found in document");
-            let ?prev_candid = CandidMap.get(candid_map, collection.schema_map, field_name) else return #err("Field '" # field_name # "' not found in document");
+            let ?prev_candid_value = CandidMap.get(candid_map, collection.schema_map, field_name) else return #err("Field '" # field_name # "' not found in document");
 
-            let new_value = switch (UpdateOps.handleFieldUpdateOperation(collection, candid_map, field_type, prev_candid, op)) {
+            let new_value = switch (UpdateOps.handleFieldUpdateOperation(collection, candid_map, field_type, prev_candid_value, op)) {
                 case (#ok(new_value)) new_value;
                 case (#err(msg)) {
                     return #err("Failed to update field '" # field_name # "' with operation '" # debug_show op # "': " # msg);
@@ -1187,10 +1185,7 @@ module StableCollection {
 
         log.lazyInfo(func() = "Updating document with id: " # debug_show id);
 
-        let ?prev_candid_blob = DocumentStore.get(collection.documents, main_btree_utils, id) else return #err("Record for id '" # debug_show (id) # "' not found");
-
-        let prev_candid = CollectionUtils.decodeCandidBlob(collection, prev_candid_blob);
-        let prev_candid_map = CandidMap.new(collection.schema_map, id, prev_candid);
+        let prev_candid_map = CollectionUtils.get_candid_map_no_cache(collection, id, null);
 
         let fields_with_updates = Array.map<(Text, T.FieldUpdateOperations), Text>(field_updates, func(k, _) = k);
 
@@ -1229,7 +1224,7 @@ module StableCollection {
             };
         };
 
-        assert ?prev_candid_blob == DocumentStore.put(collection.documents, main_btree_utils, id, new_candid_blob);
+        assert Option.isSome(DocumentStore.put(collection.documents, main_btree_utils, id, new_candid_blob));
 
         let updated_keys = Array.map<(Text, Any), Text>(
             field_updates,
@@ -1239,6 +1234,8 @@ module StableCollection {
         let #ok(_) = update_indexed_data_on_updated_fields(collection, id, prev_candid_map, new_candid_map, updated_keys) else {
             return #err("Failed to update index data");
         };
+
+        ignore CollectionUtils.remove_candid_map_from_cache(collection, id);
 
         log.lazyInfo(
             func() = "Successfully updated document with id: " # debug_show id
@@ -1503,20 +1500,6 @@ module StableCollection {
         sort_field : (Text, T.SortDirection),
     ) : ((T.DocumentId, ?[(Text, T.Candid)]), (T.DocumentId, ?[(Text, T.Candid)])) -> Order {
 
-        let candid_map_cache = Map.new<T.DocumentId, T.CandidMap>();
-
-        func get_candid_map(id : T.DocumentId) : T.CandidMap {
-            switch (Map.get(candid_map_cache, Map.bhash, id)) {
-                case (?candid) candid;
-                case (null) {
-                    let ?candid_document = CollectionUtils.lookupCandidDocument(collection, id) else Debug.trap("Couldn't find document with id: " # debug_show id);
-                    let candid_map = CandidMap.new(collection.schema_map, id, candid_document);
-                    // ignore Map.put(candid_map_cache, Map.bhash, id, candid_map);
-                    candid_map;
-                };
-            };
-        };
-
         func sort_documents_by_field_cmp(a : (T.DocumentId, ?[(Text, T.Candid)]), b : (T.DocumentId, ?[(Text, T.Candid)])) : Order {
 
             func get_value((id, opt_sort_value) : (T.DocumentId, ?[(Text, T.Candid)])) : T.Candid {
@@ -1533,7 +1516,7 @@ module StableCollection {
                 };
 
                 // Sort field not in indexed fields, fetch from document
-                let ?candid_value = CandidMap.get(get_candid_map(id), collection.schema_map, sort_field.0) else {
+                let ?candid_value = CandidMap.get(CollectionUtils.get_and_cache_candid_map(collection, id), collection.schema_map, sort_field.0) else {
                     Debug.trap("Couldn't get value from CandidMap for key: " # sort_field.0);
                 };
 
@@ -1699,8 +1682,7 @@ module StableCollection {
             return #err("Record not found");
         };
 
-        let prev_candid = CollectionUtils.decodeCandidBlob(collection, prev_candid_blob);
-        let prev_candid_map = CandidMap.new(collection.schema_map, id, prev_candid);
+        let prev_candid_map = CollectionUtils.get_candid_map_no_cache(collection, id, ?prev_candid_blob);
 
         for ((index_name, index) in Map.entries(collection.indexes)) {
 
@@ -1712,14 +1694,14 @@ module StableCollection {
             };
         };
 
-        let candid_blob = prev_candid_blob;
+        ignore CollectionUtils.remove_candid_map_from_cache(collection, id);
 
         log.lazyInfo(func() = "Successfully deleted document with id: " # debug_show id);
 
         let instructions = performance.total_instructions_used();
 
         #ok({
-            deleted_document = candid_blob;
+            deleted_document = prev_candid_blob;
             instructions = instructions;
         });
     };

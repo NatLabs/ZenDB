@@ -196,8 +196,7 @@ module {
         let doc_store_utils = DocumentStore.getBtreeUtils(collection.documents);
 
         for ((document_id, candid_blob) in DocumentStore.entries(collection.documents, doc_store_utils)) {
-            let candid = CollectionUtils.decodeCandidBlob(collection, candid_blob);
-            let candid_map = CandidMap.new(collection.schema_map, document_id, candid);
+            let candid_map = CollectionUtils.get_candid_map_no_cache(collection, document_id, ?candid_blob);
 
             for (index in indexes.vals()) {
 

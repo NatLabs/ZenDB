@@ -30,19 +30,9 @@ module {
         bench.description("Benchmarking the performance with 10k txs");
 
         bench.cols([
-            // "#heap no index",
             "#stableMemory no index",
-
-            // partially covered indexes
-            // "#heap 7 single field indexes",
             "#stableMemory 7 single field indexes",
-
-            // multi-field indexes
-            // "#heap 6 fully covered indexes",
             "#stableMemory 6 fully covered indexes",
-
-            // "(skip_limit_pagination limit = 100, -> array"
-
         ]);
 
         bench.rows([
@@ -73,7 +63,7 @@ module {
 
         ]);
 
-        let limit = 10_000;
+        let limit = 1_000;
 
         let txs_benchmarks = TxsBenchUtils.TxsBenchmarks(limit, limit);
 

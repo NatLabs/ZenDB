@@ -931,10 +931,14 @@ module {
                             sorted_documents_array := MergeSort.sort(arr, sort_documents_by_field_cmp);
                             document_ids_with_fields := sorted_documents_array.vals();
                         };
-
                     };
 
-                    iterators.add(document_ids_with_fields);
+                    if (requires_sorting) {
+                        iterators.add(document_ids_with_fields);
+                    } else {
+                        let bitmap = BitMap.fromIter(Iter.map(document_ids_with_fields, func((id, _) : (T.DocumentId, ?[(Text, T.Candid)])) : Nat { Utils.convert_last_8_bytes_to_nat(id) }));
+                        bitmaps.add(bitmap);
+                    };
 
                 } else {
                     add_interval(intervals_by_index, index_name, interval, sorted_in_reverse);
@@ -1246,16 +1250,16 @@ module {
                     };
 
                     if (requires_additional_sorting) {
-                        let arr = Utils.iter_to_array(document_ids);
+                        let arr = Utils.iter_to_array(document_ids_with_fields);
                         let sorted = MergeSort.sort(arr, sort_documents_by_field_cmp);
 
-                        document_ids := sorted.vals();
+                        document_ids_with_fields := sorted.vals();
                     };
 
-                    if (requires_additional_sorting) {
-                        iterators.add(document_ids);
-                    } else if (requires_additional_filtering) {
-                        let bitmap = BitMap.fromIter(Iter.map(document_ids, Utils.convert_last_8_bytes_to_nat));
+                    if (requires_sorting) {
+                        iterators.add(document_ids_with_fields);
+                    } else {
+                        let bitmap = BitMap.fromIter(Iter.map(document_ids_with_fields, func((id, _) : (T.DocumentId, ?[(Text, T.Candid)])) : Nat { Utils.convert_last_8_bytes_to_nat(id) }));
                         bitmaps.add(bitmap);
                     };
 
@@ -1404,19 +1408,19 @@ module {
             if (iterators.size() == 0) return #Empty;
 
             func deduplicate_document_ids_iter(
-                document_ids_iter : Iter<T.DocumentId>
-            ) : Iter<T.DocumentId> {
+                document_ids_iter : Iter<(T.DocumentId, ?[(Text, T.Candid)])>
+            ) : Iter<(T.DocumentId, ?[(Text, T.Candid)])> {
                 let dedup_bitmap = BitMap.BitMap(1024);
 
                 object {
-                    public func next() : ?T.DocumentId {
+                    public func next() : ?(T.DocumentId, ?[(Text, T.Candid)]) {
                         loop switch (document_ids_iter.next()) {
                             case (null) return null;
-                            case (?id) {
+                            case (?(id, fields)) {
                                 let nat_id = Utils.convert_last_8_bytes_to_nat(id);
                                 if (not dedup_bitmap.get(nat_id)) {
                                     dedup_bitmap.set(nat_id, true);
-                                    return ?id;
+                                    return ?(id, fields);
                                 };
                             };
                         };
@@ -1434,7 +1438,6 @@ module {
 
         };
 
-        // !keeps getting triggered: need to investigate why
         assert iterators.size() == 0;
 
         if (bitmaps.size() == 0) {

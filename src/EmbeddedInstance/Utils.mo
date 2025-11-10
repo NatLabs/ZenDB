@@ -279,46 +279,46 @@ module {
         );
     };
 
-    // public func kmerge<A>(iters : [Iter.Iter<A>], cmp : (A, A) -> Order.Order) : Iter.Iter<A> {
-    //     type Index<A> = (A, Nat);
+    public func kmerge<A>(iters : [Iter.Iter<A>], cmp : (A, A) -> Order.Order) : Iter.Iter<A> {
+        type Index<A> = (A, Nat);
 
-    //     let cmpIters = func(a : Index<A>, b : Index<A>) : Order.Order {
-    //         cmp(a.0, b.0);
-    //     };
+        let cmpIters = func(a : Index<A>, b : Index<A>) : Order.Order {
+            cmp(a.0, b.0);
+        };
 
-    //     let heap = Heap.Heap<Index<A>>(cmpIters);
+        let heap = Heap.Heap<Index<A>>(cmpIters);
 
-    //     for ((i, iter) in enumerate(iters.vals())) {
-    //         switch (iter.next()) {
-    //             case (?a) {
-    //                 heap.put((a, i));
-    //             };
-    //             case (_) {
+        for ((i, iter) in enumerate(iters.vals())) {
+            switch (iter.next()) {
+                case (?a) {
+                    heap.put((a, i));
+                };
+                case (_) {
 
-    //             };
-    //         };
-    //     };
+                };
+            };
+        };
 
-    //     object {
-    //         public func next() : ?A {
-    //             switch (heap.removeMin()) {
-    //                 case (?(min, i)) {
-    //                     switch (iters[i].next()) {
-    //                         case (?a) {
-    //                             heap.put((a, i));
-    //                         };
-    //                         case (_) {};
-    //                     };
+        object {
+            public func next() : ?A {
+                switch (heap.removeMin()) {
+                    case (?(min, i)) {
+                        switch (iters[i].next()) {
+                            case (?a) {
+                                heap.put((a, i));
+                            };
+                            case (_) {};
+                        };
 
-    //                     ?min;
-    //                 };
-    //                 case (_) {
-    //                     null;
-    //                 };
-    //             };
-    //         };
-    //     };
-    // };
+                        ?min;
+                    };
+                    case (_) {
+                        null;
+                    };
+                };
+            };
+        };
+    };
 
     public func concat_freeze<A>(buffers : [Buffer.Buffer<A>]) : [A] {
         var i = 0;
