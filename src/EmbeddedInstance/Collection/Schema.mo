@@ -25,7 +25,7 @@ import Nat8 "mo:base@0.16.0/Nat8";
 import Int8Cmp "mo:memory-collection@0.3.2/TypeUtils/Int8Cmp";
 
 import Itertools "mo:itertools@0.2.2/Iter";
-import { sort_candid_type } "mo:serde@3.3.3/Candid/Blob/CandidUtils";
+import { sort_candid_type } "mo:serde@3.4.0/Candid/Blob/CandidUtils";
 
 import T "../Types";
 import Utils "../Utils";

@@ -174,10 +174,8 @@ module TestFramework {
                             let zendb_sstore = let sstore = ZenDB.newStableStore(
                                 fuzz.principal.randomPrincipal(29),
                                 ?{
-                                    logging = ?{
-                                        log_level = settings.log_level;
-                                        is_running_locally = true;
-                                    };
+                                    log_level = ?settings.log_level;
+                                    is_running_locally = ?true;
                                     memory_type = ?(#stableMemory);
                                     cache_capacity = ?(10);
                                 },
@@ -193,10 +191,8 @@ module TestFramework {
                             let zendb_sstore = let sstore = ZenDB.newStableStore(
                                 fuzz.principal.randomPrincipal(29),
                                 ?{
-                                    logging = ?{
-                                        log_level = settings.log_level;
-                                        is_running_locally = true;
-                                    };
+                                    log_level = ?settings.log_level;
+                                    is_running_locally = ?true;
                                     memory_type = ?(#heap);
                                     cache_capacity = ?(10);
                                 },

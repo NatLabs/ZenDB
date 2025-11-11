@@ -23,6 +23,9 @@ import Utils "../../EmbeddedInstance/Utils";
 import TypeMigrations "../../EmbeddedInstance/TypeMigrations";
 import Query "../../EmbeddedInstance/Query";
 
+(
+    with migration = func({}) : ({}) { {} }
+)
 shared ({ caller = owner }) persistent actor class CanisterDB() = this_canister {
 
     transient let Permissions = {
@@ -77,6 +80,7 @@ shared ({ caller = owner }) persistent actor class CanisterDB() = this_canister 
 
     ZenDB.setLogLevel(zendb_instance, #Debug);
     ZenDB.setIsRunLocally(zendb_instance, false);
+    // ZenDB.updateCacheSize(zendb_instance, 1_000_000);
 
     public shared query func zendb_api_version() : async Text {
         "0.0.1";

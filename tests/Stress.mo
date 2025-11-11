@@ -21,10 +21,8 @@ actor {
     stable let sstore = ZenDB.newStableStore(
         canister_id,
         ?{
-            logging = ?{
-                log_level = #Error;
-                is_running_locally = true;
-            };
+            log_level = ?#Error;
+            is_running_locally = ?true;
             memory_type = ?(#stableMemory);
         },
     );

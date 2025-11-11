@@ -9,7 +9,7 @@ repository = "https://github.com/NatLabs/ZenDB"
 [dependencies]
 "base@0.16.0" = "0.16.0"
 "map@9.0.1" = "9.0.1"
-"serde@3.3.3" = "3.3.3"
+"serde@3.4.0" = "../serde"
 "itertools@0.2.2" = "0.2.2"
 "memory-collection@0.3.2" = "0.3.2"
 "bit-map@0.1.2" = "0.1.2"

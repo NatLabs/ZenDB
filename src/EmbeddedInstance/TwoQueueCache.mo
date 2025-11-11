@@ -40,6 +40,27 @@ module TwoQueueCache {
 
     };
 
+    public func resize<K, V>(cache : T.TwoQueueCache<K, V>, new_capacity : Nat) {
+
+        let max_main_cache_size = new_capacity / 2; // 50%
+        let max_ghost_cache_size = max_main_cache_size / 2; // 25%
+        let max_admission_cache_size = new_capacity - max_main_cache_size - max_ghost_cache_size : Nat; // 25%
+
+        let old_capacity = capacity(cache);
+
+        if (new_capacity >= old_capacity) {
+            cache.main_cache.capacity := max_main_cache_size;
+            cache.ghost_cache.capacity := max_ghost_cache_size;
+            cache.admission_cache.capacity := max_admission_cache_size;
+            return;
+        };
+
+        cache.main_cache := LruCache.new<K, V>(max_main_cache_size);
+        cache.ghost_cache := LruCache.new<K, V>(max_ghost_cache_size);
+        cache.admission_cache := LruCache.new<K, ()>(max_admission_cache_size);
+
+    };
+
     public func size<K, V>(cache : T.TwoQueueCache<K, V>) : Nat {
         LruCache.size(cache.main_cache) + LruCache.size(cache.ghost_cache) + LruCache.size(cache.admission_cache);
     };

@@ -14,9 +14,9 @@ import Hash "mo:base@0.16.0/Hash";
 
 import Map "mo:map@9.0.1/Map";
 import Set "mo:map@9.0.1/Set";
-import Serde "mo:serde@3.3.3";
-import Decoder "mo:serde@3.3.3/Candid/Blob/Decoder";
-import Candid "mo:serde@3.3.3/Candid";
+import Serde "mo:serde@3.4.0";
+import Decoder "mo:serde@3.4.0/Candid/Blob/Decoder";
+import Candid "mo:serde@3.4.0/Candid";
 import Itertools "mo:itertools@0.2.2/Iter";
 import RevIter "mo:itertools@0.2.2/RevIter";
 import BitMap "mo:bit-map@0.1.2";
@@ -359,9 +359,9 @@ module {
                 let bitmap = BitMap.BitMap(1024);
 
                 for (interval in interval_details.intervals.vals()) {
-                    let document_ids = Intervals.document_ids_from_index_intervals(collection, index.name, [interval], false);
+                    let document_ids_with_fields = Intervals.document_ids_and_indexed_fields_from_intervals(collection, index.name, [interval], false);
 
-                    for (id in document_ids) {
+                    for ((id, _) in document_ids_with_fields) {
                         let id_as_nat = Utils.convert_last_8_bytes_to_nat(id);
                         bitmap.set(id_as_nat, true);
                     };
@@ -931,7 +931,6 @@ module {
                             sorted_documents_array := MergeSort.sort(arr, sort_documents_by_field_cmp);
                             document_ids_with_fields := sorted_documents_array.vals();
                         };
-
                     };
 
                     if (requires_sorting) {
@@ -1015,10 +1014,11 @@ module {
 
             let sorted_in_reverse = Option.get(interval_details.sorted_in_reverse, false);
 
+            let document_ids_with_fields = Intervals.document_ids_and_indexed_fields_from_intervals(collection, index.name, [interval], sorted_in_reverse);
+
             if (requires_sorting and sorted_documents_array.size() == 0) {
 
-                let document_ids_with_fields = Intervals.document_ids_and_indexed_fields_from_intervals(collection, index.name, [interval], sorted_in_reverse);
-                let arr = Utils.iter_to_array(document_ids_with_fields);
+                let arr = Iter.toArray(document_ids_with_fields);
 
                 if (arr.size() == 0) return #Empty;
 
@@ -1027,8 +1027,7 @@ module {
                 iterators.add(sorted_documents_array.vals());
 
             } else {
-                let document_ids = Intervals.document_ids_from_index_intervals(collection, index.name, [interval], sorted_in_reverse);
-                let bitmap = BitMap.fromIter(Iter.map(document_ids, func(id : T.DocumentId) : Nat { Utils.convert_last_8_bytes_to_nat(id) }));
+                let bitmap = BitMap.fromIter(Iter.map(document_ids_with_fields, func((id, _) : (T.DocumentId, ?[(Text, T.Candid)])) : Nat { Utils.convert_last_8_bytes_to_nat(id) }));
                 bitmaps.add(bitmap);
 
             };
@@ -1251,12 +1250,10 @@ module {
                     };
 
                     if (requires_additional_sorting) {
-
-                        let arr = Iter.toArray(document_ids_with_fields);
+                        let arr = Utils.iter_to_array(document_ids_with_fields);
                         let sorted = MergeSort.sort(arr, sort_documents_by_field_cmp);
 
                         document_ids_with_fields := sorted.vals();
-
                     };
 
                     if (requires_sorting) {
@@ -1405,31 +1402,31 @@ module {
 
         };
 
-        func deduplicate_document_ids_iter(
-            document_ids_iter : Iter<(T.DocumentId, ?[(Text, T.Candid)])>
-        ) : Iter<(T.DocumentId, ?[(Text, T.Candid)])> {
-            let dedup_bitmap = BitMap.BitMap(1024);
+        if (requires_sorting) {
+            assert bitmaps.size() == 0;
 
-            object {
-                public func next() : ?(T.DocumentId, ?[(Text, T.Candid)]) {
-                    loop switch (document_ids_iter.next()) {
-                        case (null) return null;
-                        case (?(id, fields)) {
-                            let nat_id = Utils.convert_last_8_bytes_to_nat(id);
-                            if (not dedup_bitmap.get(nat_id)) {
-                                dedup_bitmap.set(nat_id, true);
-                                return ?(id, fields);
+            if (iterators.size() == 0) return #Empty;
+
+            func deduplicate_document_ids_iter(
+                document_ids_iter : Iter<(T.DocumentId, ?[(Text, T.Candid)])>
+            ) : Iter<(T.DocumentId, ?[(Text, T.Candid)])> {
+                let dedup_bitmap = BitMap.BitMap(1024);
+
+                object {
+                    public func next() : ?(T.DocumentId, ?[(Text, T.Candid)]) {
+                        loop switch (document_ids_iter.next()) {
+                            case (null) return null;
+                            case (?(id, fields)) {
+                                let nat_id = Utils.convert_last_8_bytes_to_nat(id);
+                                if (not dedup_bitmap.get(nat_id)) {
+                                    dedup_bitmap.set(nat_id, true);
+                                    return ?(id, fields);
+                                };
                             };
                         };
                     };
                 };
             };
-        };
-
-        if (requires_sorting) {
-            assert bitmaps.size() == 0;
-
-            if (iterators.size() == 0) return #Empty;
 
             // todo: we can optimize this further by eliminitating duplicates directly during the merge sort kmerge step without creating a separate dedup bitmap
             // todo: another optimization is to check if the sort field is one of the index fields and leverage that to avoid lookups in the document store and deserialization

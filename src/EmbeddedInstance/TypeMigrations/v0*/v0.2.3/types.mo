@@ -16,8 +16,8 @@ import Int "mo:base@0.16.0/Int";
 
 import Map "mo:map@9.0.1/Map";
 import Set "mo:map@9.0.1/Set";
-import Serde "mo:serde@3.3.3";
-import Candid "mo:serde@3.3.3/Candid";
+import Serde "mo:serde@3.4.0";
+import Candid "mo:serde@3.4.0/Candid";
 import Itertools "mo:itertools@0.2.2/Iter";
 import RevIter "mo:itertools@0.2.2/RevIter";
 import BitMap "mo:bit-map@0.1.2";
@@ -214,6 +214,8 @@ module T {
         field_constraints : Map<Text, [SchemaFieldConstraint]>;
         unique_constraints : [([Text], CompositeIndex)];
         fields_with_unique_constraints : Map<Text, Set<Nat>>; // the value is the index of the unique constraint in the unique_constraints list
+
+        candid_serializer : Candid.TypedSerializer;
 
         // reference to the freed btrees to the same variable in
         // the ZenDB database document

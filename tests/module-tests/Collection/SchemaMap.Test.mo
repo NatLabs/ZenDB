@@ -5,7 +5,7 @@ import Nat "mo:base@0.16.0/Nat";
 import Map "mo:map@9.0.1/Map";
 
 import { test; suite } "mo:test";
-import Candid "mo:serde@3.3.3/Candid";
+import Candid "mo:serde@3.4.0/Candid";
 import SchemaMap "../../../src/EmbeddedInstance/Collection/SchemaMap";
 import T "../../../src/EmbeddedInstance/Types";
 import ZenDB "../../../src";

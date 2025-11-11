@@ -3,7 +3,7 @@ import Iter "mo:base@0.16.0/Iter";
 import Array "mo:base@0.16.0/Array";
 import LruCache "mo:lru-cache";
 
-import V0_2_1 "../v0.2.1/types";
+import V0_2_2 "../v0.2.2/types";
 import V0_2_3 "types";
 
 module {
@@ -22,14 +22,14 @@ module {
 
     };
 
-    public func upgrade(prev : V0_2_1.StableStore) : V0_2_3.StableStore {
+    public func upgrade(prev : V0_2_2.StableStore) : V0_2_3.StableStore {
 
         let candid_map_cache = new_candid_map_cache<V0_2_3.DocumentId, V0_2_3.CandidMap>(1_000_000);
 
-        let migrated_databases = Map.map<Text, V0_2_1.StableDatabase, V0_2_3.StableDatabase>(
+        let migrated_databases = Map.map<Text, V0_2_2.StableDatabase, V0_2_3.StableDatabase>(
             prev.databases,
             Map.thash,
-            func(db_name : Text, db : V0_2_1.StableDatabase) : V0_2_3.StableDatabase {
+            func(db_name : Text, db : V0_2_2.StableDatabase) : V0_2_3.StableDatabase {
                 {
                     db with
                     collections = migrate_collections(db.collections, candid_map_cache);
@@ -45,11 +45,11 @@ module {
         };
     };
 
-    func migrate_collections(collections : Map.Map<Text, V0_2_1.StableCollection>, candid_map_cache : V0_2_3.TwoQueueCache<V0_2_3.DocumentId, V0_2_3.CandidMap>) : Map.Map<Text, V0_2_3.StableCollection> {
-        Map.map<Text, V0_2_1.StableCollection, V0_2_3.StableCollection>(
+    func migrate_collections(collections : Map.Map<Text, V0_2_2.StableCollection>, candid_map_cache : V0_2_3.TwoQueueCache<V0_2_3.DocumentId, V0_2_3.CandidMap>) : Map.Map<Text, V0_2_3.StableCollection> {
+        Map.map<Text, V0_2_2.StableCollection, V0_2_3.StableCollection>(
             collections,
             Map.thash,
-            func(collection_name : Text, collection : V0_2_1.StableCollection) : V0_2_3.StableCollection {
+            func(collection_name : Text, collection : V0_2_2.StableCollection) : V0_2_3.StableCollection {
                 {
                     collection with
                     candid_map_cache = candid_map_cache;

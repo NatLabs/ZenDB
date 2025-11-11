@@ -27,9 +27,9 @@ import ExperimentalInternetComputer "mo:base@0.16.0/ExperimentalInternetComputer
 
 import Map "mo:map@9.0.1/Map";
 import Set "mo:map@9.0.1/Set";
-import Serde "mo:serde@3.3.3";
-import Decoder "mo:serde@3.3.3/Candid/Blob/Decoder";
-import Candid "mo:serde@3.3.3/Candid";
+import Serde "mo:serde@3.4.0";
+import Decoder "mo:serde@3.4.0/Candid/Blob/Decoder";
+import Candid "mo:serde@3.4.0/Candid";
 import Itertools "mo:itertools@0.2.2/Iter";
 import RevIter "mo:itertools@0.2.2/RevIter";
 import BitMap "mo:bit-map@0.1.2";
@@ -1217,7 +1217,7 @@ module StableCollection {
             };
         };
 
-        let new_candid_blob = switch (Candid.encodeOne(new_candid_document, ?{ Candid.defaultOptions with types = ?[collection.schema] })) {
+        let new_candid_blob = switch (Candid.TypedSerializer.encode(collection.candid_serializer, [new_candid_document])) {
             case (#ok(new_candid_blob)) new_candid_blob;
             case (#err(msg)) {
                 return #err("Failed to encode new candid blob: " # msg);

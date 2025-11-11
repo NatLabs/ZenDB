@@ -25,9 +25,9 @@ import InternetComputer "mo:base@0.16.0/ExperimentalInternetComputer";
 
 import Map "mo:map@9.0.1/Map";
 import Set "mo:map@9.0.1/Set";
-import Serde "mo:serde@3.3.3";
-import Decoder "mo:serde@3.3.3/Candid/Blob/Decoder";
-import Candid "mo:serde@3.3.3/Candid";
+import Serde "mo:serde@3.4.0";
+import Decoder "mo:serde@3.4.0/Candid/Blob/Decoder";
+import Candid "mo:serde@3.4.0/Candid";
 import Itertools "mo:itertools@0.2.2/Iter";
 import RevIter "mo:itertools@0.2.2/RevIter";
 import BitMap "mo:bit-map@0.1.2";
@@ -208,7 +208,7 @@ module CollectionUtils {
     };
 
     public func decodeCandidBlob(collection : T.StableCollection, candid_blob : Blob) : Candid.Candid {
-        let candid_result = Candid.decode(candid_blob, collection.schema_keys, null);
+        let candid_result = Candid.TypedSerializer.decode(collection.candid_serializer, candid_blob);
         let #ok(candid_values) = candid_result else Debug.trap("decodeCandidBlob: decoding candid blob failed: " # debug_show candid_result);
         let candid = candid_values[0];
         candid;

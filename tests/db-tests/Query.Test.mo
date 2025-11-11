@@ -9,8 +9,8 @@ import { test; suite } "mo:test";
 
 import Bench "mo:bench";
 import Fuzz "mo:fuzz";
-import Candid "mo:serde@3.3.3/Candid";
-import Record "mo:serde@3.3.3/Candid/Text/Parser/Record";
+import Candid "mo:serde@3.4.0/Candid";
+import Record "mo:serde@3.4.0/Candid/Text/Parser/Record";
 import Itertools "mo:itertools@0.2.2/Iter";
 import ZenDB "../../src/EmbeddedInstance";
 import ZenDBSuite "../test-utils/TestFramework";

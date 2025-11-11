@@ -10,7 +10,7 @@ import Option "mo:base@0.16.0/Option";
 
 import Bench "mo:bench";
 import Fuzz "mo:fuzz";
-import Candid "mo:serde@3.3.3/Candid";
+import Candid "mo:serde@3.4.0/Candid";
 import Itertools "mo:itertools@0.2.2/Iter";
 import BitMap "mo:bit-map@0.1.2";
 
@@ -27,16 +27,15 @@ module TxsBenchUtils {
         "#heap 6 fully covered indexes (sorted by ts)",
 
         "#stableMemory no index (sorted by ts)",
-        "#stableMemory 7 single field indexes (sorted by ts)",
-        "#stableMemory 6 fully covered indexes (sorted by ts)",
-
-        // sorted by tx.amt
-        "#heap no index (sorted by tx.amt)",
-        "#heap 7 single field indexes (sorted by tx.amt)",
-        "#heap 6 fully covered indexes (sorted by tx.amt)",
-
         "#stableMemory no index (sorted by tx.amt)",
+
+        // partially covered indexes sorted by tx.amt
+        // "#heap 7 single field indexes (sorted by ts)",
         "#stableMemory 7 single field indexes (sorted by tx.amt)",
+
+        // multi-field indexes sorted by timestamp
+        // "#heap 6 fully covered indexes (sorted by ts)",
+        "#stableMemory 6 fully covered indexes (sorted by ts)",
         "#stableMemory 6 fully covered indexes (sorted by tx.amt)",
 
     ];
@@ -762,6 +761,18 @@ module TxsBenchUtils {
             iteration_limit,
         );
 
+        let stable_memory_sorted_single_field_indexes_by_amt_benchmark = CollectionBenchmark(
+            stable_memory_sorted_single_field_indexes,
+            single_field_indexes,
+            predefined_txs,
+            Buffer.Buffer<Nat>(iteration_limit),
+            principals,
+            candid_principals_0_10,
+            new_sorted_query("tx.amt", #Ascending),
+            fuzz,
+            iteration_limit,
+        );
+
         let heap_sorted_single_field_indexes_benchmark = CollectionBenchmark(
             heap_sorted_single_field_indexes,
             single_field_indexes,
@@ -834,8 +845,8 @@ module TxsBenchUtils {
             iteration_limit,
         );
 
-        let stable_memory_sorted_amt_no_index_benchmark = CollectionBenchmark(
-            stable_memory_sorted_amt_no_index,
+        let stable_memory_sorted_no_index_by_amt_benchmark = CollectionBenchmark(
+            stable_memory_sorted_no_index,
             [],
             predefined_txs,
             Buffer.Buffer<Nat>(iteration_limit),
@@ -846,8 +857,32 @@ module TxsBenchUtils {
             iteration_limit,
         );
 
-        let stable_memory_sorted_amt_single_field_indexes_benchmark = CollectionBenchmark(
-            stable_memory_sorted_amt_single_field_indexes,
+        let stable_memory_sorted_fully_covered_indexes_by_amt_benchmark = CollectionBenchmark(
+            stable_memory_sorted_fully_covered_indexes,
+            fully_covered_indexes,
+            predefined_txs,
+            Buffer.Buffer<Nat>(iteration_limit),
+            principals,
+            candid_principals_0_10,
+            new_sorted_query("tx.amt", #Ascending),
+            fuzz,
+            iteration_limit,
+        );
+
+        let heap_sorted_no_index_by_amt_benchmark = CollectionBenchmark(
+            heap_sorted_no_index,
+            [],
+            predefined_txs,
+            Buffer.Buffer<Nat>(iteration_limit),
+            principals,
+            candid_principals_0_10,
+            new_sorted_query("tx.amt", #Ascending),
+            fuzz,
+            iteration_limit,
+        );
+
+        let heap_sorted_single_field_indexes_by_amt_benchmark = CollectionBenchmark(
+            heap_sorted_single_field_indexes,
             single_field_indexes,
             predefined_txs,
             Buffer.Buffer<Nat>(iteration_limit),
@@ -858,8 +893,8 @@ module TxsBenchUtils {
             iteration_limit,
         );
 
-        let stable_memory_sorted_amt_fully_covered_indexes_benchmark = CollectionBenchmark(
-            stable_memory_sorted_amt_fully_covered_indexes,
+        let heap_sorted_fully_covered_indexes_by_amt_benchmark = CollectionBenchmark(
+            heap_sorted_fully_covered_indexes,
             fully_covered_indexes,
             predefined_txs,
             Buffer.Buffer<Nat>(iteration_limit),
@@ -909,39 +944,39 @@ module TxsBenchUtils {
                 };
 
                 case ("#heap no index (sorted by tx.amt)") {
-                    heap_sorted_amt_no_index_benchmark.run_benchmark(col);
+                    heap_sorted_no_index_by_amt_benchmark.run_benchmark(col);
                 };
 
                 case ("#heap 7 single field indexes (sorted by tx.amt)") {
-                    heap_sorted_amt_single_field_indexes_benchmark.run_benchmark(col);
+                    heap_sorted_single_field_indexes_by_amt_benchmark.run_benchmark(col);
                 };
 
                 case ("#heap 6 fully covered indexes (sorted by tx.amt)") {
-                    heap_sorted_amt_fully_covered_indexes_benchmark.run_benchmark(col);
+                    heap_sorted_fully_covered_indexes_by_amt_benchmark.run_benchmark(col);
                 };
 
                 case ("#stableMemory no index (sorted by ts)") {
                     stable_memory_sorted_no_index_benchmark.run_benchmark(col);
                 };
 
+                case ("#stableMemory no index (sorted by tx.amt)") {
+                    stable_memory_sorted_no_index_by_amt_benchmark.run_benchmark(col);
+                };
+
                 case ("#stableMemory 7 single field indexes (sorted by ts)") {
                     stable_memory_sorted_single_field_indexes_benchmark.run_benchmark(col);
+                };
+
+                case ("#stableMemory 7 single field indexes (sorted by tx.amt)") {
+                    stable_memory_sorted_single_field_indexes_by_amt_benchmark.run_benchmark(col);
                 };
 
                 case ("#stableMemory 6 fully covered indexes (sorted by ts)") {
                     stable_memory_sorted_fully_covered_indexes_benchmark.run_benchmark(col);
                 };
 
-                case ("#stableMemory no index (sorted by tx.amt)") {
-                    stable_memory_sorted_amt_no_index_benchmark.run_benchmark(col);
-                };
-
-                case ("#stableMemory 7 single field indexes (sorted by tx.amt)") {
-                    stable_memory_sorted_amt_single_field_indexes_benchmark.run_benchmark(col);
-                };
-
                 case ("#stableMemory 6 fully covered indexes (sorted by tx.amt)") {
-                    stable_memory_sorted_amt_fully_covered_indexes_benchmark.run_benchmark(col);
+                    stable_memory_sorted_fully_covered_indexes_by_amt_benchmark.run_benchmark(col);
                 };
 
                 case (_) {

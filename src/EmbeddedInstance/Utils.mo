@@ -20,9 +20,9 @@ import Int "mo:base@0.16.0/Int";
 
 import Map "mo:map@9.0.1/Map";
 import Set "mo:map@9.0.1/Set";
-import Serde "mo:serde@3.3.3";
-import Decoder "mo:serde@3.3.3/Candid/Blob/Decoder";
-import Candid "mo:serde@3.3.3/Candid";
+import Serde "mo:serde@3.4.0";
+import Decoder "mo:serde@3.4.0/Candid/Blob/Decoder";
+import Candid "mo:serde@3.4.0/Candid";
 import Itertools "mo:itertools@0.2.2/Iter";
 import PeekableIter "mo:itertools@0.2.2/PeekableIter";
 import RevIter "mo:itertools@0.2.2/RevIter";
@@ -282,18 +282,18 @@ module {
     };
 
     public func kmerge<A>(iters : [Iter.Iter<A>], cmp : (A, A) -> Order.Order) : Iter.Iter<A> {
-        type Ref<A> = (A, Nat);
+        type Index<A> = (A, Nat);
 
-        let cmpIters = func(a : Ref<A>, b : Ref<A>) : Order.Order {
+        let cmpIters = func(a : Index<A>, b : Index<A>) : Order.Order {
             cmp(a.0, b.0);
         };
 
-        let heap = MinHeap.newWithCapacity<Ref<A>>(iters.size());
+        let heap = Heap.Heap<Index<A>>(cmpIters);
 
-        for ((i, iter) in Itertools.enumerate(iters.vals())) {
+        for ((i, iter) in enumerate(iters.vals())) {
             switch (iter.next()) {
                 case (?a) {
-                    MinHeap.put(heap, (a, i), cmpIters);
+                    heap.put((a, i));
                 };
                 case (_) {
 
@@ -303,11 +303,11 @@ module {
 
         object {
             public func next() : ?A {
-                switch (MinHeap.removeMin(heap, cmpIters)) {
+                switch (heap.removeMin()) {
                     case (?(min, i)) {
                         switch (iters[i].next()) {
                             case (?a) {
-                                MinHeap.put(heap, (a, i), cmpIters);
+                                heap.put((a, i));
                             };
                             case (_) {};
                         };
