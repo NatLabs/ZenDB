@@ -116,7 +116,7 @@ module {
                 case (#FullScan({ filter_bounds; requires_additional_filtering; requires_additional_sorting })) {
                     if (not requires_additional_filtering and not requires_additional_sorting) {
                         log.lazyDebug(func() = "Full scan with no filtering or sorting");
-                        return #Interval(C.DOCUMENT_ID, [(0, DocumentStore.size(collection.documents))], false);
+                        return #Interval(C.DOCUMENT_ID, [(0, DocumentStore.size(collection))], false);
                     };
                 };
             };
@@ -129,8 +129,7 @@ module {
             let document_ids_iter : Iter<(T.DocumentId, ?[(Text, T.Candid)])> = switch (scan_details) {
                 case (#FullScan({ filter_bounds; requires_additional_filtering })) {
                     log.lazyDebug(func() = "Processing full scan");
-                    let main_btree_utils = CollectionUtils.getMainBtreeUtils(collection);
-                    let full_scan_iter = DocumentStore.keys(collection.documents, main_btree_utils);
+                    let full_scan_iter = DocumentStore.keys(collection);
 
                     let filtered_iter = if (requires_additional_filtering) {
                         log.lazyDebug(func() = "Applying filters to full scan");
@@ -866,7 +865,7 @@ module {
                 };
                 case (#FullScan({ requires_additional_sorting; requires_additional_filtering })) {
                     if (not requires_additional_sorting and not requires_additional_filtering) {
-                        return #Interval(C.DOCUMENT_ID, [(0, DocumentStore.size(collection.documents))], false);
+                        return #Interval(C.DOCUMENT_ID, [(0, DocumentStore.size(collection))], false);
                     };
 
                 };
@@ -1073,8 +1072,7 @@ module {
             };
 
             let filtered_ids : Iter<(T.DocumentId, ?[(Text, T.Candid)])> = if (smallest_interval_index == "") {
-                let main_btree_utils = CollectionUtils.getMainBtreeUtils(collection);
-                let document_ids = DocumentStore.keys(collection.documents, main_btree_utils);
+                let document_ids = DocumentStore.keys(collection);
                 let filtered = CollectionUtils.multiFilter(
                     collection,
                     document_ids,
@@ -1384,8 +1382,7 @@ module {
                 full_scan_filter_bounds.add(full_scan_details.filter_bounds);
             };
 
-            let main_btree_utils = CollectionUtils.getMainBtreeUtils(collection);
-            let document_ids = DocumentStore.keys(collection.documents, main_btree_utils);
+            let document_ids = DocumentStore.keys(collection);
             let filtered_ids = CollectionUtils.multiFilter(collection, document_ids, full_scan_filter_bounds, query_plan.is_and_operation);
 
             if (requires_sorting) {

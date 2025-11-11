@@ -299,7 +299,7 @@ module T {
 
     };
 
-    public type Cursor = DocumentId;
+    public type PaginationCursor = DocumentId;
 
     public type PaginationDirection = {
         #Forward;

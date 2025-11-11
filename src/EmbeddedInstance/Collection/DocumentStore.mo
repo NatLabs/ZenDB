@@ -15,9 +15,11 @@ import BTree "../BTree";
 import Utils "../Utils";
 
 /// BTree api wrapper for storing documents and handling their various versions.
+/// This module acts as an extension of the StableCollection module.
 module DocumentStore {
 
     public type DocumentStore = T.BTree<T.DocumentId, T.Document>;
+    public type StableCollection = T.StableCollection;
 
     public func new_stable_memory() : T.BTree<T.DocumentId, T.Document> {
         #stableMemory(MemoryBTree.new(?C.STABLE_MEMORY_BTREE_ORDER));
@@ -73,19 +75,19 @@ module DocumentStore {
         } : T.BpTreeUtils<T.DocumentId>
     );
 
-    public func getBtreeUtils(store : DocumentStore) : T.BTreeUtils<T.DocumentId, T.Document> {
-        switch (store) {
+    func getBtreeUtils(collection : StableCollection) : T.BTreeUtils<T.DocumentId, T.Document> {
+        switch (collection.documents) {
             case (#stableMemory(_)) StableMemoryUtils;
             case (#heap(_)) HeapUtils;
         };
     };
 
-    public func size(store : DocumentStore) : Nat {
-        BTree.size(store);
+    public func size(collection : StableCollection) : Nat {
+        BTree.size(collection.documents);
     };
 
-    public func clear<K, V>(store : DocumentStore) {
-        BTree.clear(store);
+    public func clear<K, V>(collection : StableCollection) {
+        BTree.clear(collection.documents);
     };
 
     func extract_candid_blob_from_document_v0(document : T.Document) : Blob {
@@ -96,36 +98,39 @@ module DocumentStore {
         };
     };
 
-    public func get(store : DocumentStore, cmp : T.BTreeUtils<T.DocumentId, T.Document>, key : T.DocumentId) : ?Blob {
+    public func get(collection : StableCollection, key : T.DocumentId) : ?Blob {
+        let cmp = getBtreeUtils(collection);
         Option.map<T.Document, Blob>(
-            BTree.get(store, cmp, key),
+            BTree.get(collection.documents, cmp, key),
             extract_candid_blob_from_document_v0,
         );
     };
 
-    public func put(store : DocumentStore, cmp : T.BTreeUtils<T.DocumentId, T.Document>, key : T.DocumentId, candid_blob : Blob) : ?Blob {
-
+    public func put(collection : StableCollection, key : T.DocumentId, candid_blob : Blob) : ?Blob {
+        let cmp = getBtreeUtils(collection);
         let document = switch (C.CURRENT_DOCUMENT_VERSION) {
             case (0) { #v0(candid_blob) };
             case (_) Debug.trap("Unsupported document version " # debug_show C.CURRENT_DOCUMENT_VERSION);
         };
 
         Option.map<T.Document, Blob>(
-            BTree.put(store, cmp, key, document),
+            BTree.put(collection.documents, cmp, key, document),
             extract_candid_blob_from_document_v0,
         );
     };
 
-    public func remove(store : DocumentStore, cmp : T.BTreeUtils<T.DocumentId, T.Document>, key : T.DocumentId) : ?Blob {
+    public func remove(collection : StableCollection, key : T.DocumentId) : ?Blob {
+        let cmp = getBtreeUtils(collection);
         Option.map<T.Document, Blob>(
-            BTree.remove(store, cmp, key),
+            BTree.remove(collection.documents, cmp, key),
             extract_candid_blob_from_document_v0,
         );
     };
 
-    public func scan(store : DocumentStore, cmp : T.BTreeUtils<T.DocumentId, T.Document>, start_key : ?T.DocumentId, end_key : ?T.DocumentId) : T.RevIter<(T.DocumentId, Blob)> {
+    public func scan(collection : StableCollection, start_key : ?T.DocumentId, end_key : ?T.DocumentId) : T.RevIter<(T.DocumentId, Blob)> {
+        let cmp = getBtreeUtils(collection);
         RevIter.map<(T.DocumentId, T.Document), (T.DocumentId, Blob)>(
-            BTree.scan<T.DocumentId, T.Document>(store, cmp, start_key, end_key),
+            BTree.scan<T.DocumentId, T.Document>(collection.documents, cmp, start_key, end_key),
             func(pair : (T.DocumentId, T.Document)) : (T.DocumentId, Blob) {
                 (pair.0, extract_candid_blob_from_document_v0(pair.1));
             },
@@ -133,31 +138,36 @@ module DocumentStore {
 
     };
 
-    public func scanKeys(store : DocumentStore, cmp : T.BTreeUtils<T.DocumentId, T.Document>, start_key : ?T.DocumentId, end_key : ?T.DocumentId) : T.RevIter<T.DocumentId> {
-        BTree.scanKeys(store, cmp, start_key, end_key);
+    public func scanKeys(collection : StableCollection, start_key : ?T.DocumentId, end_key : ?T.DocumentId) : T.RevIter<T.DocumentId> {
+        let cmp = getBtreeUtils(collection);
+        BTree.scanKeys(collection.documents, cmp, start_key, end_key);
     };
 
-    public func scanVals(store : DocumentStore, cmp : T.BTreeUtils<T.DocumentId, T.Document>, start_key : ?T.DocumentId, end_key : ?T.DocumentId) : T.RevIter<Blob> {
+    public func scanVals(collection : StableCollection, start_key : ?T.DocumentId, end_key : ?T.DocumentId) : T.RevIter<Blob> {
+        let cmp = getBtreeUtils(collection);
         RevIter.map<T.Document, Blob>(
-            BTree.scanVals(store, cmp, start_key, end_key),
+            BTree.scanVals(collection.documents, cmp, start_key, end_key),
             extract_candid_blob_from_document_v0,
         );
     };
 
-    public func keys(store : DocumentStore, cmp : T.BTreeUtils<T.DocumentId, T.Document>) : T.RevIter<T.DocumentId> {
-        BTree.keys(store, cmp);
+    public func keys(collection : StableCollection) : T.RevIter<T.DocumentId> {
+        let cmp = getBtreeUtils(collection);
+        BTree.keys(collection.documents, cmp);
     };
 
-    public func vals(store : DocumentStore, cmp : T.BTreeUtils<T.DocumentId, T.Document>) : T.RevIter<Blob> {
+    public func vals(collection : StableCollection) : T.RevIter<Blob> {
+        let cmp = getBtreeUtils(collection);
         RevIter.map<T.Document, Blob>(
-            BTree.vals(store, cmp),
+            BTree.vals(collection.documents, cmp),
             extract_candid_blob_from_document_v0,
         );
     };
 
-    public func entries(store : DocumentStore, cmp : T.BTreeUtils<T.DocumentId, T.Document>) : T.RevIter<(T.DocumentId, Blob)> {
+    public func entries(collection : StableCollection) : T.RevIter<(T.DocumentId, Blob)> {
+        let cmp = getBtreeUtils(collection);
         RevIter.map<(T.DocumentId, T.Document), (T.DocumentId, Blob)>(
-            BTree.entries(store, cmp),
+            BTree.entries(collection.documents, cmp),
             func(pair : (T.DocumentId, T.Document)) : (T.DocumentId, Blob) {
                 (pair.0, extract_candid_blob_from_document_v0(pair.1));
             },
@@ -165,46 +175,53 @@ module DocumentStore {
 
     };
 
-    public func range(store : DocumentStore, cmp : T.BTreeUtils<T.DocumentId, T.Document>, start : Nat, end : Nat) : T.RevIter<(T.DocumentId, Blob)> {
+    public func range(collection : StableCollection, start : Nat, end : Nat) : T.RevIter<(T.DocumentId, Blob)> {
+        let cmp = getBtreeUtils(collection);
         RevIter.map<(T.DocumentId, T.Document), (T.DocumentId, Blob)>(
-            BTree.range(store, cmp, start, end),
+            BTree.range(collection.documents, cmp, start, end),
             func(pair : (T.DocumentId, T.Document)) : (T.DocumentId, Blob) {
                 (pair.0, extract_candid_blob_from_document_v0(pair.1));
             },
         );
     };
 
-    public func range_keys(store : DocumentStore, cmp : T.BTreeUtils<T.DocumentId, T.Document>, start : Nat, end : Nat) : T.RevIter<T.DocumentId> {
-        BTree.range_keys(store, cmp, start, end);
+    public func range_keys(collection : StableCollection, start : Nat, end : Nat) : T.RevIter<T.DocumentId> {
+        let cmp = getBtreeUtils(collection);
+        BTree.range_keys(collection.documents, cmp, start, end);
     };
 
-    public func range_vals(store : DocumentStore, cmp : T.BTreeUtils<T.DocumentId, T.Document>, start : Nat, end : Nat) : T.RevIter<Blob> {
+    public func range_vals(collection : StableCollection, start : Nat, end : Nat) : T.RevIter<Blob> {
+        let cmp = getBtreeUtils(collection);
         RevIter.map<T.Document, Blob>(
-            BTree.range_vals(store, cmp, start, end),
+            BTree.range_vals(collection.documents, cmp, start, end),
             extract_candid_blob_from_document_v0,
         );
     };
 
-    public func get_expected_index<K, V>(btree : T.BTree<K, V>, cmp : T.BTreeUtils<K, V>, key : K) : BpTreeTypes.ExpectedIndex {
-        BTree.getExpectedIndex(btree, cmp, key);
+    public func get_expected_index(collection : StableCollection, key : T.DocumentId) : BpTreeTypes.ExpectedIndex {
+        let cmp = getBtreeUtils(collection);
+        BTree.getExpectedIndex(collection.documents, cmp, key);
     };
 
-    public func get_scan_as_interval<K, V>(btree : T.BTree<K, V>, cmp : T.BTreeUtils<K, V>, start_key : ?K, end_key : ?K) : T.Interval {
-        BTree.getScanAsInterval(btree, cmp, start_key, end_key);
+    public func get_scan_as_interval(collection : StableCollection, start_key : ?T.DocumentId, end_key : ?T.DocumentId) : T.Interval {
+        let cmp = getBtreeUtils(collection);
+        BTree.getScanAsInterval(collection.documents, cmp, start_key, end_key);
     };
 
-    public func getMin(store : DocumentStore, cmp : T.BTreeUtils<T.DocumentId, T.Document>) : ?(T.DocumentId, Blob) {
+    public func getMin(collection : StableCollection) : ?(T.DocumentId, Blob) {
+        let cmp = getBtreeUtils(collection);
         Option.map<(T.DocumentId, T.Document), (T.DocumentId, Blob)>(
-            BTree.getMin(store, cmp),
+            BTree.getMin(collection.documents, cmp),
             func(pair : (T.DocumentId, T.Document)) : (T.DocumentId, Blob) {
                 (pair.0, extract_candid_blob_from_document_v0(pair.1));
             },
         );
     };
 
-    public func getMax(store : DocumentStore, cmp : T.BTreeUtils<T.DocumentId, T.Document>) : ?(T.DocumentId, Blob) {
+    public func getMax(collection : StableCollection) : ?(T.DocumentId, Blob) {
+        let cmp = getBtreeUtils(collection);
         Option.map<(T.DocumentId, T.Document), (T.DocumentId, Blob)>(
-            BTree.getMax(store, cmp),
+            BTree.getMax(collection.documents, cmp),
             func(pair : (T.DocumentId, T.Document)) : (T.DocumentId, Blob) {
                 (pair.0, extract_candid_blob_from_document_v0(pair.1));
             },

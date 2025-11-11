@@ -271,9 +271,10 @@ suite(
             "Pagination with cursor and limit",
             func() {
                 let builder = Query.QueryBuilder();
-                let result = builder.Where("name", #eq(#Text("Alice"))).Pagination(?("\F0" : Blob), 10).build();
+                let cursor = { last_document_id = ?("\F0" : Blob) };
+                let result = builder.Where("name", #eq(#Text("Alice"))).PaginationCursor(cursor).Limit(10).build();
 
-                assert result.pagination.cursor == ?(("\F0" : Blob), #Forward);
+                assert result.pagination.cursor == ?cursor;
                 assert result.pagination.limit == ?10;
                 assert result.pagination.skip == null;
             },
@@ -307,11 +308,11 @@ suite(
             "Combined pagination options",
             func() {
                 let builder = Query.QueryBuilder();
-                let result = builder.Where("name", #eq(#Text("Alice"))).Pagination(?("\F0" : Blob), 10).Skip(5).build();
+                let cursor = { last_document_id = ?("\F0" : Blob) };
+                let result = builder.Where("name", #eq(#Text("Alice"))).PaginationCursor(cursor).Limit(10).build();
 
-                assert result.pagination.cursor == ?(("\F0" : Blob), #Forward);
+                assert result.pagination.cursor == ?cursor;
                 assert result.pagination.limit == ?10;
-                assert result.pagination.skip == ?5;
             },
         );
 

@@ -193,9 +193,7 @@ module {
             return #err("Cannot populate non-empty indexes: " # debug_show index_names);
         };
 
-        let doc_store_utils = DocumentStore.getBtreeUtils(collection.documents);
-
-        for ((document_id, candid_blob) in DocumentStore.entries(collection.documents, doc_store_utils)) {
+        for ((document_id, candid_blob) in DocumentStore.entries(collection)) {
             let candid_map = CollectionUtils.get_candid_map_no_cache(collection, document_id, ?candid_blob);
 
             for (index in indexes.vals()) {

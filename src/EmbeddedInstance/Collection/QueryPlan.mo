@@ -48,7 +48,7 @@ module {
         collection : T.StableCollection,
         query_statements : [T.ZenQueryLang],
         sort_column : ?(Text, T.SortDirection),
-        cursor_record : ?(T.DocumentId, Candid.Candid),
+        last_pagination_document : ?T.CandidMap,
     ) : QueryPlan {
         let log = Logger.NamespacedLogger(collection.logger, LOGGER_NAMESPACE).subnamespace("from_and_operation");
         log.lazyDebug(
@@ -83,12 +83,32 @@ module {
                 subplans = [];
                 simple_operations = [];
                 scans = [
+                    // switch (last_pagination_document) {
+                    //     case (?cursor_document) {
+
+                    //         let id = CandidMap.get(cursor_document, C.DOCUMENT_ID);
+
+                    //         let last_document_pos = DocumentStore.get_expected_index(collection.documents)
+                    //         #IndexScan({
+                    //             index_name = C.DOCUMENT_ID;
+                    //             requires_additional_filtering = false;
+                    //             requires_additional_sorting = false;
+                    //             sorted_in_reverse = false;
+                    //             interval = ();
+                    //         })
+
+                    //     };
+                    //     case (null) {
                     #FullScan({
                         requires_additional_sorting = false;
                         requires_additional_filtering = false;
                         scan_bounds = ([], []);
                         filter_bounds = ([], []);
-                    })
+                    }),
+                    //     };
+
+                    // },
+
                 ];
             };
         };
@@ -123,7 +143,7 @@ module {
                         collection,
                         nested_or_operations,
                         sort_column,
-                        cursor_record,
+                        last_pagination_document,
                         Buffer.toArray(operations),
                     );
 
@@ -223,7 +243,7 @@ module {
             "upper: " # debug_show scan_bounds.1
         );
 
-        var interval = CompositeIndex.scan(collection, index, scan_bounds.0, scan_bounds.1, cursor_record);
+        var interval = CompositeIndex.scan(collection, index, scan_bounds.0, scan_bounds.1, null); // pagination_cursor
 
         log.lazyDebug(
             func() {
@@ -263,7 +283,7 @@ module {
         collection : T.StableCollection,
         query_statements : [T.ZenQueryLang],
         sort_column : ?(Text, T.SortDirection),
-        cursor_record : ?(T.DocumentId, Candid.Candid),
+        last_pagination_document : ?T.CandidMap,
         parent_simple_and_operations : [(Text, T.ZqlOperators)],
     ) : QueryPlan {
         let log = Logger.NamespacedLogger(collection.logger, LOGGER_NAMESPACE).subnamespace("from_or_operation");
@@ -335,7 +355,7 @@ module {
                                 ?best_index_info.fully_covered_equality_and_range_fields,
                             );
 
-                            let interval = CompositeIndex.scan(collection, index, scan_bounds.0, scan_bounds.1, cursor_record);
+                            let interval = CompositeIndex.scan(collection, index, scan_bounds.0, scan_bounds.1, null); // pagination_curosr
                             log.lazyDebug(
                                 func() {
                                     "CompositeIndex scan intervals: " # debug_show interval;
@@ -367,7 +387,7 @@ module {
                         collection,
                         nested_query_statements,
                         sort_column,
-                        cursor_record,
+                        last_pagination_document,
                     );
 
                     sub_query_plans.add(sub_query_plan);
@@ -394,12 +414,19 @@ module {
         collection : T.StableCollection,
         db_query : ZenQueryLang,
         sort_column : ?(Text, T.SortDirection),
-        cursor_record : ?(T.DocumentId, Candid.Candid),
+        pagination_cursor : ?T.PaginationCursor,
     ) : QueryPlan {
         let LOGGER_SUB_NAMESPACE = "create_query_plan";
         let log = Logger.NamespacedLogger(collection.logger, LOGGER_NAMESPACE).subnamespace(LOGGER_SUB_NAMESPACE);
 
         log.lazyInfo(func() = "Creating query plan");
+
+        let opt_last_pagination_document = do ? {
+            CollectionUtils.get_and_cache_candid_map(
+                collection,
+                pagination_cursor!.last_document_id!,
+            );
+        };
 
         let query_plan = switch (db_query) {
             case (#And(operations)) {
@@ -412,7 +439,7 @@ module {
                     collection,
                     operations,
                     sort_column,
-                    cursor_record,
+                    opt_last_pagination_document,
                 );
             };
             case (#Or(operations)) {
@@ -425,7 +452,7 @@ module {
                     collection,
                     operations,
                     sort_column,
-                    cursor_record,
+                    opt_last_pagination_document,
                     [],
                 );
             };

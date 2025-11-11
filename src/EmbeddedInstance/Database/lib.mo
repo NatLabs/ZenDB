@@ -201,7 +201,6 @@ module {
             switch (
                 StableCollection.create_composite_index(
                     stable_collection,
-                    CollectionUtils.getMainBtreeUtils(stable_collection),
                     index_name,
                     index_fields,
                     is_unique,

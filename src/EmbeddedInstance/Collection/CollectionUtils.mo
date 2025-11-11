@@ -123,7 +123,10 @@ module CollectionUtils {
     };
 
     public func getMainBtreeUtils(collection : T.StableCollection) : T.BTreeUtils<T.DocumentId, T.Document> {
-        DocumentStore.getBtreeUtils(collection.documents);
+        switch (collection.documents) {
+            case (#stableMemory(_)) DocumentStore.StableMemoryUtils;
+            case (#heap(_)) DocumentStore.HeapUtils;
+        };
     };
 
     public func getIndexColumns(collection : T.StableCollection, index_key_details : [(Text, SortDirection)], document_id : T.DocumentId, candid_map : T.CandidMap) : ?[Candid] {
@@ -197,13 +200,13 @@ module CollectionUtils {
     };
 
     public func lookupDocument<Record>(collection : T.StableCollection, blobify : T.InternalCandify<Record>, id : T.DocumentId) : Record {
-        let ?documentDetails = DocumentStore.get(collection.documents, DocumentStore.getBtreeUtils(collection.documents), id) else Debug.trap("lookupDocument: document not found for id: " # debug_show id);
+        let ?documentDetails = DocumentStore.get(collection, id) else Debug.trap("lookupDocument: document not found for id: " # debug_show id);
         let document = blobify.from_blob(documentDetails);
         document;
     };
 
     public func lookupCandidBlob(collection : T.StableCollection, id : T.DocumentId) : Blob {
-        let ?documentDetails : ?Blob = DocumentStore.get(collection.documents, DocumentStore.getBtreeUtils(collection.documents), id) else Debug.trap("lookupCandidBlob: document not found for id: " # debug_show id);
+        let ?documentDetails : ?Blob = DocumentStore.get(collection, id) else Debug.trap("lookupCandidBlob: document not found for id: " # debug_show id);
         documentDetails;
     };
 
@@ -215,7 +218,7 @@ module CollectionUtils {
     };
 
     public func lookupCandidDocument(collection : T.StableCollection, id : T.DocumentId) : ?Candid.Candid {
-        let ?document_details = DocumentStore.get(collection.documents, DocumentStore.getBtreeUtils(collection.documents), id) else return null;
+        let ?document_details = DocumentStore.get(collection, id) else return null;
         let candid = decodeCandidBlob(collection, document_details);
 
         ?candid;

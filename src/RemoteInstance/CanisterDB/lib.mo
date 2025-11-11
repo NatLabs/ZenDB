@@ -202,8 +202,7 @@ shared ({ caller = owner }) persistent actor class CanisterDB() = this_canister 
             func() : (ZT.Result<ZT.DocumentId, Text>) {
                 let #ok(collection) = get_collection(db_name, collection_name) else return Utils.send_error(get_collection(db_name, collection_name));
 
-                let main_btree_utils = CollectionUtils.getMainBtreeUtils(collection);
-                StableCollection.insert(collection, main_btree_utils, candid_document_blob);
+                StableCollection.insert(collection, candid_document_blob);
             },
         );
     };
@@ -215,8 +214,7 @@ shared ({ caller = owner }) persistent actor class CanisterDB() = this_canister 
             func() : (ZT.Result<[ZT.DocumentId], Text>) {
                 let #ok(collection) = get_collection(db_name, collection_name) else return Utils.send_error(get_collection(db_name, collection_name));
 
-                let main_btree_utils = CollectionUtils.getMainBtreeUtils(collection);
-                StableCollection.insert_docs(collection, main_btree_utils, candid_document_blobs);
+                StableCollection.insert_docs(collection, candid_document_blobs);
             },
         );
     };
@@ -228,9 +226,7 @@ shared ({ caller = owner }) persistent actor class CanisterDB() = this_canister 
             func() : (ZT.Result<ZT.CandidBlob, Text>) {
                 let #ok(collection) = get_collection(db_name, collection_name) else return Utils.send_error(get_collection(db_name, collection_name));
 
-                let main_btree_utils = CollectionUtils.getMainBtreeUtils(collection);
-
-                switch (StableCollection.get(collection, main_btree_utils, document_id)) {
+                switch (StableCollection.get(collection, document_id)) {
                     case (?document_blob) #ok(document_blob);
                     case null #err("Document with id " # debug_show (document_id) # " does not exist in collection '" # collection_name # "' in database '" # db_name # "'");
                 };
@@ -253,9 +249,7 @@ shared ({ caller = owner }) persistent actor class CanisterDB() = this_canister 
             func() : (ZT.Result<ZT.SearchResult<Blob>, Text>) {
                 let #ok(collection) = get_collection(db_name, collection_name) else return Utils.send_error(get_collection(db_name, collection_name));
 
-                let main_btree_utils = CollectionUtils.getMainBtreeUtils(collection);
-
-                StableCollection.search(collection, main_btree_utils, stable_query);
+                StableCollection.search(collection, stable_query);
             },
         );
     };
@@ -435,9 +429,7 @@ shared ({ caller = owner }) persistent actor class CanisterDB() = this_canister 
             func() : (ZT.Result<ZT.ReplaceByIdResult, Text>) {
                 let #ok(collection) = get_collection(db_name, collection_name) else return Utils.send_error(get_collection(db_name, collection_name));
 
-                let main_btree_utils = CollectionUtils.getMainBtreeUtils(collection);
-
-                StableCollection.replace_by_id(collection, main_btree_utils, id, document_blob);
+                StableCollection.replace_by_id(collection, id, document_blob);
             },
         );
 
@@ -450,9 +442,7 @@ shared ({ caller = owner }) persistent actor class CanisterDB() = this_canister 
             func() : (ZT.Result<ZT.DeleteByIdResult<Blob>, Text>) {
                 let #ok(collection) = get_collection(db_name, collection_name) else return Utils.send_error(get_collection(db_name, collection_name));
 
-                let main_btree_utils = CollectionUtils.getMainBtreeUtils(collection);
-
-                StableCollection.delete_by_id(collection, main_btree_utils, id);
+                StableCollection.delete_by_id(collection, id);
             },
         );
     };
@@ -464,14 +454,12 @@ shared ({ caller = owner }) persistent actor class CanisterDB() = this_canister 
             func() : (ZT.Result<ZT.DeleteResult<Blob>, Text>) {
                 let #ok(collection) = get_collection(db_name, collection_name) else return Utils.send_error(get_collection(db_name, collection_name));
 
-                let main_btree_utils = CollectionUtils.getMainBtreeUtils(collection);
-
                 let blobify : ZT.InternalCandify<Blob> = {
                     to_blob = func(blob : Blob) : Blob { blob };
                     from_blob = func(blob : Blob) : Blob { blob };
                 };
 
-                StableCollection.delete_documents(collection, main_btree_utils, blobify, db_query);
+                StableCollection.delete_documents(collection, blobify, db_query);
             },
         );
     };
@@ -483,9 +471,7 @@ shared ({ caller = owner }) persistent actor class CanisterDB() = this_canister 
             func() : (ZT.Result<ZT.UpdateByIdResult, Text>) {
                 let #ok(collection) = get_collection(db_name, collection_name) else return Utils.send_error(get_collection(db_name, collection_name));
 
-                let main_btree_utils = CollectionUtils.getMainBtreeUtils(collection);
-
-                StableCollection.update_by_id(collection, main_btree_utils, id, update_operations);
+                StableCollection.update_by_id(collection, id, update_operations);
             },
         );
     };
@@ -498,9 +484,7 @@ shared ({ caller = owner }) persistent actor class CanisterDB() = this_canister 
                 let collection_res = get_collection(db_name, collection_name);
                 let #ok(collection) = collection_res else return Utils.send_error(collection_res);
 
-                let main_btree_utils = CollectionUtils.getMainBtreeUtils(collection);
-
-                StableCollection.update_documents(collection, main_btree_utils, stable_query, update_operations);
+                StableCollection.update_documents(collection, stable_query, update_operations);
             },
         );
     };
@@ -541,9 +525,7 @@ shared ({ caller = owner }) persistent actor class CanisterDB() = this_canister 
             func() : (ZT.Result<(), Text>) {
                 let #ok(collection) = get_collection(db_name, collection_name) else return Utils.send_error(get_collection(db_name, collection_name));
 
-                let main_btree_utils = CollectionUtils.getMainBtreeUtils(collection);
-
-                StableCollection.repopulate_index(collection, main_btree_utils, index_name);
+                StableCollection.repopulate_index(collection, index_name);
             },
         );
     };

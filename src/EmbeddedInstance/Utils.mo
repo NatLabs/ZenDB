@@ -282,18 +282,18 @@ module {
     };
 
     public func kmerge<A>(iters : [Iter.Iter<A>], cmp : (A, A) -> Order.Order) : Iter.Iter<A> {
-        type Index<A> = (A, Nat);
+        type Ref<A> = (A, Nat);
 
-        let cmpIters = func(a : Index<A>, b : Index<A>) : Order.Order {
+        let cmpIters = func(a : Ref<A>, b : Ref<A>) : Order.Order {
             cmp(a.0, b.0);
         };
 
-        let heap = Heap.Heap<Index<A>>(cmpIters);
+        let heap = MinHeap.newWithCapacity<Ref<A>>(iters.size());
 
-        for ((i, iter) in enumerate(iters.vals())) {
+        for ((i, iter) in Itertools.enumerate(iters.vals())) {
             switch (iter.next()) {
                 case (?a) {
-                    heap.put((a, i));
+                    MinHeap.put(heap, (a, i), cmpIters);
                 };
                 case (_) {
 
@@ -303,11 +303,11 @@ module {
 
         object {
             public func next() : ?A {
-                switch (heap.removeMin()) {
+                switch (MinHeap.removeMin(heap, cmpIters)) {
                     case (?(min, i)) {
                         switch (iters[i].next()) {
                             case (?a) {
-                                heap.put((a, i));
+                                MinHeap.put(heap, (a, i), cmpIters);
                             };
                             case (_) {};
                         };

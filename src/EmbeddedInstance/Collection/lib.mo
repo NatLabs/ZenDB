@@ -152,16 +152,14 @@ module {
         /// Returns the total number of documents in the collection.
         public func size() : Nat = StableCollection.size(collection);
 
-        let main_btree_utils : T.BTreeUtils<T.DocumentId, T.Document> = DocumentStore.getBtreeUtils(collection.documents);
-
         /// Returns an iterator over all the document ids in the collection.
         public func keys() : Iter<T.DocumentId> {
-            StableCollection.keys(collection, main_btree_utils);
+            StableCollection.keys(collection);
         };
 
         /// Returns an iterator over all the documents in the collection.
         public func vals() : Iter<Record> {
-            let iter = StableCollection.vals(collection, main_btree_utils);
+            let iter = StableCollection.vals(collection);
             let documents = Iter.map<Blob, Record>(
                 iter,
                 func(candid_blob : Blob) {
@@ -173,7 +171,7 @@ module {
 
         /// Returns an iterator over a tuple containing the id and document for all entries in the collection.
         public func entries() : Iter<(T.DocumentId, Record)> {
-            let iter = StableCollection.entries(collection, main_btree_utils);
+            let iter = StableCollection.entries(collection);
 
             let documents = Iter.map<(T.DocumentId, Blob), (T.DocumentId, Record)>(
                 iter,
@@ -197,19 +195,19 @@ module {
             let candid_blob = blobify.to_blob(document);
 
             handleResult(
-                StableCollection.insert(collection, main_btree_utils, candid_blob),
+                StableCollection.insert(collection, candid_blob),
                 "Failed to insert document",
             );
         };
 
         public func insertDocs(documents : [Record]) : Result<[T.DocumentId], Text> {
-            StableCollection.insert_docs(collection, main_btree_utils, Array.map<Record, Blob>(documents, blobify.to_blob));
+            StableCollection.insert_docs(collection, Array.map<Record, Blob>(documents, blobify.to_blob));
         };
 
         /// Retrieves a document by its id.
         public func get(id : T.DocumentId) : ?Record {
             Option.map(
-                StableCollection.get(collection, main_btree_utils, id),
+                StableCollection.get(collection, id),
                 blobify.from_blob,
             );
         };
@@ -314,10 +312,8 @@ module {
         /// If the search fails, an error message will be returned.
 
         public func search(query_builder : QueryBuilder) : T.Result<SearchResult<Record>, Text> {
-            let main_btree_utils = DocumentStore.getBtreeUtils(collection.documents);
-
             switch (
-                StableCollection.search(collection, main_btree_utils, query_builder.build())
+                StableCollection.search(collection, query_builder.build())
             ) {
                 case (#err(err)) return #err(err);
                 case (#ok(result)) {
@@ -328,10 +324,7 @@ module {
                         },
                     );
 
-                    #ok({
-                        documents = documents;
-                        instructions = result.instructions;
-                    });
+                    #ok({ result with documents = documents });
                 };
             };
         };
@@ -351,7 +344,7 @@ module {
 
         public func replace(id : T.DocumentId, document : Record) : T.Result<ReplaceByIdResult, Text> {
             handleResult(
-                StableCollection.replace_by_id(collection, main_btree_utils, id, blobify.to_blob(document)),
+                StableCollection.replace_by_id(collection, id, blobify.to_blob(document)),
                 "Failed to replace document with id: " # debug_show (id),
             );
         };
@@ -360,7 +353,6 @@ module {
             handleResult(
                 StableCollection.replace_docs(
                     collection,
-                    main_btree_utils,
                     Array.map<(T.DocumentId, Record), (T.DocumentId, Blob)>(
                         documents,
                         func((id, doc) : (T.DocumentId, Record)) : (T.DocumentId, Blob) {
@@ -375,14 +367,14 @@ module {
         /// Updates a document by its id with the given update operations.
         public func updateById(id : T.DocumentId, update_operations : [(Text, T.FieldUpdateOperations)]) : T.Result<UpdateByIdResult, Text> {
             handleResult(
-                StableCollection.update_by_id(collection, main_btree_utils, id, update_operations),
+                StableCollection.update_by_id(collection, id, update_operations),
                 "Failed to update document with id: " # debug_show (id),
             );
         };
 
         public func update(query_builder : QueryBuilder, update_operations : [(Text, T.FieldUpdateOperations)]) : T.Result<UpdateResult, Text> {
             handleResult(
-                StableCollection.update_documents(collection, main_btree_utils, query_builder.build(), update_operations),
+                StableCollection.update_documents(collection, query_builder.build(), update_operations),
                 "Failed to update documents",
             );
         };
@@ -390,7 +382,7 @@ module {
         public func deleteById(id : T.DocumentId) : T.Result<DeleteByIdResult<Record>, Text> {
             switch (
                 handleResult(
-                    StableCollection.delete_by_id(collection, main_btree_utils, id),
+                    StableCollection.delete_by_id(collection, id),
                     "Failed to delete document with id: " # debug_show (id),
                 )
             ) {
@@ -407,14 +399,14 @@ module {
 
         public func delete(query_builder : QueryBuilder) : T.Result<DeleteResult<Record>, Text> {
             handleResult(
-                StableCollection.delete_documents(collection, main_btree_utils, blobify, query_builder.build()),
+                StableCollection.delete_documents(collection, blobify, query_builder.build()),
                 "Failed to delete documents",
             );
         };
 
         public func filterIter(condition : (Record) -> Bool) : Iter<Record> {
 
-            let iter = StableCollection.vals(collection, main_btree_utils);
+            let iter = StableCollection.vals(collection);
             let documents = Iter.map<Blob, Record>(
                 iter,
                 func(candid_blob : Blob) {
@@ -494,28 +486,28 @@ module {
         /// Clears an index from the collection that is not used internally.
         public func clearIndex(name : Text) : T.Result<(), Text> {
             handleResult(
-                StableCollection.clear_index(collection, main_btree_utils, name),
+                StableCollection.clear_index(collection, name),
                 "Failed to clear index: " # name,
             );
         };
 
         public func repopulateIndex(name : Text) : T.Result<(), Text> {
             handleResult(
-                StableCollection.repopulate_index(collection, main_btree_utils, name),
+                StableCollection.repopulate_index(collection, name),
                 "Failed to populate index: " # name,
             );
         };
 
         public func repopulateIndexes(names : [Text]) : T.Result<(), Text> {
             handleResult(
-                StableCollection.repopulate_indexes(collection, main_btree_utils, names),
+                StableCollection.repopulate_indexes(collection, names),
                 "Failed to populate indexes: " # debug_show (names),
             );
         };
 
         public func createTextIndex(index_name : Text, name : Text, tokenizer : T.Tokenizer) : T.Result<(), Text> {
             let res = handleResult(
-                StableCollection.create_text_index(collection, main_btree_utils, index_name, name, tokenizer),
+                StableCollection.create_text_index(collection, index_name, name, tokenizer),
                 "Failed to create text index: " # name,
             );
 

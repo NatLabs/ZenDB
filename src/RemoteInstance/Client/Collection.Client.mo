@@ -84,8 +84,8 @@ module {
             switch (search_response) {
                 case (#ok(result)) {
                     #ok({
+                        result with
                         documents = search_results_from_blobs(result.documents);
-                        instructions = result.instructions;
                     });
                 };
                 case (#err(e)) { #err(e) };

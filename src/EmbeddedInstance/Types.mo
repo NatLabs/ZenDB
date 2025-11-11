@@ -319,7 +319,7 @@ module T {
 
     };
 
-    public type Cursor = DocumentId;
+    public type PaginationCursor = { last_document_id : ?DocumentId };
 
     public type PaginationDirection = {
         #Forward;
@@ -327,7 +327,7 @@ module T {
     };
 
     public type StableQueryPagination = {
-        cursor : ?(DocumentId, PaginationDirection);
+        cursor : ?T.PaginationCursor;
         limit : ?Nat;
         skip : ?Nat;
     };
@@ -694,6 +694,7 @@ module T {
     // Custom result types for operations that include instruction counts
     public type SearchResult<Record> = {
         documents : [WrapId<Record>];
+        pagination_cursor : PaginationCursor;
         instructions : Nat;
     };
 

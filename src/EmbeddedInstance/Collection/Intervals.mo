@@ -376,13 +376,11 @@ module {
         // Debug.print("document_ids_from_index_intervals: intervals: " # debug_show intervals);
 
         if (index_name == C.DOCUMENT_ID) {
-            let main_btree_utils = DocumentStore.getBtreeUtils(collection.documents);
-
             let document_ids = Itertools.flatten(
                 Iter.map(
                     intervals.vals(),
                     func(interval : T.Interval) : Iter<(T.DocumentId)> {
-                        let document_ids = DocumentStore.range_keys(collection.documents, main_btree_utils, interval.0, interval.1);
+                        let document_ids = DocumentStore.range_keys(collection, interval.0, interval.1);
 
                         if (sorted_in_reverse) {
                             return document_ids.rev();

@@ -282,7 +282,7 @@ ZenDBSuite.newSuite(
 
                 if (options.pagination != null) {
                     let pagination = options.pagination!;
-                    // ignore Query.Cursor(pagination.cursor, #Forward);
+                    // ignore Query.PaginationCursor(pagination.cursor, #Forward);
                     ignore Query.Limit(pagination.limit);
                 };
 
@@ -365,7 +365,7 @@ ZenDBSuite.newSuite(
         //         switch (opt_cursor, ?(documents.get(documents.size() - 1).0)) {
         //             case (?cursor, ?new_cursor) if (cursor == new_cursor) {
         //                 // break pagination;
-        //                 Debug.trap("Cursor is not moving");
+        //                 Debug.trap("PaginationCursor is not moving");
         //             } else {
         //                 opt_cursor := ?new_cursor;
         //             };
@@ -374,7 +374,7 @@ ZenDBSuite.newSuite(
 
         //         };
 
-        //         // ignore db_query.Cursor(opt_cursor, #Forward).Limit(pagination_limit);
+        //         // ignore db_query.PaginationCursor(opt_cursor, #Forward).Limit(pagination_limit);
 
         //         let #ok(matching_txs) = txs.search(db_query);
         //         Debug.print("matching_txs: " # debug_show matching_txs);

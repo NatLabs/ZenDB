@@ -265,9 +265,7 @@ module CompositeIndex {
     ) : T.Result<(), Text> {
         assert CompositeIndex.size(index) == 0;
 
-        let doc_store_utils = DocumentStore.getBtreeUtils(collection.documents);
-
-        for ((document_id, candid_blob) in DocumentStore.entries(collection.documents, doc_store_utils)) {
+        for ((document_id, candid_blob) in DocumentStore.entries(collection)) {
             let candid_map = CollectionUtils.get_candid_map_no_cache(collection, document_id, ?candid_blob);
 
             switch (CompositeIndex.insertWithCandidMap(collection, index, document_id, candid_map)) {
@@ -320,7 +318,7 @@ module CompositeIndex {
     ) : T.Result<(), Text> {
 
         let candid_map_document_entries = Iter.map<(T.DocumentId, T.CandidBlob), (T.DocumentId, T.CandidMap)>(
-            DocumentStore.entries(collection.documents, DocumentStore.getBtreeUtils(collection.documents)),
+            DocumentStore.entries(collection),
             func((id, candid_blob) : (T.DocumentId, T.CandidBlob)) : (T.DocumentId, T.CandidMap) {
                 let candid_map = CollectionUtils.get_candid_map_no_cache(collection, id, ?candid_blob);
                 (id, candid_map);
@@ -342,7 +340,7 @@ module CompositeIndex {
     ) : T.Result<(), Text> {
 
         let candid_map_document_entries = Iter.map<(T.DocumentId, T.CandidBlob), (T.DocumentId, T.CandidMap)>(
-            DocumentStore.entries(collection.documents, DocumentStore.getBtreeUtils(collection.documents)),
+            DocumentStore.entries(collection),
             func((id, candid_blob) : (T.DocumentId, T.CandidBlob)) : (T.DocumentId, T.CandidMap) {
                 let candid_map = CollectionUtils.get_candid_map_no_cache(collection, id, ?candid_blob);
                 (id, candid_map);

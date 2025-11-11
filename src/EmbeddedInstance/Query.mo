@@ -20,14 +20,13 @@ import CandidUtils "CandidUtils";
 module {
     let LOGGER_NAMESPACE = "Query";
 
-
     public type ZqlOperators = T.ZqlOperators;
     public type ZenQueryLang = T.ZenQueryLang;
     public type Operator = T.Operator;
     let { thash; bhash } = Map;
 
     type StableQuery = T.StableQuery;
-    type Cursor = T.Cursor;
+    type PaginationCursor = T.PaginationCursor;
     type PaginationDirection = T.PaginationDirection;
 
     public class QueryBuilder() = self {
@@ -35,7 +34,7 @@ module {
         public var _opt_nested_query : ?ZenQueryLang = null;
         public var _is_and : Bool = true;
         public var _buffer = Buffer.Buffer<ZenQueryLang>(8);
-        public var _pagination_cursor : ?Cursor = null;
+        public var _pagination_cursor : ?PaginationCursor = null;
         public var _pagination_limit : ?Nat = null;
         public var _pagination_skip : ?Nat = null; // skip from beginning of the query
         public var _cursor_offset = 0;
@@ -236,18 +235,11 @@ module {
             self;
         };
 
-        public func Pagination(cursor : ?Cursor, limit : Nat) : QueryBuilder {
-            _pagination_cursor := cursor;
-            _pagination_limit := ?limit;
+        public func PaginationCursor(cursor : PaginationCursor) : QueryBuilder {
+            _pagination_cursor := ?cursor;
+            _pagination_skip := null; // reset skip when using cursor
             self;
         };
-
-        // public func Cursor(cursor : ?Cursor, direction : PaginationDirection) : QueryBuilder {
-        //     _pagination_cursor := cursor;
-        //     // _cursor_offset := cursor_offset;
-        //     _direction := direction;
-        //     self;
-        // };
 
         public func Limit(limit : Nat) : QueryBuilder {
             _pagination_limit := ?limit;
@@ -255,6 +247,13 @@ module {
         };
 
         public func Skip(skip : Nat) : QueryBuilder {
+            switch (_pagination_cursor) {
+                case (?_) {
+                    Debug.trap("QueryBuilder: Cannot use Skip() when PaginationCursor() is set");
+                };
+                case (null) {};
+            };
+
             _pagination_skip := ?skip;
             self;
         };
@@ -274,10 +273,7 @@ module {
                 query_operations = flattenQuery(resolved_query);
                 sort_by = _sort_by;
                 pagination = {
-                    cursor = switch (_pagination_cursor) {
-                        case (?cursor) ?(cursor, _direction);
-                        case (_) null;
-                    };
+                    cursor = _pagination_cursor;
                     limit = _pagination_limit;
                     skip = _pagination_skip;
                 };
