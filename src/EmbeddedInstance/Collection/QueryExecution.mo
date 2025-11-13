@@ -30,13 +30,14 @@ import BTree "../BTree";
 import MergeSort "../MergeSort";
 
 import CompositeIndex "Index/CompositeIndex";
-import CommonIndexFns "Index/CommonIndexFns";
+import Index "Index";
 import Intervals "Intervals";
 import Orchid "Orchid";
 import Schema "Schema";
 import CollectionUtils "CollectionUtils";
 import QueryPlan "QueryPlan";
 import DocumentStore "DocumentStore";
+import CandidMap "../CandidMap";
 
 module {
 
@@ -211,10 +212,10 @@ module {
                                     func() = "CompositeIndex-based filtering not applicable, falling back to standard approach"
                                 );
 
-                                let index = CollectionUtils.get_composite_index(collection, index_name);
+                                let index_key_details = Index.get_key_details_by_name(collection, index_name);
                                 let filter_bounds_buffer = Buffer.fromArray<T.Bounds>([filter_bounds]);
 
-                                let document_ids_with_fields = if (CollectionUtils.can_use_indexed_fields_for_filtering(index.key_details, filter_bounds_buffer)) {
+                                let document_ids_with_fields = if (CollectionUtils.can_use_indexed_fields_for_filtering(index_key_details, filter_bounds_buffer)) {
                                     Intervals.document_ids_and_indexed_fields_from_intervals(collection, index_name, [interval], false);
                                 } else {
                                     let document_ids = Intervals.document_ids_from_index_intervals(collection, index_name, [interval], false);
@@ -337,14 +338,8 @@ module {
             );
 
             for ((index_name, interval_details) in Map.entries(intervals_by_index)) {
-                let ?_index = Map.get(collection.indexes, Map.thash, index_name) else {
-                    log.lazyError(
-                        func() = "CompositeIndex not found: " # index_name
-                    );
-                    Debug.trap("Unreachable: IndexMap not found for index: " # index_name);
-                };
 
-                let index = CommonIndexFns.get_internal_index(_index);
+                let index_config = Index.get_config_by_name(collection, index_name);
 
                 if (query_plan.is_and_operation) {
                     assert interval_details.intervals.size() == 1;
@@ -358,7 +353,7 @@ module {
                 let bitmap = BitMap.BitMap(1024);
 
                 for (interval in interval_details.intervals.vals()) {
-                    let document_ids_with_fields = Intervals.document_ids_and_indexed_fields_from_intervals(collection, index.name, [interval], false);
+                    let document_ids_with_fields = Intervals.document_ids_and_indexed_fields_from_intervals(collection, index_config.name, [interval], false);
 
                     for ((id, _) in document_ids_with_fields) {
                         let id_as_nat = Utils.convert_last_8_bytes_to_nat(id);
@@ -373,9 +368,9 @@ module {
         let result = if (bitmaps.size() == 0 and Map.size(intervals_by_index) == 1) {
             let ?(index_name, interval_details) = Map.entries(intervals_by_index).next() else {
                 log.lazyError(
-                    func() = "No elements in map when size is greater than 0"
+                    func() = "No elements in intervals_by_index map when size is greater than 0"
                 );
-                Debug.trap("No elements in map when size is greater than 0");
+                log.trap("QueryExecution.get_unique_document_ids_from_query_plan: No elements in map when size is greater than 0");
             };
 
             let sorted_in_reverse = switch (interval_details.sorted_in_reverse) {
@@ -462,7 +457,7 @@ module {
                 switch (details.sorted_in_reverse) {
                     case (?sorted_in_reverse) {
                         if (sorted_in_reverse != is_reversed) {
-                            Debug.trap("Inconsistent sorted_in_reverse values");
+                            Logger.trap("QueryExecution.add_interval: Inconsistent sorted_in_reverse values for index '" # index_name # "': existing=" # debug_show sorted_in_reverse # ", new=" # debug_show is_reversed);
                         };
                     };
                     case (null) {
@@ -536,7 +531,8 @@ module {
             let {
                 index;
                 fully_covered_equality_and_range_fields;
-            } = switch (CommonIndexFns.get_best_index(collection, Buffer.toArray(filter_operations), null)) {
+                // true because this function itself is a bitmap intersection
+            } = switch (Index.get_best_index(collection, Buffer.toArray(filter_operations), null, null, true)) {
                 case (null) {
                     log.lazyDebug(
                         func() = "No suitable index found for filtering"
@@ -577,7 +573,7 @@ module {
                 };
             };
 
-            let (scan_bounds, filter_bounds) = CommonIndexFns.convert_simple_ops_to_bounds(
+            let (scan_bounds, filter_bounds) = Index.convert_simple_ops_to_bounds(
                 false,
                 Buffer.toArray(filter_operations),
                 ?index.key_details,
@@ -589,7 +585,7 @@ module {
                 index.name # "'"
             );
 
-            let interval = CompositeIndex.scan(collection, index, scan_bounds.0, scan_bounds.1, null);
+            let interval = CompositeIndex.scan(collection, index, scan_bounds.0, scan_bounds.1, null, false);
 
             log.lazyDebug(
                 func() = "Generated interval " #
@@ -747,10 +743,11 @@ module {
         switch (Map.get(intervals_map, Map.thash, index_name)) {
             case (?intervals) {
                 log.lazyError(
-                    func() = "Filtering index same as scanning index: " #
-                    index_name
+                    func() = "Filtering index same as scanning index: '" #
+                    index_name # "'. This should not happen - it indicates the filtering and scanning operations " #
+                    "are using the same index which defeats the purpose of index-based filtering."
                 );
-                Debug.trap("QueryExecution.indexBasedIntervalFiltering : this is interesting, why would the filtering index be the same as the scanning index?");
+                log.trap("QueryExecution.index_based_interval_filtering: filtering index same as scanning index '" # index_name # "'");
                 intervals.add(interval);
             };
             case (null) {
@@ -846,26 +843,64 @@ module {
         ?{ bitmap; opt_filter_bounds };
     };
 
+    func load_bitmap(iter : T.Iter<(T.DocumentId, ?[(Text, T.Candid)])>, opt_last_pagination_document_id : ?T.DocumentId) : BitMap.BitMap {
+        BitMap.fromIter(
+            Iter.map(
+                Iter.filter(
+                    iter,
+                    func(tuple : (T.DocumentId, ?[(Text, T.Candid)])) : Bool {
+                        switch (opt_last_pagination_document_id) {
+                            case (?last_id) tuple.0 > last_id;
+                            case (null) true;
+                        };
+                    },
+                ),
+                func(tuple : (T.DocumentId, ?[(Text, T.Candid)])) : Nat {
+                    Utils.convert_last_8_bytes_to_nat(tuple.0);
+                },
+            )
+        );
+    };
+
     public func generate_document_ids_for_and_operation(
         collection : T.StableCollection,
         query_plan : T.QueryPlan,
         opt_sort_column : ?(Text, T.SortDirection),
+        opt_last_pagination_document_id : ?T.DocumentId,
         sort_documents_by_field_cmp : ((T.DocumentId, ?[(Text, T.Candid)]), (T.DocumentId, ?[(Text, T.Candid)])) -> Order,
     ) : EvalResult {
+        let log = Logger.NamespacedLogger(collection.logger, LOGGER_NAMESPACE).subnamespace("generate_document_ids_for_and_operation");
+
         assert query_plan.is_and_operation;
         let requires_sorting = Option.isSome(opt_sort_column);
+
+        log.lazyDebug(
+            func() = "Starting AND operation with " #
+            Nat.toText(query_plan.scans.size()) # " scans, " #
+            Nat.toText(query_plan.subplans.size()) # " subplans, requires_sorting=" #
+            debug_show requires_sorting # ", has_pagination=" # debug_show Option.isSome(opt_last_pagination_document_id)
+        );
 
         if (query_plan.scans.size() == 1 and query_plan.subplans.size() == 0) {
 
             switch (query_plan.scans[0]) {
                 case (#IndexScan({ requires_additional_sorting; requires_additional_filtering; interval; index_name; sorted_in_reverse })) {
                     if (not requires_additional_sorting and not requires_additional_filtering) {
+                        log.lazyDebug(
+                            func() = "Simple index scan on '" # index_name # "', returning interval directly: " #
+                            debug_show interval # ", reversed=" # debug_show sorted_in_reverse
+                        );
                         return #Interval(index_name, [interval], sorted_in_reverse);
                     };
                 };
                 case (#FullScan({ requires_additional_sorting; requires_additional_filtering })) {
                     if (not requires_additional_sorting and not requires_additional_filtering) {
-                        return #Interval(C.DOCUMENT_ID, [(0, DocumentStore.size(collection))], false);
+                        let size = DocumentStore.size(collection);
+                        log.lazyDebug(
+                            func() = "Simple full scan, returning full document range: [0, " #
+                            Nat.toText(size) # ")"
+                        );
+                        return #Interval(C.DOCUMENT_ID, [(0, size)], false);
                     };
 
                 };
@@ -880,6 +915,11 @@ module {
 
         for (scan_details in query_plan.scans.vals()) switch (scan_details) {
             case (#FullScan(full_scan_details)) {
+                log.lazyDebug(
+                    func() = "Adding full scan to processing buffer, requires_filtering=" #
+                    debug_show full_scan_details.requires_additional_filtering #
+                    ", requires_sorting=" # debug_show full_scan_details.requires_additional_sorting
+                );
                 full_scan_details_buffer.add(full_scan_details);
             };
             case (#IndexScan(index_scan_details)) {
@@ -894,23 +934,39 @@ module {
                     filter_bounds;
                 } = index_scan_details;
 
+                log.lazyDebug(
+                    func() = "Processing index scan on '" # index_name # "', interval=" #
+                    debug_show interval # ", requires_filtering=" # debug_show requires_additional_filtering #
+                    ", requires_sorting=" # debug_show requires_additional_sorting
+                );
+
                 if (requires_additional_sorting or requires_additional_filtering) {
 
-                    let index = CollectionUtils.get_composite_index(collection, index_name);
+                    let index_key_details = Index.get_key_details_by_name(collection, index_name);
 
                     let filter_bounds_buffer = Buffer.fromArray<T.Bounds>([filter_bounds]);
 
+                    log.lazyDebug(
+                        func() : Text = "Determining if indexed fields can be used for filtering"
+                    );
+
                     var document_ids_with_fields = if (
-                        CollectionUtils.can_use_indexed_fields_for_filtering(index.key_details, filter_bounds_buffer) or
+                        CollectionUtils.can_use_indexed_fields_for_filtering(index_key_details, filter_bounds_buffer) or
                         (
                             requires_sorting and
                             Option.isSome(
-                                Array.find(index.key_details, func((key, _) : (Text, Any)) : Bool { key == Option.get(opt_sort_column, ("", #Ascending)).0 })
+                                Array.find(index_key_details, func((key, _) : (Text, Any)) : Bool { key == Option.get(opt_sort_column, ("", #Ascending)).0 })
                             )
                         )
                     ) {
+                        log.lazyDebug(
+                            func() : Text = "Using indexed fields from '" # index_name # "'"
+                        );
                         Intervals.document_ids_and_indexed_fields_from_intervals(collection, index_name, [interval], sorted_in_reverse);
                     } else {
+                        log.lazyDebug(
+                            func() : Text = "Not using indexed fields, retrieving only document IDs from '" # index_name # "'"
+                        );
                         let document_ids = Intervals.document_ids_from_index_intervals(collection, index_name, [interval], sorted_in_reverse);
                         Iter.map<T.DocumentId, (T.DocumentId, ?[(Text, T.Candid)])>(
                             document_ids,
@@ -921,49 +977,134 @@ module {
                     };
 
                     if (requires_additional_filtering) {
+                        log.lazyDebug(
+                            func() = "Applying additional filters to document IDs from index '" # index_name # "'"
+                        );
                         document_ids_with_fields := CollectionUtils.multiFilterWithIndexedFields(collection, document_ids_with_fields, filter_bounds_buffer, query_plan.is_and_operation);
                     };
 
                     if (requires_additional_sorting) {
+                        log.lazyDebug(
+                            func() = "Preparing documents for sorting from index '" # index_name # "'"
+                        );
+
                         if (sorted_documents_array.size() == 0) {
-                            let arr = Iter.toArray(document_ids_with_fields);
+                            let cursor_pagination_filtered_documents = switch (opt_last_pagination_document_id) {
+                                case (null) {
+                                    log.lazyDebug(func() = "No pagination cursor, using all documents");
+                                    document_ids_with_fields;
+                                };
+                                case (?last_pagination_document_id) {
+                                    log.lazyDebug(
+                                        func() = "Applying cursor pagination filter for document: " #
+                                        debug_show last_pagination_document_id
+                                    );
+
+                                    let last_pagination_document : T.CandidMap = CollectionUtils.get_and_cache_candid_map(
+                                        collection,
+                                        last_pagination_document_id,
+                                    );
+
+                                    // should have a sort column because this block requires additional sorting
+                                    let sort_field = Option.get(opt_sort_column, ("", #Ascending)).0;
+
+                                    let opt_sort_field_value = CandidMap.get(
+                                        last_pagination_document,
+                                        collection.schema_map,
+                                        sort_field,
+                                    );
+
+                                    let bounds = Buffer.fromArray<T.Bounds>([(
+                                        [(
+                                            sort_field,
+                                            Option.map<T.CandidQuery, T.State<T.CandidQuery>>(opt_sort_field_value, func(candid_query : T.CandidQuery) : T.State<T.CandidQuery> { #Exclusive(candid_query) }),
+                                        )],
+                                        [(sort_field, ?#Inclusive(#Maximum))],
+                                    )]);
+
+                                    CollectionUtils.multiFilterWithIndexedFields(
+                                        collection,
+                                        document_ids_with_fields,
+                                        bounds,
+                                        query_plan.is_and_operation,
+                                    );
+
+                                };
+                            };
+
+                            let arr = Iter.toArray(cursor_pagination_filtered_documents);
+                            log.lazyDebug(
+                                func() = "Sorting " # Nat.toText(arr.size()) # " documents"
+                            );
                             sorted_documents_array := MergeSort.sort(arr, sort_documents_by_field_cmp);
                             document_ids_with_fields := sorted_documents_array.vals();
                         };
                     };
 
                     if (requires_sorting) {
+                        log.lazyDebug(func() = "Adding sorted iterator to iterators buffer");
                         iterators.add(document_ids_with_fields);
                     } else {
+                        log.lazyDebug(func() = "Creating bitmap from filtered document IDs");
                         let bitmap = BitMap.fromIter(Iter.map(document_ids_with_fields, func((id, _) : (T.DocumentId, ?[(Text, T.Candid)])) : Nat { Utils.convert_last_8_bytes_to_nat(id) }));
+                        log.lazyDebug(func() = "Bitmap created with " # Nat.toText(bitmap.size()) # " documents");
                         bitmaps.add(bitmap);
                     };
 
                 } else {
+                    log.lazyDebug(
+                        func() = "No additional processing needed, adding interval directly to intervals_by_index"
+                    );
                     add_interval(intervals_by_index, index_name, interval, sorted_in_reverse);
                 };
             };
         };
 
+        log.lazyDebug(
+            func() = "Processing " # Nat.toText(query_plan.subplans.size()) # " subplans (OR operations)"
+        );
+
         for (or_operation_subplan in query_plan.subplans.vals()) {
-            let eval_result = generate_document_ids_for_or_operation(collection, or_operation_subplan, opt_sort_column, sort_documents_by_field_cmp);
+            log.lazyDebug(func() = "Evaluating OR subplan");
+            let eval_result = generate_document_ids_for_or_operation(collection, or_operation_subplan, opt_sort_column, opt_last_pagination_document_id, sort_documents_by_field_cmp);
 
             switch (eval_result) {
-                case (#Empty) return #Empty; // return early if we encounter an empty set
+                case (#Empty) {
+                    log.lazyDebug(func() = "OR subplan returned empty, short-circuiting AND operation");
+                    return #Empty; // return early if we encounter an empty set
+                };
                 case (#Ids(iter)) {
                     if (requires_sorting) {
                         iterators.add(iter);
                     } else {
-                        let bitmap = BitMap.fromIter(Iter.map(iter, func((id, _) : (T.DocumentId, ?[(Text, T.Candid)])) : Nat { Utils.convert_last_8_bytes_to_nat(id) }));
-                        bitmaps.add(bitmap);
+                        bitmaps.add(
+                            load_bitmap(iter, opt_last_pagination_document_id)
+                        );
                     };
                 };
                 case (#BitMap(bitmap)) {
-                    if (requires_sorting) Debug.trap("Should only return sorted iterators when sorting is required");
-
+                    if (requires_sorting) {
+                        log.lazyError(
+                            func() : Text {
+                                "Received BitMap from OR subplan when sorting is required. Expected sorted iterator instead.";
+                            }
+                        );
+                        log.trap("QueryExecution.generate_document_ids_for_and_operation: BitMap returned when sorting required");
+                    };
+                    log.lazyDebug(
+                        func() : Text {
+                            "Adding bitmap from OR subplan with " # Nat.toText(bitmap.size()) # " documents";
+                        }
+                    );
                     bitmaps.add(bitmap);
                 };
                 case (#Interval(index_name, intervals, is_reversed)) {
+                    let intervalCount = intervals.size();
+                    log.lazyDebug(
+                        func() : Text {
+                            "Adding " # Nat.toText(intervalCount) # " intervals from OR subplan for index " # debug_show index_name;
+                        }
+                    );
                     for (interval in intervals.vals()) {
                         add_interval(intervals_by_index, index_name, interval, is_reversed);
                     };
@@ -972,26 +1113,42 @@ module {
 
         };
 
+        log.lazyDebug(
+            func() = "Intersecting intervals for " # Nat.toText(Map.size(intervals_by_index)) # " indexes"
+        );
+
         for ((index_name, interval_details) in Map.entries(intervals_by_index)) {
             switch (Intervals.intersect(interval_details.intervals)) {
                 case (?interval) {
+                    log.lazyDebug(
+                        func() : Text {
+                            "Intervals for index " # debug_show index_name # " intersected to: " # debug_show interval;
+                        }
+                    );
                     interval_details.intervals.clear();
                     interval_details.intervals.add(interval);
                 };
-                case (null) ignore Map.remove(intervals_by_index, Map.thash, index_name);
+                case (null) {
+                    log.lazyDebug(
+                        func() : Text {
+                            "Empty intersection for index " # debug_show index_name # ", removing from consideration";
+                        }
+                    );
+                    ignore Map.remove(intervals_by_index, Map.thash, index_name);
+                };
             };
         };
 
-        // Debug.print("intervals_by_index: " # debug_show Map.size(intervals_by_index));
-        // Debug.print("iterators: " # debug_show iterators.size());
-        // Debug.print("full_scan_details_buffer: " # debug_show full_scan_details_buffer.size());
-        // Debug.print("bitmaps: " # debug_show bitmaps.size());
-        // Debug.print("sorted_documents_from_iter: " # debug_show sorted_documents_from_iter.size());
-
         if (bitmaps.size() == 0 and full_scan_details_buffer.size() == 0 and iterators.size() == 0 and Map.size(intervals_by_index) <= 1) {
+            log.lazyDebug(
+                func() = "Simple case: " # (if (Map.size(intervals_by_index) == 1) "single interval" else "empty result")
+            );
 
             let merged_results : EvalResult = if (Map.size(intervals_by_index) == 1) {
-                let ?(index_name, interval_details) = Map.entries(intervals_by_index).next() else Debug.trap("No elements in map when size is greater than 0");
+                let ?(index_name, interval_details) = Map.entries(intervals_by_index).next() else {
+                    log.lazyError(func() = "No elements in intervals_by_index map when size is 1");
+                    log.trap("QueryExecution.generate_document_ids_for_and_operation: No elements in map when size is 1");
+                };
                 let interval = interval_details.intervals.get(0);
                 let sorted_in_reverse = switch (interval_details.sorted_in_reverse) {
                     case (?sorted_in_reverse) sorted_in_reverse;
@@ -1006,28 +1163,46 @@ module {
 
         };
 
+        log.lazyDebug(
+            func() = "Converting " # Nat.toText(Map.size(intervals_by_index)) # " index intervals to " #
+            (if (requires_sorting) "sorted iterators" else "bitmaps")
+        );
+
         for ((index_name, interval_details) in Map.entries(intervals_by_index)) {
             let interval = interval_details.intervals.get(0);
-            let ?_index = Map.get(collection.indexes, Map.thash, index_name) else Debug.trap("Unreachable: IndexMap not found for index: " # index_name);
-            let index = CommonIndexFns.get_internal_index(_index);
+            let index_config = Index.get_config_by_name(collection, index_name);
 
             let sorted_in_reverse = Option.get(interval_details.sorted_in_reverse, false);
 
-            let document_ids_with_fields = Intervals.document_ids_and_indexed_fields_from_intervals(collection, index.name, [interval], sorted_in_reverse);
+            log.lazyDebug(
+                func() : Text {
+                    "Retrieving documents from index '" # index_name # "' for interval " # debug_show interval # ", reversed=" # debug_show sorted_in_reverse;
+                }
+            );
+
+            let document_ids_with_fields = Intervals.document_ids_and_indexed_fields_from_intervals(collection, index_config.name, [interval], sorted_in_reverse);
 
             if (requires_sorting and sorted_documents_array.size() == 0) {
+                log.lazyDebug(func() = "Sorting is required, converting to array and sorting");
 
                 let arr = Iter.toArray(document_ids_with_fields);
 
-                if (arr.size() == 0) return #Empty;
+                if (arr.size() == 0) {
+                    log.lazyDebug(func() = "No documents found in interval, returning empty");
+                    return #Empty;
+                };
 
+                log.lazyDebug(func() = "Sorting " # Nat.toText(arr.size()) # " documents");
                 sorted_documents_array := MergeSort.sort(arr, sort_documents_by_field_cmp);
+                log.lazyDebug(func() = "Sort completed, adding to iterators");
 
                 iterators.add(sorted_documents_array.vals());
 
             } else {
-                let bitmap = BitMap.fromIter(Iter.map(document_ids_with_fields, func((id, _) : (T.DocumentId, ?[(Text, T.Candid)])) : Nat { Utils.convert_last_8_bytes_to_nat(id) }));
-                bitmaps.add(bitmap);
+                log.lazyDebug(func() = "Loading documents into bitmap");
+                bitmaps.add(
+                    load_bitmap(document_ids_with_fields, opt_last_pagination_document_id)
+                );
 
             };
 
@@ -1042,12 +1217,16 @@ module {
                     */
 
         if (full_scan_details_buffer.size() > 0) {
+            log.lazyDebug(
+                func() = "Processing " # Nat.toText(full_scan_details_buffer.size()) # " full scan operations"
+            );
 
             var smallest_interval_index = "";
             var smallest_interval_start = 0;
             var smallest_interval_end = 0;
 
             if (Map.size(intervals_by_index) > 0) {
+                log.lazyDebug(func() = "Finding smallest interval to optimize full scan range");
 
                 var smallest_interval_range = 2 ** 64;
 
@@ -1081,14 +1260,14 @@ module {
                 );
                 Iter.map<T.DocumentId, (T.DocumentId, ?[(Text, T.Candid)])>(filtered, func(id : T.DocumentId) : (T.DocumentId, ?[(Text, T.Candid)]) { (id, null) });
             } else {
-                let index = CollectionUtils.get_composite_index(collection, smallest_interval_index);
+                let index_key_details = Index.get_key_details_by_name(collection, smallest_interval_index);
 
                 let document_ids_with_fields = if (
-                    CollectionUtils.can_use_indexed_fields_for_filtering(index.key_details, full_scan_filter_bounds) or
+                    CollectionUtils.can_use_indexed_fields_for_filtering(index_key_details, full_scan_filter_bounds) or
                     (
                         requires_sorting and
                         Option.isSome(
-                            Array.find(index.key_details, func((key, _) : (Text, Any)) : Bool { key == Option.get(opt_sort_column, ("", #Ascending)).0 })
+                            Array.find(index_key_details, func((key, _) : (Text, Any)) : Bool { key == Option.get(opt_sort_column, ("", #Ascending)).0 })
                         )
                     )
                 ) {
@@ -1126,12 +1305,7 @@ module {
 
             };
 
-            // Debug.print("added full scan bounds to bitmaps");
-            // Debug.print("too bad it requires sorting: " # debug_show requires_sorting);
-            // Debug.print("query_plan.subplans.size() : " # debug_show query_plan.subplans.size());
-            // Debug.print("query_plan.scans.size() : " # debug_show query_plan.scans.size());
-
-            let bitmap = BitMap.fromIter(Iter.map(filtered_ids, func((id, _) : (T.DocumentId, ?[(Text, T.Candid)])) : Nat { Utils.convert_last_8_bytes_to_nat(id) }));
+            let bitmap = load_bitmap(filtered_ids, opt_last_pagination_document_id);
             bitmaps.add(bitmap);
 
         };
@@ -1154,7 +1328,7 @@ module {
                     sorted_documents_array.vals();
                 } else { _iter };
 
-                let bitmap = BitMap.fromIter(Iter.map(iter, func((id, _) : (T.DocumentId, ?[(Text, T.Candid)])) : Nat { Utils.convert_last_8_bytes_to_nat(id) }));
+                let bitmap = load_bitmap(iter, opt_last_pagination_document_id);
                 bitmaps.add(bitmap);
 
                 fill_sorted_documents_array := false;
@@ -1188,86 +1362,45 @@ module {
         collection : T.StableCollection,
         query_plan : T.QueryPlan,
         opt_sort_column : ?(Text, T.SortDirection),
+        opt_last_pagination_document_id : ?T.DocumentId,
         sort_documents_by_field_cmp : ((T.DocumentId, ?[(Text, T.Candid)]), (T.DocumentId, ?[(Text, T.Candid)])) -> Order,
     ) : EvalResult {
+        let log = Logger.NamespacedLogger(collection.logger, LOGGER_NAMESPACE).subnamespace("generate_document_ids_for_or_operation");
         assert not query_plan.is_and_operation;
         let requires_sorting = Option.isSome(opt_sort_column);
 
+        let sort_direction = switch (opt_sort_column) {
+            case (?(sort_field, sort_direction)) sort_direction;
+            case (null) #Ascending;
+        };
+
         let bitmaps = Buffer.Buffer<T.BitMap>(8);
         let intervals_by_index = Map.new<Text, IndexDetails>();
+        let full_scan_details_buffer = Buffer.Buffer<T.FullScanDetails>(8);
 
         let iterators = Buffer.Buffer<Iter<(T.DocumentId, ?[(Text, T.Candid)])>>(8);
-        let full_scan_details_buffer = Buffer.Buffer<T.FullScanDetails>(8);
 
         for (scan_details in query_plan.scans.vals()) switch (scan_details) {
             case (#FullScan(full_scan_details)) {
                 full_scan_details_buffer.add(full_scan_details);
             };
-            case (#IndexScan(index_scan_details)) {
-
-                let {
-                    index_name;
-                    requires_additional_filtering;
-                    requires_additional_sorting;
-                    sorted_in_reverse;
-                    interval;
-                    scan_bounds;
-                    filter_bounds;
-                } = index_scan_details;
-
-                if (not requires_additional_filtering and not requires_additional_sorting) {
-                    add_interval(intervals_by_index, index_name, interval, sorted_in_reverse);
-
-                } else {
-
-                    let index = CollectionUtils.get_composite_index(collection, index_name);
-                    let filter_bounds_buffer = Buffer.fromArray<T.Bounds>([filter_bounds]);
-
-                    var document_ids_with_fields = if (
-                        CollectionUtils.can_use_indexed_fields_for_filtering(index.key_details, filter_bounds_buffer) or
-                        (
-                            requires_sorting and
-                            Option.isSome(
-                                Array.find(index.key_details, func((key, _) : (Text, Any)) : Bool { key == Option.get(opt_sort_column, ("", #Ascending)).0 })
-                            )
-                        )
-                    ) {
-                        Intervals.document_ids_and_indexed_fields_from_intervals(collection, index_name, [interval], sorted_in_reverse);
-                    } else {
-                        let document_ids = Intervals.document_ids_from_index_intervals(collection, index_name, [interval], sorted_in_reverse);
-                        Iter.map<T.DocumentId, (T.DocumentId, ?[(Text, T.Candid)])>(
-                            document_ids,
-                            func(id : T.DocumentId) : (T.DocumentId, ?[(Text, T.Candid)]) {
-                                (id, null);
-                            },
-                        );
-                    };
-
-                    if (requires_additional_filtering) {
-                        document_ids_with_fields := CollectionUtils.multiFilterWithIndexedFields(collection, document_ids_with_fields, filter_bounds_buffer, query_plan.is_and_operation);
-                    };
-
-                    if (requires_additional_sorting) {
-                        let arr = Utils.iter_to_array(document_ids_with_fields);
-                        let sorted = MergeSort.sort(arr, sort_documents_by_field_cmp);
-
-                        document_ids_with_fields := sorted.vals();
-                    };
-
-                    if (requires_sorting) {
-                        iterators.add(document_ids_with_fields);
-                    } else {
-                        let bitmap = BitMap.fromIter(Iter.map(document_ids_with_fields, func((id, _) : (T.DocumentId, ?[(Text, T.Candid)])) : Nat { Utils.convert_last_8_bytes_to_nat(id) }));
-                        bitmaps.add(bitmap);
-                    };
-
+            case (#IndexScan({ index_name; filter_bounds; requires_additional_filtering; requires_additional_sorting; sorted_in_reverse; interval; scan_bounds })) {
+                if (index_name != C.DOCUMENT_ID) {
+                    log.trap("QueryExecution.generate_document_ids_for_or_operation: OR operations should not have index scans on '" # index_name # "' directly, they should be in subplans");
                 };
 
+                full_scan_details_buffer.add({
+                    filter_bounds;
+                    requires_additional_sorting;
+                    scan_bounds;
+                    requires_additional_filtering;
+                });
             };
         };
 
         for (and_operation_subplan in query_plan.subplans.vals()) {
-            let eval_result = generate_document_ids_for_and_operation(collection, and_operation_subplan, opt_sort_column, sort_documents_by_field_cmp);
+
+            let eval_result = generate_document_ids_for_and_operation(collection, and_operation_subplan, opt_sort_column, opt_last_pagination_document_id, sort_documents_by_field_cmp);
 
             switch (eval_result) {
                 case (#Empty) {}; // do nothing if empty set
@@ -1275,12 +1408,15 @@ module {
                     if (requires_sorting) {
                         iterators.add(iter);
                     } else {
-                        let bitmap = BitMap.fromIter(Iter.map(iter, func((id, _) : (T.DocumentId, ?[(Text, T.Candid)])) : Nat { Utils.convert_last_8_bytes_to_nat(id) }));
-                        bitmaps.add(bitmap);
+                        bitmaps.add(
+                            load_bitmap(iter, opt_last_pagination_document_id)
+                        );
                     };
                 };
                 case (#BitMap(bitmap)) {
-                    if (requires_sorting) Debug.trap("Should only return sorted iterators when sorting is required");
+                    if (requires_sorting) {
+                        log.trap("QueryExecution.generate_document_ids_for_or_operation: Should only return sorted iterators when sorting is required");
+                    };
                     bitmaps.add(bitmap);
                 };
                 case (#Interval(index_name, intervals, is_reversed)) {
@@ -1291,6 +1427,7 @@ module {
             };
         };
 
+        // requires kmerge sorting between intervals of the same index?
         func requires_additional_sorting_between_intervals(
             collection : T.StableCollection,
             index_name : Text,
@@ -1300,15 +1437,14 @@ module {
             if (not requires_sorting) return false;
             if (intervals.size() <= 1) return false;
 
-            let ?_index = Map.get(collection.indexes, Map.thash, index_name) else Debug.trap("Unreachable: IndexMap not found for index: " # index_name);
-            let index = CommonIndexFns.get_internal_index(_index);
+            let key_details = Index.get_key_details_by_name(collection, index_name);
 
             let sort_field = switch (opt_sort_column) {
                 case (?(sort_field, sort_direction)) sort_field;
                 case (null) return false;
             };
 
-            let index_key = index.key_details.get(0).0;
+            let index_key = key_details.get(0).0;
 
             // we should retrieve the operation the interval was created for to better determine if it requires sorting
             // this is an approximation that works in many cases, it fails and causes unnecessary sorting when:
@@ -1329,14 +1465,30 @@ module {
             };
         };
 
-        if (bitmaps.size() == 0 and full_scan_details_buffer.size() == 0 and iterators.size() == 0 and Map.size(intervals_by_index) <= 1) {
+        log.lazyDebug(
+            func() = "Intervals after union: " # debug_show (
+                Array.map<(Text, IndexDetails), (Text, [T.Interval])>(
+                    Map.toArray(intervals_by_index),
+                    func((index_name, details) : (Text, IndexDetails)) : (Text, [T.Interval]) {
+                        (index_name, Buffer.toArray(details.intervals));
+                    },
+                )
+            )
+        );
+
+        if (
+            bitmaps.size() == 0 and
+            full_scan_details_buffer.size() == 0 and
+            iterators.size() == 0 and
+            Map.size(intervals_by_index) <= 1
+        ) {
             if (Map.size(intervals_by_index) == 0) return #Empty;
 
-            let ?(index_name, interval_details) = Map.entries(intervals_by_index).next() else Debug.trap("No elements in map when size is greater than 0");
+            let ?(index_name, interval_details) = Map.entries(intervals_by_index).next() else {
+                log.trap("QueryExecution.generate_document_ids_for_or_operation: No elements in map when size is greater than 0");
+            };
 
             let intervals = Buffer.toArray(interval_details.intervals);
-
-            let ?index = Map.get(collection.indexes, Map.thash, index_name) else Debug.trap("Unreachable: IndexMap not found for index: " # index_name);
 
             let should_return_as_interval = not requires_additional_sorting_between_intervals(collection, index_name, interval_details.intervals, opt_sort_column);
 
@@ -1347,7 +1499,84 @@ module {
                     case (null) false;
                 };
 
-                return #Interval(index_name, intervals, is_reversed);
+                let last_pagination_document_rank = switch (opt_last_pagination_document_id) {
+                    case (null) return #Interval(index_name, intervals, is_reversed);
+                    case (?last_id) {
+
+                        let last_pagination_document : T.CandidMap = CollectionUtils.get_and_cache_candid_map(
+                            collection,
+                            last_id,
+                        );
+
+                        let rank_res = Index.getRankWithCandidMap(
+                            collection,
+                            index_name,
+                            last_id,
+                            last_pagination_document,
+                        );
+
+                        let rank = switch (rank_res) {
+                            case (#ok(rank)) rank;
+                            case (#err(msg)) {
+                                log.lazyError(
+                                    func() = "Failed to get rank for last pagination document ID: " # msg
+                                );
+                                log.trap("QueryExecution.generate_document_ids_for_or_operation: " # msg);
+                            };
+                        };
+
+                        rank;
+
+                    };
+                };
+
+                log.lazyDebug(
+                    func() = "Last pagination document rank: " # debug_show last_pagination_document_rank
+                );
+
+                let filtered_intervals = Buffer.Buffer<T.Interval>(8);
+
+                if (is_reversed) {
+                    // For reversed order, we want all intervals before the rank
+                    for (interval in intervals.vals()) {
+                        if (interval.1 > last_pagination_document_rank) {
+                            // Interval extends beyond the rank, truncate it
+                            if (interval.0 <= last_pagination_document_rank) {
+                                filtered_intervals.add((interval.0, last_pagination_document_rank));
+                            };
+                        } else {
+                            // Interval is completely before the rank, include it
+                            filtered_intervals.add(interval);
+                        };
+                    };
+                } else {
+                    // For normal order, we want all intervals after the rank
+                    for (interval in intervals.vals()) {
+                        if (interval.0 <= last_pagination_document_rank) {
+                            // Interval starts before or at the rank, truncate it
+                            if (interval.1 > last_pagination_document_rank + 1) {
+                                filtered_intervals.add((last_pagination_document_rank + 1, interval.1));
+                            };
+                        } else {
+                            // Interval is completely after the rank, include it
+                            filtered_intervals.add(interval);
+                        };
+                    };
+                };
+
+                log.lazyDebug(
+                    func() = "Pagination filtering - is_reversed: " # debug_show is_reversed #
+                    ", original intervals: " # debug_show intervals #
+                    ", filtered intervals: " # debug_show Buffer.toArray(filtered_intervals)
+                );
+
+                if (filtered_intervals.size() == 0) {
+                    log.lazyDebug(func() = "No intervals remaining after pagination filtering");
+                    return #Empty;
+                } else {
+                    return #Interval(index_name, Buffer.toArray(filtered_intervals), is_reversed);
+                };
+
             };
 
             // moves on to the next block to handle multiple intervals that requir sorting
@@ -1355,8 +1584,6 @@ module {
         };
 
         for ((index_name, interval_details) in Map.entries(intervals_by_index)) {
-            let ?index = Map.get(collection.indexes, Map.thash, index_name) else Debug.trap("Unreachable: IndexMap not found for index: " # index_name);
-            let index_data_utils = CompositeIndex.get_index_data_utils(collection);
 
             for (interval in interval_details.intervals.vals()) {
 
@@ -1367,7 +1594,15 @@ module {
                     iterators.add(document_ids_with_fields);
                 } else {
                     let document_ids = Intervals.document_ids_from_index_intervals(collection, index_name, [interval], sorted_in_reverse);
-                    let bitmap = BitMap.fromIter(Iter.map(document_ids, Utils.convert_last_8_bytes_to_nat));
+                    let bitmap = load_bitmap(
+                        Iter.map<T.DocumentId, (T.DocumentId, ?[(Text, T.Candid)])>(
+                            document_ids,
+                            func(id : T.DocumentId) : (T.DocumentId, ?[(Text, T.Candid)]) {
+                                (id, null);
+                            },
+                        ),
+                        opt_last_pagination_document_id,
+                    );
                     bitmaps.add(bitmap);
                 };
 
@@ -1375,6 +1610,10 @@ module {
         };
 
         if (full_scan_details_buffer.size() > 0) {
+            log.lazyDebug(
+                func() = "Processing " # Nat.toText(full_scan_details_buffer.size()) #
+                " full scan operations in OR operation"
+            );
 
             let full_scan_filter_bounds = Buffer.Buffer<T.Bounds>(full_scan_details_buffer.size());
 
@@ -1382,18 +1621,90 @@ module {
                 full_scan_filter_bounds.add(full_scan_details.filter_bounds);
             };
 
-            let document_ids = DocumentStore.keys(collection);
-            let filtered_ids = CollectionUtils.multiFilter(collection, document_ids, full_scan_filter_bounds, query_plan.is_and_operation);
+            let document_ids = Intervals.document_ids_and_indexed_fields_from_intervals(
+                collection,
+                C.DOCUMENT_ID,
+                [(0, DocumentStore.size(collection))],
+                false,
+            );
+
+            let filtered_ids = CollectionUtils.multiFilterWithIndexedFields(collection, document_ids, full_scan_filter_bounds, query_plan.is_and_operation);
 
             if (requires_sorting) {
-                let filtered_ids_with_null_fields : Iter<(T.DocumentId, ?[(Text, T.Candid)])> = Iter.map<T.DocumentId, (T.DocumentId, ?[(Text, T.Candid)])>(filtered_ids, func(id : T.DocumentId) : (T.DocumentId, ?[(Text, T.Candid)]) { (id, null) });
-                let arr = Iter.toArray(filtered_ids_with_null_fields);
+                log.lazyDebug(func() = "Sorting filtered documents for full scan in OR operation");
+                log.lazyDebug(
+                    func() = "Pagination document: " # debug_show opt_last_pagination_document_id
+                );
+
+                let cursor_pagination_filtered_documents = switch (opt_last_pagination_document_id) {
+                    case (null) {
+                        log.lazyDebug(func() = "No pagination cursor, using all filtered documents");
+                        filtered_ids;
+                    };
+                    case (?last_pagination_document_id) {
+                        log.lazyDebug(func() = "Applying cursor pagination to filtered documents");
+
+                        let last_pagination_document : T.CandidMap = CollectionUtils.get_and_cache_candid_map(
+                            collection,
+                            last_pagination_document_id,
+                        );
+
+                        let sort_field = Option.get(opt_sort_column, ("", #Ascending)).0;
+                        log.lazyDebug(func() = "Sort field: " # debug_show sort_field);
+
+                        let opt_sort_field_value = CandidMap.get(
+                            last_pagination_document,
+                            collection.schema_map,
+                            sort_field,
+                        );
+
+                        log.lazyDebug(
+                            func() = "Sort field value for last pagination document: " #
+                            debug_show opt_sort_field_value
+                        );
+
+                        let bounds = if (sort_direction == #Ascending) {
+                            Buffer.fromArray<T.Bounds>([(
+                                [
+                                    (
+                                        sort_field,
+                                        Option.map<T.CandidQuery, T.State<T.CandidQuery>>(opt_sort_field_value, func(candid_query) { #Inclusive(candid_query) }),
+                                    ),
+                                    (C.DOCUMENT_ID, ?#Exclusive(#Blob(last_pagination_document_id))),
+                                ],
+                                [(sort_field, ?#Inclusive(#Maximum)), (C.DOCUMENT_ID, ?#Inclusive(#Maximum))],
+                            )]);
+                        } else {
+                            Buffer.fromArray<T.Bounds>([(
+                                [(sort_field, ?#Inclusive(#Minimum)), (C.DOCUMENT_ID, ?#Inclusive(#Minimum))],
+                                [
+                                    (
+                                        sort_field,
+                                        Option.map<T.CandidQuery, T.State<T.CandidQuery>>(opt_sort_field_value, func(candid_query) { #Inclusive(candid_query) }),
+                                    ),
+                                    (C.DOCUMENT_ID, ?#Exclusive(#Blob(last_pagination_document_id))),
+                                ],
+                            )]);
+
+                        };
+
+                        CollectionUtils.multiFilterWithIndexedFields(
+                            collection,
+                            filtered_ids,
+                            bounds,
+                            query_plan.is_and_operation,
+                        );
+
+                    };
+                };
+
+                let arr = Iter.toArray(cursor_pagination_filtered_documents);
                 let sorted = MergeSort.sort(arr, sort_documents_by_field_cmp);
 
                 iterators.add(sorted.vals());
 
             } else {
-                let bitmap = BitMap.fromIter(Iter.map<T.DocumentId, Nat>(filtered_ids, Utils.convert_last_8_bytes_to_nat));
+                let bitmap = load_bitmap(filtered_ids, opt_last_pagination_document_id);
                 bitmaps.add(bitmap);
             };
 
@@ -1402,45 +1713,31 @@ module {
         if (requires_sorting) {
             assert bitmaps.size() == 0;
 
-            if (iterators.size() == 0) return #Empty;
-
-            func deduplicate_document_ids_iter(
-                document_ids_iter : Iter<(T.DocumentId, ?[(Text, T.Candid)])>
-            ) : Iter<(T.DocumentId, ?[(Text, T.Candid)])> {
-                let dedup_bitmap = BitMap.BitMap(1024);
-
-                object {
-                    public func next() : ?(T.DocumentId, ?[(Text, T.Candid)]) {
-                        loop switch (document_ids_iter.next()) {
-                            case (null) return null;
-                            case (?(id, fields)) {
-                                let nat_id = Utils.convert_last_8_bytes_to_nat(id);
-                                if (not dedup_bitmap.get(nat_id)) {
-                                    dedup_bitmap.set(nat_id, true);
-                                    return ?(id, fields);
-                                };
-                            };
-                        };
-                    };
-                };
+            if (iterators.size() == 0) {
+                log.lazyDebug(func() = "No iterators available, returning empty");
+                return #Empty;
             };
 
-            // todo: we can optimize this further by eliminitating duplicates directly during the merge sort kmerge step without creating a separate dedup bitmap
-            // todo: another optimization is to check if the sort field is one of the index fields and leverage that to avoid lookups in the document store and deserialization
-            let merged_iterators = Itertools.kmerge<(T.DocumentId, ?[(Text, T.Candid)])>(Buffer.toArray(iterators), sort_documents_by_field_cmp);
+            log.lazyDebug(
+                func() = "Merging " # Nat.toText(iterators.size()) # " sorted iterators using k-way merge"
+            );
+            var merged_iterators = Utils.kmerge<(T.DocumentId, ?[(Text, T.Candid)])>(Buffer.toArray(iterators), sort_documents_by_field_cmp);
 
-            let deduped_iter = deduplicate_document_ids_iter(merged_iterators);
-
-            return #Ids(deduped_iter);
+            return #Ids(merged_iterators);
 
         };
 
         assert iterators.size() == 0;
 
         if (bitmaps.size() == 0) {
+            log.lazyDebug(func() = "No bitmaps to merge, returning empty");
             #Empty;
         } else {
+            log.lazyDebug(
+                func() = "Performing union on " # Nat.toText(bitmaps.size()) # " bitmaps"
+            );
             let bitmap = BitMap.multiUnion(bitmaps.vals());
+            log.lazyDebug(func() = "Union completed, resulting bitmap has " # Nat.toText(bitmap.size()) # " documents");
             #BitMap(bitmap);
         };
 
@@ -1448,7 +1745,7 @@ module {
 
     public func generate_document_ids_for_query_plan(
         collection : T.StableCollection,
-        query_plan : T.QueryPlan,
+        { query_plan; opt_last_pagination_document_id } : T.QueryPlanResult,
         opt_sort_column : ?(Text, T.SortDirection),
         sort_documents_by_field_cmp : ((T.DocumentId, ?[(Text, T.Candid)]), (T.DocumentId, ?[(Text, T.Candid)])) -> Order,
     ) : EvalResult {
@@ -1459,9 +1756,9 @@ module {
         log.logDebug("QueryExecution.generate_document_ids_for_query_plan(): Query plan: " # debug_show query_plan);
 
         let result = if (query_plan.is_and_operation) {
-            generate_document_ids_for_and_operation(collection, query_plan, opt_sort_column, sort_documents_by_field_cmp);
+            generate_document_ids_for_and_operation(collection, query_plan, opt_sort_column, opt_last_pagination_document_id, sort_documents_by_field_cmp);
         } else {
-            generate_document_ids_for_or_operation(collection, query_plan, opt_sort_column, sort_documents_by_field_cmp);
+            generate_document_ids_for_or_operation(collection, query_plan, opt_sort_column, opt_last_pagination_document_id, sort_documents_by_field_cmp);
         };
 
         let elapsed = 0;

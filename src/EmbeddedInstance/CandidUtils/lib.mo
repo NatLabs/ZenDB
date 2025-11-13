@@ -21,6 +21,10 @@ import Nat16 "mo:base@0.16.0/Nat16";
 import Nat8 "mo:base@0.16.0/Nat8";
 import Char "mo:base@0.16.0/Char";
 import Principal "mo:base@0.16.0/Principal";
+import Bool "mo:base@0.16.0/Bool";
+
+import Itertools "mo:itertools@0.2.2/Iter";
+import { sort_candid_type } "mo:serde@3.4.0/Candid/Blob/CandidUtils";
 
 import CastModule "Cast";
 import OpsModule "Ops";
@@ -235,6 +239,273 @@ module {
             case (#Option(nested_type)) inheritOptionsFromType(nested_type, #Option(value));
             case (_) value;
         };
+    };
+
+    public func min(schema : T.Schema, a : T.CandidQuery, b : T.CandidQuery) : T.CandidQuery {
+        let cmp = compare_ignore_option(schema, a, b);
+        if (cmp == #less or cmp == #equal) a else b;
+    };
+
+    public func max(schema : T.Schema, a : T.CandidQuery, b : T.CandidQuery) : T.CandidQuery {
+        let cmp = compare_ignore_option(schema, a, b);
+        if (cmp == #greater or cmp == #equal) a else b;
+    };
+
+    // schema is added here to get the order of the #Variant type
+    public func compare(schema : T.Schema, a : T.CandidQuery, b : T.CandidQuery) : T.Order {
+
+        switch (schema, a, b) {
+            // The #Minimum variant is used in queries to represent the minimum value
+            case (_, #Minimum, _) #less;
+            case (_, _, #Minimum) #greater;
+
+            // The #Maximum variant is used in queries to represent the maximum value
+            case (_, #Maximum, _) #greater;
+            case (_, _, #Maximum) #less;
+
+            case (_, #Null, #Null) #equal;
+            case (_, #Empty, #Empty) #equal;
+
+            case (_, _, #Null) #greater;
+            case (_, #Null, _) #less;
+
+            case (_, #Text(a), #Text(b)) Text.compare(a, b);
+            case (_, #Blob(a), #Blob(b)) Blob.compare(a, b);
+            case (_, #Nat(a), #Nat(b)) Nat.compare(a, b);
+            case (_, #Nat8(a), #Nat8(b)) Nat8.compare(a, b);
+            case (_, #Nat16(a), #Nat16(b)) Nat16.compare(a, b);
+            case (_, #Nat32(a), #Nat32(b)) Nat32.compare(a, b);
+            case (_, #Nat64(a), #Nat64(b)) Nat64.compare(a, b);
+            case (_, #Principal(a), #Principal(b)) Principal.compare(a, b);
+            case (_, #Float(a), #Float(b)) Float.compare(a, b);
+            case (_, #Bool(a), #Bool(b)) Bool.compare(a, b);
+            case (_, #Int(a), #Int(b)) Int.compare(a, b);
+            case (_, #Int8(a), #Int8(b)) Int8.compare(a, b);
+            case (_, #Int16(a), #Int16(b)) Int16.compare(a, b);
+            case (_, #Int32(a), #Int32(b)) Int32.compare(a, b);
+            case (_, #Int64(a), #Int64(b)) Int64.compare(a, b);
+
+            case (_, #Option(a), #Option(b)) {
+                switch (a, b) {
+                    case (#Null, #Null) #equal;
+                    case (#Null, _) #less;
+                    case (_, #Null) #greater;
+                    case (_, _) compare(schema, a, b);
+                };
+            };
+            case (#Variant(schema), #Variant(a), #Variant(b)) {
+
+                let ?i = Array.indexOf<(Text, Any)>(
+                    a,
+                    schema,
+                    func((name, _) : (Text, Any), (name2, _) : (Text, Any)) : Bool {
+                        name == name2;
+                    },
+                ) else Debug.trap("compare: variant not found in schema");
+
+                let ?j = Array.indexOf<(Text, Any)>(
+                    b,
+                    schema,
+                    func((name, _) : (Text, Any), (name2, _) : (Text, Any)) : Bool {
+                        name == name2;
+                    },
+                ) else Debug.trap("compare: variant not found in schema");
+
+                let res = Nat.compare(i, j);
+
+                if (res == #equal) {
+                    compare(schema[i].1, a.1, b.1);
+                } else {
+                    res;
+                };
+
+            };
+
+            // case (_, #Array(a), #Array(b)) {
+            //     // compare the length of the arrays
+            //     let len_cmp = Nat.compare(a.size(), b.size());
+            //     if (len_cmp != #equal) return len_cmp;
+
+            //     let min_len = Nat.min(a.size(), b.size());
+            //     for (i in Iter.range(0, min_len - 1)) {
+            //         let cmp_result = compare(a[i], b[i]);
+            //         if (cmp_result != #equal) return cmp_result;
+            //     };
+            //     Nat.compare(a.size(), b.size());
+            // };
+
+            case (schema, a, b) {
+                // Debug.print(debug_show (a, b));
+                Debug.trap("compare: unexpected candid type " # debug_show { schema; a; b });
+            };
+        };
+    };
+
+    public func compare_ignore_option(schema : T.Schema, a : T.CandidQuery, b : T.CandidQuery) : T.Order {
+
+        switch (schema, a, b) {
+            // The #Minimum variant is used in queries to represent the minimum value
+            case (_, #Minimum, _) #less;
+            case (_, _, #Minimum) #greater;
+
+            // The #Maximum variant is used in queries to represent the maximum value
+            case (_, #Maximum, _) #greater;
+            case (_, _, #Maximum) #less;
+
+            case (_, #Null, #Null) #equal;
+            case (_, #Empty, #Empty) #equal;
+
+            case (_, _, #Null) #greater;
+            case (_, #Null, _) #less;
+
+            case (_, #Text(a), #Text(b)) Text.compare(a, b);
+            case (_, #Blob(a), #Blob(b)) Blob.compare(a, b);
+            case (_, #Nat(a), #Nat(b)) Nat.compare(a, b);
+            case (_, #Nat8(a), #Nat8(b)) Nat8.compare(a, b);
+            case (_, #Nat16(a), #Nat16(b)) Nat16.compare(a, b);
+            case (_, #Nat32(a), #Nat32(b)) Nat32.compare(a, b);
+            case (_, #Nat64(a), #Nat64(b)) Nat64.compare(a, b);
+            case (_, #Principal(a), #Principal(b)) Principal.compare(a, b);
+            case (_, #Float(a), #Float(b)) Float.compare(a, b);
+            case (_, #Bool(a), #Bool(b)) Bool.compare(a, b);
+            case (_, #Int(a), #Int(b)) Int.compare(a, b);
+            case (_, #Int8(a), #Int8(b)) Int8.compare(a, b);
+            case (_, #Int16(a), #Int16(b)) Int16.compare(a, b);
+            case (_, #Int32(a), #Int32(b)) Int32.compare(a, b);
+            case (_, #Int64(a), #Int64(b)) Int64.compare(a, b);
+
+            case (_, #Option(a), #Option(b)) {
+                switch (a, b) {
+                    case (#Null, #Null) #equal;
+                    case (#Null, _) #less;
+                    case (_, #Null) #greater;
+                    case (_, _) compare(schema, a, b);
+                };
+            };
+            case (_, #Option(a), b) compare_ignore_option(schema, a, b);
+            case (_, a, #Option(b)) compare_ignore_option(schema, a, b);
+            case (#Variant(schema), #Variant(a), #Variant(b)) {
+
+                let ?i = Array.indexOf<(Text, Any)>(
+                    a,
+                    schema,
+                    func((name, _) : (Text, Any), (name2, _) : (Text, Any)) : Bool {
+                        name == name2;
+                    },
+                ) else Debug.trap("compare: variant not found in schema");
+
+                let ?j = Array.indexOf<(Text, Any)>(
+                    b,
+                    schema,
+                    func((name, _) : (Text, Any), (name2, _) : (Text, Any)) : Bool {
+                        name == name2;
+                    },
+                ) else Debug.trap("compare: variant not found in schema");
+
+                let res = Nat.compare(i, j);
+
+                if (res == #equal) {
+                    compare(schema[i].1, a.1, b.1);
+                } else {
+                    res;
+                };
+
+            };
+
+            // case (_, #Array(a), #Array(b)) {
+            //     // compare the length of the arrays
+            //     let len_cmp = Nat.compare(a.size(), b.size());
+            //     if (len_cmp != #equal) return len_cmp;
+
+            //     let min_len = Nat.min(a.size(), b.size());
+            //     for (i in Iter.range(0, min_len - 1)) {
+            //         let cmp_result = compare(a[i], b[i]);
+            //         if (cmp_result != #equal) return cmp_result;
+            //     };
+            //     Nat.compare(a.size(), b.size());
+            // };
+
+            case (schema, a, b) {
+                // Debug.print(debug_show (a, b));
+                Debug.trap("compare: unexpected candid type " # debug_show { schema; a; b });
+            };
+        };
+    };
+
+    public func generate_default_value(schema : T.Schema) : T.Result<T.Candid, Text> {
+        let candid : T.Candid = switch (schema) {
+            case (#Empty) #Empty;
+            case (#Null) #Null;
+            case (#Text) #Text("");
+            case (#Nat) #Nat(0);
+            case (#Nat8) #Nat8(0);
+            case (#Nat16) #Nat16(0);
+            case (#Nat32) #Nat32(0);
+            case (#Nat64) #Nat64(0);
+            case (#Int) #Int(0);
+            case (#Int8) #Int8(0);
+            case (#Int16) #Int16(0);
+            case (#Int32) #Int32(0);
+            case (#Int64) #Int64(0);
+            case (#Float) #Float(0.0);
+            case (#Bool) #Bool(false);
+            case (#Principal) #Principal(Principal.fromBlob("\04")); // anonymous principal
+            case (#Blob) #Blob("");
+            case (#Option(inner)) switch (generate_default_value(inner)) {
+                case (#ok(value)) #Option(value);
+                case (#err(err)) return #err(err);
+            };
+            case (#Array(inner)) switch (generate_default_value(inner)) {
+                case (#ok(val)) #Array([val]);
+                case (#err(err)) return #err(err);
+            };
+            case (#Tuple(tuples)) {
+
+                let buffer = Buffer.Buffer<T.Candid>(tuples.size());
+
+                for (i in Itertools.range(0, tuples.size())) {
+                    let tuple_type = tuples[i];
+                    let value = switch (generate_default_value(tuple_type)) {
+                        case (#ok(value)) value;
+                        case (#err(err)) return #err(err);
+                    };
+
+                    buffer.add(value);
+                };
+
+                #Tuple(Buffer.toArray(buffer))
+
+            };
+            case (#Record(fields) or #Map(fields)) {
+
+                let buffer = Buffer.Buffer<(Text, T.Candid)>(fields.size());
+                for (i in Itertools.range(0, fields.size())) {
+                    let (name, record_type) = fields[i];
+                    let value = switch (generate_default_value(record_type)) {
+                        case (#ok(value)) value;
+                        case (#err(err)) return #err(err);
+                    };
+
+                    buffer.add((name, value));
+                };
+
+                #Record(Buffer.toArray(buffer));
+
+            };
+
+            case (#Variant(variants)) {
+                let (name, variant_type) = variants[0];
+
+                switch (generate_default_value(variant_type)) {
+                    case (#ok(value)) #Variant((name, value));
+                    case (#err(err)) return #err(err);
+                };
+            };
+
+            case (_) return #err("generate_default_value: unexpected schema type " # debug_show (schema));
+        };
+
+        #ok(candid);
     };
 
 };

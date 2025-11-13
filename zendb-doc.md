@@ -192,7 +192,7 @@ Here's an example of how to use the tuple schema types in a collection:
         TupleSchema,
         candify,
         ?{
-            schemaConstraints = [#Field("0", [#Min(1)]), #Field("1", [#MinSize(1)]), #Unique(["0"]), #Unique(["1"])];
+            schema_constraints = [#Field("0", [#Min(1)]), #Field("1", [#MinSize(1)]), #Unique(["0"]), #Unique(["1"])];
         },
     ) else return assert false;
 
@@ -232,7 +232,7 @@ let candify : ZenDB.Types.Candify<Text> = {
 ```
 
 ### Schema Constraints
-Schema constraints allow you to define rules and restrictions on the values stored in your collections. These constraints are specified in the `schemaConstraints` field when creating a collection and are automatically enforced during insert and update operations.
+Schema constraints allow you to define rules and restrictions on the values stored in your collections. These constraints are specified in the `schema_constraints` field when creating a collection and are automatically enforced during insert and update operations.
 
 #### Collection-Level Constraints
 | Constraint          | Description                                                                       | Supported Types  | Example                                              |
@@ -256,7 +256,7 @@ let #ok(users_collection) = db.createCollection(
   UserSchema,
   candify,
   ?{
-    schemaConstraints = [
+    schema_constraints = [
       #Unique(["email"]),                    // Email must be unique
       #Unique(["username"]),                 // Username must be unique  
       #Field("age", [#Min(#Nat(0)), #Max(#Nat(120))])   // Age between 0-120
@@ -682,8 +682,8 @@ The `stats()` method returns a `CollectionStats` record containing:
 
 ##### Document Storage Metrics
 - **`memory`** - [Memory statistics](#memory-statistics) for the main document storage B-tree
-- **`avgDocumentIdSize`** - Average size of document IDs in bytes
-- **`totalDocumentIdSize`** - Total memory used by all document IDs
+- **`avg_document_id_size`** - Average size of document IDs in bytes
+- **`total_document_id_size`** - Total memory used by all document IDs
 - **`avg_document_size`** - Average size of documents in bytes  
 - **`total_document_size`** - Total memory used by all documents
 
@@ -705,8 +705,8 @@ Each index provides detailed statistics:
 - **`memory`** - [Memory statistics](#memory-statistics) for the index B-tree
 - **`avg_index_key_size`** - Average size of composite index keys in bytes
 - **`total_index_key_size`** - Total memory used by index keys
-- **`avgDocumentIdSize`** - Average size of document ID values in bytes
-- **`totalDocumentIdSize`** - Total memory used by document ID references
+- **`avg_document_id_size`** - Average size of document ID values in bytes
+- **`total_document_id_size`** - Total memory used by document ID references
 
 ### Memory Statistics
 

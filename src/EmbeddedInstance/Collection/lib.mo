@@ -44,7 +44,7 @@ import C "../Constants";
 import BTree "../BTree";
 
 import CompositeIndex "Index/CompositeIndex";
-import CommonIndexFns "Index/CommonIndexFns";
+import Index "Index";
 import Orchid "Orchid";
 import Schema "Schema";
 import CollectionUtils "CollectionUtils";
@@ -136,14 +136,16 @@ module {
             Array.map<(Text, T.Index), (Text, T.IndexStats)>(
                 Map.toArray(collection.indexes),
                 func((key, index) : (Text, T.Index)) : (Text, T.IndexStats) {
-                    (key, CommonIndexFns.stats(index, StableCollection.size(collection)));
+                    (key, Index.stats(collection, index, StableCollection.size(collection)));
                 },
             );
         };
 
         public func getIndex(name : Text) : ?T.IndexStats {
             switch (Map.get(collection.indexes, T.thash, name)) {
-                case (?index) ?CommonIndexFns.stats(index, StableCollection.size(collection));
+                case (?index) {
+                    ?Index.stats(collection, index, StableCollection.size(collection));
+                };
                 case (null) null;
             };
         };
@@ -502,6 +504,22 @@ module {
             handleResult(
                 StableCollection.repopulate_indexes(collection, names),
                 "Failed to populate indexes: " # debug_show (names),
+            );
+        };
+
+        /// Hide indexes from query planning.
+        public func hideIndexes(index_names : [Text]) : T.Result<(), Text> {
+            handleResult(
+                StableCollection.hide_indexes(collection, index_names),
+                "Failed to hide indexes: " # debug_show (index_names),
+            );
+        };
+
+        /// Unhide indexes and make them available for query planning again.
+        public func unhideIndexes(index_names : [Text]) : T.Result<(), Text> {
+            handleResult(
+                StableCollection.unhide_indexes(collection, index_names),
+                "Failed to unhide indexes: " # debug_show (index_names),
             );
         };
 

@@ -391,7 +391,8 @@ module CompositeIndex {
         index : T.CompositeIndex,
         start_query : [(Text, ?T.CandidInclusivityQuery)],
         end_query : [(Text, ?T.CandidInclusivityQuery)],
-        opt_cursor : ?(T.DocumentId, Candid.Candid),
+        opt_last_pagination_document : ?T.CandidMap,
+        use_pagination_filter_on_lower_bound : Bool,
     ) : T.Interval {
         // Debug.print("start_query: " # debug_show start_query);
         // Debug.print("end_query: " # debug_show end_query);
@@ -417,7 +418,6 @@ module CompositeIndex {
 
         func sort_and_fill_query_entries(
             query_entries : [(Text, ?T.CandidInclusivityQuery)],
-            opt_cursor : ?(T.DocumentId, T.PaginationDirection),
             is_lower_bound : Bool,
         ) : [(Text, ?T.CandidInclusivityQuery)] {
             let sorted = MergeSort.sort(query_entries, sort_by_key_details);
@@ -428,18 +428,6 @@ module CompositeIndex {
 
                     let index_key_tuple = index.key_details[i];
 
-                    switch (opt_cursor) {
-                        case (?(id, pagination_direction)) if (index.key_details[i].0 == C.DOCUMENT_ID) {
-                            // DOCUMENT_ID is only added in the query if it is a cursor
-                            // todo: update based on pagination_direction and is_lower_bound
-                            return (
-                                C.DOCUMENT_ID,
-                                ?#Inclusive(CandidUtils.getNextValue(#Blob(id))),
-                            );
-                        };
-                        case (null) {};
-                    };
-
                     if (i >= query_entries.size()) {
                         return (index_key_tuple.0, null);
                     };
@@ -448,6 +436,26 @@ module CompositeIndex {
                 },
             );
 
+        };
+
+        func convert_inclusivity_query_to_candid_query(
+            inclusivity_query : ?T.CandidInclusivityQuery,
+            is_lower_bound : Bool,
+        ) : T.CandidQuery {
+            switch (inclusivity_query) {
+                case (null) if (is_lower_bound) #Minimum else #Maximum;
+                case (?#Inclusive(#Minimum) or ?#Inclusive(#Minimum)) #Minimum;
+                case (?#Inclusive(#Maximum) or ?#Inclusive(#Maximum)) #Maximum;
+                case (?#Inclusive(value)) value;
+                case (?#Exclusive(value)) if (is_lower_bound) {
+                    let next = CandidUtils.getNextValue(value);
+                    // Debug.print("Retrieving the next value for " # debug_show value);
+                    // Debug.print("Next value: " # debug_show next);
+                    next;
+                } else {
+                    CandidUtils.getPrevValue(value);
+                };
+            };
         };
 
         // filter null entries and update the last entry to be inclusive or exclusive by keeping it's value or replacing it with the next or previous value respectively
@@ -471,20 +479,7 @@ module CompositeIndex {
             };
 
             func get_new_value_at_index(i : Nat) : T.CandidQuery {
-                switch (query_entries[i]) {
-                    case ((_field, ?#Inclusive(#Minimum) or ?#Exclusive(#Minimum))) #Minimum;
-                    case ((_field, ?#Inclusive(#Maximum) or ?#Exclusive(#Maximum))) #Maximum;
-                    case ((_field, ?#Inclusive(value))) value;
-                    case ((_field, ?#Exclusive(value))) if (is_lower_bound) {
-                        let next = CandidUtils.getNextValue(value);
-                        // Debug.print("Retrieving the next value for " # debug_show value);
-                        // Debug.print("Next value: " # debug_show next);
-                        next;
-                    } else {
-                        CandidUtils.getPrevValue(value);
-                    };
-                    case (_) Debug.trap("filter_null_entries_in_query: received null value, should not happen");
-                };
+                convert_inclusivity_query_to_candid_query(query_entries[i].1, is_lower_bound);
             };
 
             Array.tabulate<T.CandidQuery>(
@@ -499,22 +494,88 @@ module CompositeIndex {
 
         };
 
-        let opt_cursor_with_direction : ?(Blob, T.PaginationDirection) = switch (opt_cursor) {
-            case (null) null;
-            case (?(id, cursor)) {
-                ?(id, #Forward);
+        var sorted_start_query = sort_and_fill_query_entries(start_query, true);
+        var sorted_end_query = sort_and_fill_query_entries(end_query, false);
+
+        switch (opt_last_pagination_document) {
+            case (null) {};
+            case (?last_pagination_document) {
+
+                func update_query_with_pagination_filter(
+                    query_entries : [(Text, ?T.CandidInclusivityQuery)],
+                    is_lower_bound : Bool,
+                ) : [(Text, ?T.CandidInclusivityQuery)] {
+                    Array.tabulate<(Text, ?T.CandidInclusivityQuery)>(
+                        query_entries.size(),
+                        func(i : Nat) : (Text, ?T.CandidInclusivityQuery) {
+                            let query_entry = query_entries[i];
+                            let opposite_entry = if (is_lower_bound) sorted_end_query[i] else sorted_start_query[i];
+
+                            if (query_entry != opposite_entry) {
+                                let field_name = query_entry.0;
+                                let ?field_value = CandidMap.get(last_pagination_document, collection.schema_map, field_name) else log.trap("missing field '" # field_name # "' in last pagination document");
+
+                                let inclusivity = if (field_name == C.DOCUMENT_ID) ?#Exclusive(field_value) else ?#Inclusive(field_value);
+
+                                let order = CandidUtils.compare(
+                                    collection.schema,
+                                    convert_inclusivity_query_to_candid_query(inclusivity, is_lower_bound),
+                                    convert_inclusivity_query_to_candid_query(query_entry.1, is_lower_bound),
+                                );
+
+                                if ((is_lower_bound and order == #greater) or (not is_lower_bound and order == #less)) {
+                                    return (field_name, inclusivity);
+                                };
+
+                                return query_entry;
+                            };
+
+                            query_entry;
+                        },
+                    );
+                };
+
+                if (use_pagination_filter_on_lower_bound) {
+                    sorted_start_query := update_query_with_pagination_filter(sorted_start_query, true);
+                } else {
+                    sorted_end_query := update_query_with_pagination_filter(sorted_end_query, false);
+                };
             };
         };
-
-        let sorted_start_query = sort_and_fill_query_entries(start_query, opt_cursor_with_direction, true);
-        let sorted_end_query = sort_and_fill_query_entries(end_query, opt_cursor_with_direction, false);
 
         log.lazyDebug(
             func() = "scan after sort and fill: " # debug_show (sorted_start_query, sorted_end_query)
         );
 
-        let start_query_values = format_query_entries(sorted_start_query, true);
-        let end_query_values = format_query_entries(sorted_end_query, false);
+        var start_query_values = format_query_entries(sorted_start_query, true);
+        var end_query_values = format_query_entries(sorted_end_query, false);
+
+        switch (opt_last_pagination_document) {
+            case (null) {};
+            case (?last_pagination_document) {
+                start_query_values := Array.tabulate<T.CandidQuery>(
+                    index.key_details.size(),
+                    func(i : Nat) : T.CandidQuery {
+                        CandidUtils.min(
+                            collection.schema,
+                            start_query_values[i],
+                            end_query_values[i],
+                        );
+                    },
+                );
+
+                end_query_values := Array.tabulate<T.CandidQuery>(
+                    index.key_details.size(),
+                    func(i : Nat) : T.CandidQuery {
+                        CandidUtils.max(
+                            collection.schema,
+                            start_query_values[i],
+                            end_query_values[i],
+                        );
+                    },
+                );
+            };
+        };
 
         log.lazyDebug(
             func() = "scan after format: " # debug_show (start_query_values, end_query_values)
@@ -575,6 +636,28 @@ module CompositeIndex {
         BTree.entries<[T.CandidQuery], T.DocumentId>(index.data, index_data_utils);
     };
 
+    public func getRankWithCandidMap(
+        collection : T.StableCollection,
+        index : CompositeIndex,
+        document_id : T.DocumentId,
+        candid_map : T.CandidMap,
+    ) : T.Result<Nat, Text> {
+        let index_data_utils = get_index_data_utils(collection);
+
+        let index_key_values = switch (CollectionUtils.getIndexColumns(collection, index.key_details, document_id, candid_map)) {
+            case (?index_key_values) index_key_values;
+            case (null) {
+
+                return #err("Error retrieving rank for document with id " # debug_show document_id # " from index " # index.name # ", because it does not have any values in the index");
+            };
+        };
+
+        switch (BTree.getExpectedIndex(index.data, index_data_utils, index_key_values)) {
+            case (#Found(rank)) #ok(rank);
+            case (#NotFound(rank)) #ok(rank);
+        };
+    };
+
     // func unwrap_candid_option_value(option : T.CandidQuery) : T.CandidQuery {
     //     switch (option_type) {
     //         case (#Option(inner)) {
@@ -598,7 +681,7 @@ module CompositeIndex {
 
     // };
 
-    public func stats(index : CompositeIndex, collection_entries : Nat) : T.IndexStats {
+    public func stats(index : CompositeIndex, collection_entries : Nat, hidden : Bool) : T.IndexStats {
 
         let memory = BTree.getMemoryStats(index.data);
         let index_entries = CompositeIndex.size(index); // could be less or more than collection entries depending on the index type and if there are duplicate values
@@ -610,6 +693,7 @@ module CompositeIndex {
             memory;
             is_unique = index.is_unique;
             used_internally = index.used_internally;
+            hidden;
 
             // the index fields values are stored as the keys
             avg_index_key_size = if (collection_entries == 0) 0 else (memory.keyBytes / collection_entries);

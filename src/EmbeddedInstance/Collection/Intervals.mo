@@ -134,235 +134,136 @@ module {
         };
         count;
     };
-
-    // tries to skip the number of documents requested within the instruction limit
+    // tries to to_skip the number of documents requested within the instruction limit
     // returns the number of documents skipped
-    public func extract_document_ids_in_pagination_range(collection : T.StableCollection, skip : Nat, opt_limit : ?Nat, index_name : Text, intervals : [T.Interval], sorted_in_reverse : Bool) : Iter<T.DocumentId> {
-        // Debug.print("skip, opt_limit: " # debug_show (skip, opt_limit));
+    public func extract_document_ids_in_pagination_range(collection : T.StableCollection, to_skip : Nat, opt_limit : ?Nat, index_name : Text, intervals : [T.Interval], sorted_in_reverse : Bool) : Iter<T.DocumentId> {
 
+        let result = Buffer.Buffer<T.Interval>(intervals.size());
         var skipped = 0;
-        var prev = 0;
-        var i = 0;
-
-        label searching_for_skip_index while (i < intervals.size()) {
-            let size = intervals.get(i).1 - intervals.get(i).0;
-
-            skipped += size;
-
-            let remaining_skip = skip - prev;
-
-            if (skipped > skip) {
-                break searching_for_skip_index;
-            };
-
-            prev := skipped;
-            i += 1;
-        };
-
-        if (i == intervals.size()) {
-            return Itertools.empty();
-        };
-
-        let remaining_skip = skip - prev;
-
-        let new_intervals_first_start = intervals.get(i).0 + remaining_skip;
-
-        // Debug.print("old_intervals: " # debug_show intervals);
-
-        let new_intervals = Array.tabulate<T.Interval>(
-            intervals.size() - i,
-            func(j : Nat) : T.Interval {
-                if (j == 0) {
-                    (new_intervals_first_start, intervals.get(i).1);
-                } else {
-                    intervals.get(i + j);
-                };
-            },
-        );
-
-        if (new_intervals.size() == 1 and new_intervals.get(0).0 == new_intervals.get(0).1) {
-            return Itertools.empty();
-        };
-
-        // Debug.print("new_intervals: " # debug_show new_intervals);
-
+        var collected = 0;
         let limit = switch (opt_limit) {
-            case (null) {
-                return document_ids_from_index_intervals(collection, index_name, new_intervals, sorted_in_reverse);
-            };
-            case (?limit) limit;
+            case (null) null;
+            case (?l) ?l;
         };
 
-        i := 0;
-        prev := 0;
-        var add = 0;
-
-        label finding_limit_index while (i < new_intervals.size()) {
-            prev := add;
-            let interval = new_intervals.get(i);
+        for (interval in intervals.vals()) {
             let size = interval.1 - interval.0;
 
-            add += size;
+            // Still skipping
+            if (skipped < to_skip) {
+                let can_skip = Nat.min(size, to_skip - skipped);
+                skipped += can_skip;
 
-            if (add >= limit or (add < limit and i == (new_intervals.size() - 1))) {
-                break finding_limit_index;
+                // Partial interval after to_skip
+                if (can_skip < size) {
+                    let new_start = interval.0 + can_skip;
+                    let remaining_size = size - can_skip;
+
+                    switch (limit) {
+                        case (null) {
+                            result.add((new_start, interval.1));
+                        };
+                        case (?lim) {
+                            let can_collect = Nat.min(remaining_size, lim - collected);
+                            if (can_collect > 0) {
+                                result.add((new_start, new_start + can_collect));
+                                collected += can_collect;
+                            };
+                        };
+                    };
+                };
+            }
+            // Collecting (to_skip satisfied)
+            else {
+                switch (limit) {
+                    case (null) {
+                        result.add(interval);
+                    };
+                    case (?lim) {
+                        if (collected < lim) {
+                            let can_collect = Nat.min(size, lim - collected);
+                            result.add((interval.0, interval.0 + can_collect));
+                            collected += can_collect;
+                        };
+                    };
+                };
             };
 
-            i += 1;
         };
 
-        let remaining_limit = limit - prev;
-
-        // Debug.print("remaining_limit: " # debug_show remaining_limit);
-        // Debug.print("i: " # debug_show i);
-
-        if (i == intervals.size()) {
-            return document_ids_from_index_intervals(collection, index_name, new_intervals, sorted_in_reverse);
-        };
-
-        let even_newer_intervals = Array.tabulate<T.Interval>(
-            i + 1,
-            func(j : Nat) : T.Interval {
-                if (j == i) {
-                    (
-                        new_intervals.get(j).0,
-                        Nat.min(new_intervals.get(j).0 + remaining_limit, new_intervals.get(j).1),
-                    );
-                } else {
-                    new_intervals.get(j);
-                };
-            },
-        );
-
-        // Debug.print("even_newer_intervals: " # debug_show even_newer_intervals);
-
-        return document_ids_from_index_intervals(collection, index_name, even_newer_intervals, sorted_in_reverse);
-
+        return document_ids_from_index_intervals(collection, index_name, Buffer.toArray(result), sorted_in_reverse);
     };
 
     public func extract_document_ids_in_pagination_range_for_reversed_intervals(
         collection : T.StableCollection,
-        skip : Nat,
+        to_skip : Nat,
         opt_limit : ?Nat,
         index_name : Text,
         intervals : [T.Interval],
         sorted_in_reverse : Bool,
     ) : Iter<T.DocumentId> {
-        // Debug.print("extract_document_ids_in_pagination_range_for_reversed_intervals");
-        // Debug.print("skip, opt_limit: " # debug_show (skip, opt_limit));
 
+        let result = Buffer.Buffer<T.Interval>(intervals.size());
         var skipped = 0;
-        var prev = 0;
-
-        var i = intervals.size();
-
-        // Debug.print("old_intervals: " # debug_show intervals);
-
-        //! calculate the total size and use it as the max bound when calculating the remaining skip
-        label searching_for_skip_index while (i > 0) {
-
-            prev := skipped;
-
-            let interval = intervals.get(i - 1);
-            let size = interval.1 - interval.0;
-            skipped += size;
-
-            if (skipped > skip) {
-                break searching_for_skip_index;
-            };
-
-            i -= 1;
-
-        };
-
-        if (i == 0) {
-            return Itertools.empty();
-        };
-
-        // Debug.print("skipped: " # debug_show skipped);
-        // Debug.print("prev: " # debug_show prev);
-        // Debug.print("i: " # debug_show i);
-
-        let remaining_skip = skip - prev;
-
-        let new_intervals_last_end = intervals.get(i - 1).1 - remaining_skip;
-
-        let new_intervals = Array.tabulate<T.Interval>(
-            i,
-            func(j : Nat) : T.Interval {
-                if (j == (intervals.size() - i)) {
-                    (intervals.get(i - 1).0, new_intervals_last_end);
-                } else {
-                    intervals.get(i + j);
-                };
-            },
-        );
-
-        // Debug.print("new_intervals: " # debug_show new_intervals);
-
+        var collected = 0;
         let limit = switch (opt_limit) {
-            case (null) {
-                return document_ids_from_index_intervals(collection, index_name, new_intervals, sorted_in_reverse);
-            };
-            case (?limit) limit;
+            case (null) null;
+            case (?l) ?l;
         };
 
-        i := new_intervals.size();
-
-        prev := 0;
-        var add = 0;
-
-        label searching_for_limit_index while (i > 0) {
-
-            prev := add;
-            let interval = new_intervals.get(i - 1);
+        // Iterate through intervals in reverse order
+        var i = intervals.size();
+        while (i > 0) {
+            i -= 1;
+            let interval = intervals[i];
             let size = interval.1 - interval.0;
 
-            add += size;
+            // Still skipping
+            if (skipped < to_skip) {
+                let can_skip = Nat.min(size, to_skip - skipped);
+                skipped += can_skip;
 
-            if (add >= limit or (add < limit and i == 1)) {
-                break searching_for_limit_index;
-            };
+                // Partial interval after skip
+                if (can_skip < size) {
+                    let new_end = interval.1 - can_skip;
+                    let remaining_size = size - can_skip;
 
-            i -= 1;
-        };
-
-        // Debug.print("i: " # debug_show i);
-
-        if (i == 0) {
-            return document_ids_from_index_intervals(collection, index_name, new_intervals, sorted_in_reverse);
-        };
-
-        let remaining_limit = limit - prev;
-        // Debug.print("remaining_limit: " # debug_show remaining_limit);
-
-        let even_newer_intervals = Array.tabulate<T.Interval>(
-            new_intervals.size() - i + 1,
-            func(j : Nat) : T.Interval {
-                if (j == (new_intervals.size() - i)) {
-                    let updated_start_interval = if (new_intervals.get(j).1 < remaining_limit) {
-                        0;
-                    } else {
-                        new_intervals.get(j).1 - remaining_limit;
+                    switch (limit) {
+                        case (null) {
+                            result.add((interval.0, new_end));
+                        };
+                        case (?lim) {
+                            let can_collect = Nat.min(remaining_size, lim - collected);
+                            if (can_collect > 0) {
+                                result.add((new_end - can_collect, new_end));
+                                collected += can_collect;
+                            };
+                        };
                     };
-
-                    (
-                        Nat.max(
-                            new_intervals.get(j).0,
-                            updated_start_interval,
-                        ),
-                        new_intervals.get(j).1,
-                    );
-                } else {
-                    new_intervals.get(j);
                 };
-            },
-        );
+            }
+            // Collecting (skip satisfied)
+            else {
+                switch (limit) {
+                    case (null) {
+                        result.add(interval);
+                    };
+                    case (?lim) {
+                        if (collected < lim) {
+                            let can_collect = Nat.min(size, lim - collected);
+                            result.add((interval.1 - can_collect, interval.1));
+                            collected += can_collect;
+                        };
+                    };
+                };
+            };
+        };
 
-        // Debug.print("even_newer_intervals: " # debug_show even_newer_intervals);
+        Buffer.reverse(result);
 
-        return document_ids_from_index_intervals(collection, index_name, even_newer_intervals, sorted_in_reverse);
+        // Debug.print("Reversed intervals after pagination extraction: " # debug_show (Buffer.toArray(result)));
 
+        return document_ids_from_index_intervals(collection, index_name, Buffer.toArray(result), sorted_in_reverse);
     };
 
     public func document_ids_from_index_intervals(collection : T.StableCollection, index_name : Text, _intervals : [T.Interval], sorted_in_reverse : Bool) : Iter<T.DocumentId> {

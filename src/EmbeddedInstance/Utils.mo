@@ -15,6 +15,7 @@ import Hash "mo:base@0.16.0/Hash";
 import Float "mo:base@0.16.0/Float";
 import Blob "mo:base@0.16.0/Blob";
 import Prelude "mo:base@0.16.0/Prelude";
+import Heap "mo:base@0.16.0/Heap";
 
 import Int "mo:base@0.16.0/Int";
 
@@ -281,7 +282,7 @@ module {
         );
     };
 
-    public func kmerge<A>(iters : [Iter.Iter<A>], cmp : (A, A) -> Order.Order) : Iter.Iter<A> {
+    public func kmerge_with_arr_heap<A>(iters : [Iter.Iter<A>], cmp : (A, A) -> Order.Order) : Iter.Iter<A> {
         type Ref<A> = (A, Nat);
 
         let cmpIters = func(a : Ref<A>, b : Ref<A>) : Order.Order {
@@ -316,6 +317,65 @@ module {
                     };
                     case (_) {
                         null;
+                    };
+                };
+            };
+        };
+    };
+
+    public func kmerge<A>(iters : [Iter.Iter<A>], cmp : (A, A) -> Order.Order) : Iter.Iter<A> {
+        type Index<A> = (A, Nat);
+
+        let cmpIters = func(a : Index<A>, b : Index<A>) : Order.Order {
+            cmp(a.0, b.0);
+        };
+
+        let heap = Heap.Heap<Index<A>>(cmpIters);
+
+        for ((i, iter) in Itertools.enumerate(iters.vals())) {
+            switch (iter.next()) {
+                case (?a) {
+                    heap.put((a, i));
+                };
+                case (_) {
+
+                };
+            };
+        };
+
+        var prev_popped_element : ?A = null;
+
+        object {
+            public func next() : ?A {
+                loop {
+                    switch (heap.removeMin()) {
+                        case (?(min, i)) {
+                            // Try to get the next element from the same iterator
+                            switch (iters[i].next()) {
+                                case (?a) {
+                                    heap.put((a, i));
+                                };
+                                case (_) {
+                                    // Iterator exhausted, continue with remaining elements
+                                };
+                            };
+
+                            // Skip duplicates by comparing with prev_popped element
+                            switch (prev_popped_element) {
+                                case (?prev_popped) if (cmp(min, prev_popped) == #greater) {
+                                    prev_popped_element := ?min;
+                                    return ?min;
+                                };
+                                case (null) {
+                                    prev_popped_element := ?min;
+                                    return ?min;
+                                };
+                            };
+                        };
+                        case (_) {
+                            // Heap is empty, no more elements
+                            return null;
+                        };
                     };
                 };
             };

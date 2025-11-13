@@ -23,7 +23,7 @@ let limit = 10_000;
 ZenDBSuite.newSuite(
     "Query Tests",
     ?{
-        ZenDBSuite.onlyWithIndex with log_level = #Error;
+        ZenDBSuite.onlyWithIndex with log_level = #Debug;
     },
     func query_tests(zendb : ZenDB.Database, suite_utils : ZenDBSuite.SuiteUtils) {
 
@@ -198,6 +198,7 @@ ZenDBSuite.newSuite(
                     );
 
                     let #ok(res_result) = res else return assert false;
+                    Debug.print(debug_show { res_result });
                     assert res_result.documents == [
                         (text_a_id, { value = "a" }),
                         (text_b_id, { value = "b" }),

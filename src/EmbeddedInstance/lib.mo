@@ -173,9 +173,14 @@ module {
         TypeMigrations.share_version(zendb);
     };
 
-    public func updateCacheSize(versioned_sstore : T.VersionedStableStore, new_cache_size : Nat) {
+    public func updateCacheCapacity(versioned_sstore : T.VersionedStableStore, new_capacity : Nat) {
         let sstore = TypeMigrations.get_current_state(versioned_sstore);
-        TwoQueueCache.resize(sstore.candid_map_cache, new_cache_size);
+        TwoQueueCache.resize(sstore.candid_map_cache, new_capacity);
+    };
+
+    public func clearCache(versioned_sstore : T.VersionedStableStore) {
+        let sstore = TypeMigrations.get_current_state(versioned_sstore);
+        TwoQueueCache.clear(sstore.candid_map_cache);
     };
 
     public func upgrade(versioned_sstore : T.VersionedStableStore) : T.VersionedStableStore {
@@ -263,10 +268,16 @@ module {
             totalIndexData += dbStat.total_index_store_bytes;
         };
 
+        let cache_stats : T.CacheStats = {
+            capacity = TwoQueueCache.capacity(sstore.candid_map_cache);
+            size = TwoQueueCache.size(sstore.candid_map_cache);
+        };
+
         {
             memory_type = sstore.memory_type;
             databases = Map.size(sstore.databases);
             database_stats = Buffer.toArray(dbStats);
+            cache_stats;
             total_allocated_bytes = totalAllocated;
             total_used_bytes = totalUsed;
             total_free_bytes = totalFree;

@@ -177,6 +177,12 @@ module {
         /// Repopulate index in a collection (composite query).
         zendb_collection_repopulate_index_composite_query : shared composite query (Text, Text, Text) -> async (ZT.Result<(), Text>);
 
+        /// Hide indexes in a collection.
+        zendb_collection_hide_indexes : shared (Text, Text, [Text]) -> async (ZT.Result<(), Text>);
+
+        /// Unhide indexes in a collection.
+        zendb_collection_unhide_indexes : shared (Text, Text, [Text]) -> async (ZT.Result<(), Text>);
+
         /// Batch create indexes on a collection.
         zendb_collection_batch_create_indexes : shared (Text, Text, [ZT.CreateIndexParams]) -> async (ZT.Result<Nat, Text>);
 
@@ -214,6 +220,9 @@ module {
 
         /// Get collection statistics (composite query)
         zendb_collection_stats_composite_query : shared composite query (Text, Text) -> async ZT.CollectionStats;
+
+        /// Clear the candid map cache
+        zendb_clear_cache : shared () -> async ();
     };
 
 };

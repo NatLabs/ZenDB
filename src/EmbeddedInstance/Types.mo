@@ -167,6 +167,13 @@ module T {
 
     public type DocumentStore = BTree<DocumentId, Document>;
 
+    public type IndexConfig = {
+        name : Text;
+        key_details : [(Text, SortDirection)];
+        is_unique : Bool;
+        used_internally : Bool;
+    };
+
     public type CreateIndexParams = (
         name : Text,
         key_details : [(field : Text, SortDirection)],
@@ -214,6 +221,7 @@ module T {
         indexes : Map<Text, Index>;
         indexes_in_batch_operations : Map<Text, Index>;
         populate_index_batches : Map<Nat, BatchPopulateIndex>;
+        hidden_indexes : Set<Text>;
 
         candid_serializer : Candid.TypedSerializer;
 
@@ -305,7 +313,10 @@ module T {
         #anyOf : [Candid];
         #not_ : ZqlOperators;
 
-        #between : (Candid, Candid);
+        #between : (Candid, Candid); // [min, max] - both inclusive
+        #betweenExclusive : (Candid, Candid); // (min, max) - both exclusive
+        #betweenLeftOpen : (Candid, Candid); // (min, max] - min exclusive, max inclusive
+        #betweenRightOpen : (Candid, Candid); // [min, max) - min inclusive, max exclusive
         #exists;
         #startsWith : Candid;
 
@@ -319,7 +330,7 @@ module T {
 
     };
 
-    public type PaginationCursor = { last_document_id : ?DocumentId };
+    public type PaginationToken = { last_document_id : ?DocumentId };
 
     public type PaginationDirection = {
         #Forward;
@@ -327,7 +338,7 @@ module T {
     };
 
     public type StableQueryPagination = {
-        cursor : ?T.PaginationCursor;
+        cursor : ?T.PaginationToken;
         limit : ?Nat;
         skip : ?Nat;
     };
@@ -383,6 +394,11 @@ module T {
         scans : [ScanDetails]; // scan results from simple #Operation
     };
 
+    public type QueryPlanResult = {
+        query_plan : QueryPlan;
+        opt_last_pagination_document_id : ?T.DocumentId;
+    };
+
     public type CreateIndexOptions = {
         is_unique : Bool;
     };
@@ -417,12 +433,12 @@ module T {
     };
 
     public type CreateCollectionOptions = {
-        schemaConstraints : [T.SchemaConstraint];
+        schema_constraints : [T.SchemaConstraint];
     };
 
     public module CreateCollectionOptions {
         public func default() : CreateCollectionOptions {
-            { schemaConstraints = [] };
+            { schema_constraints = [] };
         };
     };
 
@@ -482,6 +498,9 @@ module T {
 
         /// Flag indicating if the index is used internally (these indexes cannot be deleted by user)
         used_internally : Bool;
+
+        /// Flag indicating if the index is hidden from queries
+        hidden : Bool;
 
         /// The average size in bytes of an index key
         avg_index_key_size : Nat;
@@ -569,6 +588,11 @@ module T {
 
     };
 
+    public type CacheStats = {
+        capacity : Nat;
+        size : Nat;
+    };
+
     public type InstanceStats = {
         /// The memory type of the instance
         memory_type : MemoryType;
@@ -578,6 +602,8 @@ module T {
 
         /// The database statistics for each database in the instance
         database_stats : [DatabaseStats];
+
+        cache_stats : CacheStats;
 
         /// The total memory allocation across all databases in the instance
         total_allocated_bytes : Nat;
@@ -694,8 +720,9 @@ module T {
     // Custom result types for operations that include instruction counts
     public type SearchResult<Record> = {
         documents : [WrapId<Record>];
-        pagination_cursor : PaginationCursor;
         instructions : Nat;
+        pagination_token : PaginationToken;
+        has_more : Bool;
     };
 
     public type CountResult = {

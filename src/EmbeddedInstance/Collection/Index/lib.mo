@@ -23,6 +23,8 @@ import TypeUtils "mo:memory-collection@0.3.2/TypeUtils";
 import T "../../Types";
 import Logger "../../Logger";
 import Utils "../../Utils";
+import C "../../Constants";
+import BTree "../../BTree";
 
 import DocumentStore "../DocumentStore";
 import CollectionUtils "../CollectionUtils";
@@ -33,10 +35,20 @@ import CompositeIndex "CompositeIndex";
 import TextIndex "TextIndex";
 
 module {
+    // Helper function to get index from collection by name
+    func get_index(collection : T.StableCollection, index_name : Text) : ?T.Index {
+        Map.get(collection.indexes, Map.thash, index_name);
+    };
+
+    // ========== Functions with ByName suffix (lookup by collection + index_name) ==========
+
     public func clear_index(
         collection : T.StableCollection,
-        index : T.Index,
+        index_name : Text,
     ) : T.Result<(), Text> {
+        let ?index = get_index(collection, index_name) else {
+            return #err("Index '" # index_name # "' not found");
+        };
 
         switch (index) {
             case (#composite_index(composite_index)) {
@@ -45,15 +57,187 @@ module {
             case (#text_index(text_index)) {
                 TextIndex.clear(collection, text_index);
             };
-
         };
 
-        #ok()
+        #ok();
+    };
+
+    public func sizeByName(collection : T.StableCollection, index_name : Text) : Nat {
+        // Handle DOCUMENT_ID as a pseudo index
+        if (index_name == C.DOCUMENT_ID) {
+            return DocumentStore.size(collection);
+        };
+
+        let ?index = get_index(collection, index_name) else {
+            Debug.trap("Index '" # index_name # "' not found in collection");
+        };
+
+        size(index);
+    };
+
+    public func nameByName(collection : T.StableCollection, index_name : Text) : Text {
+        // Handle DOCUMENT_ID as a pseudo index
+        if (index_name == C.DOCUMENT_ID) {
+            return C.DOCUMENT_ID;
+        };
+
+        let ?index = get_index(collection, index_name) else {
+            Debug.trap("Index '" # index_name # "' not found in collection");
+        };
+
+        name(index);
+    };
+
+    // Internal function - use get_config() or get_key_details() for external access
+    func get_internal_index(collection : T.StableCollection, index_name : Text) : T.CompositeIndex {
+        let ?index = get_index(collection, index_name) else {
+            Debug.trap("Index '" # index_name # "' not found in collection");
+        };
+
+        get_internal_index_from_index(index);
+    };
+
+    public func deallocateByName(
+        collection : T.StableCollection,
+        index_name : Text,
+    ) {
+        let ?index = get_index(collection, index_name) else {
+            Debug.trap("Index '" # index_name # "' not found in collection");
+        };
+
+        deallocate(collection, index);
+    };
+
+    public func insertWithCandidMapByName(
+        collection : T.StableCollection,
+        index_name : Text,
+        document_id : T.DocumentId,
+        candid_map : T.CandidMap,
+    ) : T.Result<(), Text> {
+        let ?index = get_index(collection, index_name) else {
+            return #err("Index '" # index_name # "' not found");
+        };
+
+        insertWithCandidMap(collection, index, document_id, candid_map);
+    };
+
+    public func removeWithCandidMapByName(
+        collection : T.StableCollection,
+        index_name : Text,
+        document_id : T.DocumentId,
+        candid_map : T.CandidMap,
+    ) : T.Result<(), Text> {
+        let ?index = get_index(collection, index_name) else {
+            return #err("Index '" # index_name # "' not found");
+        };
+
+        removeWithCandidMap(collection, index, document_id, candid_map);
+    };
+
+    public func clearByName(
+        collection : T.StableCollection,
+        index_name : Text,
+    ) {
+        let ?index = get_index(collection, index_name) else {
+            Debug.trap("Index '" # index_name # "' not found in collection");
+        };
+
+        clear(collection, index);
+    };
+
+    public func statsByName(
+        collection : T.StableCollection,
+        index_name : Text,
+        entries : Nat,
+    ) : T.IndexStats {
+        // Handle DOCUMENT_ID as a pseudo index
+        if (index_name == C.DOCUMENT_ID) {
+            let memory = BTree.getMemoryStats(collection.documents);
+            return {
+                name = C.DOCUMENT_ID;
+                fields = [(C.DOCUMENT_ID, #Ascending)];
+                entries = entries;
+                memory;
+                is_unique = true;
+                used_internally = true;
+                hidden = false; // Document ID is never hidden
+                // For the document ID pseudo index, keys are the document IDs themselves
+                avg_index_key_size = if (entries == 0) 0 else (memory.keyBytes / entries);
+                total_index_key_size = memory.keyBytes;
+                total_index_data_bytes = memory.dataBytes;
+            };
+        };
+
+        let ?index = get_index(collection, index_name) else {
+            Debug.trap("Index '" # index_name # "' not found in collection");
+        };
+
+        stats(collection, index, entries);
+    };
+
+    public func get_config_by_name(collection : T.StableCollection, index_name : Text) : T.IndexConfig {
+        // Handle DOCUMENT_ID as a pseudo index
+        if (index_name == C.DOCUMENT_ID) {
+            return {
+                name = C.DOCUMENT_ID;
+                key_details = [(C.DOCUMENT_ID, #Ascending)];
+                is_unique = true;
+                used_internally = true;
+            };
+        };
+
+        let ?index = get_index(collection, index_name) else {
+            Debug.trap("Index '" # index_name # "' not found in collection");
+        };
+
+        get_config(index);
+    };
+
+    public func get_key_details_by_name(collection : T.StableCollection, index_name : Text) : [(Text, T.SortDirection)] {
+        // Handle DOCUMENT_ID as a pseudo index
+        if (index_name == C.DOCUMENT_ID) {
+            return [(C.DOCUMENT_ID, #Ascending)];
+        };
+
+        let ?index = get_index(collection, index_name) else {
+            Debug.trap("Index '" # index_name # "' not found in collection");
+        };
+
+        get_key_details(index);
+    };
+
+    // ========== Default functions that work with Index objects ==========
+    // These are the primary API - they work directly with index objects
+
+    public func hide(collection : T.StableCollection, index_name : Text) : T.Result<(), Text> {
+
+        if (Set.has(collection.hidden_indexes, Set.thash, index_name)) {
+            return #err("Index '" # index_name # "' is already hidden");
+        };
+
+        if (not Map.has(collection.indexes, Map.thash, index_name)) {
+            return #err("Index '" # index_name # "' does not exist");
+        };
+
+        ignore Set.add(collection.hidden_indexes, Set.thash, index_name);
+
+        #ok();
+
+    };
+
+    public func unhide(collection : T.StableCollection, index_name : Text) : T.Result<(), Text> {
+
+        if (not Set.has(collection.hidden_indexes, Set.thash, index_name)) {
+            return #err("Index '" # index_name # "' is not hidden");
+        };
+
+        ignore Set.remove(collection.hidden_indexes, Set.thash, index_name);
+
+        #ok();
 
     };
 
     public func size(index : T.Index) : Nat {
-
         switch (index) {
             case (#composite_index(composite_index)) {
                 return CompositeIndex.size(composite_index);
@@ -62,11 +246,9 @@ module {
                 return CompositeIndex.size(text_index.internal_index);
             };
         };
-
     };
 
     public func name(index : T.Index) : Text {
-
         switch (index) {
             case (#composite_index(composite_index)) {
                 return composite_index.name;
@@ -75,11 +257,9 @@ module {
                 return text_index.internal_index.name;
             };
         };
-
     };
 
-    public func get_internal_index(index : T.Index) : T.CompositeIndex {
-
+    public func get_internal_index_from_index(index : T.Index) : T.CompositeIndex {
         switch (index) {
             case (#composite_index(composite_index)) {
                 return composite_index;
@@ -88,14 +268,12 @@ module {
                 return text_index.internal_index;
             };
         };
-
     };
 
     public func deallocate(
         collection : T.StableCollection,
         index : T.Index,
     ) {
-
         switch (index) {
             case (#text_index(text_index)) {
                 TextIndex.deallocate(collection, text_index);
@@ -104,7 +282,6 @@ module {
                 CompositeIndex.deallocate(collection, composite_index);
             };
         };
-
     };
 
     public func insertWithCandidMap(
@@ -113,13 +290,32 @@ module {
         document_id : T.DocumentId,
         candid_map : T.CandidMap,
     ) : T.Result<(), Text> {
-
         switch (index) {
             case (#text_index(text_index)) {
                 return TextIndex.insertWithCandidMap(collection, text_index, document_id, candid_map);
             };
             case (#composite_index(composite_index)) {
                 return CompositeIndex.insertWithCandidMap(collection, composite_index, document_id, candid_map);
+            };
+        };
+    };
+
+    public func getRankWithCandidMap(
+        collection : T.StableCollection,
+        index_name : Text,
+        document_id : T.DocumentId,
+        candid_map : T.CandidMap,
+    ) : T.Result<Nat, Text> {
+        let ?index = get_index(collection, index_name) else {
+            return #err("Index '" # index_name # "' not found");
+        };
+
+        switch (index) {
+            case (#text_index(text_index)) {
+                return #err("getRankWithCandidMap is not supported for TextIndex");
+            };
+            case (#composite_index(composite_index)) {
+                return CompositeIndex.getRankWithCandidMap(collection, composite_index, document_id, candid_map);
             };
         };
 
@@ -131,7 +327,6 @@ module {
         document_id : T.DocumentId,
         candid_map : T.CandidMap,
     ) : T.Result<(), Text> {
-
         switch (index) {
             case (#text_index(text_index)) {
                 return TextIndex.removeWithCandidMap(collection, text_index, document_id, candid_map);
@@ -140,14 +335,12 @@ module {
                 return CompositeIndex.removeWithCandidMap(collection, composite_index, document_id, candid_map);
             };
         };
-
     };
 
     public func clear(
         collection : T.StableCollection,
         index : T.Index,
     ) {
-
         switch (index) {
             case (#text_index(text_index)) {
                 TextIndex.clear(collection, text_index);
@@ -156,23 +349,61 @@ module {
                 CompositeIndex.clear(collection, composite_index);
             };
         };
-
     };
 
     public func stats(
-
+        collection : T.StableCollection,
         index : T.Index,
         entries : Nat,
     ) : T.IndexStats {
+        let hidden = switch (index) {
+            case (#text_index(text_index)) {
+                Set.has(collection.hidden_indexes, Map.thash, text_index.internal_index.name);
+            };
+            case (#composite_index(composite_index)) {
+                Set.has(collection.hidden_indexes, Map.thash, composite_index.name);
+            };
+        };
 
         switch (index) {
             case (#text_index(text_index)) {
-                return CompositeIndex.stats(text_index.internal_index, entries);
+                return CompositeIndex.stats(text_index.internal_index, entries, hidden);
             };
             case (#composite_index(composite_index)) {
-                return CompositeIndex.stats(composite_index, entries);
+                return CompositeIndex.stats(composite_index, entries, hidden);
             };
         };
+    };
+
+    public func iterate(
+        collection : T.StableCollection,
+        include_hidden_indexes : Bool,
+    ) : Iter.Iter<(Text, T.Index)> {
+
+        let entries = Map.entries(collection.indexes);
+        if (include_hidden_indexes) return entries;
+
+        Iter.filter(
+            entries,
+            func((index_name, _) : (Text, T.Index)) : Bool {
+                not Set.has(collection.hidden_indexes, Set.thash, index_name);
+            },
+        );
+    };
+
+    public func get_config(index : T.Index) : T.IndexConfig {
+        let internal_index = get_internal_index_from_index(index);
+        {
+            name = internal_index.name;
+            key_details = internal_index.key_details;
+            is_unique = internal_index.is_unique;
+            used_internally = internal_index.used_internally;
+        };
+    };
+
+    public func get_key_details(index : T.Index) : [(Text, T.SortDirection)] {
+        let internal_index = get_internal_index_from_index(index);
+        internal_index.key_details;
     };
 
     public func populate_indexes(
@@ -588,7 +819,8 @@ module {
         let results = Buffer.Buffer<T.BestIndexResult>(3);
 
         // Get the best single index first
-        let best_index = switch (get_best_index(collection, operations, sort_field)) {
+        let best_index = switch (get_best_index(collection, operations, sort_field, null, false)) {
+            // false is a placeholder here
             case (null) return [];
             case (?index) index;
         };
@@ -628,7 +860,7 @@ module {
 
         // Helper function to try a combination of operations
         func try_combination(combo_operations : [(Text, T.ZqlOperators)], combo_sort : ?(Text, T.SortDirection)) : ?T.BestIndexResult {
-            let candidate = get_best_index(collection, combo_operations, combo_sort);
+            let candidate = get_best_index(collection, combo_operations, combo_sort, null, false); // false is a placeholder here
 
             switch (candidate) {
                 case (null) null;
@@ -918,7 +1150,14 @@ module {
         Buffer.toArray(results);
     };
 
-    public func get_best_index(collection : T.StableCollection, operations : [(Text, T.ZqlOperators)], sort_field : ?(Text, T.SortDirection)) : ?T.BestIndexResult {
+    public func get_best_index(
+        collection : T.StableCollection,
+        operations : [(Text, T.ZqlOperators)],
+        sort_field : ?(Text, T.SortDirection),
+        opt_last_pagination_document : ?T.CandidMap,
+        has_nested_and_or_operations : Bool,
+    ) : ?T.BestIndexResult {
+        let requires_sorting = Option.isSome(sort_field);
         let equal_fields = Set.new<Text>();
         let sort_fields = Buffer.Buffer<(Text, T.SortDirection)>(8);
         let range_fields = Set.new<Text>();
@@ -932,7 +1171,7 @@ module {
 
         let indexes = Buffer.Buffer<IndexCmpDetails>(collection.indexes.size());
 
-        for (index in Map.vals(collection.indexes)) {
+        for ((index_name, index) in iterate(collection, false)) {
 
             var num_of_sort_fields_evaluated = 0;
 
@@ -1028,11 +1267,42 @@ module {
                         };
                     };
 
+                    // Debug.print("operations: " # debug_show operations);
+                    // Debug.print("sort_field: " # debug_show sort_field);
+                    // Debug.print("index.name: " # debug_show index.name);
+                    // Debug.print("num_of_equal_fields_covered: " # debug_show num_of_equal_fields_covered);
+                    // Debug.print("num_of_range_fields_covered: " # debug_show num_of_range_fields_covered);
+                    // Debug.print("num_of_sort_fields_covered: " # debug_show num_of_sort_fields_covered);
+
                     if (num_of_equal_fields_covered > 0 or num_of_range_fields_covered > 0 or num_of_sort_fields_covered > 0) {
 
                         let (scan_bounds, filter_bounds) = convert_simple_ops_to_bounds(false, operations, ?index.key_details, ?fully_covered_equality_and_range_fields);
 
-                        let interval = CompositeIndex.scan(collection, index, scan_bounds.0, scan_bounds.1, null);
+                        requires_additional_sorting := requires_additional_sorting or num_of_sort_fields_evaluated < sort_fields.size();
+
+                        let sorted_in_reverse = switch (is_query_and_index_direction_a_match) {
+                            case (null) false;
+                            case (?is_a_match) not is_a_match;
+                        };
+
+                        let should_use_cursor_pagination = (
+                            not requires_additional_sorting and (
+                                (requires_sorting) or
+                                (not has_nested_and_or_operations)
+                            )
+                        );
+
+                        let interval = CompositeIndex.scan(
+                            collection,
+                            index,
+                            scan_bounds.0,
+                            scan_bounds.1,
+                            if (should_use_cursor_pagination) opt_last_pagination_document else null,
+                            // the reason we need the query to be sorted to use cursor pagination is so that we can safely
+                            // filter out the documents that are before the last pagination document
+                            // We have 100% guarantee that those documents will not appear later in the results because the index is sorted in the same order as the query
+                            should_use_cursor_pagination and not sorted_in_reverse,
+                        );
 
                         let index_details : IndexCmpDetails = {
                             index;
@@ -1042,12 +1312,9 @@ module {
                             num_of_equal_fields = num_of_equal_fields_covered;
 
                             requires_additional_filtering;
-                            requires_additional_sorting = requires_additional_sorting or num_of_sort_fields_evaluated < sort_fields.size();
+                            requires_additional_sorting;
                             fully_covered_equality_and_range_fields;
-                            sorted_in_reverse = switch (is_query_and_index_direction_a_match) {
-                                case (null) false;
-                                case (?is_a_match) not is_a_match;
-                            };
+                            sorted_in_reverse;
 
                             interval;
                         };

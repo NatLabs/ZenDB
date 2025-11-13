@@ -66,7 +66,7 @@ actor class Backend() {
         BlockSchema,
         CandifyBlock,
         ?{
-            schemaConstraints = [
+            schema_constraints = [
                 #Unique(["tx_index"]),
             ];
         },

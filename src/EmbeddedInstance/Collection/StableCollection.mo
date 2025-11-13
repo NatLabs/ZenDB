@@ -46,7 +46,7 @@ import CandidMap "../CandidMap";
 import SchemaMap "SchemaMap";
 
 import CompositeIndex "Index/CompositeIndex";
-import CommonIndexFns "Index/CommonIndexFns";
+import Index "Index";
 import TextIndex "Index/TextIndex";
 import DocumentStore "DocumentStore";
 import Orchid "Orchid";
@@ -146,8 +146,8 @@ module StableCollection {
     public func clear(collection : T.StableCollection) : () {
         DocumentStore.clear(collection);
 
-        for (index in Map.vals(collection.indexes)) {
-            CommonIndexFns.clear(collection, index);
+        for (index_name in Map.keys(collection.indexes)) {
+            Index.clearByName(collection, index_name);
         };
     };
 
@@ -210,8 +210,11 @@ module StableCollection {
         switch (Map.get(collection.indexes, Map.thash, index_name)) {
             case (?index) {
                 log.lazyInfo(func() = "CompositeIndex '" # index_name # "' already exists");
-                let internal_index = CommonIndexFns.get_internal_index(index);
-                return #ok(internal_index);
+                // Return the existing index directly
+                switch (index) {
+                    case (#composite_index(composite_index)) return #ok(composite_index);
+                    case (#text_index(_)) Debug.trap("Expected composite index but found text index");
+                };
             };
             case (null) {};
         };
@@ -384,7 +387,7 @@ module StableCollection {
             let processed_indexes = Buffer.Buffer<T.Index>(collection.indexes.size());
 
             for (index in batch.indexes.vals()) {
-                switch (CommonIndexFns.insertWithCandidMap(collection, index, document_id, candid_map)) {
+                switch (Index.insertWithCandidMap(collection, index, document_id, candid_map)) {
                     case (#err(err)) { errors.add(err) };
                     case (#ok(_)) { processed_indexes.add(index) };
                 };
@@ -393,7 +396,7 @@ module StableCollection {
             if (errors.size() > 0) {
 
                 for (processed_index in processed_indexes.vals()) {
-                    ignore CommonIndexFns.removeWithCandidMap(collection, processed_index, document_id, candid_map);
+                    ignore Index.removeWithCandidMap(collection, processed_index, document_id, candid_map);
                 };
 
                 return #err(
@@ -448,7 +451,7 @@ module StableCollection {
         let replaced_indexes = Buffer.Buffer<T.Index>(batch.indexes.size());
 
         for (index in batch.indexes.vals()) {
-            let name = CommonIndexFns.name(index);
+            let name = Index.name(index);
 
             // - Replace any existing index in the main indexes map and store the old one
             switch (Map.put(collection.indexes, Map.thash, name, index)) {
@@ -462,7 +465,7 @@ module StableCollection {
 
         // - Now safely deallocate all the old/replaced indexes
         for (old_index in replaced_indexes.vals()) {
-            CommonIndexFns.deallocate(collection, old_index);
+            Index.deallocate(collection, old_index);
         };
 
         ignore Map.remove<Nat, T.BatchPopulateIndex>(collection.populate_index_batches, Map.nhash, batch.id);
@@ -615,12 +618,12 @@ module StableCollection {
 
         // Remove all indexes from the batch operations map and deallocate them
         for (index in batch.indexes.vals()) {
-            let index_name = CommonIndexFns.name(index);
+            let index_name = Index.name(index);
 
             switch (Map.remove(collection.indexes_in_batch_operations, Map.thash, index_name)) {
                 case (?removed_index) {
                     log.lazyDebug(func() = "Deallocating index: " # index_name);
-                    CommonIndexFns.deallocate(collection, removed_index);
+                    Index.deallocate(collection, removed_index);
                 };
                 case (null) {
 
@@ -722,9 +725,9 @@ module StableCollection {
             let candid_map = CollectionUtils.get_candid_map_no_cache(collection, id, ?candid_blob);
 
             for (index in indexes.vals()) {
-                switch (CommonIndexFns.insertWithCandidMap(collection, index, id, candid_map)) {
+                switch (Index.insertWithCandidMap(collection, index, id, candid_map)) {
                     case (#err(err)) {
-                        return #err("Failed to insert into index '" # CommonIndexFns.name(index) # "': " # err);
+                        return #err("Failed to insert into index '" # Index.name(index) # "': " # err);
                     };
                     case (#ok(_)) {};
                 };
@@ -777,7 +780,7 @@ module StableCollection {
 
         log.lazyDebug(func() = "Collected " # debug_show indexes.size() # " indexes to populate");
 
-        CommonIndexFns.populate_indexes(collection, Buffer.toArray(indexes));
+        Index.populate_indexes(collection, Buffer.toArray(indexes));
 
     };
 
@@ -852,6 +855,8 @@ module StableCollection {
             };
             case (#Interval(index_name, _intervals, sorted_in_reverse)) {
                 log.lazyDebug(func() = "Interval iterator");
+                Debug.print("Interval pagination called");
+                Debug.print("Intervals: " # debug_show _intervals);
 
                 if (sorted_in_reverse) {
                     return Intervals.extract_document_ids_in_pagination_range_for_reversed_intervals(collection, skip, opt_limit, index_name, _intervals, sorted_in_reverse);
@@ -863,17 +868,7 @@ module StableCollection {
 
         };
 
-        let iter_with_offset = Itertools.skip(iter, skip);
-
-        var paginated_iter = switch (opt_limit) {
-            case (?limit) {
-                let iter_with_limit = Itertools.take(iter_with_offset, limit);
-                (iter_with_limit);
-            };
-            case (null) (iter_with_offset);
-        };
-
-        paginated_iter;
+        Itertools.skip(iter, skip);
 
     };
 
@@ -1149,7 +1144,7 @@ module StableCollection {
         ignore do ? {
             let prev_document_candid_map = opt_prev_document_candid_map!;
 
-            switch (CommonIndexFns.removeWithCandidMap(collection, index, document_id, prev_document_candid_map)) {
+            switch (Index.removeWithCandidMap(collection, index, document_id, prev_document_candid_map)) {
                 case (#err(err)) {
                     return #err(err);
                 };
@@ -1160,9 +1155,9 @@ module StableCollection {
 
         log.lazyDebug(func() = "Updating index for id: " # debug_show document_id);
 
-        switch (CommonIndexFns.insertWithCandidMap(collection, index, document_id, new_document_candid_map)) {
+        switch (Index.insertWithCandidMap(collection, index, document_id, new_document_candid_map)) {
             case (#err(err)) {
-                return #err("Failed to insert into index '" # CommonIndexFns.name(index) # "': " # err);
+                return #err("Failed to insert into index '" # Index.name(index) # "': " # err);
             };
             case (#ok(_)) {};
         };
@@ -1175,9 +1170,9 @@ module StableCollection {
         let updated_fields_set = Set.fromIter(updated_fields.vals(), Map.thash);
 
         for (index in Map.vals(collection.indexes)) {
-            let internal_index = CommonIndexFns.get_internal_index(index);
+            let key_details = Index.get_key_details(index);
 
-            for ((index_key, _) in internal_index.key_details.vals()) {
+            for ((index_key, _) in key_details.vals()) {
 
                 // only updates the fields that were changed
                 if (Set.has(updated_fields_set, Map.thash, index_key)) {
@@ -1312,7 +1307,7 @@ module StableCollection {
             switch (res) {
                 case (#err(err)) {
                     for (index in updated_indexes.vals()) {
-                        ignore CommonIndexFns.removeWithCandidMap(collection, index, document_id, candid_map);
+                        ignore Index.removeWithCandidMap(collection, index, document_id, candid_map);
                     };
 
                     ignore DocumentStore.remove(collection, document_id);
@@ -1386,12 +1381,10 @@ module StableCollection {
                 let candid_blobs = Iter.toArray(candid_blob_iter);
                 log.lazyDebug(func() = "Search completed, found " # debug_show (candid_blobs.size()) # " results");
 
-                let pagination_cursor = {
-                    last_document_id = if (candid_blobs.size() == 0) {
-                        null; // if it's null, we should assume there are no more results
-                    } else {
+                let pagination_token = {
+                    last_document_id = if (candid_blobs.size() == Option.get(stable_query.pagination.limit, 2 ** 64)) {
                         ?candid_blobs[candid_blobs.size() - 1].0;
-                    };
+                    } else (null);
                 };
 
                 let instructions = performance.total_instructions_used();
@@ -1399,7 +1392,8 @@ module StableCollection {
                 #ok({
                     documents = candid_blobs;
                     instructions = instructions;
-                    pagination_cursor;
+                    pagination_token;
+                    has_more = Option.isSome(pagination_token.last_document_id);
                 });
             };
         };
@@ -1431,7 +1425,7 @@ module StableCollection {
             func() = "Formatted query operations: " # debug_show formatted_query_operations
         );
 
-        let query_plan : T.QueryPlan = QueryPlan.create_query_plan(
+        let query_plan = QueryPlan.create_query_plan(
             collection,
             formatted_query_operations,
             sort_by,
@@ -1444,10 +1438,41 @@ module StableCollection {
         };
 
         let eval = QueryExecution.generate_document_ids_for_query_plan(collection, query_plan, sort_by, sort_documents_by_field_cmp);
-        let iter = paginate(collection, eval, Option.get(pagination.skip, 0), pagination.limit);
+        var iter = paginate(collection, eval, Option.get(pagination.skip, 0), pagination.limit);
+
+        ignore do ? {
+            let last_document_id = pagination.cursor!.last_document_id!;
+            let sort_column = stable_query.sort_by!.0;
+
+            let last_pagination_document = CollectionUtils.get_and_cache_candid_map(collection, last_document_id);
+            let ?last_sort_value = CandidMap.get(last_pagination_document, collection.schema_map, sort_column) else {
+                Debug.trap("Couldn't get sort value from last pagination document for key: " # sort_column);
+            };
+
+            let sort_order = stable_query.sort_by!.1;
+
+            iter := Itertools.skipWhile<T.DocumentId>(
+                iter,
+                func(curr_id : T.DocumentId) : Bool {
+                    let current_document_candid_map = CollectionUtils.get_and_cache_candid_map(collection, curr_id);
+                    let ?current_sort_value = CandidMap.get(current_document_candid_map, collection.schema_map, sort_column) else Debug.trap("Couldn't get sort value from current document for key: " # sort_column);
+                    let order = Schema.cmp_candid(#Empty, current_sort_value, last_sort_value);
+
+                    order == 0 and (if (sort_order == #Ascending) last_document_id >= curr_id else last_document_id <= curr_id);
+                },
+            );
+
+            // iter.next(); // skip the last_document_id itself
+        };
 
         log.lazyDebug(func() = "Query evaluation completed");
-        return #ok((iter));
+
+        let iter_with_limit = switch (pagination.limit) {
+            case (?limit) Itertools.take<T.DocumentId>(iter, limit);
+            case (null) iter;
+        };
+
+        return #ok(iter_with_limit);
     };
 
     public func internal_search(collection : T.StableCollection, stable_query : T.StableQuery) : T.Result<Iter<T.DocumentId>, Text> {
@@ -1522,13 +1547,26 @@ module StableCollection {
             let value_a = get_value(a);
             let value_b = get_value(b);
 
-            let order_num = Schema.cmp_candid(#Empty, value_a, value_b);
+            var order_num = Schema.cmp_candid(#Empty, value_a, value_b);
+
+            if (order_num == 0) {
+                // to ensure a stable sort, compare by document id if values are equal
+                order_num := Schema.cmp_candid(#Empty, #Blob(a.0), #Blob(b.0));
+            };
 
             let order_variant = if (sort_field.1 == #Ascending) {
                 if (order_num == 0) #equal else if (order_num == 1) #greater else #less;
             } else {
                 if (order_num == 0) #equal else if (order_num == 1) #less else #greater;
             };
+
+            // Debug.print(
+            //     "Comparing documents " # debug_show (a.0) # " and " # debug_show (b.0) # ": " #
+            //     "value_a = " # debug_show (value_a) # ", " #
+            //     "value_b = " # debug_show (value_b) # ", " #
+            //     "order_num = " # debug_show (order_num) # ", " #
+            //     "order_variant = " # debug_show (order_variant)
+            // );
 
             order_variant;
         };
@@ -1546,8 +1584,7 @@ module StableCollection {
             Iter.map<(Text, T.Index), T.IndexStats>(
                 Map.entries(collection.indexes),
                 func((index_name, index) : (Text, T.Index)) : T.IndexStats {
-                    let internal_index = CommonIndexFns.get_internal_index(index);
-                    CompositeIndex.stats(internal_index, total_documents);
+                    Index.stats(collection, index, total_documents);
                 },
             )
         );
@@ -1601,7 +1638,7 @@ module StableCollection {
 
         log.lazyDebug(func() = "Counting documents with query: " # debug_show (stable_query));
 
-        let query_plan = QueryPlan.create_query_plan(
+        let { query_plan } = QueryPlan.create_query_plan(
             collection,
             stable_query.query_operations,
             null,
@@ -1668,6 +1705,45 @@ module StableCollection {
 
     };
 
+    public func hide_indexes(collection : T.StableCollection, index_names : [Text]) : T.Result<(), Text> {
+        let log = Logger.NamespacedLogger(collection.logger, LOGGER_NAMESPACE).subnamespace("hide_indexes");
+
+        // ensure all indexes exist
+        for (index_name in index_names.vals()) {
+            if (not Map.has(collection.indexes, Map.thash, index_name)) {
+                let err_msg = "Index '" # index_name # "' not found in collection '" # collection.name # "'";
+                log.lazyError(func() = err_msg);
+                return #err(err_msg);
+            };
+        };
+
+        for (index_name in index_names.vals()) {
+            let #ok(_) = Index.hide(collection, index_name) else return #err("Failed to disable index '" # index_name # "'");
+        };
+
+        #ok();
+    };
+
+    public func unhide_indexes(collection : T.StableCollection, index_names : [Text]) : T.Result<(), Text> {
+        let log = Logger.NamespacedLogger(collection.logger, LOGGER_NAMESPACE).subnamespace("unhide_indexes");
+
+        for (index_name in index_names.vals()) {
+            if (not Map.has(collection.indexes_in_batch_operations, Map.thash, index_name)) {
+                let err_msg = "Index '" # index_name # "' not found in disabled indexes of collection '" # collection.name # "'";
+                log.lazyError(func() = err_msg);
+                return #err(err_msg);
+            };
+
+            log.lazyInfo(func() = "Enabled index '" # index_name # "' in collection '" # collection.name # "'");
+        };
+
+        for (index_name in index_names.vals()) {
+            let #ok(_) = Index.unhide(collection, index_name) else return #err("Failed to enable index '" # index_name # "'");
+        };
+
+        #ok();
+    };
+
     public func delete_by_id(collection : T.StableCollection, id : T.DocumentId) : T.Result<T.DeleteByIdResult<T.CandidBlob>, Text> {
         let log = Logger.NamespacedLogger(collection.logger, LOGGER_NAMESPACE).subnamespace("delete_by_id");
         let performance = Performance(collection.is_running_locally, null);
@@ -1682,7 +1758,7 @@ module StableCollection {
 
         for ((index_name, index) in Map.entries(collection.indexes)) {
 
-            switch (CommonIndexFns.removeWithCandidMap(collection, index, id, prev_candid_map)) {
+            switch (Index.removeWithCandidMap(collection, index, id, prev_candid_map)) {
                 case (#err(err)) {
                     return #err("Failed to remove from index '" # index_name # "': " # err);
                 };
@@ -1708,7 +1784,7 @@ module StableCollection {
         log.logInfo("Deallocating collection: " # collection.name);
 
         for (index in Itertools.chain(Map.vals(collection.indexes), Map.vals(collection.indexes_in_batch_operations))) {
-            CommonIndexFns.deallocate(collection, index);
+            Index.deallocate(collection, index);
         };
 
         BTree.clear(collection.documents);

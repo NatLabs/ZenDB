@@ -63,7 +63,7 @@ module {
     // public type CollectionOptions = T.CollectionOptions;
 
     public type CreateCollectionOptions = {
-        schemaConstraints : [T.SchemaConstraint];
+        schema_constraints : [T.SchemaConstraint];
     };
 
     public func create_collection(db : T.StableDatabase, name : Text, schema : T.Schema, options : ?T.CreateCollectionOptions) : T.Result<StableCollection, Text> {
@@ -116,7 +116,7 @@ module {
         let schema_map = SchemaMap.new(processed_schema);
 
         let schema_constraints = switch (options) {
-            case (?options) { options.schemaConstraints };
+            case (?options) { options.schema_constraints };
             case (null) { [] };
         };
 
@@ -155,6 +155,7 @@ module {
             indexes = Map.new<Text, T.Index>();
             indexes_in_batch_operations = Map.new<Text, T.Index>();
             populate_index_batches = Map.new<Nat, T.BatchPopulateIndex>();
+            hidden_indexes = Set.new<Text>();
             candid_serializer = Candid.TypedSerializer.new(
                 [processed_schema],
                 ?{ Candid.defaultOptions with types = ?[processed_schema] },

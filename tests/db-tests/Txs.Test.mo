@@ -150,7 +150,7 @@ func new_tx(fuzz : Fuzz.Fuzzer, principals : [Principal], i : Nat) : Tx {
     };
 };
 
-let limit = 1000;
+let limit = 5_000;
 let pagination_limit = 10;
 
 let input_txs = Buffer.fromArray<Tx>(
@@ -282,7 +282,7 @@ ZenDBSuite.newSuite(
 
                 if (options.pagination != null) {
                     let pagination = options.pagination!;
-                    // ignore Query.PaginationCursor(pagination.cursor, #Forward);
+                    // ignore Query.PaginationToken(pagination.cursor, #Forward);
                     ignore Query.Limit(pagination.limit);
                 };
 
@@ -365,7 +365,7 @@ ZenDBSuite.newSuite(
         //         switch (opt_cursor, ?(documents.get(documents.size() - 1).0)) {
         //             case (?cursor, ?new_cursor) if (cursor == new_cursor) {
         //                 // break pagination;
-        //                 Debug.trap("PaginationCursor is not moving");
+        //                 Debug.trap("PaginationToken is not moving");
         //             } else {
         //                 opt_cursor := ?new_cursor;
         //             };
@@ -374,7 +374,7 @@ ZenDBSuite.newSuite(
 
         //         };
 
-        //         // ignore db_query.PaginationCursor(opt_cursor, #Forward).Limit(pagination_limit);
+        //         // ignore db_query.PaginationToken(opt_cursor, #Forward).Limit(pagination_limit);
 
         //         let #ok(matching_txs) = txs.search(db_query);
         //         Debug.print("matching_txs: " # debug_show matching_txs);
@@ -527,34 +527,34 @@ ZenDBSuite.newSuite(
                     tx1.ts >= tx2.ts;
                 };
             },
-            // {
-            //     query_name = "get_txs() with the first principal as the recipient";
-            //     db_query = QueryBuilder().Where(
-            //         "tx.to.owner",
-            //         #eq(#Principal(principals[0])),
-            //     );
-            //     expected_query_resolution = #And([
-            //         #Operation(
-            //             "tx.to.owner",
-            //             #eq(#Principal(principals[0])),
-            //         )
-            //     ]);
-            //     check_if_result_matches_query = func(id : Nat, tx : Tx) : Bool {
-            //         ?true == (
-            //             do ? {
-            //                 tx.tx.to!.owner == principals[0];
-            //             }
-            //         );
-            //     };
-            //     display_document = func(tx : Tx) : Text = debug_show tx;
-            //     sort = [
-            //         ("ts", #Ascending),
-            //     ];
-            //     check_if_results_are_sorted = func(tx1 : Tx, tx2 : Tx) : Bool {
-            //         tx1.ts <= tx2.ts;
-            //     };
+            {
+                query_name = "get_txs() with the first principal as the recipient";
+                db_query = QueryBuilder().Where(
+                    "tx.to.owner",
+                    #eq(#Principal(principals[0])),
+                );
+                expected_query_resolution = #And([
+                    #Operation(
+                        "tx.to.owner",
+                        #eq(#Principal(principals[0])),
+                    )
+                ]);
+                check_if_result_matches_query = func(id : Nat, tx : Tx) : Bool {
+                    ?true == (
+                        do ? {
+                            tx.tx.to!.owner == principals[0];
+                        }
+                    );
+                };
+                display_document = func(tx : Tx) : Text = debug_show tx;
+                sort = [
+                    ("ts", #Ascending),
+                ];
+                check_if_results_are_sorted = func(tx1 : Tx, tx2 : Tx) : Bool {
+                    tx1.ts <= tx2.ts;
+                };
 
-            // },
+            },
             {
                 query_name = "get_txs() with the 2nd principal as the sender";
                 db_query = QueryBuilder().Where(

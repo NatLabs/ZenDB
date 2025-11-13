@@ -12,7 +12,7 @@ import Map "mo:map@9.0.1/Map";
 import Set "mo:map@9.0.1/Set";
 
 import ZenDB "../../src/EmbeddedInstance";
-import CommonIndexFns "../../src/EmbeddedInstance/Collection/Index/CommonIndexFns";
+import Index "../../src/EmbeddedInstance/Collection/Index";
 import StableDatabase "../../src/EmbeddedInstance/Database/StableDatabase";
 import T "../../src/EmbeddedInstance/Types";
 
@@ -115,7 +115,7 @@ suite(
                 let stable_collection = collection._get_stable_state();
 
                 // Call get_best_indexes_to_intersect
-                let result_indexes = CommonIndexFns.get_best_indexes_to_intersect(
+                let result_indexes = Index.get_best_indexes_to_intersect(
                     stable_collection,
                     operations,
                     sort_field,
@@ -199,7 +199,7 @@ suite(
 
                 let stable_collection = collection._get_stable_state();
 
-                let result_indexes = CommonIndexFns.get_best_indexes_to_intersect(
+                let result_indexes = Index.get_best_indexes_to_intersect(
                     stable_collection,
                     operations,
                     sort_field,
@@ -286,7 +286,7 @@ suite(
 
                 let stable_collection = collection._get_stable_state();
 
-                let result_indexes = CommonIndexFns.get_best_indexes_to_intersect(
+                let result_indexes = Index.get_best_indexes_to_intersect(
                     stable_collection,
                     operations,
                     null,
@@ -358,7 +358,7 @@ suite(
 
                 let stable_collection = collection._get_stable_state();
 
-                let result_indexes = CommonIndexFns.get_best_indexes_to_intersect(
+                let result_indexes = Index.get_best_indexes_to_intersect(
                     stable_collection,
                     operations,
                     null,

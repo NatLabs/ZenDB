@@ -297,7 +297,7 @@ module T {
 
     };
 
-    public type PaginationCursor = DocumentId;
+    public type PaginationToken = DocumentId;
 
     public type PaginationDirection = {
         #Forward;
@@ -362,7 +362,7 @@ module T {
     };
 
     public type CreateCollectionOptions = {
-        schemaConstraints : [T.SchemaConstraint];
+        schema_constraints : [T.SchemaConstraint];
     };
 
     /// MemoryBTree Stats

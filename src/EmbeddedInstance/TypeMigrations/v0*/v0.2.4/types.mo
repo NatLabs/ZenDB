@@ -163,6 +163,13 @@ module T {
 
     public type DocumentStore = BTree<DocumentId, Document>;
 
+    public type IndexConfig = {
+        name : Text;
+        key_details : [(Text, SortDirection)];
+        is_unique : Bool;
+        used_internally : Bool;
+    };
+
     public type CreateIndexParams = (
         name : Text,
         key_details : [(field : Text, SortDirection)],
@@ -210,12 +217,13 @@ module T {
         indexes : Map<Text, Index>;
         indexes_in_batch_operations : Map<Text, Index>;
         populate_index_batches : Map<Nat, BatchPopulateIndex>;
+        hidden_indexes : Set<Text>;
+
+        candid_serializer : Candid.TypedSerializer;
 
         field_constraints : Map<Text, [SchemaFieldConstraint]>;
         unique_constraints : [([Text], CompositeIndex)];
         fields_with_unique_constraints : Map<Text, Set<Nat>>; // the value is the index of the unique constraint in the unique_constraints list
-
-        candid_serializer : Candid.TypedSerializer;
 
         // reference to the freed btrees to the same variable in
         // the ZenDB database document
@@ -315,7 +323,7 @@ module T {
 
     };
 
-    public type PaginationToken = DocumentId;
+    public type PaginationToken = { last_document_id : ?DocumentId };
 
     public type PaginationDirection = {
         #Forward;
@@ -323,7 +331,7 @@ module T {
     };
 
     public type StableQueryPagination = {
-        cursor : ?(DocumentId, PaginationDirection);
+        cursor : ?T.PaginationToken;
         limit : ?Nat;
         skip : ?Nat;
     };
@@ -377,6 +385,11 @@ module T {
         subplans : [QueryPlan]; // result of nested #And/#Or operations
         simple_operations : [(Text, T.ZqlOperators)];
         scans : [ScanDetails]; // scan results from simple #Operation
+    };
+
+    public type QueryPlanResult = {
+        query_plan : QueryPlan;
+        opt_last_pagination_document_id : ?T.DocumentId;
     };
 
     public type CreateIndexOptions = {
@@ -478,6 +491,9 @@ module T {
 
         /// Flag indicating if the index is used internally (these indexes cannot be deleted by user)
         used_internally : Bool;
+
+        /// Flag indicating if the index is hidden from queries
+        hidden : Bool;
 
         /// The average size in bytes of an index key
         avg_index_key_size : Nat;
@@ -691,6 +707,8 @@ module T {
     public type SearchResult<Record> = {
         documents : [WrapId<Record>];
         instructions : Nat;
+        pagination_token : PaginationToken;
+        has_more : Bool;
     };
 
     public type CountResult = {

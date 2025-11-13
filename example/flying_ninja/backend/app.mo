@@ -28,7 +28,7 @@ persistent actor FlyingNinja {
         LeaderboardEntrySchema,
         candify,
         ?{
-            schemaConstraints = [#Unique("name")];
+            schema_constraints = [#Unique("name")];
         },
     );
 

@@ -119,7 +119,7 @@ suite(
 
                 let stable_collection = collection._get_stable_state();
 
-                let query_plan = QueryPlan.create_query_plan(
+                let { query_plan } = QueryPlan.create_query_plan(
                     stable_collection,
                     ZenDB.QueryBuilder().Where(
                         "text",
@@ -160,7 +160,7 @@ suite(
 
                 let stable_collection = collection._get_stable_state();
 
-                let query_plan = QueryPlan.create_query_plan(
+                let { query_plan } = QueryPlan.create_query_plan(
                     stable_collection,
                     ZenDB.QueryBuilder().Where(
                         "text",

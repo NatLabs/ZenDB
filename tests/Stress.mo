@@ -52,7 +52,7 @@ actor {
                                 "collection_" # debug_show (i),
                                 UserIdSchema,
                                 candify,
-                                ?{ schemaConstraints = [#Unique(["id"])] },
+                                ?{ schema_constraints = [#Unique(["id"])] },
                             );
 
                             collections.add(collection);

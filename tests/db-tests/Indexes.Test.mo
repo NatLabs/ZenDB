@@ -494,13 +494,13 @@ ZenDBSuite.newSuite(
                             };
                         };
 
-                        let schemaConstraints : [ZenDB.Types.SchemaConstraint] = [
+                        let schema_constraints : [ZenDB.Types.SchemaConstraint] = [
                             #Field("nat", [#Min(1_000), #Max(32_000)]),
                             #Field("int", [#Min(-10), #Max(10)]),
                             #Field("float", [#Min(-1.0), #Max(1.0)]),
                         ];
 
-                        let #ok(test_collection) = zendb.createCollection("schema_constraints_test", TestSchema, candify_test, ?{ schemaConstraints }) else return assert false;
+                        let #ok(test_collection) = zendb.createCollection("schema_constraints_test", TestSchema, candify_test, ?{ schema_constraints }) else return assert false;
 
                         let valid_values : TestRecord = {
                             nat = 10_000;
@@ -583,12 +583,12 @@ ZenDBSuite.newSuite(
                             };
                         };
 
-                        let schemaConstraints : [ZenDB.Types.SchemaConstraint] = [
+                        let schema_constraints : [ZenDB.Types.SchemaConstraint] = [
                             #Field("text", [#MinSize(5), #MaxSize(10)]),
                             #Field("blob", [#Size(3, 5)]),
                         ];
 
-                        let #ok(test_collection) = zendb.createCollection("schema_constraints_test_2", TestSchema, candify_test, ?{ schemaConstraints }) else return assert false;
+                        let #ok(test_collection) = zendb.createCollection("schema_constraints_test_2", TestSchema, candify_test, ?{ schema_constraints }) else return assert false;
 
                         let valid_values : TestRecord = {
                             text = "hello";
@@ -657,13 +657,13 @@ ZenDBSuite.newSuite(
                             };
                         };
 
-                        let schemaConstraints : [ZenDB.Types.SchemaConstraint] = [
+                        let schema_constraints : [ZenDB.Types.SchemaConstraint] = [
                             #Unique(["text"]),
                             #Unique(["nat"]),
                             #Unique(["compound.0", "compound.1"]),
                         ];
 
-                        let #ok(test_collection) = zendb.createCollection("schema_constraints_test_3", TestSchema, candify_test, ?{ schemaConstraints }) else return assert false;
+                        let #ok(test_collection) = zendb.createCollection("schema_constraints_test_3", TestSchema, candify_test, ?{ schema_constraints }) else return assert false;
 
                         test(
                             "Succeeds with unique values",

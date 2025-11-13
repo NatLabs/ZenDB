@@ -69,6 +69,12 @@ module TwoQueueCache {
         LruCache.capacity(cache.main_cache) + LruCache.capacity(cache.ghost_cache) + LruCache.capacity(cache.admission_cache);
     };
 
+    public func clear<K, V>(cache : T.TwoQueueCache<K, V>) : () {
+        LruCache.clear(cache.main_cache);
+        LruCache.clear(cache.ghost_cache);
+        LruCache.clear(cache.admission_cache);
+    };
+
     public func get<K, V>(cache : T.TwoQueueCache<K, V>, hash : Map.HashUtils<K>, key : K, get_value : (K) -> V) : ?V {
         let main_utils = LruCache.defaultUtils<K, V>(hash);
         let ghost_utils = LruCache.defaultUtils<K, V>(hash);

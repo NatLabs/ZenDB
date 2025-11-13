@@ -26,7 +26,7 @@ module {
     let { thash; bhash } = Map;
 
     type StableQuery = T.StableQuery;
-    type PaginationCursor = T.PaginationCursor;
+    type PaginationToken = T.PaginationToken;
     type PaginationDirection = T.PaginationDirection;
 
     public class QueryBuilder() = self {
@@ -34,7 +34,7 @@ module {
         public var _opt_nested_query : ?ZenQueryLang = null;
         public var _is_and : Bool = true;
         public var _buffer = Buffer.Buffer<ZenQueryLang>(8);
-        public var _pagination_cursor : ?PaginationCursor = null;
+        public var _pagination_token : ?PaginationToken = null;
         public var _pagination_limit : ?Nat = null;
         public var _pagination_skip : ?Nat = null; // skip from beginning of the query
         public var _cursor_offset = 0;
@@ -76,33 +76,51 @@ module {
             _is_and := new_is_and;
         };
 
-        func handle_not(key : Text, not_op : ZqlOperators) {
+        func handle_not(key : Text, not_op : ZqlOperators) : ZenQueryLang {
             switch (not_op) {
                 case (#eq(value)) {
                     // #not_(#eq(x)) -> #Or([#lt(x), #gt(x)])
-                    _buffer.add(#Or([#Operation(key, #lt(value)), #Operation(key, #gt(value))]));
+                    #Or([#Operation(key, #lt(value)), #Operation(key, #gt(value))]);
                 };
                 case (#lt(value)) {
                     // #not_(#lt(x)) -> #gte(x)
-                    _buffer.add(#Operation(key, #gte(value)));
+                    #Operation(key, #gte(value));
                 };
                 case (#gt(value)) {
                     // #not_(#gt(x) )-> #lte(x)
-                    _buffer.add(#Operation(key, #lte(value)));
+                    #Operation(key, #lte(value));
                 };
                 case (#lte(value)) {
                     // #not_(#lte(x)) -> #gt(x)
-                    _buffer.add(#Operation(key, #gt(value)));
+                    #Operation(key, #gt(value));
                 };
                 case (#gte(value)) {
                     // #not_(#gte(x)) -> #lt(x)
-                    _buffer.add(#Operation(key, #lt(value)));
+                    #Operation(key, #lt(value));
                 };
                 case (#between(min, max)) {
                     // #not_(#between(min, max))
                     // -> #not_(#And([#gte(min), #lte(max)]))
                     // -> #Or([#lt(min), #gt(max)])
-                    _buffer.add(#Or([#Operation(key, #lt(min)), #Operation(key, #gt(max))]));
+                    #Or([#Operation(key, #lt(min)), #Operation(key, #gt(max))]);
+                };
+                case (#betweenExclusive(min, max)) {
+                    // #not_(#betweenExclusive(min, max))
+                    // -> #not_(#And([#gt(min), #lt(max)]))
+                    // -> #Or([#lte(min), #gte(max)])
+                    #Or([#Operation(key, #lte(min)), #Operation(key, #gte(max))]);
+                };
+                case (#betweenLeftOpen(min, max)) {
+                    // #not_(#betweenLeftOpen(min, max))
+                    // -> #not_(#And([#gt(min), #lte(max)]))
+                    // -> #Or([#lte(min), #gt(max)])
+                    #Or([#Operation(key, #lte(min)), #Operation(key, #gt(max))]);
+                };
+                case (#betweenRightOpen(min, max)) {
+                    // #not_(#betweenRightOpen(min, max))
+                    // -> #not_(#And([#gte(min), #lt(max)]))
+                    // -> #Or([#lt(min), #gte(max)])
+                    #Or([#Operation(key, #lt(min)), #Operation(key, #gte(max))]);
                 };
                 case (#exists) {
                     // #not_(#exists)
@@ -111,54 +129,75 @@ module {
                 };
                 case (#startsWith(prefix)) {
                     let prefix_lower_bound = prefix;
-                    let #ok(prefix_upper_bound) = CandidUtils.Ops.concatBytes(prefix, "\FF") else {
-                        Debug.trap("QueryBuilder: Failed to create upper bound for #startsWith");
+                    let res = CandidUtils.Ops.concatBytes(prefix, "\FF");
+                    switch (res) {
+                        case (#err(msg)) {
+                            Debug.trap("QueryBuilder: Failed to create upper bound for #startsWith. " # msg);
+                        };
+                        case (#ok(prefix_upper_bound)) {
+                            // #not_(#startsWith(prefix))
+                            // -> #not_(#between(prefix_lower_bound, prefix_upper_bound))
+                            // -> #Or([#lt(prefix_lower_bound), #gt(prefix_upper_bound)])
+                            #Or([#Operation(key, #lt(prefix_lower_bound)), #Operation(key, #gt(prefix_upper_bound))]);
+                        };
                     };
-
-                    // #not_(#startsWith(prefix))
-                    // -> #not_(#between(prefix_lower_bound, prefix_upper_bound))
-                    // -> #Or([#lt(prefix_lower_bound), #gt(prefix_upper_bound)])
-                    _buffer.add(#Or([#Operation(key, #lt(prefix_lower_bound)), #Operation(key, #gt(prefix_upper_bound))]));
 
                 };
                 case (#anyOf(values)) {
-                    // #not_(#anyOf([x, y, z]))
-                    // -> #And([#not_(x), #not_(y), #not_(z)])
-                    // -> #And([#Or([#lt(x), #gt(x)]), #Or([#lt(y), #gt(y)]), #Or([#lt(z), #gt(z)])])
+                    // #not_(#anyOf([y, z, x]))
+                    //
+                    // If the values were sorted, we would need only find the gaps between them
+                    // Sort the values: [y, z, x] -> [x, y, z]
+                    // Then express as: #Or([
+                    //  #lt(x),                           // values before first
+                    //  #betweenExclusive(x, y),          // values between first and second
+                    //  #betweenExclusive(y, z),          // values between second and third
+                    //  #gt(z)                            // values after last
+                    // ])
 
-                    if (values.size() > 0) {
-                        update_query(true);
-                        for (value in values.vals()) {
-                            _buffer.add(#Or([#Operation(key, #lt(value)), #Operation(key, #gt(value))]));
-                        };
+                    let sorted_values = Array.sort(
+                        values,
+                        func(a : T.Candid, b : T.Candid) : T.Order {
+                            CandidUtils.compare(#Empty, a, b);
+                        },
+                    );
 
-                    };
+                    let conditions = Array.tabulate(
+                        sorted_values.size() + 1,
+                        func(i : Nat) : ZenQueryLang {
+                            if (i == 0) {
+                                #Operation(key, #lt(sorted_values[0]));
+                            } else if (i == sorted_values.size()) {
+                                #Operation(key, #gt(sorted_values[sorted_values.size() - 1]));
+                            } else {
+                                reduce_op(key, #betweenExclusive(sorted_values[i - 1], sorted_values[i]));
+                            };
+                        },
+                    );
+
+                    #Or(conditions);
 
                 };
                 case (#not_(nested_op)) {
                     // #not_(#not_(x)) -> x
-                    _buffer.add(#Operation(key, nested_op));
+                    #Operation(key, nested_op);
                 };
             };
         };
 
-        func handle_op(key : Text, op : ZqlOperators) {
+        func reduce_op(key : Text, op : ZqlOperators) : ZenQueryLang {
             switch (op) {
                 // aliases
                 case (#anyOf(values)) {
                     // #anyOf([x, y, z]) -> #Or([#eq(x), #eq(y), #eq(z)])
-                    if (values.size() > 0) {
-                        _buffer.add(
-                            #Or(
-                                Array.map(
-                                    values,
-                                    func(value : T.Candid) : ZenQueryLang {
-                                        #Operation(key, #eq(value));
-                                    },
-                                )
-                            )
-                        );
-                    };
+                    #Or(
+                        Array.map(
+                            values,
+                            func(value : T.Candid) : ZenQueryLang {
+                                #Operation(key, #eq(value));
+                            },
+                        )
+                    );
 
                 };
                 case (#not_(not_op)) {
@@ -166,8 +205,19 @@ module {
                 };
                 case (#between(min, max)) {
                     // #between(min, max) -> #And([#gte(min), #lte(max)])
-
-                    _buffer.add(#And([#Operation(key, #gte(min)), #Operation(key, #lte(max))]));
+                    #And([#Operation(key, #gte(min)), #Operation(key, #lte(max))]);
+                };
+                case (#betweenExclusive(min, max)) {
+                    // #betweenExclusive(min, max) -> #And([#gt(min), #lt(max)])
+                    #And([#Operation(key, #gt(min)), #Operation(key, #lt(max))]);
+                };
+                case (#betweenLeftOpen(min, max)) {
+                    // #betweenLeftOpen(min, max) -> #And([#gt(min), #lte(max)])
+                    #And([#Operation(key, #gt(min)), #Operation(key, #lte(max))]);
+                };
+                case (#betweenRightOpen(min, max)) {
+                    // #betweenRightOpen(min, max) -> #And([#gte(min), #lt(max)])
+                    #And([#Operation(key, #gte(min)), #Operation(key, #lt(max))]);
                 };
                 case (#startsWith(prefix)) {
                     let prefix_lower_bound = prefix;
@@ -175,14 +225,18 @@ module {
                         Debug.trap("QueryBuilder: Failed to create upper bound for #startsWith");
                     };
 
-                    handle_op(key, #between(prefix_lower_bound, prefix_upper_bound));
+                    reduce_op(key, #between(prefix_lower_bound, prefix_upper_bound));
 
                 };
                 // core operations
                 case (_) {
-                    _buffer.add(#Operation(key, op));
+                    #Operation(key, op);
                 };
             };
+        };
+
+        func handle_op(key : Text, op : ZqlOperators) {
+            _buffer.add(reduce_op(key, op));
         };
 
         public func RawQuery(query_lang : T.ZenQueryLang) : QueryBuilder {
@@ -235,8 +289,34 @@ module {
             self;
         };
 
-        public func PaginationCursor(cursor : PaginationCursor) : QueryBuilder {
-            _pagination_cursor := ?cursor;
+        public func SortDirection(direction : T.SortDirection) : QueryBuilder {
+            switch (_sort_by) {
+                case (null) {
+                    Debug.trap("QueryBuilder: SortDirection() called before SortField()");
+                };
+                case (?(key, _)) {
+                    _sort_by := ?(key, direction);
+                };
+            };
+
+            self;
+        };
+
+        public func SortField(key : Text) : QueryBuilder {
+            switch (_sort_by) {
+                case (null) {
+                    _sort_by := ?(key, #Ascending);
+                };
+                case (?(_, direction)) {
+                    _sort_by := ?(key, direction);
+                };
+            };
+
+            self;
+        };
+
+        public func PaginationToken(cursor : PaginationToken) : QueryBuilder {
+            _pagination_token := ?cursor;
             _pagination_skip := null; // reset skip when using cursor
             self;
         };
@@ -247,9 +327,9 @@ module {
         };
 
         public func Skip(skip : Nat) : QueryBuilder {
-            switch (_pagination_cursor) {
+            switch (_pagination_token) {
                 case (?_) {
-                    Debug.trap("QueryBuilder: Cannot use Skip() when PaginationCursor() is set");
+                    Debug.trap("QueryBuilder: Cannot use Skip() when PaginationToken() is set");
                 };
                 case (null) {};
             };
@@ -273,7 +353,7 @@ module {
                 query_operations = flattenQuery(resolved_query);
                 sort_by = _sort_by;
                 pagination = {
-                    cursor = _pagination_cursor;
+                    cursor = _pagination_token;
                     limit = _pagination_limit;
                     skip = _pagination_skip;
                 };
@@ -288,7 +368,7 @@ module {
             for (item in _buffer.vals()) {
                 new_builder._buffer.add(item);
             };
-            new_builder._pagination_cursor := _pagination_cursor;
+            new_builder._pagination_token := _pagination_token;
             new_builder._pagination_limit := _pagination_limit;
             new_builder._pagination_skip := _pagination_skip;
             new_builder._cursor_offset := _cursor_offset;
@@ -380,6 +460,9 @@ module {
                     case (#lt(value)) #lt(handle_operator_value(operator_value_type, value));
                     case (#gt(value)) #gt(handle_operator_value(operator_value_type, value));
                     case (#between(min, max)) #between(handle_operator_value(operator_value_type, min), handle_operator_value(operator_value_type, max));
+                    case (#betweenExclusive(min, max)) #betweenExclusive(handle_operator_value(operator_value_type, min), handle_operator_value(operator_value_type, max));
+                    case (#betweenLeftOpen(min, max)) #betweenLeftOpen(handle_operator_value(operator_value_type, min), handle_operator_value(operator_value_type, max));
+                    case (#betweenRightOpen(min, max)) #betweenRightOpen(handle_operator_value(operator_value_type, min), handle_operator_value(operator_value_type, max));
                     case (#exists) #exists;
                     case (#startsWith(prefix)) #startsWith(handle_operator_value(operator_value_type, prefix));
                     case (#anyOf(values)) #anyOf(Array.map(values, func(value : T.Candid) : T.Candid = handle_operator_value(operator_value_type, value)));
@@ -441,6 +524,11 @@ module {
                             buffer.add(nested_q);
                         };
                     };
+                    case (#Or(nested)) {
+                        if (nested.size() > 0) {
+                            buffer.add(#Or(nested));
+                        };
+                    };
                     case (other) {
                         buffer.add(other);
                     };
@@ -459,6 +547,11 @@ module {
                         // Flatten nested #Or by merging its contents
                         for (nested_q in nested.vals()) {
                             buffer.add(nested_q);
+                        };
+                    };
+                    case (#And(nested)) {
+                        if (nested.size() > 0) {
+                            buffer.add(#And(nested));
                         };
                     };
                     case (other) {

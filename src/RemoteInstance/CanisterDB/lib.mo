@@ -80,7 +80,7 @@ shared ({ caller = owner }) persistent actor class CanisterDB() = this_canister 
 
     ZenDB.setLogLevel(zendb_instance, #Debug);
     ZenDB.setIsRunLocally(zendb_instance, false);
-    // ZenDB.updateCacheSize(zendb_instance, 1_000_000);
+    // ZenDB.updateCacheCapacity(zendb_instance, 1_000_000);
 
     public shared query func zendb_api_version() : async Text {
         "0.0.1";
@@ -538,6 +538,30 @@ shared ({ caller = owner }) persistent actor class CanisterDB() = this_canister 
         _zendb_collection_repopulate_index(caller, db_name, collection_name, index_name);
     };
 
+    public shared ({ caller }) func zendb_collection_hide_indexes(db_name : Text, collection_name : Text, index_names : [Text]) : async ZT.Result<(), Text> {
+        auth.allow_rs(
+            caller,
+            Permissions.MANAGE,
+            func() : (ZT.Result<(), Text>) {
+                let #ok(collection) = get_collection(db_name, collection_name) else return Utils.send_error(get_collection(db_name, collection_name));
+
+                StableCollection.hide_indexes(collection, index_names);
+            },
+        );
+    };
+
+    public shared ({ caller }) func zendb_collection_unhide_indexes(db_name : Text, collection_name : Text, index_names : [Text]) : async ZT.Result<(), Text> {
+        auth.allow_rs(
+            caller,
+            Permissions.MANAGE,
+            func() : (ZT.Result<(), Text>) {
+                let #ok(collection) = get_collection(db_name, collection_name) else return Utils.send_error(get_collection(db_name, collection_name));
+
+                StableCollection.unhide_indexes(collection, index_names);
+            },
+        );
+    };
+
     public shared ({ caller }) func zendb_collection_batch_create_indexes(db_name : Text, collection_name : Text, index_configs : [ZT.CreateIndexParams]) : async ZT.Result<Nat, Text> {
         auth.allow_rs(
             caller,
@@ -601,6 +625,16 @@ shared ({ caller = owner }) persistent actor class CanisterDB() = this_canister 
 
     public shared composite query func zendb_canister_stats_composite_query() : async ([ZT.InstanceStats]) {
         [];
+    };
+
+    public shared ({ caller }) func zendb_clear_cache() : async () {
+        auth.allow<()>(
+            caller,
+            Permissions.MANAGE,
+            func() : () {
+                ZenDB.clearCache(zendb_instance);
+            },
+        );
     };
 
 };

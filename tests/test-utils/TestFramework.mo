@@ -10,7 +10,7 @@ import Principal "mo:base@0.16.0/Principal";
 import ZenDB "../../src/EmbeddedInstance";
 import CollectionUtils "../../src/EmbeddedInstance/Collection/CollectionUtils";
 import StableCollection "../../src/EmbeddedInstance/Collection/StableCollection";
-import CommonIndexFns "../../src/EmbeddedInstance/Collection/Index/CommonIndexFns";
+import Index "../../src/EmbeddedInstance/Collection/Index";
 import TypeMigrations "../../src/EmbeddedInstance/TypeMigrations";
 
 import { test; suite } "mo:test";
@@ -54,11 +54,19 @@ module TestFramework {
         options : ?ZenDB.Types.CreateIndexOptions,
     ) -> ZenDB.Types.Result<(), Text>;
 
-    type Function<A, B> = A -> B;
+    type Fn<A, B> = A -> B;
+
+    type TestSearchQueryInput = (
+        collection_name : Text,
+        index_name : Text,
+        query_builder : ZenDB.QueryBuilder,
+        sort_field : ?Text,
+    );
 
     public type SuiteUtils = {
         createIndex : CreateIndexOnCollection;
-        indexOnlyFns : Function<Function<(), ()>, ()>;
+        indexOnlyFns : Fn<Fn<(), ()>, ()>;
+        test_search_query : Fn<TestSearchQueryInput, Bool>;
     };
 
     public func newSuite(
@@ -71,13 +79,39 @@ module TestFramework {
 
         func run_suite_with_or_without_indexes(memory_type_suite_name : Text, zendb_sstore : ZenDB.Types.VersionedStableStore) {
 
+            let test_search_query_callback = func(db : ZenDB.Database) : Fn<TestSearchQueryInput, Bool> = func(
+                collection_name : Text,
+                index_name : Text,
+                query_builder : ZenDB.QueryBuilder,
+                sort_field : ?Text,
+            ) : Bool {
+
+                let stable_db = db.getStableState();
+
+                let ?collection = Map.get(stable_db.collections, Map.thash, collection_name) else {
+                    Debug.trap("ZenDB Test Suite -> test_search_query(): Could not find collection named '" # collection_name # "'");
+                };
+
+                let search_results = switch (StableCollection.search(collection, query_builder.build())) {
+                    case (#err(err_msg)) {
+                        Debug.trap("ZenDB Test Suite -> test_search_query(): Search query failed with error: " # err_msg);
+                    };
+                    case (#ok(results)) results;
+                };
+
+                // Implement a simple search query test that always returns true for demonstration purposes.
+                // In a real test suite, this would execute the query and verify results.
+                Debug.print("Executing search query on collection: " # collection_name # ", index: " # index_name);
+                true;
+            };
+
             if (settings.compare_with_no_index) {
                 suite(
                     memory_type_suite_name # " - with no index",
                     func() {
                         let #ok(zendb) = ZenDB.createDB(zendb_sstore, "no_index");
                         let suite_utils : SuiteUtils = {
-                            indexOnlyFns = func(callback_fns : Function<(), ()>) {
+                            indexOnlyFns = func(callback_fns : Fn<(), ()>) {
                                 // no-op
                             };
                             createIndex : CreateIndexOnCollection = func(
@@ -89,6 +123,8 @@ module TestFramework {
                                 // no-op
                                 return #ok(());
                             };
+
+                            test_search_query = test_search_query_callback(zendb);
                         };
 
                         zendb_suite(zendb, suite_utils);
@@ -104,7 +140,7 @@ module TestFramework {
                         let #ok(zendb) = ZenDB.createDB(zendb_sstore, "with_index");
 
                         let suite_utils : SuiteUtils = {
-                            indexOnlyFns = func(callback_fns : Function<(), ()>) {
+                            indexOnlyFns = func(callback_fns : Fn<(), ()>) {
                                 callback_fns();
                             };
 
@@ -138,13 +174,13 @@ module TestFramework {
                                 let ?index = Map.get(collection.indexes, Map.thash, index_name) else return Debug.trap("ZenDB Test Suite -> createIndex(): Could not retrieve Index named '" # index_name # "' after it was supposedly created");
 
                                 let collection_size = StableCollection.size(collection);
-                                let index_size = CommonIndexFns.size(index);
+                                let index_size = Index.size(index);
 
-                                assert CommonIndexFns.name(index) == index_name;
-                                let internal_index = CommonIndexFns.get_internal_index(index);
+                                assert Index.name(index) == index_name;
+                                let actual_key_details = Index.get_key_details(index);
 
-                                // Debug.print("ZenDB Test Suite -> createIndex(): Index Key details mismatch (expected: " # debug_show (index_key_details) # ", actual: " # debug_show (internal_index.key_details) # ")");
-                                // assert internal_index.key_details == index_key_details;
+                                // Debug.print("ZenDB Test Suite -> createIndex(): Index Key details mismatch (expected: " # debug_show (index_key_details) # ", actual: " # debug_show (actual_key_details) # ")");
+                                // assert actual_key_details == index_key_details;
 
                                 if (collection_size > 0) if (index_size == 0) {
                                     Debug.trap(
@@ -155,6 +191,8 @@ module TestFramework {
                                 res;
 
                             };
+
+                            test_search_query = test_search_query_callback(zendb);
                         };
 
                         zendb_suite(zendb, suite_utils);

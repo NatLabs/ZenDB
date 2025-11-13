@@ -30,7 +30,7 @@ module {
         bench.description("Benchmarking the performance with 10k txs");
 
         bench.cols([
-            "#stableMemory no index",
+            // "#stableMemory no index",
             "#stableMemory 7 single field indexes",
             "#stableMemory 6 fully covered indexes",
         ]);
@@ -48,7 +48,7 @@ module {
             "query(): #And (btype='1burn' AND tx.amt>=750)",
             "query(): #And (500_000<ts<=1_000_000 AND 200<amt<=600)",
             "query(): #Or (btype == '1xfer' OR '2xfer' OR '1mint')",
-            "query(): #anyOf (btype either of ['1xfer', '2xfer', '1mint'])",
+            "query(): #Or (btype == '1xfer' OR '2xfer' OR '1mint')",
             "query(): #Or (btype == '1xfer' OR tx.amt >= 500)",
             "query(): #Or (btype == '1xfer' OR tx.amt >= 500 OR ts > 500_000)",
             "query(): #Or (500_000<ts<=1_000_000 OR 200<amt<=600)",
@@ -66,7 +66,7 @@ module {
 
         ]);
 
-        let input_limit = 16_000;
+        let input_limit = 20_000;
         let limit = 1_000;
 
         let txs_benchmarks = TxsBenchUtils.TxsBenchmarks(input_limit, limit);

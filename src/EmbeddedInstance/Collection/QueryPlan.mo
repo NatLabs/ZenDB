@@ -11,17 +11,20 @@ import Candid "mo:serde@3.4.0/Candid";
 import Map "mo:map@9.0.1/Map";
 import Set "mo:map@9.0.1/Set";
 import BitMap "mo:bit-map@0.1.2";
+import Itertools "mo:itertools@0.2.2/Iter";
 
 import T "../Types";
 import CandidMap "../CandidMap";
 import Utils "../Utils";
 
 import CompositeIndex "Index/CompositeIndex";
-import CommonIndexFns "Index/CommonIndexFns";
+import Index "Index";
 import CollectionUtils "CollectionUtils";
 import C "../Constants";
 import Schema "Schema";
 import Logger "../Logger";
+import DocumentStore "DocumentStore";
+import Query "../Query";
 
 module {
     let LOGGER_NAMESPACE = "QueryPlan";
@@ -49,6 +52,7 @@ module {
         query_statements : [T.ZenQueryLang],
         sort_column : ?(Text, T.SortDirection),
         last_pagination_document : ?T.CandidMap,
+        parent_has_nested_operations : Bool, // this helps us indicate if the results from this operation will be fed into an outer operation via a bitmap intersection (if requires_sorting is false) or a kmerge (if requires_sorting is true)
     ) : QueryPlan {
         let log = Logger.NamespacedLogger(collection.logger, LOGGER_NAMESPACE).subnamespace("from_and_operation");
         log.lazyDebug(
@@ -75,6 +79,9 @@ module {
 
         var num_of_nested_or_operations = 0;
 
+        let opt_sort_direction = do ? { sort_column!.1 };
+        let sort_direction = Option.get(opt_sort_direction, #Ascending);
+
         if (query_statements.size() == 0 and not requires_sorting) {
             log.lazyDebug(func() = "Empty query with no sorting, using full scan");
 
@@ -83,35 +90,51 @@ module {
                 subplans = [];
                 simple_operations = [];
                 scans = [
-                    // switch (last_pagination_document) {
-                    //     case (?cursor_document) {
+                    switch (last_pagination_document) {
+                        case (?cursor_document) {
 
-                    //         let id = CandidMap.get(cursor_document, C.DOCUMENT_ID);
+                            let ?#Blob(id) = CandidMap.get(cursor_document, collection.schema_map, C.DOCUMENT_ID) else Debug.trap("Pagination cursor document is missing document ID field");
 
-                    //         let last_document_pos = DocumentStore.get_expected_index(collection.documents)
-                    //         #IndexScan({
-                    //             index_name = C.DOCUMENT_ID;
-                    //             requires_additional_filtering = false;
-                    //             requires_additional_sorting = false;
-                    //             sorted_in_reverse = false;
-                    //             interval = ();
-                    //         })
+                            let last_document_pos = DocumentStore.get_expected_index(collection, id);
+                            let pos = switch (last_document_pos) {
+                                case (#Found(pos)) pos;
+                                case (#NotFound(pos)) pos;
+                            };
 
-                    //     };
-                    //     case (null) {
-                    #FullScan({
-                        requires_additional_sorting = false;
-                        requires_additional_filtering = false;
-                        scan_bounds = ([], []);
-                        filter_bounds = ([], []);
-                    }),
-                    //     };
+                            let interval = switch (sort_direction) {
+                                case (#Ascending) (pos + 1, DocumentStore.size(collection));
+                                case (#Descending) (0, (if (pos > 0) pos - 1 else 0));
+                            };
 
-                    // },
+                            #IndexScan({
+                                index_name = C.DOCUMENT_ID;
+                                requires_additional_filtering = false;
+                                requires_additional_sorting = false;
+                                sorted_in_reverse = sort_direction == #Descending;
+                                interval;
+                                filter_bounds = ([], []);
+                                scan_bounds = ([], []);
+                                simple_operations = [];
+
+                            });
+
+                        };
+                        case (null) {
+                            #FullScan({
+                                requires_additional_sorting = false;
+                                requires_additional_filtering = false;
+                                scan_bounds = ([], []);
+                                filter_bounds = ([], []);
+                            });
+                        };
+
+                    },
 
                 ];
             };
         };
+
+        var this_query_has_nested_or_operations = false;
 
         for (query_statement in query_statements.vals()) {
             switch (query_statement) {
@@ -120,11 +143,14 @@ module {
                         func() = "Adding simple operation on field '" #
                         field # "': " # debug_show op
                     );
+                    // ?: what's the difference between these two
                     simple_operations.add((field, op));
                     operations.add(field, op);
                 };
                 case (#And(_)) Debug.trap("And not allowed in this context");
-                case ((_)) {};
+                case (#Or(_)) {
+                    this_query_has_nested_or_operations := true;
+                };
             };
         };
 
@@ -145,6 +171,7 @@ module {
                         sort_column,
                         last_pagination_document,
                         Buffer.toArray(operations),
+                        true, // since we are in a nested OR operation, the parent has nested operations
                     );
 
                     sub_query_plans.add(sub_query_plan);
@@ -192,22 +219,92 @@ module {
 
         // if there where #Operation types in the operations
 
-        let best_index_result = switch (CommonIndexFns.get_best_index(collection, Buffer.toArray(operations), sort_column)) {
+        let has_nested_and_or_operations_in_path = parent_has_nested_operations or this_query_has_nested_or_operations;
+
+        let best_index_result = switch (Index.get_best_index(collection, Buffer.toArray(operations), sort_column, last_pagination_document, has_nested_and_or_operations_in_path)) {
             case (null) {
                 log.lazyDebug(func() = "No suitable index found, using full scan");
-                let (scan_bounds, filter_bounds) = CommonIndexFns.convert_simple_ops_to_bounds(true, Buffer.toArray(simple_operations), null, null);
+
+                switch (last_pagination_document) {
+                    case (?cursor_document) {
+
+                        switch (sort_column) {
+                            case (?(sort_field, sort_direction)) {
+
+                                let ?cursor_value = CandidMap.get(cursor_document, collection.schema_map, sort_field) else Debug.trap("Pagination cursor document is missing sort field");
+                                let ?#Blob(id) = CandidMap.get(cursor_document, collection.schema_map, C.DOCUMENT_ID) else Debug.trap("Pagination cursor document is missing document ID field");
+
+                                switch (sort_direction) {
+                                    case (#Ascending) {
+                                        operations.add(sort_field, #gte(cursor_value));
+                                        // operations.add(C.DOCUMENT_ID, #gt(#Blob(id)));
+                                        // the above operation should be added so we filter out all the entries that are equal to the cursor value but have a document ID less than the cursor document ID.
+                                        // However, this assumes the secondary sort order is always document ID which is not the case.
+                                        // We would need to get the results from this query and then skip all the entries until we reach the document ID of the cursor document.
+                                    };
+                                    case (#Descending) {
+                                        operations.add(sort_field, #lte(cursor_value));
+                                        // operations.add(C.DOCUMENT_ID, #lt(#Blob(id)));
+                                    };
+                                };
+                            };
+                            case (null) {
+
+                                let ?#Blob(id) = CandidMap.get(cursor_document, collection.schema_map, C.DOCUMENT_ID) else Debug.trap("Pagination cursor document is missing document ID field");
+
+                                let pos = switch (DocumentStore.get_expected_index(collection, id)) {
+                                    case (#Found(pos)) pos;
+                                    case (#NotFound(pos)) pos;
+                                };
+
+                                let interval = switch (sort_direction) {
+                                    case (#Ascending) (pos + 1, DocumentStore.size(collection));
+                                    case (#Descending) (0, (if (pos > 0) pos - 1 else 0));
+                                };
+
+                                let (scan_bounds, filter_bounds) = Index.convert_simple_ops_to_bounds(true, Buffer.toArray(operations), null, null);
+                                assert not requires_sorting;
+
+                                return {
+                                    is_and_operation = true;
+                                    subplans = [];
+                                    simple_operations = Buffer.toArray(operations);
+                                    scans = [
+
+                                        #IndexScan({
+                                            index_name = C.DOCUMENT_ID;
+                                            requires_additional_sorting = requires_sorting;
+                                            requires_additional_filtering = operations.size() > 0;
+                                            sorted_in_reverse = sort_direction == #Descending;
+                                            interval;
+                                            scan_bounds;
+                                            filter_bounds;
+                                            simple_operations = Buffer.toArray(operations);
+                                        })
+
+                                    ];
+                                };
+                            };
+                        };
+                    };
+                    case (null) {};
+                };
+
+                let (scan_bounds, filter_bounds) = Index.convert_simple_ops_to_bounds(true, Buffer.toArray(operations), null, null);
 
                 return {
                     is_and_operation = true;
                     subplans = [];
                     simple_operations = Buffer.toArray(operations);
                     scans = [
+
                         #FullScan({
                             requires_additional_sorting = requires_sorting;
                             requires_additional_filtering = operations.size() > 0;
                             scan_bounds = scan_bounds;
                             filter_bounds = filter_bounds;
-                        })
+                        }),
+
                     ];
                 };
 
@@ -221,10 +318,13 @@ module {
             };
         };
 
-        let index = best_index_result.index;
-        let requires_additional_filtering = best_index_result.requires_additional_filtering;
-        let requires_additional_sorting = best_index_result.requires_additional_sorting;
-        let sorted_in_reverse = best_index_result.sorted_in_reverse;
+        let {
+            index;
+            requires_additional_filtering;
+            requires_additional_sorting;
+            sorted_in_reverse;
+            interval;
+        } = best_index_result;
 
         log.lazyDebug(
             func() = "CompositeIndex details - " #
@@ -235,7 +335,7 @@ module {
 
         let operations_array = Buffer.toArray(operations);
 
-        let (scan_bounds, filter_bounds) = CommonIndexFns.convert_simple_ops_to_bounds(true, Buffer.toArray(simple_operations), ?index.key_details, ?best_index_result.fully_covered_equality_and_range_fields);
+        let (scan_bounds, filter_bounds) = Index.convert_simple_ops_to_bounds(true, Buffer.toArray(simple_operations), ?index.key_details, ?best_index_result.fully_covered_equality_and_range_fields);
 
         log.lazyDebug(
             func() = "Scan bounds - " #
@@ -243,7 +343,7 @@ module {
             "upper: " # debug_show scan_bounds.1
         );
 
-        var interval = CompositeIndex.scan(collection, index, scan_bounds.0, scan_bounds.1, null); // pagination_cursor
+        // var interval = CompositeIndex.scan(collection, index, scan_bounds.0, scan_bounds.1, last_pagination_document, not sorted_in_reverse); // pagination_token
 
         log.lazyDebug(
             func() {
@@ -285,11 +385,12 @@ module {
         sort_column : ?(Text, T.SortDirection),
         last_pagination_document : ?T.CandidMap,
         parent_simple_and_operations : [(Text, T.ZqlOperators)],
+        parent_has_nested_operations : Bool,
     ) : QueryPlan {
         let log = Logger.NamespacedLogger(collection.logger, LOGGER_NAMESPACE).subnamespace("from_or_operation");
         log.lazyDebug(
             func() = "Creating query plan for OR operation with " #
-            Nat.toText(query_statements.size()) # " statements and " # Nat.toText(parent_simple_and_operations.size()) # " parent AND operations"
+            debug_show (query_statements.size()) # " statements and " # debug_show (parent_simple_and_operations.size()) # " parent AND operations"
         );
 
         let requires_sorting : Bool = Option.isSome(sort_column);
@@ -301,8 +402,24 @@ module {
             );
         };
 
+        let opt_sort_direction = do ? { sort_column!.1 };
+        let sort_direction = Option.get(opt_sort_direction, #Ascending);
+
         let scans = Buffer.Buffer<ScanDetails>(8);
         let sub_query_plans = Buffer.Buffer<QueryPlan>(8);
+
+        let this_query_has_nested_or_operations = Itertools.any(
+            query_statements.vals(),
+            func(qs : T.ZenQueryLang) : Bool {
+                switch (qs) {
+                    case (#Or(_)) Debug.trap("Directly nested #Or not allowed in this context");
+                    case (#And(nested_qs)) true;
+                    case (_) false;
+                };
+            },
+        );
+
+        let has_nested_and_or_operations_in_path = parent_has_nested_operations or this_query_has_nested_or_operations and query_statements.size() <= 1;
 
         label resolving_or_operations for (query_statement in query_statements.vals()) {
 
@@ -315,67 +432,83 @@ module {
                     );
 
                     let operations = Array.append(parent_simple_and_operations, [(field, op)]);
-                    let opt_index = CommonIndexFns.get_best_index(collection, operations, sort_column);
+                    let opt_index = Index.get_best_index(collection, operations, sort_column, last_pagination_document, has_nested_and_or_operations_in_path);
 
                     let scan_details = switch (opt_index) {
                         case (null) {
                             log.lazyDebug(func() = "No suitable index found for operation, using full scan");
-                            let (scan_bounds, filter_bounds) = CommonIndexFns.convert_simple_ops_to_bounds(false, operations, null, null);
+                            let (scan_bounds, filter_bounds) = Index.convert_simple_ops_to_bounds(false, operations, null, null);
 
-                            let scan_details : ScanDetails = #FullScan({
+                            Debug.print("Or operation filter bounds: " # debug_show filter_bounds);
+
+                            var scan_details : ScanDetails = #FullScan({
                                 requires_additional_sorting = requires_sorting;
                                 requires_additional_filtering = true;
                                 scan_bounds;
                                 filter_bounds;
                             });
 
+                            switch (last_pagination_document) {
+                                case (null) {};
+                                case (?cursor_document) {
+
+                                    switch (sort_column) {
+                                        case (?(sort_field, sort_direction)) {
+
+                                        };
+                                        case (null) {
+
+                                            let ?#Blob(id) = CandidMap.get(cursor_document, collection.schema_map, C.DOCUMENT_ID) else Debug.trap("Pagination cursor document is missing document ID field");
+
+                                            let pos = switch (DocumentStore.get_expected_index(collection, id)) {
+                                                case (#Found(pos)) pos;
+                                                case (#NotFound(pos)) pos;
+                                            };
+
+                                            let interval = switch (sort_direction) {
+                                                case (#Ascending) (pos + 1, DocumentStore.size(collection));
+                                                case (#Descending) (0, (if (pos > 0) pos - 1 else 0));
+                                            };
+
+                                            assert not requires_sorting;
+
+                                            scan_details := #IndexScan({
+                                                index_name = C.DOCUMENT_ID;
+                                                requires_additional_sorting = false;
+                                                requires_additional_filtering = true;
+                                                sorted_in_reverse = sort_direction == #Descending;
+                                                interval;
+                                                scan_bounds;
+                                                filter_bounds;
+                                                simple_operations = operations;
+                                            });
+
+                                        };
+                                    };
+                                };
+                            };
+
+                            scans.add(scan_details);
+
                         };
-                        case (?best_index_info) {
-                            log.lazyDebug(
-                                func() = "Found best index for operation: '" #
-                                best_index_info.index.name # "'"
+                        case (?index) {
+                            let sub_query_plan = from_and_operation(
+                                collection,
+                                Array.map<(Text, T.ZqlOperators), T.ZenQueryLang>(
+                                    operations,
+                                    func((f, o) : (Text, T.ZqlOperators)) : T.ZenQueryLang {
+                                        #Operation(f, o);
+                                    },
+                                ),
+                                sort_column,
+                                last_pagination_document,
+                                true,
                             );
 
-                            let index = best_index_info.index;
-                            let requires_additional_filtering = best_index_info.requires_additional_filtering;
-                            let requires_additional_sorting = best_index_info.requires_additional_sorting;
-                            let sorted_in_reverse = best_index_info.sorted_in_reverse;
-
-                            log.lazyDebug(
-                                func() = "CompositeIndex details - " #
-                                "requires_additional_filtering: " # debug_show requires_additional_filtering # ", " #
-                                "requires_additional_sorting: " # debug_show requires_additional_sorting # ", " #
-                                "sorted_in_reverse: " # debug_show sorted_in_reverse
-                            );
-
-                            let (scan_bounds, filter_bounds) = CommonIndexFns.convert_simple_ops_to_bounds(
-                                false,
-                                operations,
-                                ?index.key_details,
-                                ?best_index_info.fully_covered_equality_and_range_fields,
-                            );
-
-                            let interval = CompositeIndex.scan(collection, index, scan_bounds.0, scan_bounds.1, null); // pagination_curosr
-                            log.lazyDebug(
-                                func() {
-                                    "CompositeIndex scan intervals: " # debug_show interval;
-                                }
-                            );
-
-                            let scan_details : ScanDetails = #IndexScan({
-                                index_name = index.name;
-                                requires_additional_filtering;
-                                requires_additional_sorting;
-                                sorted_in_reverse;
-                                interval;
-                                scan_bounds;
-                                filter_bounds;
-                                simple_operations = operations;
-                            });
+                            sub_query_plans.add(sub_query_plan);
                         };
                     };
 
-                    scans.add(scan_details);
                 };
                 case (#And(nested_query_statements)) {
                     log.lazyDebug(
@@ -388,6 +521,7 @@ module {
                         nested_query_statements,
                         sort_column,
                         last_pagination_document,
+                        true,
                     );
 
                     sub_query_plans.add(sub_query_plan);
@@ -414,17 +548,21 @@ module {
         collection : T.StableCollection,
         db_query : ZenQueryLang,
         sort_column : ?(Text, T.SortDirection),
-        pagination_cursor : ?T.PaginationCursor,
-    ) : QueryPlan {
+        pagination_token : ?T.PaginationToken,
+    ) : T.QueryPlanResult {
         let LOGGER_SUB_NAMESPACE = "create_query_plan";
         let log = Logger.NamespacedLogger(collection.logger, LOGGER_NAMESPACE).subnamespace(LOGGER_SUB_NAMESPACE);
 
         log.lazyInfo(func() = "Creating query plan");
 
+        let opt_last_pagination_document_id = do ? {
+            pagination_token!.last_document_id!;
+        };
+
         let opt_last_pagination_document = do ? {
             CollectionUtils.get_and_cache_candid_map(
                 collection,
-                pagination_cursor!.last_document_id!,
+                opt_last_pagination_document_id!,
             );
         };
 
@@ -440,6 +578,7 @@ module {
                     operations,
                     sort_column,
                     opt_last_pagination_document,
+                    false,
                 );
             };
             case (#Or(operations)) {
@@ -454,6 +593,7 @@ module {
                     sort_column,
                     opt_last_pagination_document,
                     [],
+                    false,
                 );
             };
             case (_) {
@@ -467,7 +607,11 @@ module {
         log.lazyInfo(
             func() = "Query plan created successfully -> " # debug_show query_plan
         );
-        query_plan;
+
+        {
+            query_plan;
+            opt_last_pagination_document_id;
+        };
     };
 
 };

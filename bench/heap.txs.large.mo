@@ -65,7 +65,7 @@ module {
 
         ]);
 
-        let input_limit = 16_000;
+        let input_limit = 20_000;
 
         let limit = 1_000;
 

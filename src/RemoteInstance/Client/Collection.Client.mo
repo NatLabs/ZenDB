@@ -149,6 +149,14 @@ module {
             await canister_db.zendb_collection_repopulate_index(db_name, collection_name, index_name);
         };
 
+        public func hide_indexes(index_names : [Text]) : async* (ZT.Result<(), Text>) {
+            await canister_db.zendb_collection_hide_indexes(db_name, collection_name, index_names);
+        };
+
+        public func unhide_indexes(index_names : [Text]) : async* (ZT.Result<(), Text>) {
+            await canister_db.zendb_collection_unhide_indexes(db_name, collection_name, index_names);
+        };
+
         /// Get collection statistics
         public func stats() : async* ZT.CollectionStats {
             await canister_db.zendb_collection_stats(db_name, collection_name);

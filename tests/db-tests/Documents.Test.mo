@@ -116,7 +116,7 @@ ZenDBSuite.newSuite(
                                 to_blob = func(c : Int) : Blob = to_candid (c);
                             },
                             ?{
-                                schemaConstraints = [#Field("", [#Max(-1)]), #Unique([""])];
+                                schema_constraints = [#Field("", [#Max(-1)]), #Unique([""])];
                             },
                         ) else return assert false;
 
@@ -169,7 +169,7 @@ ZenDBSuite.newSuite(
                                 to_blob = func(c : Nat) : Blob = to_candid (c);
                             },
                             ?{
-                                schemaConstraints = [#Field("", [#Min(1)]), #Unique([""])];
+                                schema_constraints = [#Field("", [#Min(1)]), #Unique([""])];
                             },
                         ) else return assert false;
 
@@ -196,7 +196,7 @@ ZenDBSuite.newSuite(
                                 to_blob = func(c : Float) : Blob = to_candid (c);
                             },
                             ?{
-                                schemaConstraints = [#Field("", [#Min(1)]), #Unique([""])];
+                                schema_constraints = [#Field("", [#Min(1)]), #Unique([""])];
                             },
                         ) else return assert false;
 
@@ -224,7 +224,7 @@ ZenDBSuite.newSuite(
                                 to_blob = func(c : Text) : Blob = to_candid (c);
                             },
                             ?{
-                                schemaConstraints = [#Field("", [#MinSize(1)]), #Unique([""])];
+                                schema_constraints = [#Field("", [#MinSize(1)]), #Unique([""])];
                             },
                         ) else return assert false;
 
@@ -251,7 +251,7 @@ ZenDBSuite.newSuite(
                                 to_blob = func(c : Blob) : Blob = to_candid (c);
                             },
                             ?{
-                                schemaConstraints = [#Field("", [#MinSize(1)]), #Unique([""])];
+                                schema_constraints = [#Field("", [#MinSize(1)]), #Unique([""])];
                             },
                         ) else return assert false;
 
@@ -275,7 +275,7 @@ ZenDBSuite.newSuite(
                                 to_blob = func(c : ?Text) : Blob = to_candid (c);
                             },
                             ?{
-                                schemaConstraints = [#Field("", [#MinSize(1)]), #Unique([""])];
+                                schema_constraints = [#Field("", [#MinSize(1)]), #Unique([""])];
                             },
                         ) else return assert false;
 
@@ -305,7 +305,7 @@ ZenDBSuite.newSuite(
                                 to_blob = func(c : NestedOption) : Blob = to_candid (c);
                             },
                             ?{
-                                schemaConstraints = [#Field("", [#Min(1)]), #Unique([""])];
+                                schema_constraints = [#Field("", [#Min(1)]), #Unique([""])];
                             },
                         ) else return assert false;
 
@@ -373,7 +373,7 @@ ZenDBSuite.newSuite(
                                 to_blob = func(c : Record) : Blob = to_candid (c);
                             },
                             ?{
-                                schemaConstraints = [#Field("a", [#Min(1)]), #Field("b", [#MinSize(1)]), #Unique(["a"]), #Unique(["b"])];
+                                schema_constraints = [#Field("a", [#Min(1)]), #Field("b", [#MinSize(1)]), #Unique(["a"]), #Unique(["b"])];
                             },
                         ) else return assert false;
 
@@ -424,7 +424,7 @@ ZenDBSuite.newSuite(
                             NoteSchema,
                             candify,
                             ?{
-                                schemaConstraints = schema_constraints;
+                                schema_constraints = schema_constraints;
                             },
                         ) else return assert false;
 
@@ -498,10 +498,10 @@ ZenDBSuite.newSuite(
                         };
 
                         // Should fail on indexes created on variant fields with #Null type
-                        let #err(_) = zendb.createCollection<Variant>("variants_0", VariantSchema, candify, ?{ schemaConstraints = [#Unique(["active"])] }) else return assert false;
-                        let #err(_) = zendb.createCollection<Variant>("variants_0", VariantSchema, candify, ?{ schemaConstraints = [#Unique(["inactive"])] }) else return assert false;
-                        let #err(_) = zendb.createCollection<Variant>("variants_0", VariantSchema, candify, ?{ schemaConstraints = [#Field("active", [#Min(1)])] }) else return assert false;
-                        let #err(_) = zendb.createCollection<Variant>("variants_0", VariantSchema, candify, ?{ schemaConstraints = [#Field("inactive", [#Min(1)])] }) else return assert false;
+                        let #err(_) = zendb.createCollection<Variant>("variants_0", VariantSchema, candify, ?{ schema_constraints = [#Unique(["active"])] }) else return assert false;
+                        let #err(_) = zendb.createCollection<Variant>("variants_0", VariantSchema, candify, ?{ schema_constraints = [#Unique(["inactive"])] }) else return assert false;
+                        let #err(_) = zendb.createCollection<Variant>("variants_0", VariantSchema, candify, ?{ schema_constraints = [#Field("active", [#Min(1)])] }) else return assert false;
+                        let #err(_) = zendb.createCollection<Variant>("variants_0", VariantSchema, candify, ?{ schema_constraints = [#Field("inactive", [#Min(1)])] }) else return assert false;
 
                         let #ok(variants) = zendb.createCollection<Variant>(
                             "variants_0",
@@ -561,7 +561,7 @@ ZenDBSuite.newSuite(
                                 to_blob = func(c : Variant) : Blob = to_candid (c);
                             },
                             ?{
-                                schemaConstraints = [#Field("name", [#MinSize(1)]), #Field("id", [#Min(1)]), #Unique(["id"]), #Unique(["name"])];
+                                schema_constraints = [#Field("name", [#MinSize(1)]), #Field("id", [#Min(1)]), #Unique(["id"]), #Unique(["name"])];
                             },
                         ) else return assert false;
 
@@ -622,7 +622,7 @@ ZenDBSuite.newSuite(
                             TupleSchema,
                             candify,
                             ?{
-                                schemaConstraints = [#Field("0", [#Min(1)]), #Field("1", [#MinSize(1)]), #Unique(["0"]), #Unique(["1"])];
+                                schema_constraints = [#Field("0", [#Min(1)]), #Field("1", [#MinSize(1)]), #Unique(["0"]), #Unique(["1"])];
                             },
                         ) else return assert false;
 
@@ -658,7 +658,7 @@ ZenDBSuite.newSuite(
                                 to_blob = func(c : Triple) : Blob = to_candid (c);
                             },
                             ?{
-                                schemaConstraints = [#Field("0", [#Min(1)]), #Field("1", [#MinSize(1)]), #Field("2", [#Min(1)]), #Unique(["0"]), #Unique(["1"]), #Unique(["2"])];
+                                schema_constraints = [#Field("0", [#Min(1)]), #Field("1", [#MinSize(1)]), #Field("2", [#Min(1)]), #Unique(["0"]), #Unique(["1"]), #Unique(["2"])];
                             },
                         ) else return assert false;
 
@@ -708,7 +708,7 @@ ZenDBSuite.newSuite(
                                 to_blob = func(c : Quadruple) : Blob = to_candid (c);
                             },
                             ?{
-                                schemaConstraints = [#Field("0", [#Min(1)]), #Field("1", [#MinSize(1)]), #Field("2", [#Min(1)]), #Field("3", [#MinSize(1)]), #Unique(["0"]), #Unique(["1"]), #Unique(["2"]), #Unique(["3"])];
+                                schema_constraints = [#Field("0", [#Min(1)]), #Field("1", [#MinSize(1)]), #Field("2", [#Min(1)]), #Field("3", [#MinSize(1)]), #Unique(["0"]), #Unique(["1"]), #Unique(["2"]), #Unique(["3"])];
                             },
                         ) else return assert false;
 
@@ -751,7 +751,7 @@ ZenDBSuite.newSuite(
                                 to_blob = func(c : NestedRecord) : Blob = to_candid (c);
                             },
                             ?{
-                                schemaConstraints = [#Field("a.b", [#Min(1)]), #Field("a.c", [#MinSize(1)]), #Field("d", [#Min(1)]), #Unique(["a.b"]), #Unique(["a.c"]), #Unique(["d"])];
+                                schema_constraints = [#Field("a.b", [#Min(1)]), #Field("a.c", [#MinSize(1)]), #Field("d", [#Min(1)]), #Unique(["a.b"]), #Unique(["a.c"]), #Unique(["d"])];
                             },
                         ) else return assert false;
 
@@ -790,7 +790,7 @@ ZenDBSuite.newSuite(
                                 to_blob = func(c : NestedVariant) : Blob = to_candid (c);
                             },
                             ?{
-                                schemaConstraints = [#Field("name", [#MinSize(1)]), #Field("id.active", [#Min(1)]), #Unique(["name"]), #Unique(["id.active"])];
+                                schema_constraints = [#Field("name", [#MinSize(1)]), #Field("id.active", [#Min(1)]), #Unique(["name"]), #Unique(["id.active"])];
                             },
                         );
 
@@ -871,7 +871,7 @@ ZenDBSuite.newSuite(
                                 to_blob = func(c : NestedTuple) : Blob = to_candid (c);
                             },
                             ?{
-                                schemaConstraints = [#Field("0", [#Min(1)]), #Field("1.0", [#MinSize(1)]), #Field("1.1", [#Min(1)]), #Unique(["0"]), #Unique(["1.0"]), #Unique(["1.1"])];
+                                schema_constraints = [#Field("0", [#Min(1)]), #Field("1.0", [#MinSize(1)]), #Field("1.1", [#Min(1)]), #Unique(["0"]), #Unique(["1.0"]), #Unique(["1.1"])];
                             },
                         ) else return assert false;
 
@@ -902,7 +902,7 @@ ZenDBSuite.newSuite(
                                 to_blob = func(c : OptionalRecord) : Blob = to_candid (c);
                             },
                             ?{
-                                schemaConstraints = [#Field("a", [#Min(1)]), #Field("b", [#MinSize(1)]), #Unique(["a"]), #Unique(["b"])];
+                                schema_constraints = [#Field("a", [#Min(1)]), #Field("b", [#MinSize(1)]), #Unique(["a"]), #Unique(["b"])];
                             },
                         ) else return assert false;
 
@@ -948,14 +948,14 @@ ZenDBSuite.newSuite(
                             to_blob = func(c : OptionalVariant) : Blob = to_candid (c);
                         };
 
-                        let #err(_) = zendb.createCollection<OptionalVariant>("optional_variants", OptionalVariantSchema, candify, ?{ schemaConstraints = [#Unique([""])] }) else return assert false;
+                        let #err(_) = zendb.createCollection<OptionalVariant>("optional_variants", OptionalVariantSchema, candify, ?{ schema_constraints = [#Unique([""])] }) else return assert false;
 
                         let #ok(optional_variants) = zendb.createCollection<OptionalVariant>(
                             "optional_variants",
                             OptionalVariantSchema,
                             candify,
                             ?{
-                                schemaConstraints = [#Field("name", [#MinSize(1)]), #Field("id", [#Min(1)]), #Unique(["id"]), #Unique(["name"])];
+                                schema_constraints = [#Field("name", [#MinSize(1)]), #Field("id", [#Min(1)]), #Unique(["id"]), #Unique(["name"])];
                             },
                         );
 
@@ -1019,7 +1019,7 @@ ZenDBSuite.newSuite(
                                 to_blob = func(c : OptionalTuple) : Blob = to_candid (c);
                             },
                             ?{
-                                schemaConstraints = [#Field("0", [#Min(1)]), #Field("1", [#MinSize(1)]), #Unique(["0"]), #Unique(["1"])];
+                                schema_constraints = [#Field("0", [#Min(1)]), #Field("1", [#MinSize(1)]), #Unique(["0"]), #Unique(["1"])];
                             },
                         ) else return assert false;
 
@@ -1070,7 +1070,7 @@ ZenDBSuite.newSuite(
                                 to_blob = func(c : DeepOptional) : Blob = to_candid (c);
                             },
                             ?{
-                                schemaConstraints = [#Field("name", [#MinSize(1)]), #Field("details.id", [#Min(1)]), #Unique(["name"]), #Unique(["details.id"])];
+                                schema_constraints = [#Field("name", [#MinSize(1)]), #Field("details.id", [#Min(1)]), #Unique(["name"]), #Unique(["details.id"])];
                             },
                         ) else return assert false;
 
@@ -1245,7 +1245,7 @@ ZenDBSuite.newSuite(
                                 to_blob = func(c : RecordWithArrays) : Blob = to_candid (c);
                             },
                             ?{
-                                schemaConstraints = [#Field("id", [#Min(1)]), #Unique(["id"])];
+                                schema_constraints = [#Field("id", [#Min(1)]), #Unique(["id"])];
                                 // Note: Cannot add constraints on array fields since they're not queryable
                             },
                         ) else return assert false;
@@ -1293,7 +1293,7 @@ ZenDBSuite.newSuite(
                                 to_blob = func(c : VariantWithArrays) : Blob = to_candid (c);
                             },
                             ?{
-                                schemaConstraints = [#Field("single", [#Min(1)]), #Unique(["single"])];
+                                schema_constraints = [#Field("single", [#Min(1)]), #Unique(["single"])];
                                 // Note: Cannot add constraints on array fields
                             },
                         ) else return assert false;
@@ -1454,7 +1454,7 @@ ZenDBSuite.newSuite(
                                 to_blob = func(c : ExtremeNesting) : Blob = to_candid (c);
                             },
                             ?{
-                                schemaConstraints = [
+                                schema_constraints = [
                                     #Field("id", [#Min(1)]),
                                     #Field("metadata.name", [#MinSize(1)]),
                                     #Field("status.active.level", [#Min(1)]),

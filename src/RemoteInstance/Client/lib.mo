@@ -62,6 +62,11 @@ module Client {
             await canister_db.revoke_role(target, role);
         };
 
+        /// Clear the candid map cache
+        public func clear_cache() : async* () {
+            await canister_db.zendb_clear_cache();
+        };
+
         // Role constants for convenience
         public let ROLES = ClusterTypes.Roles;
         public let PERMISSIONS = ClusterTypes.Permissions;
