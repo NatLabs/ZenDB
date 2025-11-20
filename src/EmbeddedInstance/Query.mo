@@ -40,6 +40,7 @@ module {
         public var _cursor_offset = 0;
         public var _direction : PaginationDirection = #Forward;
         public var _sort_by : ?(Text, T.SortDirection) = null; // only support sorting by one field for now
+        public var _enable_cross_product : Bool = false;
 
         func update_query(new_is_and : Bool) {
             let old_is_and = _is_and;
@@ -338,6 +339,15 @@ module {
             self;
         };
 
+        public func CrossProduct(enable : Bool) : QueryBuilder {
+            // Convert nested Or operations into a single top-level Or by computing the cross product
+            // of all Or branches within an And operation. This eliminates nested Or queries by
+            // flattening them into all possible And combinations.
+            // Example: And([Or([A, B]), Or([C, D])]) becomes Or([And([A, C]), And([A, D]), And([B, C]), And([B, D])])
+            _enable_cross_product := enable;
+            self;
+        };
+
         public func build() : StableQuery {
             update_query(not _is_and); // flushes _buffer because the state is switched
 
@@ -349,8 +359,15 @@ module {
 
             // Debug.print("Query: " # debug_show resolved_query);
 
+            let flattened = flattenQuery(resolved_query);
+            let final_query = if (_enable_cross_product) {
+                crossProduct(flattened);
+            } else {
+                flattened;
+            };
+
             {
-                query_operations = flattenQuery(resolved_query);
+                query_operations = final_query;
                 sort_by = _sort_by;
                 pagination = {
                     cursor = _pagination_token;
@@ -574,6 +591,130 @@ module {
                 #Or(flattenOr(queries));
             };
         };
+    };
+
+    public func crossProduct(zendb_query : T.ZenQueryLang) : T.ZenQueryLang {
+        // Convert to Disjunctive Normal Form (DNF) by distributing AND over OR
+        // Example: And([Or([A, B]), Or([C, D])]) -> Or([And([A, C]), And([A, D]), And([B, C]), And([B, D])])
+
+        switch (zendb_query) {
+            case (#Operation(field, op)) {
+                // Base case: operation stays as is
+                #Operation(field, op);
+            };
+            case (#Or(queries)) {
+                // Recursively apply to nested queries
+                let transformed = Array.map<ZenQueryLang, ZenQueryLang>(queries, crossProduct);
+
+                // Flatten any nested Or operations
+                let flattened = Buffer.Buffer<ZenQueryLang>(transformed.size());
+                for (q in transformed.vals()) {
+                    switch (q) {
+                        case (#Or(nested_queries)) {
+                            // Flatten nested Or into parent
+                            for (nested_q in nested_queries.vals()) {
+                                flattened.add(nested_q);
+                            };
+                        };
+                        case (_) {
+                            flattened.add(q);
+                        };
+                    };
+                };
+
+                #Or(Buffer.toArray(flattened));
+            };
+            case (#And(queries)) {
+                // Check if any child is an Or - if so, we need to distribute
+                let transformed = Array.map<ZenQueryLang, ZenQueryLang>(queries, crossProduct);
+
+                // Find all Or operations in the And
+                let ors = Buffer.Buffer<[ZenQueryLang]>(transformed.size());
+                let nonOrs = Buffer.Buffer<ZenQueryLang>(transformed.size());
+
+                for (q in transformed.vals()) {
+                    switch (q) {
+                        case (#Or(or_queries)) {
+                            ors.add(or_queries);
+                        };
+                        case (_) {
+                            nonOrs.add(q);
+                        };
+                    };
+                };
+
+                // If no Or operations, return as is
+                if (ors.size() == 0) {
+                    return #And(transformed);
+                };
+
+                // Compute cartesian product of all Or branches
+                let product = computeCartesianProduct(Buffer.toArray(ors));
+
+                // For each combination, create an And with the combination + nonOrs
+                let result = Buffer.Buffer<ZenQueryLang>(product.size());
+                let nonOrsArray = Buffer.toArray(nonOrs);
+
+                for (combination in product.vals()) {
+                    let andChildren = Buffer.Buffer<ZenQueryLang>(combination.size() + nonOrsArray.size());
+
+                    // Add elements from this combination
+                    for (elem in combination.vals()) {
+                        andChildren.add(elem);
+                    };
+
+                    // Add non-Or elements
+                    for (elem in nonOrsArray.vals()) {
+                        andChildren.add(elem);
+                    };
+
+                    let andArray = Buffer.toArray(andChildren);
+                    if (andArray.size() == 1) {
+                        result.add(andArray[0]);
+                    } else {
+                        result.add(#And(andArray));
+                    };
+                };
+
+                let resultArray = Buffer.toArray(result);
+                if (resultArray.size() == 1) {
+                    resultArray[0];
+                } else {
+                    #Or(resultArray);
+                };
+            };
+        };
+    };
+
+    // Helper function to compute cartesian product of arrays
+    func computeCartesianProduct(arrays : [[ZenQueryLang]]) : [[ZenQueryLang]] {
+        if (arrays.size() == 0) {
+            return [[]];
+        };
+
+        if (arrays.size() == 1) {
+            return Array.map<ZenQueryLang, [ZenQueryLang]>(arrays[0], func(x) { [x] });
+        };
+
+        // Recursive case: product of first array with product of rest
+        let first = arrays[0];
+        let rest = Array.tabulate<[ZenQueryLang]>(arrays.size() - 1, func(i) { arrays[i + 1] });
+        let restProduct = computeCartesianProduct(rest);
+
+        let result = Buffer.Buffer<[ZenQueryLang]>(first.size() * restProduct.size());
+
+        for (elem in first.vals()) {
+            for (combination in restProduct.vals()) {
+                let newCombination = Buffer.Buffer<ZenQueryLang>(1 + combination.size());
+                newCombination.add(elem);
+                for (c in combination.vals()) {
+                    newCombination.add(c);
+                };
+                result.add(Buffer.toArray(newCombination));
+            };
+        };
+
+        Buffer.toArray(result);
     };
 
     // public func optimizeQuery()

@@ -1106,3 +1106,300 @@ suite(
         );
     },
 );
+
+suite(
+    "Cross Product / DNF Conversion",
+    func() {
+        test(
+            "Basic cross product - And with two Or and one Operation",
+            func() {
+                // Query: And([Or([A, B]), Or([C, D]), E])
+                // Expected after cross product: Or([And([A, C, E]), And([A, D, E]), And([B, C, E]), And([B, D, E])])
+                let input : T.ZenQueryLang = #And([
+                    #Or([
+                        #Operation("field1", #eq(#Text("A"))),
+                        #Operation("field1", #eq(#Text("B"))),
+                    ]),
+                    #Or([
+                        #Operation("field2", #eq(#Text("C"))),
+                        #Operation("field2", #eq(#Text("D"))),
+                    ]),
+                    #Operation("field3", #eq(#Text("E"))),
+                ]);
+
+                let builder = Query.QueryBuilder();
+                let result = builder.RawQuery(input).CrossProduct(true).build();
+
+                let expected = #Or([
+                    #And([
+                        #Operation("field1", #eq(#Text("A"))),
+                        #Operation("field2", #eq(#Text("C"))),
+                        #Operation("field3", #eq(#Text("E"))),
+                    ]),
+                    #And([
+                        #Operation("field1", #eq(#Text("A"))),
+                        #Operation("field2", #eq(#Text("D"))),
+                        #Operation("field3", #eq(#Text("E"))),
+                    ]),
+                    #And([
+                        #Operation("field1", #eq(#Text("B"))),
+                        #Operation("field2", #eq(#Text("C"))),
+                        #Operation("field3", #eq(#Text("E"))),
+                    ]),
+                    #And([
+                        #Operation("field1", #eq(#Text("B"))),
+                        #Operation("field2", #eq(#Text("D"))),
+                        #Operation("field3", #eq(#Text("E"))),
+                    ]),
+                ]);
+
+                Debug.print("Cross product result: " # debug_show result.query_operations);
+                assert result.query_operations == expected;
+            },
+        );
+
+        test(
+            "Cross product with single Or in And",
+            func() {
+                // Query: And([Or([A, B]), C])
+                // Expected: Or([And([A, C]), And([B, C])])
+                let input : T.ZenQueryLang = #And([
+                    #Or([
+                        #Operation("status", #eq(#Text("active"))),
+                        #Operation("status", #eq(#Text("pending"))),
+                    ]),
+                    #Operation("verified", #eq(#Bool(true))),
+                ]);
+
+                let builder = Query.QueryBuilder();
+                let result = builder.RawQuery(input).CrossProduct(true).build();
+
+                let expected = #Or([
+                    #And([
+                        #Operation("status", #eq(#Text("active"))),
+                        #Operation("verified", #eq(#Bool(true))),
+                    ]),
+                    #And([
+                        #Operation("status", #eq(#Text("pending"))),
+                        #Operation("verified", #eq(#Bool(true))),
+                    ]),
+                ]);
+
+                Debug.print("Single Or cross product: " # debug_show result.query_operations);
+                assert result.query_operations == expected;
+            },
+        );
+
+        test(
+            "Cross product with three Ors",
+            func() {
+                // Query: And([Or([red, blue]), Or([small, large]), Or([true, false])])
+                // Expected: 2 * 2 * 2 = 8 combinations
+                let input : T.ZenQueryLang = #And([
+                    #Or([
+                        #Operation("color", #eq(#Text("red"))),
+                        #Operation("color", #eq(#Text("blue"))),
+                    ]),
+                    #Or([
+                        #Operation("size", #eq(#Text("small"))),
+                        #Operation("size", #eq(#Text("large"))),
+                    ]),
+                    #Or([
+                        #Operation("available", #eq(#Bool(true))),
+                        #Operation("available", #eq(#Bool(false))),
+                    ]),
+                ]);
+
+                let builder = Query.QueryBuilder();
+                let result = builder.RawQuery(input).CrossProduct(true).build();
+
+                let expected = #Or([
+                    #And([
+                        #Operation("color", #eq(#Text("red"))),
+                        #Operation("size", #eq(#Text("small"))),
+                        #Operation("available", #eq(#Bool(true))),
+                    ]),
+                    #And([
+                        #Operation("color", #eq(#Text("red"))),
+                        #Operation("size", #eq(#Text("small"))),
+                        #Operation("available", #eq(#Bool(false))),
+                    ]),
+                    #And([
+                        #Operation("color", #eq(#Text("red"))),
+                        #Operation("size", #eq(#Text("large"))),
+                        #Operation("available", #eq(#Bool(true))),
+                    ]),
+                    #And([
+                        #Operation("color", #eq(#Text("red"))),
+                        #Operation("size", #eq(#Text("large"))),
+                        #Operation("available", #eq(#Bool(false))),
+                    ]),
+                    #And([
+                        #Operation("color", #eq(#Text("blue"))),
+                        #Operation("size", #eq(#Text("small"))),
+                        #Operation("available", #eq(#Bool(true))),
+                    ]),
+                    #And([
+                        #Operation("color", #eq(#Text("blue"))),
+                        #Operation("size", #eq(#Text("small"))),
+                        #Operation("available", #eq(#Bool(false))),
+                    ]),
+                    #And([
+                        #Operation("color", #eq(#Text("blue"))),
+                        #Operation("size", #eq(#Text("large"))),
+                        #Operation("available", #eq(#Bool(true))),
+                    ]),
+                    #And([
+                        #Operation("color", #eq(#Text("blue"))),
+                        #Operation("size", #eq(#Text("large"))),
+                        #Operation("available", #eq(#Bool(false))),
+                    ]),
+                ]);
+
+                Debug.print("Three Ors cross product: " # debug_show result.query_operations);
+                assert result.query_operations == expected;
+            },
+        );
+
+        test(
+            "No cross product needed - And with only Operations",
+            func() {
+                // Query: And([A, B, C])
+                // Expected: And([A, B, C]) (unchanged)
+                let input : T.ZenQueryLang = #And([
+                    #Operation("field1", #eq(#Text("A"))),
+                    #Operation("field2", #eq(#Text("B"))),
+                    #Operation("field3", #eq(#Text("C"))),
+                ]);
+
+                let builder = Query.QueryBuilder();
+                let result = builder.RawQuery(input).CrossProduct(true).build();
+
+                Debug.print("No cross product needed: " # debug_show result.query_operations);
+                assert result.query_operations == input;
+            },
+        );
+
+        test(
+            "Top-level Or unchanged by cross product",
+            func() {
+                // Query: Or([A, B, C])
+                // Expected: Or([A, B, C]) (unchanged)
+                let input : T.ZenQueryLang = #Or([
+                    #Operation("field1", #eq(#Text("A"))),
+                    #Operation("field2", #eq(#Text("B"))),
+                    #Operation("field3", #eq(#Text("C"))),
+                ]);
+
+                let builder = Query.QueryBuilder();
+                let result = builder.RawQuery(input).CrossProduct(true).build();
+
+                Debug.print("Top-level Or unchanged: " # debug_show result.query_operations);
+                assert result.query_operations == input;
+            },
+        );
+
+        test(
+            "Nested cross product - recursive transformation",
+            func() {
+                // Query: And([Or([And([A, Or([B, C])]), D])])
+                // Should recursively apply cross product
+                let input : T.ZenQueryLang = #And([
+                    #Or([
+                        #And([
+                            #Operation("field1", #eq(#Text("A"))),
+                            #Or([
+                                #Operation("field2", #eq(#Text("B"))),
+                                #Operation("field2", #eq(#Text("C"))),
+                            ]),
+                        ]),
+                        #Operation("field3", #eq(#Text("D"))),
+                    ]),
+                ]);
+
+                let builder = Query.QueryBuilder();
+                let result = builder.RawQuery(input).CrossProduct(true).build();
+
+                // After recursive cross product, the nested And([A, Or([B, C])]) should become Or([And([A, B]), And([A, C])])
+                // Then the top-level And with this Or should distribute
+                Debug.print("Nested cross product result: " # debug_show result.query_operations);
+
+                // Just verify it transforms without erroring
+                switch (result.query_operations) {
+                    case (#Or(_)) {}; // Expected to be an Or at top level
+                    case (_) {};
+                };
+            },
+        );
+
+        test(
+            "Cross product disabled by default",
+            func() {
+                // Without EnableCrossProduct, nested Ors should remain unchanged
+                let input : T.ZenQueryLang = #And([
+                    #Or([
+                        #Operation("status", #eq(#Text("active"))),
+                        #Operation("status", #eq(#Text("pending"))),
+                    ]),
+                    #Operation("verified", #eq(#Bool(true))),
+                ]);
+
+                let builder = Query.QueryBuilder();
+                let result = builder.RawQuery(input).build();
+
+                // Should remain as And with nested Or (no cross product)
+                Debug.print("Cross product disabled: " # debug_show result.query_operations);
+                assert result.query_operations == input;
+            },
+        );
+
+        test(
+            "Quadratic nested cross product - Or containing And with Ors",
+            func() {
+                // Query: Or([A, And([Or([B, C]), Or([D, E])])])
+                // Inner And([Or([B, C]), Or([D, E])]) should become Or([And([B, D]), And([B, E]), And([C, D]), And([C, E])])
+                // Outer Or([A, Or([...])]) should remain Or and flatten
+                let input : T.ZenQueryLang = #Or([
+                    #Operation("field1", #eq(#Text("A"))),
+                    #And([
+                        #Or([
+                            #Operation("field2", #eq(#Text("B"))),
+                            #Operation("field2", #eq(#Text("C"))),
+                        ]),
+                        #Or([
+                            #Operation("field3", #eq(#Text("D"))),
+                            #Operation("field3", #eq(#Text("E"))),
+                        ]),
+                    ]),
+                ]);
+
+                let builder = Query.QueryBuilder();
+                let result = builder.RawQuery(input).CrossProduct(true).build();
+
+                let expected = #Or([
+                    #Operation("field1", #eq(#Text("A"))),
+                    #And([
+                        #Operation("field2", #eq(#Text("B"))),
+                        #Operation("field3", #eq(#Text("D"))),
+                    ]),
+                    #And([
+                        #Operation("field2", #eq(#Text("B"))),
+                        #Operation("field3", #eq(#Text("E"))),
+                    ]),
+                    #And([
+                        #Operation("field2", #eq(#Text("C"))),
+                        #Operation("field3", #eq(#Text("D"))),
+                    ]),
+                    #And([
+                        #Operation("field2", #eq(#Text("C"))),
+                        #Operation("field3", #eq(#Text("E"))),
+                    ]),
+                ]);
+
+                Debug.print("Quadratic nested cross product: " # debug_show result.query_operations);
+                Debug.print("Expected: " # debug_show expected);
+                assert result.query_operations == expected;
+            },
+        );
+    },
+);

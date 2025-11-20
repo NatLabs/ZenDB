@@ -2,6 +2,8 @@ import Array "mo:base@0.16.0/Array";
 import Order "mo:base@0.16.0/Order";
 import Debug "mo:base@0.16.0/Debug";
 import Int "mo:base@0.16.0/Int";
+import Iter "mo:base@0.16.0/Iter";
+import Option "mo:base@0.16.0/Option";
 
 module {
     type Order = Order.Order;
@@ -82,12 +84,18 @@ module {
             let newSize = if (heap.data.size() == 0) { 4 } else {
                 heap.data.size() * 2;
             };
-            let newData = Array.init<?A>(newSize, null);
-            var i = 0;
-            while (i < heap.count) {
-                newData[i] := heap.data[i];
-                i += 1;
-            };
+
+            let newData = Array.tabulateVar<?A>(
+                newSize,
+                func(i : Nat) : ?A {
+                    if (i < heap.data.size()) {
+                        heap.data[i];
+                    } else {
+                        null;
+                    };
+                },
+            );
+
             heap.data := newData;
         };
 
@@ -124,6 +132,20 @@ module {
             i += 1;
         };
         heap.count := 0;
+    };
+
+    public func unsortedVals<A>(heap : MinHeap<A>) : Iter.Iter<A> {
+        Iter.map<?A, A>(
+            heap.data.vals(),
+            func(opt : ?A) : A {
+                switch (opt) {
+                    case (?val) { val };
+                    case (_) {
+                        Debug.trap("MinHeap.unsortedVals: Unexpected null value");
+                    };
+                };
+            },
+        );
     };
 
     // Private helper: move element up to maintain heap property

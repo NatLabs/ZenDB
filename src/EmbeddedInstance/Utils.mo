@@ -282,7 +282,7 @@ module {
         );
     };
 
-    public func kmerge_with_arr_heap<A>(iters : [Iter.Iter<A>], cmp : (A, A) -> Order.Order) : Iter.Iter<A> {
+    public func kmerge_or_with_arr_heap<A>(iters : [Iter.Iter<A>], cmp : (A, A) -> Order.Order) : Iter.Iter<A> {
         type Ref<A> = (A, Nat);
 
         let cmpIters = func(a : Ref<A>, b : Ref<A>) : Order.Order {
@@ -323,7 +323,7 @@ module {
         };
     };
 
-    public func kmerge<A>(iters : [Iter.Iter<A>], cmp : (A, A) -> Order.Order) : Iter.Iter<A> {
+    public func kmerge_or<A>(iters : [Iter.Iter<A>], cmp : (A, A) -> Order.Order) : Iter.Iter<A> {
         type Index<A> = (A, Nat);
 
         let cmpIters = func(a : Index<A>, b : Index<A>) : Order.Order {
@@ -375,6 +375,101 @@ module {
                         case (_) {
                             // Heap is empty, no more elements
                             return null;
+                        };
+                    };
+                };
+            };
+        };
+    };
+
+    public func kmerge_and<A>(iters : [Iter.Iter<A>], cmp : (A, A) -> Order.Order) : Iter.Iter<A> {
+        type Index<A> = (A, Nat);
+
+        let cmpIters = func(a : Index<A>, b : Index<A>) : Order.Order {
+            cmp(a.0, b.0);
+        };
+
+        let heap = MinHeap.newWithCapacity<Index<A>>(iters.size());
+
+        for ((i, iter) in Itertools.enumerate(iters.vals())) {
+            switch (iter.next()) {
+                case (?a) {
+                    MinHeap.put(heap, (a, i), cmpIters);
+                };
+                case (_) {};
+            };
+        };
+
+        var currentMin : ?A = null;
+        var matchCount : Nat = 0;
+        var prev_returned : ?A = null;
+
+        func resetState() {
+            currentMin := null;
+            matchCount := 0;
+        };
+
+        func shouldReturn(value : ?A) : Bool {
+            switch (value, prev_returned) {
+                case (?v, ?prev) { cmp(v, prev) != #equal };
+                case (?_, null) { true };
+                case (null, _) { false };
+            };
+        };
+
+        object {
+            public func next() : ?A {
+                loop {
+                    // Only check heap size if we're not in the middle of counting matches
+                    if (matchCount == 0 and MinHeap.size(heap) < iters.size()) {
+                        return null;
+                    };
+
+                    switch (MinHeap.removeMin(heap, cmpIters)) {
+                        case (null) {
+                            // Heap is empty, but check if we completed a match
+                            if (matchCount == iters.size()) {
+                                let result = currentMin;
+                                resetState();
+                                return result;
+                            };
+                            return null;
+                        };
+                        case (?(min, i)) {
+                            // Update match tracking
+                            switch (currentMin) {
+                                case (?prevMin) {
+                                    if (cmp(min, prevMin) == #equal) {
+                                        matchCount += 1;
+                                    } else {
+                                        currentMin := ?min;
+                                        matchCount := 1;
+                                    };
+                                };
+                                case (null) {
+                                    currentMin := ?min;
+                                    matchCount := 1;
+                                };
+                            };
+
+                            // Advance this iterator
+                            switch (iters[i].next()) {
+                                case (?a) {
+                                    MinHeap.put(heap, (a, i), cmpIters);
+                                };
+                                case (_) {};
+                            };
+
+                            // Check if we have a complete match from all iterators
+                            if (matchCount == iters.size() and shouldReturn(currentMin)) {
+                                let result = currentMin;
+                                prev_returned := result;
+                                resetState();
+                                return result;
+                            } else if (matchCount == iters.size()) {
+                                // Duplicate, skip it
+                                resetState();
+                            };
                         };
                     };
                 };

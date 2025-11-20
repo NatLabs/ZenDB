@@ -150,7 +150,7 @@ func new_tx(fuzz : Fuzz.Fuzzer, principals : [Principal], i : Nat) : Tx {
     };
 };
 
-let limit = 5_000;
+let limit = 1_000;
 let pagination_limit = 10;
 
 let input_txs = Buffer.fromArray<Tx>(

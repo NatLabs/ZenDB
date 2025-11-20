@@ -908,7 +908,7 @@ module {
         };
 
         let iterators = Buffer.Buffer<Iter<(T.DocumentId, ?[(Text, T.Candid)])>>(8);
-        var sorted_documents_array : [(T.DocumentId, ?[(Text, T.Candid)])] = [];
+        var scans_sorted_documents_array : [(T.DocumentId, ?[(Text, T.Candid)])] = [];
         let intervals_by_index = Map.new<Text, IndexDetails>();
         let full_scan_details_buffer = Buffer.Buffer<T.FullScanDetails>(8);
         let bitmaps = Buffer.Buffer<T.BitMap>(8);
@@ -988,7 +988,7 @@ module {
                             func() = "Preparing documents for sorting from index '" # index_name # "'"
                         );
 
-                        if (sorted_documents_array.size() == 0) {
+                        if (scans_sorted_documents_array.size() == 0) {
                             let cursor_pagination_filtered_documents = switch (opt_last_pagination_document_id) {
                                 case (null) {
                                     log.lazyDebug(func() = "No pagination cursor, using all documents");
@@ -1036,8 +1036,8 @@ module {
                             log.lazyDebug(
                                 func() = "Sorting " # Nat.toText(arr.size()) # " documents"
                             );
-                            sorted_documents_array := MergeSort.sort(arr, sort_documents_by_field_cmp);
-                            document_ids_with_fields := sorted_documents_array.vals();
+                            scans_sorted_documents_array := MergeSort.sort(arr, sort_documents_by_field_cmp);
+                            document_ids_with_fields := scans_sorted_documents_array.vals();
                         };
                     };
 
@@ -1182,7 +1182,7 @@ module {
 
             let document_ids_with_fields = Intervals.document_ids_and_indexed_fields_from_intervals(collection, index_config.name, [interval], sorted_in_reverse);
 
-            if (requires_sorting and sorted_documents_array.size() == 0) {
+            if (requires_sorting and scans_sorted_documents_array.size() == 0) {
                 log.lazyDebug(func() = "Sorting is required, converting to array and sorting");
 
                 let arr = Iter.toArray(document_ids_with_fields);
@@ -1193,10 +1193,10 @@ module {
                 };
 
                 log.lazyDebug(func() = "Sorting " # Nat.toText(arr.size()) # " documents");
-                sorted_documents_array := MergeSort.sort(arr, sort_documents_by_field_cmp);
+                scans_sorted_documents_array := MergeSort.sort(arr, sort_documents_by_field_cmp);
                 log.lazyDebug(func() = "Sort completed, adding to iterators");
 
-                iterators.add(sorted_documents_array.vals());
+                iterators.add(scans_sorted_documents_array.vals());
 
             } else {
                 log.lazyDebug(func() = "Loading documents into bitmap");
@@ -1286,7 +1286,9 @@ module {
                 CollectionUtils.multiFilterWithIndexedFields(collection, document_ids_with_fields, full_scan_filter_bounds, query_plan.is_and_operation);
             };
 
-            if (requires_sorting and sorted_documents_array.size() == 0) {
+            if (requires_sorting and scans_sorted_documents_array.size() == 0) {
+                // this code block is only reached if there were no sub #Or queries in the AND operation
+
                 assert iterators.size() == 0;
                 assert bitmaps.size() == 0;
                 assert Map.size(intervals_by_index) == 0;
@@ -1311,28 +1313,30 @@ module {
         };
 
         if (iterators.size() == 1) {
+            assert bitmaps.size() == 0;
             return #Ids(iterators.get(0));
         };
 
         if (iterators.size() > 1) {
-            var fill_sorted_documents_array = if (sorted_documents_array.size() > 0) {
-                false;
-            } else { true };
+            assert bitmaps.size() == 0;
 
-            for (_iter in iterators.vals()) {
-                let iter = if (fill_sorted_documents_array) {
-                    let arr = Iter.toArray(_iter);
-                    if (arr.size() > 0) {
-                        sorted_documents_array := MergeSort.sort(arr, sort_documents_by_field_cmp);
-                    };
-                    sorted_documents_array.vals();
-                } else { _iter };
-
-                let bitmap = load_bitmap(iter, opt_last_pagination_document_id);
-                bitmaps.add(bitmap);
-
-                fill_sorted_documents_array := false;
+            let new_size = if (scans_sorted_documents_array.size() > 0) {
+                iterators.size() + 1;
+            } else {
+                iterators.size();
             };
+
+            let iters = Array.tabulate<Iter<(T.DocumentId, ?[(Text, T.Candid)])>>(
+                new_size,
+                func(i : Nat) : Iter<(T.DocumentId, ?[(Text, T.Candid)])> {
+                    if (i == iterators.size()) return scans_sorted_documents_array.vals();
+                    iterators.get(i);
+                },
+            );
+
+            let merged_iterator = Utils.kmerge_and(iters, sort_documents_by_field_cmp);
+
+            return #Ids(merged_iterator);
 
         };
 
@@ -1344,17 +1348,7 @@ module {
             bitmaps.get(0);
         } else { BitMap.multiIntersect(bitmaps.vals()) };
 
-        if (sorted_documents_array.size() > 0) {
-            let sorted_bitmap_vals = Iter.filter<(T.DocumentId, ?[(Text, T.Candid)])>(
-                sorted_documents_array.vals(),
-                func((id, _) : (T.DocumentId, ?[(Text, T.Candid)])) : Bool = bitmap.get(Utils.convert_last_8_bytes_to_nat(id)),
-            );
-
-            #Ids(sorted_bitmap_vals);
-
-        } else {
-            #BitMap(bitmap);
-        };
+        #BitMap(bitmap);
 
     };
 
@@ -1721,7 +1715,7 @@ module {
             log.lazyDebug(
                 func() = "Merging " # Nat.toText(iterators.size()) # " sorted iterators using k-way merge"
             );
-            var merged_iterators = Utils.kmerge<(T.DocumentId, ?[(Text, T.Candid)])>(Buffer.toArray(iterators), sort_documents_by_field_cmp);
+            var merged_iterators = Utils.kmerge_or<(T.DocumentId, ?[(Text, T.Candid)])>(Buffer.toArray(iterators), sort_documents_by_field_cmp);
 
             return #Ids(merged_iterators);
 

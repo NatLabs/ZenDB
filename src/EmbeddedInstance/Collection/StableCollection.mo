@@ -855,8 +855,8 @@ module StableCollection {
             };
             case (#Interval(index_name, _intervals, sorted_in_reverse)) {
                 log.lazyDebug(func() = "Interval iterator");
-                Debug.print("Interval pagination called");
-                Debug.print("Intervals: " # debug_show _intervals);
+                // Debug.print("Interval pagination called");
+                // Debug.print("Intervals: " # debug_show _intervals);
 
                 if (sorted_in_reverse) {
                     return Intervals.extract_document_ids_in_pagination_range_for_reversed_intervals(collection, skip, opt_limit, index_name, _intervals, sorted_in_reverse);
@@ -1728,7 +1728,7 @@ module StableCollection {
         let log = Logger.NamespacedLogger(collection.logger, LOGGER_NAMESPACE).subnamespace("unhide_indexes");
 
         for (index_name in index_names.vals()) {
-            if (not Map.has(collection.indexes_in_batch_operations, Map.thash, index_name)) {
+            if (not Set.has(collection.hidden_indexes, Set.thash, index_name)) {
                 let err_msg = "Index '" # index_name # "' not found in disabled indexes of collection '" # collection.name # "'";
                 log.lazyError(func() = err_msg);
                 return #err(err_msg);

@@ -439,7 +439,7 @@ module {
                             log.lazyDebug(func() = "No suitable index found for operation, using full scan");
                             let (scan_bounds, filter_bounds) = Index.convert_simple_ops_to_bounds(false, operations, null, null);
 
-                            Debug.print("Or operation filter bounds: " # debug_show filter_bounds);
+                            // Debug.print("Or operation filter bounds: " # debug_show filter_bounds);
 
                             var scan_details : ScanDetails = #FullScan({
                                 requires_additional_sorting = requires_sorting;
