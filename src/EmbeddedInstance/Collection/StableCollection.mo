@@ -33,7 +33,7 @@ import Decoder "mo:serde@3.4.0/Candid/Blob/Decoder";
 import Candid "mo:serde@3.4.0/Candid";
 import Itertools "mo:itertools@0.2.2/Iter";
 import RevIter "mo:itertools@0.2.2/RevIter";
-import BitMap "mo:bit-map@0.1.2";
+import SparseBitMap64 "mo:bit-map@0.1.2/SparseBitMap64";
 import Vector "mo:vector@0.4.2";
 import MemoryBTree "mo:memory-collection@0.3.2/MemoryBTree/Stable";
 import ByteUtils "mo:byte-utils@0.1.1";
@@ -788,43 +788,67 @@ module StableCollection {
         collection : T.StableCollection,
         index_name : Text,
     ) : T.Result<(), Text> {
-        let log = Logger.NamespacedLogger(collection.logger, LOGGER_NAMESPACE).subnamespace("delete_index");
-        log.logInfo("Deleting index: " # index_name);
+        delete_indexes(collection, [index_name]);
+    };
 
-        let opt_index = Map.get(collection.indexes, Map.thash, index_name);
+    public func delete_indexes(
+        collection : T.StableCollection,
+        index_names : [Text],
+    ) : T.Result<(), Text> {
+        let log = Logger.NamespacedLogger(collection.logger, LOGGER_NAMESPACE).subnamespace("delete_indexes");
+        log.logInfo("Deleting indexes: " # debug_show index_names);
 
-        let index = switch (opt_index) {
-            case (?index) { index };
-            case (null) {
-                return #err("CompositeIndex not found");
+        // First, validate that all indexes exist and can be deleted
+        let indexes_to_delete = Buffer.Buffer<(Text, T.CompositeIndex)>(index_names.size());
+
+        for (index_name in index_names.vals()) {
+            // Check if index is in a batch operation
+            if (Map.has(collection.indexes_in_batch_operations, Map.thash, index_name)) {
+                return #err("Index '" # index_name # "' cannot be deleted because it is currently being populated in a batch operation");
             };
+
+            let opt_index = Map.get(collection.indexes, Map.thash, index_name);
+
+            let index = switch (opt_index) {
+                case (?index) { index };
+                case (null) {
+                    return #err("Index '" # index_name # "' not found");
+                };
+            };
+
+            let composite_index = switch (index) {
+                case (#text_index(text_index)) {
+                    text_index.internal_index;
+                };
+                case (#composite_index(composite_index)) {
+                    composite_index;
+                };
+            };
+
+            if (composite_index.used_internally) {
+                return #err("Index '" # index_name # "' cannot be deleted because it is used internally");
+            };
+
+            indexes_to_delete.add((index_name, composite_index));
         };
 
-        let composite_index = switch (index) {
-            case (#text_index(text_index)) {
-                text_index.internal_index;
+        // All indexes are valid, now delete them
+        for ((index_name, composite_index) in indexes_to_delete.vals()) {
+            log.lazyDebug(func() = "Clearing and recycling BTree for index: " # index_name);
+
+            BTree.clear(composite_index.data);
+
+            switch (composite_index.data) {
+                case (#stableMemory(btree)) {
+                    Vector.add(collection.freed_btrees, btree);
+                };
+                case (_) {};
             };
-            case (#composite_index(composite_index)) {
-                composite_index;
-            };
+
+            ignore Map.remove(collection.indexes, Map.thash, index_name);
         };
 
-        if (composite_index.used_internally) {
-            return #err("CompositeIndex '" # index_name # "' cannot be deleted because it is used internally");
-        };
-
-        log.lazyDebug(func() = "Clearing and recycling BTree for index: " # index_name);
-
-        BTree.clear(composite_index.data);
-
-        switch (composite_index.data) {
-            case (#stableMemory(btree)) {
-                Vector.add(collection.freed_btrees, btree);
-            };
-            case (_) {};
-        };
-
-        ignore Map.remove(collection.indexes, Map.thash, index_name);
+        log.lazyInfo(func() = "Successfully deleted " # debug_show index_names.size() # " indexes");
 
         #ok();
     };
@@ -843,7 +867,7 @@ module StableCollection {
             case (#BitMap(bitmap)) {
                 log.lazyDebug(func() = "Bitmap iterator");
                 let document_ids = Iter.map<Nat, T.DocumentId>(
-                    bitmap.vals(),
+                    SparseBitMap64.vals(bitmap),
                     func(n : Nat) : T.DocumentId {
                         CollectionUtils.convert_bitmap_8_byte_to_document_id(collection, n);
                     },
@@ -1462,7 +1486,6 @@ module StableCollection {
                 },
             );
 
-            // iter.next(); // skip the last_document_id itself
         };
 
         log.lazyDebug(func() = "Query evaluation completed");
@@ -1647,7 +1670,7 @@ module StableCollection {
 
         let count = switch (QueryExecution.get_unique_document_ids_from_query_plan(collection, Map.new(), query_plan)) {
             case (#Empty) 0;
-            case (#BitMap(bitmap)) bitmap.size();
+            case (#BitMap(bitmap)) SparseBitMap64.size(bitmap);
             case (#Ids(iter)) Iter.size(iter);
             case (#Interval(_index_name, intervals, _sorted_in_reverse)) {
 
@@ -1686,7 +1709,7 @@ module StableCollection {
 
         let greater_than_0 = switch (eval) {
             case (#Empty) false;
-            case (#BitMap(bitmap)) bitmap.size() > 0;
+            case (#BitMap(bitmap)) SparseBitMap64.size(bitmap) > 0;
             case (#Ids(iter)) switch (iter.next()) {
                 case (?_) true;
                 case (null) false;

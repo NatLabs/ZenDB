@@ -12,7 +12,7 @@ import Bench "mo:bench";
 import Fuzz "mo:fuzz";
 import Candid "mo:serde@3.4.0/Candid";
 import Itertools "mo:itertools@0.2.2/Iter";
-import BitMap "mo:bit-map@0.1.2";
+import SparseBitMap64 "mo:bit-map@0.1.2/SparseBitMap64";
 
 import ZenDB "../src";
 import Utils "../src/EmbeddedInstance/Utils";
@@ -1020,7 +1020,7 @@ module TxsBenchUtils {
 
             ignore db_query.Limit(pagination_limit);
             let #ok(result) = txs.search(db_query) else Prelude.unreachable();
-            let bitmap = BitMap.fromIter(Iter.map<(Blob, Tx), Nat>(result.documents.vals(), func((id, _) : (Blob, Tx)) : Nat = Utils.nat_from_12_byte_blob(id)));
+            let bitmap = SparseBitMap64.fromIter(Iter.map<(Blob, Tx), Nat>(result.documents.vals(), func((id, _) : (Blob, Tx)) : Nat = Utils.nat_from_12_byte_blob(id)));
             let documents = Buffer.fromArray<(Blob, Tx)>(result.documents);
             var batch_size = result.documents.size();
 
@@ -1036,10 +1036,10 @@ module TxsBenchUtils {
                 for ((id, tx) in result.documents.vals()) {
                     documents.add((id, tx));
 
-                    if (bitmap.get(Utils.nat_from_12_byte_blob(id))) {
+                    if (SparseBitMap64.get(bitmap, Utils.nat_from_12_byte_blob(id))) {
                         Debug.trap("Duplicate entry for id " # debug_show id);
                     } else {
-                        bitmap.set(Utils.nat_from_12_byte_blob(id), true);
+                        SparseBitMap64.set(bitmap, Utils.nat_from_12_byte_blob(id), true);
                     };
                 };
 

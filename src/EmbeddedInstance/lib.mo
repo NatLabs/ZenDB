@@ -173,6 +173,10 @@ module {
         TypeMigrations.share_version(zendb);
     };
 
+    public func getStableState(versioned_sstore : T.VersionedStableStore) : T.StableStore {
+        TypeMigrations.get_current_state(versioned_sstore);
+    };
+
     public func updateCacheCapacity(versioned_sstore : T.VersionedStableStore, new_capacity : Nat) {
         let sstore = TypeMigrations.get_current_state(versioned_sstore);
         TwoQueueCache.resize(sstore.candid_map_cache, new_capacity);

@@ -538,7 +538,7 @@ module T {
     public type EvalResult = {
         #Empty;
         #Ids : Iter<DocumentId>;
-        #BitMap : T.BitMap;
+        #BitMap : BitMap.BitMap;
         #Interval : (index : Text, interval : [Interval], is_reversed : Bool);
     };
 

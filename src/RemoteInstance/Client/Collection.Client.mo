@@ -145,6 +145,10 @@ module {
             await canister_db.zendb_collection_delete_index(db_name, collection_name, index_name);
         };
 
+        public func delete_indexes(index_names : [Text]) : async* (ZT.Result<(), Text>) {
+            await canister_db.zendb_collection_delete_indexes(db_name, collection_name, index_names);
+        };
+
         public func repopulate_index(index_name : Text) : async* (ZT.Result<(), Text>) {
             await canister_db.zendb_collection_repopulate_index(db_name, collection_name, index_name);
         };

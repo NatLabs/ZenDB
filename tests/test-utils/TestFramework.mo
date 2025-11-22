@@ -11,7 +11,6 @@ import ZenDB "../../src/EmbeddedInstance";
 import CollectionUtils "../../src/EmbeddedInstance/Collection/CollectionUtils";
 import StableCollection "../../src/EmbeddedInstance/Collection/StableCollection";
 import Index "../../src/EmbeddedInstance/Collection/Index";
-import TypeMigrations "../../src/EmbeddedInstance/TypeMigrations";
 
 import { test; suite } "mo:test";
 import Itertools "mo:itertools@0.2.2/Iter";
@@ -151,7 +150,7 @@ module TestFramework {
                                 opt_options : ?ZenDB.Types.CreateIndexOptions,
                             ) {
 
-                                let stable_state = TypeMigrations.get_current_state(zendb_sstore);
+                                let stable_state = ZenDB.getStableState(zendb_sstore);
 
                                 let db = Option.unwrap(Map.get(stable_state.databases, Map.thash, "with_index"));
                                 let collection = Option.unwrap(Map.get(db.collections, Map.thash, collection_name));

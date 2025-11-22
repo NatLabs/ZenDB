@@ -13,7 +13,7 @@ import Bench "mo:bench";
 import Fuzz "mo:fuzz";
 import Candid "mo:serde@3.4.0/Candid";
 import Itertools "mo:itertools@0.2.2/Iter";
-import BitMap "mo:bit-map@0.1.2";
+import SparseBitMap64 "mo:bit-map@0.1.2/SparseBitMap64";
 
 import ZenDB "../../src/EmbeddedInstance";
 import TestUtils "../test-utils/TestUtils";
@@ -184,10 +184,10 @@ ZenDBSuite.newSuite(
         assert txs.size() == limit;
 
         var size = 0;
-        let bitmap = BitMap.fromIter(Iter.map(txs.keys(), Utils.convert_last_8_bytes_to_nat));
+        let bitmap = SparseBitMap64.fromIter(Iter.map(txs.keys(), Utils.convert_last_8_bytes_to_nat));
 
-        Debug.print("bitmap: " # debug_show bitmap.size());
-        assert bitmap.size() == limit;
+        Debug.print("bitmap: " # debug_show SparseBitMap64.size(bitmap));
+        assert SparseBitMap64.size(bitmap) == limit;
 
         type Options = {
             filter : {
@@ -315,7 +315,7 @@ ZenDBSuite.newSuite(
 
             ignore db_query.Limit(pagination_limit);
             let #ok(matching_txs) = txs.search(db_query);
-            let bitmap = BitMap.fromIter(Iter.map(matching_txs.documents.vals(), func((id, _) : (ZenDB.Types.DocumentId, Tx)) : Nat = Utils.convert_last_8_bytes_to_nat(id)));
+            let bitmap = SparseBitMap64.fromIter(Iter.map(matching_txs.documents.vals(), func((id, _) : (ZenDB.Types.DocumentId, Tx)) : Nat = Utils.convert_last_8_bytes_to_nat(id)));
             let documents = Buffer.fromArray<ZenDB.Types.WrapId<Tx>>(matching_txs.documents);
             var batch_size = documents.size();
 
@@ -335,10 +335,10 @@ ZenDBSuite.newSuite(
                     documents.add((id, tx));
                     let nat_id = Utils.convert_last_8_bytes_to_nat(id);
 
-                    if (bitmap.get(nat_id)) {
+                    if (SparseBitMap64.get(bitmap, nat_id)) {
                         Debug.trap("Duplicate entry for id " # debug_show id);
                     } else {
-                        bitmap.set(nat_id, true);
+                        SparseBitMap64.set(bitmap, nat_id, true);
                     };
                 };
 
@@ -356,7 +356,7 @@ ZenDBSuite.newSuite(
         //     let #ok(matching_txs) = txs.search(db_query);
         //     // Debug.print("matching_txs: " # debug_show matching_txs);
         //     let documents = Buffer.fromArray<(Nat, Tx)>(matching_txs);
-        //     let bitmap = BitMap.fromIter(Iter.map<(Nat, Tx), Nat>(matching_txs.documents.vals(), func((id, _) : (Nat, Tx)) : Nat = id));
+        //     let bitmap = SparseBitMap64.fromIter(Iter.map<(Nat, Tx), Nat>(matching_txs.documents.vals(), func((id, _) : (Nat, Tx)) : Nat = id));
         //     var batch_size = documents.size();
 
         //     var opt_cursor : ?Nat = null;
@@ -385,10 +385,10 @@ ZenDBSuite.newSuite(
         //         for ((id, tx) in matching_txs.documents.vals()) {
         //             documents.add((id, tx));
 
-        //             if (bitmap.get(id)) {
+        //             if (SparseBitMap64.get(bitmap, id)) {
         //                 Debug.trap("Duplicate entry for id " # debug_show id);
         //             } else {
-        //                 bitmap.set(id, true);
+        //                 SparseBitMap64.set(bitmap, id, true);
         //             };
         //         };
 

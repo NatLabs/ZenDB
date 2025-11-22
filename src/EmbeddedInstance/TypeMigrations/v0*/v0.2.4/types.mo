@@ -20,7 +20,7 @@ import Serde "mo:serde@3.4.0";
 import Candid "mo:serde@3.4.0/Candid";
 import Itertools "mo:itertools@0.2.2/Iter";
 import RevIter "mo:itertools@0.2.2/RevIter";
-import BitMap "mo:bit-map@0.1.2";
+import SparseBitMap64 "mo:bit-map@0.1.2/SparseBitMap64";
 import Vector "mo:vector@0.4.2";
 
 import MemoryBTree "mo:memory-collection@0.3.2/MemoryBTree/Stable";
@@ -32,7 +32,7 @@ import LruCache "mo:lru-cache";
 
 module T {
 
-    public type BitMap = BitMap.BitMap;
+    public type SparseBitMap64 = SparseBitMap64.SparseBitMap64;
 
     public type Candid = Serde.Candid;
 
@@ -611,7 +611,7 @@ module T {
     public type EvalResult = {
         #Empty;
         #Ids : Iter<(DocumentId, ?[(Text, Candid)])>; // todo: returned the assumed size with the iterator, can help in choosing the smallest set of ids
-        #BitMap : T.BitMap;
+        #BitMap : T.SparseBitMap64;
         #Interval : (index : Text, interval : [Interval], is_reversed : Bool);
     };
 

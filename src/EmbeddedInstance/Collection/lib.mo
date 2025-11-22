@@ -34,7 +34,6 @@ import Decoder "mo:serde@3.4.0/Candid/Blob/Decoder";
 import Candid "mo:serde@3.4.0/Candid";
 import Itertools "mo:itertools@0.2.2/Iter";
 import RevIter "mo:itertools@0.2.2/RevIter";
-import BitMap "mo:bit-map@0.1.2";
 
 import T "../Types";
 import Query "../Query";
@@ -403,6 +402,13 @@ module {
             handleResult(
                 StableCollection.delete_documents(collection, blobify, query_builder.build()),
                 "Failed to delete documents",
+            );
+        };
+
+        public func deleteIndexes(index_names : [Text]) : T.Result<(), Text> {
+            handleResult(
+                StableCollection.delete_indexes(collection, index_names),
+                "Failed to delete indexes",
             );
         };
 

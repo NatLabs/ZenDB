@@ -10,7 +10,7 @@ import Text "mo:base@0.16.0/Text";
 import Candid "mo:serde@3.4.0/Candid";
 import Map "mo:map@9.0.1/Map";
 import Set "mo:map@9.0.1/Set";
-import BitMap "mo:bit-map@0.1.2";
+import SparseBitMap64 "mo:bit-map@0.1.2/SparseBitMap64";
 import Itertools "mo:itertools@0.2.2/Iter";
 
 import T "../Types";

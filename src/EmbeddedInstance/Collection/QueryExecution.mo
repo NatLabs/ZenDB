@@ -19,7 +19,7 @@ import Decoder "mo:serde@3.4.0/Candid/Blob/Decoder";
 import Candid "mo:serde@3.4.0/Candid";
 import Itertools "mo:itertools@0.2.2/Iter";
 import RevIter "mo:itertools@0.2.2/RevIter";
-import BitMap "mo:bit-map@0.1.2";
+import SparseBitMap64 "mo:bit-map@0.1.2/SparseBitMap64";
 
 import T "../Types";
 import Query "../Query";
@@ -83,7 +83,7 @@ module {
     public func get_unique_document_ids_from_query_plan(
         collection : T.StableCollection,
         // only accepts bitmaps directly created from an index scan
-        bitmap_cache : Map<Text, BitMap.BitMap>,
+        bitmap_cache : Map<Text, T.SparseBitMap64>,
         query_plan : T.QueryPlan,
     ) : EvalResult {
         let log = Logger.NamespacedLogger(collection.logger, LOGGER_NAMESPACE).subnamespace("get_unique_document_ids_from_query_plan");
@@ -123,7 +123,7 @@ module {
             };
         };
 
-        let bitmaps = Buffer.Buffer<T.BitMap>(query_plan.scans.size() + query_plan.subplans.size());
+        let bitmaps = Buffer.Buffer<T.SparseBitMap64>(query_plan.scans.size() + query_plan.subplans.size());
         let intervals_by_index = Map.new<Text, IndexDetails>();
 
         label evaluating_query_plan for (scan_details in query_plan.scans.vals()) {
@@ -185,7 +185,7 @@ module {
                                     case (?filter_bounds) {
                                         log.lazyDebug(func() = "Applying additional post-filtering");
                                         let document_ids = Iter.map<Nat, T.DocumentId>(
-                                            bitmap.vals(),
+                                            SparseBitMap64.vals(bitmap),
                                             func(n : Nat) : T.DocumentId {
                                                 CollectionUtils.convert_bitmap_8_byte_to_document_id(collection, n);
                                             },
@@ -245,7 +245,7 @@ module {
 
             log.lazyDebug(func() = "Creating bitmap from document IDs iterator");
             bitmaps.add(
-                BitMap.fromIter(Iter.map(document_ids_iter, func((id, _)) : Nat { Utils.convert_last_8_bytes_to_nat(id) }))
+                SparseBitMap64.fromIter(Iter.map(document_ids_iter, func((id, _)) : Nat { Utils.convert_last_8_bytes_to_nat(id) }))
             );
         };
 
@@ -269,13 +269,13 @@ module {
                 case (#Ids(document_ids_iter)) {
                     log.lazyDebug(func() = "Subplan returned document IDs iterator");
                     bitmaps.add(
-                        BitMap.fromIter(Iter.map(document_ids_iter, func((id, _) : (T.DocumentId, ?[(Text, T.Candid)])) : Nat { Utils.convert_last_8_bytes_to_nat(id) }))
+                        SparseBitMap64.fromIter(Iter.map(document_ids_iter, func((id, _) : (T.DocumentId, ?[(Text, T.Candid)])) : Nat { Utils.convert_last_8_bytes_to_nat(id) }))
                     );
                 };
                 case (#BitMap(sub_bitmap)) {
                     log.lazyDebug(
                         func() = "Subplan returned bitmap with " #
-                        Nat.toText(sub_bitmap.size()) # " documents"
+                        Nat.toText(SparseBitMap64.size(sub_bitmap)) # " documents"
                     );
                     bitmaps.add(sub_bitmap);
                 };
@@ -337,32 +337,56 @@ module {
                 Nat.toText(Map.size(intervals_by_index)) # " index intervals to bitmaps"
             );
 
-            for ((index_name, interval_details) in Map.entries(intervals_by_index)) {
+            let intervals_by_index_array = Map.toArray(intervals_by_index);
 
-                let index_config = Index.get_config_by_name(collection, index_name);
+            let sorted_intervals_by_index = Array.sort(
+                intervals_by_index_array,
+                func(a : (Text, IndexDetails), b : (Text, IndexDetails)) : Order {
+                    let a_size = a.1.intervals.size();
+                    let b_size = b.1.intervals.size();
 
-                if (query_plan.is_and_operation) {
-                    assert interval_details.intervals.size() == 1;
+                    Nat.compare(a_size, b_size);
+                },
+            );
+
+            let bitmap = if (bitmaps.size() == 0) SparseBitMap64.new() else bitmaps.remove(bitmaps.size() - 1);
+
+            func load_interval_into_bitmap(bitmap : T.SparseBitMap64, index_name : Text, intervals : [T.Interval]) {
+                let document_ids_in_interval = Intervals.document_ids_from_index_intervals(collection, index_name, intervals, false);
+
+                for (id in document_ids_in_interval) {
+                    let id_as_nat = Utils.convert_last_8_bytes_to_nat(id);
+                    SparseBitMap64.add(bitmap, id_as_nat);
                 };
-
-                log.lazyDebug(
-                    func() = "Creating bitmap from intervals on index '" #
-                    index_name # "'"
-                );
-
-                let bitmap = BitMap.BitMap(1024);
-
-                for (interval in interval_details.intervals.vals()) {
-                    let document_ids_with_fields = Intervals.document_ids_and_indexed_fields_from_intervals(collection, index_config.name, [interval], false);
-
-                    for ((id, _) in document_ids_with_fields) {
-                        let id_as_nat = Utils.convert_last_8_bytes_to_nat(id);
-                        bitmap.set(id_as_nat, true);
-                    };
-                };
-
-                bitmaps.add(bitmap);
             };
+
+            if (not query_plan.is_and_operation) {
+                for ((index_name, interval_details) in sorted_intervals_by_index.vals()) {
+                    load_interval_into_bitmap(bitmap, index_name, Buffer.toArray(interval_details.intervals));
+                };
+            } else {
+
+                let sorted_intervals_by_index_iter = sorted_intervals_by_index.vals();
+
+                if (bitmaps.size() == 0) {
+                    let ?(index_name, interval_details) = sorted_intervals_by_index_iter.next() else Debug.trap("QueryExecution.get_unique_document_ids_from_query_plan: No elements in intervals_by_index map when size is greater than 0");
+                    load_interval_into_bitmap(bitmap, index_name, Buffer.toArray(interval_details.intervals));
+                };
+
+                let loading_zone = SparseBitMap64.new();
+
+                for ((index_name, interval_details) in sorted_intervals_by_index_iter) {
+
+                    load_interval_into_bitmap(loading_zone, index_name, Buffer.toArray(interval_details.intervals));
+                    SparseBitMap64.intersectInPlace(bitmap, loading_zone);
+
+                    // retains the size but clears the contents
+                    SparseBitMap64.clear(loading_zone);
+                };
+            };
+
+            bitmaps.add(bitmap);
+
         };
 
         let result = if (bitmaps.size() == 0 and Map.size(intervals_by_index) == 1) {
@@ -389,23 +413,24 @@ module {
             #Empty;
         } else {
             if (bitmaps.size() == 1) {
+                let bitmap = bitmaps.get(0);
                 log.lazyDebug(
                     func() = "Using single bitmap with " #
-                    Nat.toText(bitmaps.get(0).size()) # " documents"
+                    Nat.toText(SparseBitMap64.size(bitmap)) # " documents"
                 );
-                #BitMap(bitmaps.get(0));
+                #BitMap(bitmap);
             } else if (query_plan.is_and_operation) {
                 log.lazyDebug(
                     func() = "Intersecting " #
                     Nat.toText(bitmaps.size()) # " bitmaps for AND operation"
                 );
-                #BitMap(BitMap.multiIntersect(bitmaps.vals()));
+                #BitMap(SparseBitMap64.multiIntersect(bitmaps.vals()));
             } else {
                 log.lazyDebug(
                     func() = "Merging " #
                     Nat.toText(bitmaps.size()) # " bitmaps for OR operation"
                 );
-                #BitMap(BitMap.multiUnion(bitmaps.vals()));
+                #BitMap(SparseBitMap64.multiUnion(bitmaps.vals()));
             };
         };
 
@@ -421,7 +446,7 @@ module {
             case (#BitMap(bitmap)) {
                 log.lazyDebug(
                     func() = "Query returned bitmap with "
-                    # debug_show bitmap.size() # " documents in " # debug_show elapsed # " instructions"
+                    # debug_show SparseBitMap64.size(bitmap) # " documents in " # debug_show elapsed # " instructions"
                 );
             };
             case (#Ids(iter)) {
@@ -682,13 +707,13 @@ module {
     };
 
     type IndexBasedFilteringResult = {
-        bitmap : BitMap.BitMap;
+        bitmap : T.SparseBitMap64;
         opt_filter_bounds : ?T.Bounds;
     };
 
     public func index_based_interval_filtering(
         collection : T.StableCollection,
-        bitmap_cache : Map<Text, BitMap.BitMap>,
+        bitmap_cache : Map<Text, T.SparseBitMap64>,
         index_scan_details : T.IndexScanDetails,
     ) : ?IndexBasedFilteringResult {
         let log = Logger.NamespacedLogger(collection.logger, LOGGER_NAMESPACE).subnamespace("index_based_interval_filtering");
@@ -789,7 +814,7 @@ module {
             };
         };
 
-        let bitmaps = Buffer.Buffer<T.BitMap>(8);
+        let bitmaps = Buffer.Buffer<T.SparseBitMap64>(8);
 
         log.lazyDebug(
             func() = "Creating bitmaps from " #
@@ -818,7 +843,7 @@ module {
                     );
 
                     let document_ids = Intervals.document_ids_from_index_intervals(collection, index_name, [interval], false);
-                    let bitmap = BitMap.fromIter(Iter.map(document_ids, Utils.convert_last_8_bytes_to_nat));
+                    let bitmap = SparseBitMap64.fromIter(Iter.map(document_ids, Utils.convert_last_8_bytes_to_nat));
 
                     ignore Map.put(bitmap_cache, Map.thash, interval_cache_key, bitmap);
                     bitmap;
@@ -833,18 +858,18 @@ module {
             Nat.toText(bitmaps.size()) # " bitmaps"
         );
 
-        let bitmap = BitMap.multiIntersect(bitmaps.vals());
+        let bitmap = SparseBitMap64.multiIntersect(bitmaps.vals());
 
         log.lazyDebug(
             func() = "Final bitmap contains " #
-            Nat.toText(bitmap.size()) # " document IDs"
+            Nat.toText(SparseBitMap64.size(bitmap)) # " document IDs"
         );
 
         ?{ bitmap; opt_filter_bounds };
     };
 
-    func load_bitmap(iter : T.Iter<(T.DocumentId, ?[(Text, T.Candid)])>, opt_last_pagination_document_id : ?T.DocumentId) : BitMap.BitMap {
-        BitMap.fromIter(
+    func load_bitmap(iter : T.Iter<(T.DocumentId, ?[(Text, T.Candid)])>, opt_last_pagination_document_id : ?T.DocumentId) : T.SparseBitMap64 {
+        SparseBitMap64.fromIter(
             Iter.map(
                 Iter.filter(
                     iter,
@@ -911,7 +936,7 @@ module {
         var scans_sorted_documents_array : [(T.DocumentId, ?[(Text, T.Candid)])] = [];
         let intervals_by_index = Map.new<Text, IndexDetails>();
         let full_scan_details_buffer = Buffer.Buffer<T.FullScanDetails>(8);
-        let bitmaps = Buffer.Buffer<T.BitMap>(8);
+        let bitmaps = Buffer.Buffer<T.SparseBitMap64>(8);
 
         for (scan_details in query_plan.scans.vals()) switch (scan_details) {
             case (#FullScan(full_scan_details)) {
@@ -1046,8 +1071,8 @@ module {
                         iterators.add(document_ids_with_fields);
                     } else {
                         log.lazyDebug(func() = "Creating bitmap from filtered document IDs");
-                        let bitmap = BitMap.fromIter(Iter.map(document_ids_with_fields, func((id, _) : (T.DocumentId, ?[(Text, T.Candid)])) : Nat { Utils.convert_last_8_bytes_to_nat(id) }));
-                        log.lazyDebug(func() = "Bitmap created with " # Nat.toText(bitmap.size()) # " documents");
+                        let bitmap = SparseBitMap64.fromIter(Iter.map(document_ids_with_fields, func((id, _) : (T.DocumentId, ?[(Text, T.Candid)])) : Nat { Utils.convert_last_8_bytes_to_nat(id) }));
+                        log.lazyDebug(func() = "Bitmap created with " # Nat.toText(SparseBitMap64.size(bitmap)) # " documents");
                         bitmaps.add(bitmap);
                     };
 
@@ -1093,7 +1118,7 @@ module {
                     };
                     log.lazyDebug(
                         func() : Text {
-                            "Adding bitmap from OR subplan with " # Nat.toText(bitmap.size()) # " documents";
+                            "Adding bitmap from OR subplan with " # Nat.toText(SparseBitMap64.size(bitmap)) # " documents";
                         }
                     );
                     bitmaps.add(bitmap);
@@ -1346,7 +1371,7 @@ module {
 
         let bitmap = if (bitmaps.size() == 1) {
             bitmaps.get(0);
-        } else { BitMap.multiIntersect(bitmaps.vals()) };
+        } else { SparseBitMap64.multiIntersect(bitmaps.vals()) };
 
         #BitMap(bitmap);
 
@@ -1368,7 +1393,7 @@ module {
             case (null) #Ascending;
         };
 
-        let bitmaps = Buffer.Buffer<T.BitMap>(8);
+        let bitmaps = Buffer.Buffer<T.SparseBitMap64>(8);
         let intervals_by_index = Map.new<Text, IndexDetails>();
         let full_scan_details_buffer = Buffer.Buffer<T.FullScanDetails>(8);
 
@@ -1730,8 +1755,8 @@ module {
             log.lazyDebug(
                 func() = "Performing union on " # Nat.toText(bitmaps.size()) # " bitmaps"
             );
-            let bitmap = BitMap.multiUnion(bitmaps.vals());
-            log.lazyDebug(func() = "Union completed, resulting bitmap has " # Nat.toText(bitmap.size()) # " documents");
+            let bitmap = SparseBitMap64.multiUnion(bitmaps.vals());
+            log.lazyDebug(func() = "Union completed, resulting bitmap has " # Nat.toText(SparseBitMap64.size(bitmap)) # " documents");
             #BitMap(bitmap);
         };
 
@@ -1767,7 +1792,7 @@ module {
             case (#BitMap(bitmap)) {
                 log.lazyInfo(
                     func() = "Query returned "
-                    # debug_show bitmap.size() # " documents in bitmap in " # debug_show elapsed # " instructions"
+                    # debug_show SparseBitMap64.size(bitmap) # " documents in bitmap in " # debug_show elapsed # " instructions"
                 );
             };
             case (#Ids(iter)) {

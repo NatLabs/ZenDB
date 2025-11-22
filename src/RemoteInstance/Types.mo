@@ -171,6 +171,9 @@ module {
         /// Delete index from a collection.
         zendb_collection_delete_index : shared (Text, Text, Text) -> async (ZT.Result<(), Text>);
 
+        /// Delete multiple indexes from a collection.
+        zendb_collection_delete_indexes : shared (Text, Text, [Text]) -> async (ZT.Result<(), Text>);
+
         /// Repopulate index in a collection.
         zendb_collection_repopulate_index : shared query (Text, Text, Text) -> async (ZT.Result<(), Text>);
 

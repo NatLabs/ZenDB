@@ -518,6 +518,18 @@ shared ({ caller = owner }) persistent actor class CanisterDB() = this_canister 
         );
     };
 
+    public shared ({ caller }) func zendb_collection_delete_indexes(db_name : Text, collection_name : Text, index_names : [Text]) : async ZT.Result<(), Text> {
+        auth.allow_rs(
+            caller,
+            Permissions.MANAGE,
+            func() : (ZT.Result<(), Text>) {
+                let #ok(collection) = get_collection(db_name, collection_name) else return Utils.send_error(get_collection(db_name, collection_name));
+
+                StableCollection.delete_indexes(collection, index_names);
+            },
+        );
+    };
+
     func _zendb_collection_repopulate_index(caller : Principal, db_name : Text, collection_name : Text, index_name : Text) : ZT.Result<(), Text> {
         auth.allow_rs(
             caller,

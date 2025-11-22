@@ -10,7 +10,7 @@ module TwoQueueCache {
         hash : Map.HashUtils<K>,
         get_value : (K) -> V,
     ) : LruCache.LruCacheUtils<K, ()> {
-        LruCache.utils<K, ()>(
+        LruCache.createUtils<K, ()>(
             hash,
             func(evicted_key : K, _ : ()) {
                 // When admission cache evicts, we don't have the value yet (keys only)

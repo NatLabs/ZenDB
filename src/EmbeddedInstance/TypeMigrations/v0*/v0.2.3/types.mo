@@ -595,7 +595,7 @@ module T {
     public type EvalResult = {
         #Empty;
         #Ids : Iter<(DocumentId, ?[(Text, Candid)])>; // todo: returned the assumed size with the iterator, can help in choosing the smallest set of ids
-        #BitMap : T.BitMap;
+        #BitMap : BitMap.BitMap;
         #Interval : (index : Text, interval : [Interval], is_reversed : Bool);
     };
 
