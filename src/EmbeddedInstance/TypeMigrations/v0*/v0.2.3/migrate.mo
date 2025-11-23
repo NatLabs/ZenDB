@@ -1,7 +1,7 @@
 import Map "mo:map@9.0.1/Map";
 import Iter "mo:base@0.16.0/Iter";
 import Array "mo:base@0.16.0/Array";
-import LruCache "mo:lru-cache";
+import LruCache "mo:lru-cache@2.0.0";
 
 import V0_2_2 "../v0.2.2/types";
 import V0_2_3 "types";

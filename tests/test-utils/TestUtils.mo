@@ -2,7 +2,7 @@ import Debug "mo:base@0.16.0/Debug";
 import Buffer "mo:base@0.16.0/Buffer";
 
 import MemoryBTree "mo:memory-collection@0.3.2/MemoryBTree/Stable";
-import SparseBitMap64 "mo:bit-map@0.1.2/SparseBitMap64";
+import SparseBitMap64 "mo:bit-map@1.1.0/SparseBitMap64";
 
 import T "../../src/EmbeddedInstance/Types";
 

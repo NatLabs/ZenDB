@@ -1,4 +1,4 @@
-import LruCache "mo:lru-cache";
+import LruCache "mo:lru-cache@2.0.0";
 import Map "mo:map/Map";
 
 import T "Types";

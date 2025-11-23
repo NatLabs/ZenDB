@@ -19,7 +19,7 @@ import Decoder "mo:serde@3.4.0/Candid/Blob/Decoder";
 import Candid "mo:serde@3.4.0/Candid";
 import Itertools "mo:itertools@0.2.2/Iter";
 import RevIter "mo:itertools@0.2.2/RevIter";
-import SparseBitMap64 "mo:bit-map@0.1.2/SparseBitMap64";
+import SparseBitMap64 "mo:bit-map@1.1.0/SparseBitMap64";
 
 import T "../Types";
 import Query "../Query";

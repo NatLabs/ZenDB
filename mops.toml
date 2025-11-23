@@ -9,14 +9,14 @@ repository = "https://github.com/NatLabs/ZenDB"
 [dependencies]
 "base@0.16.0" = "0.16.0"
 "map@9.0.1" = "9.0.1"
-"serde@3.4.0" = "../serde"
+"serde@3.4.0" = "3.4.0"
 "itertools@0.2.2" = "0.2.2"
 "memory-collection@0.3.2" = "0.3.2"
-"bit-map@0.1.2" = "../bitmap"
+"bit-map@1.1.0" = "1.1.0"
 "vector@0.4.2" = "0.4.2"
 "augmented-btrees@0.7.1" = "0.7.1"
 "byte-utils@0.1.1" = "0.1.1"
-lru-cache = "1.0.0"
+'lru-cache@2.0.0' = "2.0.0"
 
 [dev-dependencies]
 test = "2.1.1"
