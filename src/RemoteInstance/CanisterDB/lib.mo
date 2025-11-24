@@ -24,7 +24,9 @@ import TypeMigrations "../../EmbeddedInstance/TypeMigrations";
 import Query "../../EmbeddedInstance/Query";
 
 (
-    with migration = func({}) : ({}) { {} }
+    with migration = func({ zendb_instance : ZenDB.Types.PrevVersionedStableStore }) : ({
+        zendb_instance : ZenDB.Types.VersionedStableStore;
+    }) { { zendb_instance = ZenDB.upgrade(zendb_instance) } }
 )
 shared ({ caller = owner }) persistent actor class CanisterDB() = this_canister {
 

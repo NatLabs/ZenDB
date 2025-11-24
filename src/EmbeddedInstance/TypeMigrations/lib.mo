@@ -17,7 +17,13 @@ module {
         #v1 : V1_.VersionedStableStore;
     };
 
-    public func upgrade(versions : VersionedStableStore) : VersionedStableStore {
+    /// Required for actor migrations if the type is no longer compatible with future versions
+    public type PrevVersionedStableStore = {
+        #v0 : V0_.PrevVersionedStableStore;
+        #v1 : V1_.PrevVersionedStableStore;
+    };
+
+    public func upgrade(versions : PrevVersionedStableStore) : VersionedStableStore {
         switch (versions) {
             case (#v0(v0)) {
                 Debug.trap("Cannot upgrade from " # V0_.to_text(v0) # ". This version requires manual data migration to v1.0.0 due to breaking changes (DocumentId: Nat → Blob, BitMap changes). No automatic upgrade path available.");

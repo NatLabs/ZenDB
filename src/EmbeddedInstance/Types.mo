@@ -35,6 +35,18 @@ import TypeMigrations "TypeMigrations";
 module T {
 
     public type VersionedStableStore = TypeMigrations.VersionedStableStore;
+    public type PrevVersionedStableStore = TypeMigrations.PrevVersionedStableStore;
+
+    public type Vector<A> = Vector.Vector<A>;
+    public type Map<K, V> = Map.Map<K, V>;
+    public type Set<K> = Set.Set<K>;
+    public let { thash; bhash; nhash } = Map;
+
+    public type Result<A, B> = Result.Result<A, B>;
+    public type Buffer<A> = Buffer.Buffer<A>;
+    public type Iter<A> = Iter.Iter<A>;
+    public type RevIter<A> = RevIter.RevIter<A>;
+    public type Order = Order.Order;
 
     public type BitMap = SparseBitMap64.SparseBitMap64;
     public type SparseBitMap64 = SparseBitMap64.SparseBitMap64;
@@ -59,16 +71,6 @@ module T {
         from_blob : Blob -> A;
         to_blob : A -> Blob;
     };
-
-    public type Map<K, V> = Map.Map<K, V>;
-    public type Set<K> = Set.Set<K>;
-    public let { thash; bhash; nhash } = Map;
-
-    public type Result<A, B> = Result.Result<A, B>;
-    public type Buffer<A> = Buffer.Buffer<A>;
-    public type Iter<A> = Iter.Iter<A>;
-    public type RevIter<A> = RevIter.RevIter<A>;
-    public type Order = Order.Order;
 
     public type MemoryBTree = MemoryBTree.StableMemoryBTree;
     public type TypeUtils<A> = TypeUtils.TypeUtils<A>;

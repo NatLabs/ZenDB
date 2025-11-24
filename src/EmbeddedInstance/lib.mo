@@ -187,7 +187,7 @@ module {
         TwoQueueCache.clear(sstore.candid_map_cache);
     };
 
-    public func upgrade(versioned_sstore : T.VersionedStableStore) : T.VersionedStableStore {
+    public func upgrade(versioned_sstore : T.PrevVersionedStableStore) : T.VersionedStableStore {
         TypeMigrations.upgrade(versioned_sstore);
     };
 

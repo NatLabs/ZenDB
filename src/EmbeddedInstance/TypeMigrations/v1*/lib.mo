@@ -12,7 +12,11 @@ module {
         #v1_0_0 : V1_0_0_types.StableStore;
     };
 
-    public func upgrade(versions : VersionedStableStore) : VersionedStableStore {
+    public type PrevVersionedStableStore = {
+        #v1_0_0 : V1_0_0_types.StableStore;
+    };
+
+    public func upgrade(versions : PrevVersionedStableStore) : VersionedStableStore {
         switch (versions) {
             case (#v1_0_0(v1_0_0)) {
                 #v1_0_0(v1_0_0);

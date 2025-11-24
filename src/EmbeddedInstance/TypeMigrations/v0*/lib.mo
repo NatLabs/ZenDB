@@ -1,21 +1,36 @@
-import V0_1_0 "./v0.1.0/types";
+import Debug "mo:base@0.16.0/Debug";
+
+import Types_v0_1_0 "v0.1.0/types";
 
 module {
+
     public type VersionedStableStore = {
-        #v0_1_0 : V0_1_0.StableStore;
+        #v0_1_0 : Types_v0_1_0.StableStore;
     };
 
-    public func upgrade(prev_store : VersionedStableStore) : VersionedStableStore {
-        prev_store;
+    public type PrevVersionedStableStore = {
+        #v0_1_0 : Types_v0_1_0.StableStore;
+    };
+
+    public func upgrade(prev_store : PrevVersionedStableStore) : VersionedStableStore {
+        switch (prev_store) {
+            case (#v0_1_0(state)) {
+                #v0_1_0(state);
+            };
+        };
     };
 
     public func share(store : VersionedStableStore) : VersionedStableStore {
         store;
     };
 
-    public func get_current_state(store : VersionedStableStore) : V0_1_0.StableStore {
-        switch (store) {
-            case (#v0_1_0(state)) state;
+    public func get_current_state(store : VersionedStableStore) : Types_v0_1_0.StableStore {
+        let upgraded = upgrade(store);
+        switch (upgraded) {
+            case (#v0_2_4(state)) state;
+            case (_) {
+                Debug.trap("Invalid version of stable store " # to_text(store) # ". Expected v0.1.0. Please call upgrade() on the stable store.");
+            };
         };
     };
 
