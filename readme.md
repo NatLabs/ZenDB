@@ -185,12 +185,13 @@ assert updatedUser1.profile.location == "New York";
 assert updatedUser1.profile.interests == ["coding", "reading"];
 
 // Update multiple fields referencing the current value of a field
+let currTime = Time.now();
 let #ok(_) = users.update(
   ZenDB.QueryBuilder().Where("email", #eq(#Text(""))),
   [
     ("name", #uppercase(#currValue)),
     ("age", #add(#currValue, #Nat(1))),
-    ("updated_at", #Int(Time.now())),
+    ("updated_at", #Int(currTime)),
     ("email", #lowercase(
       #concatAll([
         #concat(#get("name"), #Text("-in-")),
@@ -205,7 +206,7 @@ let updatedUser2 = users.get(userId);
 
 assert updatedUser2.name == "ALICE";
 assert updatedUser2.age == ?36;
-assert updatedUser2.updated_at == Time.now(); // I believe Time.now() resets after each call, so this will always be the same value as before
+assert updatedUser2.updated_at == currTime;
 assert updatedUser2.email == "alice-in-san-francisco@example.com";
 
 ```
