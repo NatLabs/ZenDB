@@ -1,0 +1,40 @@
+{
+  "version": 1,
+  "moc": "0.16.2",
+  "replica": "dfx",
+  "replicaVersion": "0.29.2",
+  "gc": "incremental",
+  "forceGc": true,
+  "results": [
+    [
+      "BasicTokenizer:tokenize() lorem ipsum",
+      {
+        "rts_stable_memory_size": 0,
+        "stable_memory_size": 0,
+        "instructions": 1377341405,
+        "rts_memory_size": 33554432,
+        "rts_total_allocation": 32206428,
+        "rts_collector_instructions": 364447,
+        "rts_mutator_instructions": -12683,
+        "rts_logical_stable_memory_size": 0,
+        "rts_heap_size": 1518908,
+        "rts_reclaimed": 30687520
+      }
+    ],
+    [
+      "BasicTokenizer:tokenize() random text",
+      {
+        "rts_stable_memory_size": 0,
+        "stable_memory_size": 0,
+        "instructions": 2427578013,
+        "rts_memory_size": 0,
+        "rts_total_allocation": 36566700,
+        "rts_collector_instructions": 742684,
+        "rts_mutator_instructions": -10215,
+        "rts_logical_stable_memory_size": 0,
+        "rts_heap_size": 3733592,
+        "rts_reclaimed": 32833108
+      }
+    ]
+  ]
+}
