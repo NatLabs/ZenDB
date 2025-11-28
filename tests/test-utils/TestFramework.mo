@@ -49,7 +49,7 @@ module TestFramework {
     public type CreateIndexOnCollection = (
         collection_name : Text,
         index_name : Text,
-        index_key_details : [(Text, ZenDB.Types.SortDirection)],
+        index_key_details : [(Text, ZenDB.Types.CreateIndexSortDirection)],
         options : ?ZenDB.Types.CreateIndexOptions,
     ) -> ZenDB.Types.Result<(), Text>;
 
@@ -91,11 +91,22 @@ module TestFramework {
                     Debug.trap("ZenDB Test Suite -> test_search_query(): Could not find collection named '" # collection_name # "'");
                 };
 
+                let stable_query = query_builder.build();
+                Debug.print("ZenDB Test Suite -> test_search_query(): Retrieved collection named '" # collection_name # "'");
+                Debug.print("Executing search query : " # debug_show (query_builder.build()));
+
                 let search_results = switch (StableCollection.search(collection, query_builder.build())) {
                     case (#err(err_msg)) {
                         Debug.trap("ZenDB Test Suite -> test_search_query(): Search query failed with error: " # err_msg);
                     };
                     case (#ok(results)) results;
+                };
+
+                let count = switch (StableCollection.count(collection, stable_query)) {
+                    case (#err(err_msg)) {
+                        Debug.trap("ZenDB Test Suite -> test_search_query(): Count query failed with error: " # err_msg);
+                    };
+                    case (#ok(res)) res.count;
                 };
 
                 // Implement a simple search query test that always returns true for demonstration purposes.
@@ -116,7 +127,7 @@ module TestFramework {
                             createIndex : CreateIndexOnCollection = func(
                                 collection_name : Text,
                                 index_name : Text,
-                                index_key_details : [(Text, ZenDB.Types.SortDirection)],
+                                index_key_details : [(Text, ZenDB.Types.CreateIndexSortDirection)],
                                 options : ?ZenDB.Types.CreateIndexOptions,
                             ) {
                                 // no-op
@@ -146,7 +157,7 @@ module TestFramework {
                             createIndex : CreateIndexOnCollection = func(
                                 collection_name : Text,
                                 index_name : Text,
-                                index_key_details : [(Text, ZenDB.Types.SortDirection)],
+                                index_key_details : [(Text, ZenDB.Types.CreateIndexSortDirection)],
                                 opt_options : ?ZenDB.Types.CreateIndexOptions,
                             ) {
 

@@ -292,4 +292,32 @@ module {
         };
     };
 
+    public func listDatabaseNames(versioned_sstore : T.VersionedStableStore) : [Text] {
+        let sstore = TypeMigrations.get_current_state(versioned_sstore);
+        Iter.toArray(Map.keys(sstore.databases));
+    };
+
+    public func renameDB(versioned_sstore : T.VersionedStableStore, old_name : Text, new_name : Text) : T.Result<(), Text> {
+        let sstore = TypeMigrations.get_current_state(versioned_sstore);
+
+        switch (Map.get<Text, T.StableDatabase>(sstore.databases, T.thash, old_name)) {
+            case (null) return #err("Database with name '" # old_name # "' does not exist");
+            case (?_) {};
+        };
+
+        switch (Map.get<Text, T.StableDatabase>(sstore.databases, T.thash, new_name)) {
+            case (?_) return #err("Database with name '" # new_name # "' already exists");
+            case (null) {};
+        };
+
+        let ?db = Map.remove<Text, T.StableDatabase>(sstore.databases, T.thash, old_name) else {
+            return #err("Database with name '" # old_name # "' does not exist");
+        };
+
+        ignore Map.put(sstore.databases, T.thash, new_name, db);
+
+        #ok(());
+    };
+
+
 };

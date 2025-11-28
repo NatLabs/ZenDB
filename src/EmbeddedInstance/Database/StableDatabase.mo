@@ -179,9 +179,9 @@ module {
 
         for (unique_field_names in unique_constraints.vals()) {
 
-            let unique_field_names_with_direction = Array.map<Text, (Text, T.SortDirection)>(
+            let unique_field_names_with_direction = Array.map<Text, (Text, T.CreateIndexSortDirection)>(
                 unique_field_names,
-                func(field_name : Text) : (Text, T.SortDirection) = (field_name, #Ascending),
+                func(field_name : Text) : (Text, T.CreateIndexSortDirection) = (field_name, #Ascending),
             );
 
             let index_res = StableCollection.create_index_internal(
@@ -312,7 +312,7 @@ module {
         #ok(());
     };
 
-    public func list_collections(db : T.StableDatabase) : [Text] {
+    public func list_collection_names(db : T.StableDatabase) : [Text] {
         Utils.iter_to_array(Map.keys(db.collections));
     };
 
@@ -360,6 +360,24 @@ module {
             total_document_store_bytes = total_document_store_bytes;
             total_index_store_bytes = total_index_store_bytes;
         };
+    };
+
+    public func get_collection_stats(db : T.StableDatabase, collection_name : Text) : ?T.CollectionStats {
+        switch (Map.get(db.collections, Map.thash, collection_name)) {
+            case (?collection) ?StableCollection.stats(collection);
+            case (null) null;
+        };
+    };
+
+    public func get_all_collections_stats(db : T.StableDatabase) : [(Text, T.CollectionStats)] {
+        let collections = Map.toArray<Text, T.StableCollection>(db.collections);
+
+        Array.map<(Text, T.StableCollection), (Text, T.CollectionStats)>(
+            collections,
+            func((collection_name, stable_collection) : (Text, T.StableCollection)) : (Text, T.CollectionStats) {
+                (collection_name, StableCollection.stats(stable_collection));
+            },
+        );
     };
 
 };

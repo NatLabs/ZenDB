@@ -39,7 +39,7 @@ module {
         #v1_0_0(sstore);
     };
 
-    public func to_text(versions : VersionedStableStore) : Text {
+    public func to_text(versions : PrevVersionedStableStore) : Text {
         switch (versions) {
             case (#v1_0_0(_)) { "v1.0.0" };
         };

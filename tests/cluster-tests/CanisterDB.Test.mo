@@ -33,7 +33,7 @@ persistent actor {
                     ("is_active", #Bool),
                 ]);
 
-                let #ok(_) = await canister_db.zendb_create_collection("default", "users", schema, null) else return assert false;
+                let #ok(_) = await canister_db.zendb_v1_create_collection("default", "users", schema, null) else return assert false;
 
                 let user_blob = to_candid ({
                     name = "Alice";
@@ -41,11 +41,11 @@ persistent actor {
                     is_active = true;
                 });
 
-                let #ok(user_id) = await canister_db.zendb_collection_insert_document("default", "users", user_blob) else return assert false;
+                let #ok(user_id) = await canister_db.zendb_v1_collection_insert_document("default", "users", user_blob) else return assert false;
 
-                assert #ok(user_blob) == (await canister_db.zendb_collection_get_document("default", "users", user_id));
+                assert #ok(user_blob) == (await canister_db.zendb_v1_collection_get_document("default", "users", user_id));
 
-                let query_results = await canister_db.zendb_collection_search(
+                let query_results = await canister_db.zendb_v1_collection_search(
                     "default",
                     "users",
                     ZenDB.QueryBuilder().Where(
@@ -83,7 +83,7 @@ persistent actor {
                     from_blob = func(blob : Blob) : ?User { from_candid (blob) };
                 };
 
-                let users = db.get_collection<User>("users", candify);
+                let users = db.getCollection<User>("users", candify);
 
                 let user_bob : User = {
                     name = "Bob";
@@ -95,7 +95,7 @@ persistent actor {
 
                 assert #ok(
                     user_bob
-                ) == users.from_get(
+                ) == users.fromGet(
                     await* users.get(user_bob_id)
                 );
 

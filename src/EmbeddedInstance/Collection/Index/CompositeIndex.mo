@@ -52,7 +52,6 @@ module CompositeIndex {
     type State<A> = T.State<A>;
     type Candid = T.Candid;
     type Bounds = T.Bounds;
-    type SortDirection = T.SortDirection;
     type FieldLimit = T.FieldLimit;
     type Order = Order.Order;
 
@@ -61,15 +60,15 @@ module CompositeIndex {
     public func new(
         collection : T.StableCollection,
         name : Text,
-        index_key_details : [(Text, SortDirection)],
+        index_key_details : [(Text, T.SortDirection)],
         is_unique : Bool, // if true, the index is unique and the document ids are not concatenated with the index key values to make duplicate values appear unique
         used_internally : Bool, // cannot be deleted by user if true
     ) : T.CompositeIndex {
 
-        let key_details : [(Text, SortDirection)] = if (is_unique) {
+        let key_details : [(Text, T.SortDirection)] = if (is_unique) {
             let contains_option_type = Itertools.any(
                 index_key_details.vals(),
-                func(index_key_detail : (Text, SortDirection)) : Bool {
+                func(index_key_detail : (Text, T.SortDirection)) : Bool {
                     switch (SchemaMap.get(collection.schema_map, index_key_detail.0)) {
                         case (?#Option(_)) true;
                         case (null) Debug.trap("CompositeIndex key details must be a valid field in the schema map");
@@ -401,12 +400,12 @@ module CompositeIndex {
         let index_data_utils = get_index_data_utils(collection);
 
         func sort_by_key_details(a : (Text, Any), b : (Text, Any)) : Order {
-            let pos_a = switch (Array.indexOf<(Text, SortDirection)>((a.0, #Ascending), index.key_details, Utils.tuple_eq(Text.equal))) {
+            let pos_a = switch (Array.indexOf<(Text, T.SortDirection)>((a.0, #Ascending), index.key_details, Utils.tuple_eq(Text.equal))) {
                 case (?pos) pos;
                 case (null) index.key_details.size();
             };
 
-            let pos_b = switch (Array.indexOf<(Text, SortDirection)>((b.0, #Ascending), index.key_details, Utils.tuple_eq(Text.equal))) {
+            let pos_b = switch (Array.indexOf<(Text, T.SortDirection)>((b.0, #Ascending), index.key_details, Utils.tuple_eq(Text.equal))) {
                 case (?pos) pos;
                 case (null) index.key_details.size();
             };

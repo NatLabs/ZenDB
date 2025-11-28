@@ -17,6 +17,9 @@ module {
             case (#v0_1_0(state)) {
                 #v0_1_0(state);
             };
+            case (_) {
+                Debug.trap("Invalid version " # to_text(prev_store) # " of stable store. Expected v0.2.4. Please call upgrade() on the stable store.");
+            };
         };
     };
 
@@ -27,16 +30,18 @@ module {
     public func get_current_state(store : VersionedStableStore) : Types_v0_1_0.StableStore {
         let upgraded = upgrade(store);
         switch (upgraded) {
-            case (#v0_2_4(state)) state;
+            case (#v0_1_0(state)) state;
             case (_) {
-                Debug.trap("Invalid version of stable store " # to_text(store) # ". Expected v0.1.0. Please call upgrade() on the stable store.");
+                Debug.trap("Invalid version of stable store " # to_text(store) # ". Expected v0.2.4. Please call upgrade() on the stable store.");
             };
+
         };
     };
 
-    public func to_text(store : VersionedStableStore) : Text {
+    public func to_text(store : PrevVersionedStableStore) : Text {
         switch (store) {
             case (#v0_1_0(_)) { "v0.1.0" };
+
         };
     };
 };

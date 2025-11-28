@@ -65,34 +65,7 @@ import BTree "../BTree";
 module StableCollection {
     let LOGGER_NAMESPACE = "StableCollection";
 
-    public type Map<K, V> = Map.Map<K, V>;
-    public type Set<K> = Set.Set<K>;
-    let { thash; nhash; bhash } = Map;
-
-    public type Result<A, B> = Result.Result<A, B>;
-    public type Buffer<A> = Buffer.Buffer<A>;
-    public type Iter<A> = Iter.Iter<A>;
-    public type RevIter<A> = RevIter.RevIter<A>;
     type QueryBuilder = Query.QueryBuilder;
-
-    public type Order = Order.Order;
-    public type Hash = Hash.Hash;
-
-    public type Schema = Candid.CandidType;
-
-    public type DocumentId = T.DocumentId;
-    public type CompositeIndex = T.CompositeIndex;
-    public type Candid = T.Candid;
-    public type SortDirection = T.SortDirection;
-    public type State<R> = T.State<R>;
-    public type ZenQueryLang = T.ZenQueryLang;
-
-    public type InternalCandify<A> = T.InternalCandify<A>;
-
-    public type StableCollection = T.StableCollection;
-
-    public type IndexKeyFields = T.IndexKeyFields;
-    type EvalResult = T.EvalResult;
 
     // public func new(
     //     db : ZenDB.StableDatabase,
@@ -153,27 +126,27 @@ module StableCollection {
 
     // BTree methods
 
-    public func entries(collection : T.StableCollection) : Iter<(T.DocumentId, Blob)> {
+    public func entries(collection : T.StableCollection) : T.Iter<(T.DocumentId, Blob)> {
         DocumentStore.entries(collection);
     };
 
-    public func keys(collection : T.StableCollection) : Iter<T.DocumentId> {
+    public func keys(collection : T.StableCollection) : T.Iter<T.DocumentId> {
         DocumentStore.keys(collection);
     };
 
-    public func vals(collection : T.StableCollection) : Iter<Blob> {
+    public func vals(collection : T.StableCollection) : T.Iter<Blob> {
         DocumentStore.vals(collection);
     };
 
-    public func range(collection : T.StableCollection, start : Nat, end : Nat) : Iter<(T.DocumentId, Blob)> {
+    public func range(collection : T.StableCollection, start : Nat, end : Nat) : T.Iter<(T.DocumentId, Blob)> {
         DocumentStore.range(collection, start, end);
     };
 
-    public func range_keys(collection : T.StableCollection, start : Nat, end : Nat) : Iter<T.DocumentId> {
+    public func range_keys(collection : T.StableCollection, start : Nat, end : Nat) : T.Iter<T.DocumentId> {
         DocumentStore.range_keys(collection, start, end);
     };
 
-    public func range_vals(collection : T.StableCollection, start : Nat, end : Nat) : Iter<Blob> {
+    public func range_vals(collection : T.StableCollection, start : Nat, end : Nat) : T.Iter<Blob> {
         DocumentStore.range_vals(collection, start, end);
     };
 
@@ -201,7 +174,7 @@ module StableCollection {
     public func create_index_internal(
         collection : T.StableCollection,
         index_name : Text,
-        index_key_details : [(Text, SortDirection)],
+        index_key_details : [(Text, T.CreateIndexSortDirection)],
         is_unique : Bool,
         used_internally : Bool,
     ) : T.Result<T.CompositeIndex, Text> {
@@ -234,7 +207,7 @@ module StableCollection {
     public func create_composite_index(
         collection : T.StableCollection,
         index_name : Text,
-        _index_key_details : [(Text, SortDirection)],
+        _index_key_details : [(Text, T.CreateIndexSortDirection)],
         is_unique : Bool,
     ) : T.Result<(T.CompositeIndex), Text> {
         let log = Logger.NamespacedLogger(collection.logger, LOGGER_NAMESPACE).subnamespace("create_composite_index");
@@ -258,7 +231,7 @@ module StableCollection {
     };
 
     func get_existing_keys<V>(
-        map : Map<Text, V>,
+        map : T.Map<Text, V>,
         index_names : [Text],
     ) : [Text] {
 
@@ -276,7 +249,7 @@ module StableCollection {
     };
 
     public func create_populate_indexes_batch(
-        collection : StableCollection,
+        collection : T.StableCollection,
         index_configs : [T.CreateInternalIndexParams],
         opt_performance_init : ?Nat,
     ) : T.Result<(batch_id : Nat), Text> {
@@ -337,9 +310,9 @@ module StableCollection {
     };
 
     public func batch_create_indexes(
-        collection : StableCollection,
+        collection : T.StableCollection,
         index_configs : [T.CreateInternalIndexParams],
-    ) : Result<(batch_id : Nat), Text> {
+    ) : T.Result<(batch_id : Nat), Text> {
         if (index_configs.size() == 0) {
             return #err("No index configurations provided");
         };
@@ -360,7 +333,7 @@ module StableCollection {
     };
 
     func process_index_population_batch(
-        collection : StableCollection,
+        collection : T.StableCollection,
         batch : T.BatchPopulateIndex,
         starting_document_id : T.DocumentId,
         num_documents_to_process : Nat,
@@ -433,9 +406,9 @@ module StableCollection {
     };
 
     func commit_batch_populate_indexes(
-        collection : StableCollection,
+        collection : T.StableCollection,
         batch_id : Nat,
-    ) : Result<(), Text> {
+    ) : T.Result<(), Text> {
         let log = Logger.NamespacedLogger(collection.logger, LOGGER_NAMESPACE).subnamespace("commit_batch_populate_indexes");
 
         log.lazyInfo(func() = "Committing batch with id " # debug_show batch_id);
@@ -529,10 +502,10 @@ module StableCollection {
     };
 
     public func populate_indexes_in_batch(
-        collection : StableCollection,
+        collection : T.StableCollection,
         batch_id : Nat,
         opt_performance_init : ?Nat,
-    ) : Result<(Bool), Text> {
+    ) : T.Result<(Bool), Text> {
         let log = Logger.NamespacedLogger(collection.logger, LOGGER_NAMESPACE).subnamespace("populate_indexes_in_batch");
 
         let MAX_INSTRUCTIONS = Nat64.toNat(C.MAX_UPDATE_INSTRUCTIONS * 80 / 100);
@@ -603,9 +576,9 @@ module StableCollection {
     };
 
     func rollback_and_delete_batch_populate_indexes(
-        collection : StableCollection,
+        collection : T.StableCollection,
         batch_id : Nat,
-    ) : Result<(), Text> {
+    ) : T.Result<(), Text> {
         let log = Logger.NamespacedLogger(collection.logger, LOGGER_NAMESPACE).subnamespace("rollback_and_delete_batch_populate_indexes");
         log.logInfo(
             "Rolling back batch populate indexes with id: " # debug_show batch_id
@@ -642,7 +615,7 @@ module StableCollection {
     public func create_and_populate_index_in_one_call(
         collection : T.StableCollection,
         index_name : Text,
-        index_key_details : [(Text, T.SortDirection)],
+        index_key_details : [(Text, T.CreateIndexSortDirection)],
         options : T.CreateIndexInternalOptions,
     ) : T.Result<(), Text> {
 
@@ -715,7 +688,7 @@ module StableCollection {
     func internal_populate_indexes(
         collection : T.StableCollection,
         indexes : Buffer.Buffer<T.Index>,
-        entries : Iter<(T.DocumentId, Blob)>,
+        entries : T.Iter<(T.DocumentId, Blob)>,
     ) : T.Result<(), Text> {
         let log = Logger.NamespacedLogger(collection.logger, LOGGER_NAMESPACE).subnamespace("internal_populate_indexes");
         log.lazyInfo(func() = "Populating " # debug_show indexes.size() # " indexes");
@@ -856,7 +829,7 @@ module StableCollection {
     let MAX_QUERY_INSTRUCTIONS : Nat64 = 5_000_000_000;
     let MAX_UPDATE_INSTRUCTIONS : Nat64 = 40_000_000_000;
 
-    func paginate(collection : T.StableCollection, eval : EvalResult, skip : Nat, opt_limit : ?Nat) : Iter<T.DocumentId> {
+    func paginate(collection : T.StableCollection, eval : T.EvalResult, skip : Nat, opt_limit : ?Nat) : T.Iter<T.DocumentId> {
         let log = Logger.NamespacedLogger(collection.logger, LOGGER_NAMESPACE).subnamespace("paginate");
 
         let iter = switch (eval) {
@@ -944,7 +917,7 @@ module StableCollection {
             for (field_constraint in field_constraints.vals()) {
 
                 // move to CandidOps
-                func unwrapOption(val : Candid) : Candid {
+                func unwrapOption(val : T.Candid) : T.Candid {
                     switch (val) {
                         case (#Option(inenr)) unwrapOption(inenr);
                         case (val) val;
@@ -1128,7 +1101,7 @@ module StableCollection {
         });
     };
 
-    func partially_update_doc(collection : T.StableCollection, candid_map : T.CandidMap, update_operations : [(Text, T.FieldUpdateOperations)]) : T.Result<Candid, Text> {
+    func partially_update_doc(collection : T.StableCollection, candid_map : T.CandidMap, update_operations : [(Text, T.FieldUpdateOperations)]) : T.Result<T.Candid, Text> {
         let log = Logger.NamespacedLogger(collection.logger, LOGGER_NAMESPACE).subnamespace("partially_update_doc");
         log.lazyInfo(func() = "Partially updating document with operations: " # debug_show update_operations);
 
@@ -1348,9 +1321,9 @@ module StableCollection {
     };
 
     public func insert_docs(
-        collection : StableCollection,
+        collection : T.StableCollection,
         documents : [T.CandidBlob],
-    ) : Result<[T.DocumentId], Text> {
+    ) : T.Result<[T.DocumentId], Text> {
         let log = Logger.NamespacedLogger(collection.logger, LOGGER_NAMESPACE).subnamespace("insert_docs");
         let ids = Buffer.Buffer<T.DocumentId>(documents.size());
 
@@ -1423,7 +1396,31 @@ module StableCollection {
         };
     };
 
-    public func evaluate_query(collection : T.StableCollection, stable_query : T.StableQuery) : T.Result<Iter<T.DocumentId>, Text> {
+    public func search_for_one(
+        collection : T.StableCollection,
+        stable_query : T.StableQuery,
+    ) : T.Result<T.SearchOneResult<T.CandidBlob>, Text> {
+        // Override limit to 1
+        let single_query = {
+            stable_query with
+            pagination = {
+                stable_query.pagination with
+                limit = ?1;
+            };
+        };
+
+        switch (search(collection, single_query)) {
+            case (#err(err)) #err(err);
+            case (#ok({ documents; instructions; pagination_token; has_more })) {
+                #ok({
+                    document = if (documents.size() == 0) null else ?documents[0];
+                    instructions;
+                });
+            };
+        };
+    };
+
+    public func evaluate_query(collection : T.StableCollection, stable_query : T.StableQuery) : T.Result<T.Iter<T.DocumentId>, Text> {
         let log = Logger.NamespacedLogger(collection.logger, LOGGER_NAMESPACE).subnamespace("evaluate_query");
         log.lazyDebug(func() = "Evaluating query with operations: " # debug_show (stable_query.query_operations));
 
@@ -1458,7 +1455,7 @@ module StableCollection {
 
         let sort_documents_by_field_cmp = switch (sort_by) {
             case (?sort_by) get_document_field_cmp(collection, sort_by);
-            case (null) func(_ : (T.DocumentId, ?[(Text, T.Candid)]), _ : (T.DocumentId, ?[(Text, T.Candid)])) : Order = #equal;
+            case (null) func(_ : (T.DocumentId, ?[(Text, T.Candid)]), _ : (T.DocumentId, ?[(Text, T.Candid)])) : T.Order = #equal;
         };
 
         let eval = QueryExecution.generate_document_ids_for_query_plan(collection, query_plan, sort_by, sort_documents_by_field_cmp);
@@ -1498,7 +1495,7 @@ module StableCollection {
         return #ok(iter_with_limit);
     };
 
-    public func internal_search(collection : T.StableCollection, stable_query : T.StableQuery) : T.Result<Iter<T.DocumentId>, Text> {
+    public func internal_search(collection : T.StableCollection, stable_query : T.StableQuery) : T.Result<T.Iter<T.DocumentId>, Text> {
         // let stable_query = query_builder.build();
         switch (evaluate_query(collection, stable_query)) {
             case (#err(err)) return #err(err);
@@ -1506,7 +1503,7 @@ module StableCollection {
         };
     };
 
-    public func ids_to_documents<Record>(collection : T.StableCollection, blobify : InternalCandify<Record>, iter : Iter<T.DocumentId>) : Iter<(T.DocumentId, Record)> {
+    public func ids_to_documents<Record>(collection : T.StableCollection, blobify : T.InternalCandify<Record>, iter : T.Iter<T.DocumentId>) : T.Iter<(T.DocumentId, Record)> {
         Iter.map<T.DocumentId, (T.DocumentId, Record)>(
             iter,
             func(id : T.DocumentId) : (T.DocumentId, Record) {
@@ -1516,7 +1513,7 @@ module StableCollection {
         );
     };
 
-    public func ids_to_candid_blobs<Record>(collection : T.StableCollection, iter : Iter<T.DocumentId>) : Iter<(T.DocumentId, T.CandidBlob)> {
+    public func ids_to_candid_blobs<Record>(collection : T.StableCollection, iter : T.Iter<T.DocumentId>) : T.Iter<(T.DocumentId, T.CandidBlob)> {
         Iter.map<T.DocumentId, (T.DocumentId, T.CandidBlob)>(
             iter,
             func(id : T.DocumentId) : (T.DocumentId, T.CandidBlob) {
@@ -1529,7 +1526,7 @@ module StableCollection {
     public func search_iter(
         collection : T.StableCollection,
         stable_query : T.StableQuery,
-    ) : T.Result<Iter<T.WrapId<T.CandidBlob>>, Text> {
+    ) : T.Result<T.Iter<T.WrapId<T.CandidBlob>>, Text> {
         switch (internal_search(collection, stable_query)) {
             case (#err(err)) return #err(err);
             case (#ok(document_ids_iter)) {
@@ -1542,9 +1539,9 @@ module StableCollection {
     public func get_document_field_cmp(
         collection : T.StableCollection,
         sort_field : (Text, T.SortDirection),
-    ) : ((T.DocumentId, ?[(Text, T.Candid)]), (T.DocumentId, ?[(Text, T.Candid)])) -> Order {
+    ) : ((T.DocumentId, ?[(Text, T.Candid)]), (T.DocumentId, ?[(Text, T.Candid)])) -> T.Order {
 
-        func sort_documents_by_field_cmp(a : (T.DocumentId, ?[(Text, T.Candid)]), b : (T.DocumentId, ?[(Text, T.Candid)])) : Order {
+        func sort_documents_by_field_cmp(a : (T.DocumentId, ?[(Text, T.Candid)]), b : (T.DocumentId, ?[(Text, T.Candid)])) : T.Order {
 
             func get_value((id, opt_sort_value) : (T.DocumentId, ?[(Text, T.Candid)])) : T.Candid {
                 switch (opt_sort_value) {
@@ -1655,6 +1652,28 @@ module StableCollection {
         collection_stats;
     };
 
+    public func list_index_names(collection : T.StableCollection) : [Text] {
+        Utils.iter_to_array(Map.keys(collection.indexes));
+    };
+
+    public func get_indexes(collection : T.StableCollection) : [(Text, T.IndexStats)] {
+        Array.map<(Text, T.Index), (Text, T.IndexStats)>(
+            Map.toArray(collection.indexes),
+            func((key, index) : (Text, T.Index)) : (Text, T.IndexStats) {
+                (key, Index.stats(collection, index, size(collection)));
+            },
+        );
+    };
+
+    public func get_index(collection : T.StableCollection, name : Text) : ?T.IndexStats {
+        switch (Map.get(collection.indexes, T.thash, name)) {
+            case (?index) {
+                ?Index.stats(collection, index, size(collection));
+            };
+            case (null) null;
+        };
+    };
+
     public func count(collection : T.StableCollection, stable_query : T.StableQuery) : T.Result<T.CountResult, Text> {
         let log = Logger.NamespacedLogger(collection.logger, LOGGER_NAMESPACE).subnamespace("count");
         let performance = Performance(collection.is_running_locally, null);
@@ -1703,7 +1722,7 @@ module StableCollection {
             null,
         );
 
-        let sort_documents_by_field_cmp = func(_ : (T.DocumentId, ?[(Text, T.Candid)]), _ : (T.DocumentId, ?[(Text, T.Candid)])) : Order = #equal;
+        let sort_documents_by_field_cmp = func(_ : (T.DocumentId, ?[(Text, T.Candid)]), _ : (T.DocumentId, ?[(Text, T.Candid)])) : T.Order = #equal;
 
         let eval = QueryExecution.generate_document_ids_for_query_plan(collection, query_plan, null, sort_documents_by_field_cmp);
 
@@ -1825,10 +1844,10 @@ module StableCollection {
 
     /// Updates multiple documents matching a query with the given update operations
     public func update_documents(
-        collection : StableCollection,
+        collection : T.StableCollection,
         stable_query : T.StableQuery,
         update_operations : [(Text, T.FieldUpdateOperations)],
-    ) : Result<T.UpdateResult, Text> {
+    ) : T.Result<T.UpdateResult, Text> {
         let log = Logger.NamespacedLogger(collection.logger, LOGGER_NAMESPACE).subnamespace("update_documents");
         let performance = Performance(collection.is_running_locally, null);
 
@@ -1862,9 +1881,9 @@ module StableCollection {
 
     /// Replaces multiple documents by their ids
     public func replace_docs(
-        collection : StableCollection,
+        collection : T.StableCollection,
         documents : [(T.DocumentId, Blob)],
-    ) : Result<T.ReplaceDocsResult, Text> {
+    ) : T.Result<T.ReplaceDocsResult, Text> {
         let performance = Performance(collection.is_running_locally, null);
 
         for ((id, candid_blob) in documents.vals()) {
@@ -1883,10 +1902,10 @@ module StableCollection {
 
     /// Deletes multiple documents matching a query
     public func delete_documents<Record>(
-        collection : StableCollection,
+        collection : T.StableCollection,
         blobify : T.InternalCandify<Record>,
         stable_query : T.StableQuery,
-    ) : Result<T.DeleteResult<Record>, Text> {
+    ) : T.Result<T.DeleteResult<Record>, Text> {
         let log = Logger.NamespacedLogger(collection.logger, LOGGER_NAMESPACE).subnamespace("delete_documents");
         let performance = Performance(collection.is_running_locally, null);
 
@@ -1924,11 +1943,22 @@ module StableCollection {
 
     /// Creates a batch populate operation from index names
     public func batch_populate_indexes_from_names(
-        collection : StableCollection,
+        collection : T.StableCollection,
         index_names : [Text],
-    ) : Result<(batch_id : Nat), Text> {
+    ) : T.Result<(batch_id : Nat), Text> {
         let log = Logger.NamespacedLogger(collection.logger, LOGGER_NAMESPACE).subnamespace("batch_populate_indexes_from_names");
         var error : ?Text = null;
+
+        func index_key_details_to_create_index_key_details(
+            index_key_details : [(Text, T.SortDirection)]
+        ) : [(Text, T.CreateIndexSortDirection)] {
+            Array.map<(Text, T.SortDirection), (Text, T.CreateIndexSortDirection)>(
+                index_key_details,
+                func(detail : (Text, T.SortDirection)) : (Text, T.CreateIndexSortDirection) {
+                    (detail.0, if (detail.1 == #Ascending) #Ascending else log.trap("Descending index sort direction is not currently supported"));
+                },
+            );
+        };
 
         let index_configs = Array.map<Text, T.CreateInternalIndexParams>(
             index_names,
@@ -1938,7 +1968,7 @@ module StableCollection {
                         case (#composite_index(composite_index)) {
                             (
                                 name,
-                                composite_index.key_details,
+                                index_key_details_to_create_index_key_details(composite_index.key_details),
                                 {
                                     is_unique = composite_index.is_unique;
                                     used_internally = composite_index.used_internally;
@@ -1948,7 +1978,7 @@ module StableCollection {
                         case (#text_index(text_index)) {
                             (
                                 text_index.internal_index.name,
-                                text_index.internal_index.key_details,
+                                index_key_details_to_create_index_key_details(text_index.internal_index.key_details),
                                 {
                                     is_unique = text_index.internal_index.is_unique;
                                     used_internally = text_index.internal_index.used_internally;

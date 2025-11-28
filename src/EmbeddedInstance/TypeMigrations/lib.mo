@@ -45,7 +45,7 @@ module {
         #v1(V1_.share_version(sstore));
     };
 
-    public func to_text(versions : VersionedStableStore) : Text {
+    public func to_text(versions : PrevVersionedStableStore) : Text {
         switch (versions) {
             case (#v0(v)) { V0_.to_text(v) };
             case (#v1(v)) { V1_.to_text(v) };

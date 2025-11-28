@@ -20,7 +20,7 @@ import Serde "mo:serde@3.4.0";
 import Candid "mo:serde@3.4.0/Candid";
 import Itertools "mo:itertools@0.2.2/Iter";
 import RevIter "mo:itertools@0.2.2/RevIter";
-import SparseBitMap64 "mo:bit-map@1.1.0/SparseBitMap64";
+import BitMap "mo:bit-map@1.1.0";
 import Vector "mo:vector@0.4.2";
 
 import MemoryBTree "mo:memory-collection@0.3.2/MemoryBTree/Stable";
@@ -28,28 +28,10 @@ import TypeUtils "mo:memory-collection@0.3.2/TypeUtils";
 import Int8Cmp "mo:memory-collection@0.3.2/TypeUtils/Int8Cmp";
 import BpTree "mo:augmented-btrees@0.7.1/BpTree";
 import BpTreeTypes "mo:augmented-btrees@0.7.1/BpTree/Types";
-import LruCache "mo:lru-cache@2.0.0";
-
-import TypeMigrations "TypeMigrations";
 
 module T {
 
-    public type VersionedStableStore = TypeMigrations.VersionedStableStore;
-    public type PrevVersionedStableStore = TypeMigrations.PrevVersionedStableStore;
-
-    public type Vector<A> = Vector.Vector<A>;
-    public type Map<K, V> = Map.Map<K, V>;
-    public type Set<K> = Set.Set<K>;
-    public let { thash; bhash; nhash } = Map;
-
-    public type Result<A, B> = Result.Result<A, B>;
-    public type Buffer<A> = Buffer.Buffer<A>;
-    public type Iter<A> = Iter.Iter<A>;
-    public type RevIter<A> = RevIter.RevIter<A>;
-    public type Order = Order.Order;
-
-    public type BitMap = SparseBitMap64.SparseBitMap64;
-    public type SparseBitMap64 = SparseBitMap64.SparseBitMap64;
+    public type BitMap = BitMap.BitMap;
 
     public type Candid = Serde.Candid;
 
@@ -71,6 +53,16 @@ module T {
         from_blob : Blob -> A;
         to_blob : A -> Blob;
     };
+
+    public type Map<K, V> = Map.Map<K, V>;
+    public type Set<K> = Set.Set<K>;
+    public let { thash; bhash; nhash } = Map;
+
+    public type Result<A, B> = Result.Result<A, B>;
+    public type Buffer<A> = Buffer.Buffer<A>;
+    public type Iter<A> = Iter.Iter<A>;
+    public type RevIter<A> = RevIter.RevIter<A>;
+    public type Order = Order.Order;
 
     public type MemoryBTree = MemoryBTree.StableMemoryBTree;
     public type TypeUtils<A> = TypeUtils.TypeUtils<A>;
@@ -118,10 +110,6 @@ module T {
         #Descending;
     };
 
-    public type CreateIndexSortDirection = {
-        #Ascending;
-    };
-
     public type SchemaMap = {
         map : Map.Map<Text, T.Schema>;
         fields_with_array_type : [Text];
@@ -152,7 +140,7 @@ module T {
         #v0 : CandidBlob;
     };
 
-    public type CompositeIndex = {
+    public type Index = {
         name : Text;
         key_details : [(Text, SortDirection)];
 
@@ -161,59 +149,7 @@ module T {
         is_unique : Bool; // if true, the index is unique and the document ids are not concatenated with the index key values to make duplicate values appear unique
     };
 
-    public type TextIndex = {
-        internal_index : T.CompositeIndex;
-        field : Text; // the field this index is on
-        tokenizer : Tokenizer; // the tokenizer used for this index
-    };
-
-    public type Index = {
-        #text_index : T.TextIndex;
-        #composite_index : T.CompositeIndex;
-    };
-
     public type DocumentStore = BTree<DocumentId, Document>;
-
-    public type IndexConfig = {
-        name : Text;
-        key_details : [(Text, SortDirection)];
-        is_unique : Bool;
-        used_internally : Bool;
-    };
-
-    public type CreateIndexParams = (
-        name : Text,
-        key_details : [(field : Text, CreateIndexSortDirection)],
-        create_index_options : ?T.CreateIndexOptions,
-    );
-
-    public type CreateInternalIndexParams = (
-        name : Text,
-        key_details : [(field : Text, CreateIndexSortDirection)],
-        create_index_options : T.CreateIndexInternalOptions,
-    );
-
-    public type BatchPopulateIndex = {
-        id : Nat;
-        indexes : [Index];
-        var indexed_documents : Nat;
-        total_documents : Nat;
-
-        var avg_instructions_per_document : Nat;
-        var total_instructions_used : Nat;
-
-        var next_document_to_process : DocumentId;
-
-        var num_documents_to_process_per_batch : ?Nat;
-        var done_processing : Bool;
-
-    };
-
-    public type TwoQueueCache<K, V> = {
-        var main_cache : LruCache.LruCache<K, V>; // stores frequently accessed items
-        var ghost_cache : LruCache.LruCache<K, V>; // items that were recently evicted from the main cache
-        var admission_cache : LruCache.LruCache<K, ()>; // items in line for the main cache (keys only)
-    };
 
     public type StableCollection = {
         ids : Ids;
@@ -226,23 +162,16 @@ module T {
 
         documents : DocumentStore;
         indexes : Map<Text, Index>;
-        indexes_in_batch_operations : Map<Text, Index>;
-        populate_index_batches : Map<Nat, BatchPopulateIndex>;
-        hidden_indexes : Set<Text>;
-
-        candid_serializer : Candid.TypedSerializer;
 
         field_constraints : Map<Text, [SchemaFieldConstraint]>;
-        unique_constraints : [([Text], CompositeIndex)];
+        unique_constraints : [([Text], Index)];
         fields_with_unique_constraints : Map<Text, Set<Nat>>; // the value is the index of the unique constraint in the unique_constraints list
 
         // reference to the freed btrees to the same variable in
         // the ZenDB database document
-        candid_map_cache : TwoQueueCache<T.DocumentId, T.CandidMap>;
         freed_btrees : Vector.Vector<MemoryBTree.StableMemoryBTree>;
         logger : Logger;
         memory_type : MemoryType;
-        is_running_locally : Bool;
     };
 
     type NestedCandid = {
@@ -268,10 +197,8 @@ module T {
 
         // reference to the freed btrees to the same variable in
         // the ZenDB database document
-        candid_map_cache : TwoQueueCache<T.DocumentId, T.CandidMap>;
         freed_btrees : Vector.Vector<MemoryBTree.StableMemoryBTree>;
         logger : Logger;
-        is_running_locally : Bool;
     };
 
     public type StableStore = {
@@ -282,12 +209,9 @@ module T {
         /// This id is concatenated with each document id to ensure uniqueness across canisters
         instance_id : Blob;
         databases : Map<Text, StableDatabase>;
-        candid_map_cache : TwoQueueCache<T.DocumentId, T.CandidMap>;
-
         memory_type : MemoryType;
         freed_btrees : Vector.Vector<MemoryBTree.StableMemoryBTree>;
         logger : Logger;
-        is_running_locally : Bool;
     };
 
     public type LogLevel = {
@@ -320,10 +244,7 @@ module T {
         #anyOf : [Candid];
         #not_ : ZqlOperators;
 
-        #between : (Candid, Candid); // [min, max] - both inclusive
-        #betweenExclusive : (Candid, Candid); // (min, max) - both exclusive
-        #betweenLeftOpen : (Candid, Candid); // (min, max] - min exclusive, max inclusive
-        #betweenRightOpen : (Candid, Candid); // [min, max) - min inclusive, max exclusive
+        #between : (Candid, Candid);
         #exists;
         #startsWith : Candid;
 
@@ -337,7 +258,7 @@ module T {
 
     };
 
-    public type PaginationToken = { last_document_id : ?DocumentId };
+    public type PaginationToken = DocumentId;
 
     public type PaginationDirection = {
         #Forward;
@@ -345,7 +266,7 @@ module T {
     };
 
     public type StableQueryPagination = {
-        cursor : ?T.PaginationToken;
+        cursor : ?(DocumentId, PaginationDirection);
         limit : ?Nat;
         skip : ?Nat;
     };
@@ -386,10 +307,6 @@ module T {
         filter_bounds : Bounds;
         simple_operations : [(Text, T.ZqlOperators)];
     };
-
-    public type IndexIntersectionDetails = {
-
-    };
     public type ScanDetails = {
         #IndexScan : IndexScanDetails;
         #FullScan : FullScanDetails;
@@ -401,52 +318,12 @@ module T {
         scans : [ScanDetails]; // scan results from simple #Operation
     };
 
-    public type QueryPlanResult = {
-        query_plan : QueryPlan;
-        opt_last_pagination_document_id : ?T.DocumentId;
-    };
-
     public type CreateIndexOptions = {
         is_unique : Bool;
     };
 
-    public type CreateIndexInternalOptions = CreateIndexOptions and {
-        used_internally : Bool;
-    };
-
-    public module CreateIndexOptions {
-        public func default() : CreateIndexOptions {
-            { is_unique = false };
-        };
-
-        public func internal_default() : CreateIndexInternalOptions {
-            { default() with used_internally = false };
-        };
-
-        public func to_internal_default(options : CreateIndexOptions) : CreateIndexInternalOptions {
-            { is_unique = options.is_unique; used_internally = false };
-        };
-
-        public func internal_from_opt(opt_options : ?CreateIndexOptions) : CreateIndexInternalOptions {
-            switch (opt_options) {
-                case (?options) {
-                    to_internal_default(options);
-                };
-                case (null) {
-                    internal_default();
-                };
-            };
-        };
-    };
-
     public type CreateCollectionOptions = {
         schema_constraints : [T.SchemaConstraint];
-    };
-
-    public module CreateCollectionOptions {
-        public func default() : CreateCollectionOptions {
-            { schema_constraints = [] };
-        };
     };
 
     /// MemoryBTree Stats
@@ -505,9 +382,6 @@ module T {
 
         /// Flag indicating if the index is used internally (these indexes cannot be deleted by user)
         used_internally : Bool;
-
-        /// Flag indicating if the index is hidden from queries
-        hidden : Bool;
 
         /// The average size in bytes of an index key
         avg_index_key_size : Nat;
@@ -595,11 +469,6 @@ module T {
 
     };
 
-    public type CacheStats = {
-        capacity : Nat;
-        size : Nat;
-    };
-
     public type InstanceStats = {
         /// The memory type of the instance
         memory_type : MemoryType;
@@ -609,8 +478,6 @@ module T {
 
         /// The database statistics for each database in the instance
         database_stats : [DatabaseStats];
-
-        cache_stats : CacheStats;
 
         /// The total memory allocation across all databases in the instance
         total_allocated_bytes : Nat;
@@ -631,29 +498,23 @@ module T {
 
     public type EvalResult = {
         #Empty;
-        #Ids : Iter<(DocumentId, ?[(Text, Candid)])>; // todo: returned the assumed size with the iterator, can help in choosing the smallest set of ids
-        #BitMap : T.SparseBitMap64;
+        #Ids : Iter<DocumentId>;
+        #BitMap : BitMap.BitMap;
         #Interval : (index : Text, interval : [Interval], is_reversed : Bool);
     };
 
     public type BestIndexResult = {
-        index : T.CompositeIndex;
+        index : T.Index;
         requires_additional_sorting : Bool;
         requires_additional_filtering : Bool;
         sorted_in_reverse : Bool;
         fully_covered_equality_and_range_fields : Set.Set<Text>;
         score : Float;
-
-        fully_covered_equal_fields : Set.Set<Text>;
-        fully_covered_sort_fields : Set.Set<Text>;
-        fully_covered_range_fields : Set.Set<Text>;
-
-        interval : T.Interval; // (start, end) range of matching entries in the index
     };
 
     public type FieldUpdateOperations = {
         #currValue : (); // refers to the current (prior to the update) of the field you are updating
-        #get : (Text); // retrieves the value of the given field path (eg. #get("profile.age") return #Nat(28))
+        #get : (Text);
 
         // multi-value operations
         #addAll : [FieldUpdateOperations];
@@ -687,12 +548,6 @@ module T {
 
     } or Candid;
 
-    public type CrossCanisterRecordsCursor = {
-        collection_name : Text;
-        collection_query : T.StableQuery;
-        results : T.Result<[(T.DocumentId, T.CandidBlob)], Text>;
-    };
-
     public type SchemaFieldConstraint = {
         #Min : Float;
         #Max : Float;
@@ -715,56 +570,4 @@ module T {
     //     #candid_map : { get : () -> () }; // placeholder for map type
 
     // };
-
-    public type Token = (Text, [(start : Nat, end : Nat)]);
-
-    public type Tokenizer = {
-        #basic;
-    };
-
-    public type CompareFunc<K> = (K, K) -> Order;
-
-    // Custom result types for operations that include instruction counts
-    public type SearchResult<Record> = {
-        documents : [WrapId<Record>];
-        instructions : Nat;
-        pagination_token : PaginationToken;
-        has_more : Bool;
-    };
-
-    public type SearchOneResult<Record> = {
-        document : ?WrapId<Record>;
-        instructions : Nat;
-    };
-    public type CountResult = {
-        count : Nat;
-        instructions : Nat;
-    };
-
-    public type UpdateByIdResult = {
-        instructions : Nat;
-    };
-
-    public type UpdateResult = {
-        updated_count : Nat;
-        instructions : Nat;
-    };
-    public type ReplaceByIdResult = {
-        instructions : Nat;
-    };
-
-    public type ReplaceDocsResult = {
-        instructions : Nat;
-    };
-
-    public type DeleteByIdResult<Record> = {
-        deleted_document : Record;
-        instructions : Nat;
-    };
-
-    public type DeleteResult<Record> = {
-        deleted_documents : [(DocumentId, Record)];
-        instructions : Nat;
-    };
-
 };

@@ -618,7 +618,7 @@
 //     //     };
 //     // };
 
-//     public shared ({ caller }) func zendb_collection_create_index(db_name : Text, collection_name : Text, index_name : Text, index_fields : [(Text, ZT.SortDirection)], options : ?ZT.CreateIndexOptions) : async ZT.Result<(), Text> {
+//     public shared ({ caller }) func zendb_collection_create_index(db_name : Text, collection_name : Text, index_name : Text, index_fields : [(Text, ZT.CreateIndexSortDirection)], options : ?ZT.CreateIndexOptions) : async ZT.Result<(), Text> {
 //         assert init_has_been_executed;
 
 //         let ?collection = get_collection_layout(db_name, collection_name) else return #err("Collection '" # collection_name # "' not found in database '" # db_name # "'");

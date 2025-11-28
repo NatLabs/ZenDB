@@ -30,25 +30,8 @@ import BpTree "mo:augmented-btrees@0.7.1/BpTree";
 import BpTreeTypes "mo:augmented-btrees@0.7.1/BpTree/Types";
 import LruCache "mo:lru-cache@2.0.0";
 
-import TypeMigrations "TypeMigrations";
-
 module T {
 
-    public type VersionedStableStore = TypeMigrations.VersionedStableStore;
-    public type PrevVersionedStableStore = TypeMigrations.PrevVersionedStableStore;
-
-    public type Vector<A> = Vector.Vector<A>;
-    public type Map<K, V> = Map.Map<K, V>;
-    public type Set<K> = Set.Set<K>;
-    public let { thash; bhash; nhash } = Map;
-
-    public type Result<A, B> = Result.Result<A, B>;
-    public type Buffer<A> = Buffer.Buffer<A>;
-    public type Iter<A> = Iter.Iter<A>;
-    public type RevIter<A> = RevIter.RevIter<A>;
-    public type Order = Order.Order;
-
-    public type BitMap = SparseBitMap64.SparseBitMap64;
     public type SparseBitMap64 = SparseBitMap64.SparseBitMap64;
 
     public type Candid = Serde.Candid;
@@ -71,6 +54,16 @@ module T {
         from_blob : Blob -> A;
         to_blob : A -> Blob;
     };
+
+    public type Map<K, V> = Map.Map<K, V>;
+    public type Set<K> = Set.Set<K>;
+    public let { thash; bhash; nhash } = Map;
+
+    public type Result<A, B> = Result.Result<A, B>;
+    public type Buffer<A> = Buffer.Buffer<A>;
+    public type Iter<A> = Iter.Iter<A>;
+    public type RevIter<A> = RevIter.RevIter<A>;
+    public type Order = Order.Order;
 
     public type MemoryBTree = MemoryBTree.StableMemoryBTree;
     public type TypeUtils<A> = TypeUtils.TypeUtils<A>;
@@ -116,10 +109,6 @@ module T {
     public type SortDirection = {
         #Ascending;
         #Descending;
-    };
-
-    public type CreateIndexSortDirection = {
-        #Ascending;
     };
 
     public type SchemaMap = {
@@ -183,13 +172,13 @@ module T {
 
     public type CreateIndexParams = (
         name : Text,
-        key_details : [(field : Text, CreateIndexSortDirection)],
+        key_details : [(field : Text, SortDirection)],
         create_index_options : ?T.CreateIndexOptions,
     );
 
     public type CreateInternalIndexParams = (
         name : Text,
-        key_details : [(field : Text, CreateIndexSortDirection)],
+        key_details : [(field : Text, SortDirection)],
         create_index_options : T.CreateIndexInternalOptions,
     );
 
@@ -320,10 +309,7 @@ module T {
         #anyOf : [Candid];
         #not_ : ZqlOperators;
 
-        #between : (Candid, Candid); // [min, max] - both inclusive
-        #betweenExclusive : (Candid, Candid); // (min, max) - both exclusive
-        #betweenLeftOpen : (Candid, Candid); // (min, max] - min exclusive, max inclusive
-        #betweenRightOpen : (Candid, Candid); // [min, max) - min inclusive, max exclusive
+        #between : (Candid, Candid);
         #exists;
         #startsWith : Candid;
 
@@ -595,11 +581,6 @@ module T {
 
     };
 
-    public type CacheStats = {
-        capacity : Nat;
-        size : Nat;
-    };
-
     public type InstanceStats = {
         /// The memory type of the instance
         memory_type : MemoryType;
@@ -609,8 +590,6 @@ module T {
 
         /// The database statistics for each database in the instance
         database_stats : [DatabaseStats];
-
-        cache_stats : CacheStats;
 
         /// The total memory allocation across all databases in the instance
         total_allocated_bytes : Nat;
@@ -653,7 +632,7 @@ module T {
 
     public type FieldUpdateOperations = {
         #currValue : (); // refers to the current (prior to the update) of the field you are updating
-        #get : (Text); // retrieves the value of the given field path (eg. #get("profile.age") return #Nat(28))
+        #get : (Text);
 
         // multi-value operations
         #addAll : [FieldUpdateOperations];
@@ -732,10 +711,6 @@ module T {
         has_more : Bool;
     };
 
-    public type SearchOneResult<Record> = {
-        document : ?WrapId<Record>;
-        instructions : Nat;
-    };
     public type CountResult = {
         count : Nat;
         instructions : Nat;
@@ -749,6 +724,7 @@ module T {
         updated_count : Nat;
         instructions : Nat;
     };
+
     public type ReplaceByIdResult = {
         instructions : Nat;
     };

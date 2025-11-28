@@ -442,7 +442,7 @@ To delete documents, use one of the delete methods:
 let #ok(deletedUser) = users_collection.deleteById(userId);
 
 // Delete many documents matching criteria
-let #ok(deletedUsers) = users_collection.deleteMany(
+let #ok(deletedUsers) = users_collection.delete(
   ZenDB.QueryBuilder()
     .Where("age", #lt(#Nat(18)))
 );

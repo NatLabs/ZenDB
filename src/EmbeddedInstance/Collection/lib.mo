@@ -62,35 +62,8 @@ module {
     public type Result<A, B> = Result.Result<A, B>;
     public type Buffer<A> = Buffer.Buffer<A>;
     public type Iter<A> = Iter.Iter<A>;
-    public type RevIter<A> = RevIter.RevIter<A>;
+
     type QueryBuilder = Query.QueryBuilder;
-
-    public type Order = Order.Order;
-    public type Hash = Hash.Hash;
-
-    public type Schema = Candid.CandidType;
-
-    public type CompositeIndex = T.CompositeIndex;
-    public type Candid = T.Candid;
-    public type SortDirection = T.SortDirection;
-    public type State<R> = T.State<R>;
-    public type ZenQueryLang = T.ZenQueryLang;
-
-    public type InternalCandify<A> = T.InternalCandify<A>;
-
-    public type StableCollection = T.StableCollection;
-
-    public type IndexKeyFields = T.IndexKeyFields;
-
-    // Reference custom result types from Types module
-    public type SearchResult<Record> = T.SearchResult<Record>;
-    public type CountResult = T.CountResult;
-    public type UpdateByIdResult = T.UpdateByIdResult;
-    public type UpdateResult = T.UpdateResult;
-    public type ReplaceByIdResult = T.ReplaceByIdResult;
-    public type ReplaceDocsResult = T.ReplaceDocsResult;
-    public type DeleteByIdResult<Record> = T.DeleteByIdResult<Record>;
-    public type DeleteResult<Record> = T.DeleteResult<Record>;
 
     public class Collection<Record>(
         collection_name : Text,
@@ -120,38 +93,18 @@ module {
         };
         public func _get_index(name : Text) : T.Index = switch (Map.get(collection.indexes, T.thash, name)) {
             case (?(index)) return index;
-            case (null) Debug.trap("Internal function error '_get_index()': You shouldn't be using this function anyway");
+            case (null) Debug.trap("Internal function error '_get_index()': use getIndex() instead");
         };
 
         /// Returns the collection name.
         public func name() : Text = collection_name;
         public func getSchema() : T.Schema { collection.schema };
 
-        public func listIndexes() : [Text] {
-            Utils.iter_to_array(Map.keys(collection.indexes));
-        };
-
-        public func getIndexes() : [(Text, T.IndexStats)] {
-            Array.map<(Text, T.Index), (Text, T.IndexStats)>(
-                Map.toArray(collection.indexes),
-                func((key, index) : (Text, T.Index)) : (Text, T.IndexStats) {
-                    (key, Index.stats(collection, index, StableCollection.size(collection)));
-                },
-            );
-        };
-
-        public func getIndex(name : Text) : ?T.IndexStats {
-            switch (Map.get(collection.indexes, T.thash, name)) {
-                case (?index) {
-                    ?Index.stats(collection, index, StableCollection.size(collection));
-                };
-                case (null) null;
-            };
-        };
         public func get_schema() : T.Schema { collection.schema };
 
         /// Returns the total number of documents in the collection.
         public func size() : Nat = StableCollection.size(collection);
+        public func isEmpty() : Bool = StableCollection.size(collection) == 0;
 
         /// Returns an iterator over all the document ids in the collection.
         public func keys() : Iter<T.DocumentId> {
@@ -231,8 +184,8 @@ module {
         //     );
         // };
 
-        type DocumentLimits = [(Text, ?State<T.CandidQuery>)];
-        type FieldLimit = (Text, ?State<T.CandidQuery>);
+        type DocumentLimits = [(Text, ?T.State<T.CandidQuery>)];
+        type FieldLimit = (Text, ?T.State<T.CandidQuery>);
 
         type Bounds = (DocumentLimits, DocumentLimits);
 
@@ -312,7 +265,7 @@ module {
         /// @returns A Result containing an array of tuples containing the id and the document for all matching documents.
         /// If the search fails, an error message will be returned.
 
-        public func search(query_builder : QueryBuilder) : T.Result<SearchResult<Record>, Text> {
+        public func search(query_builder : QueryBuilder) : T.Result<T.SearchResult<Record>, Text> {
             switch (
                 StableCollection.search(collection, query_builder.build())
             ) {
@@ -330,27 +283,42 @@ module {
             };
         };
 
+        public func searchForOne(query_builder : QueryBuilder) : T.Result<T.SearchOneResult<Record>, Text> {
+            switch (StableCollection.search_for_one(collection, query_builder.build())) {
+                case (#err(err)) #err(err);
+                case (#ok({ document; instructions })) {
+                    #ok({
+                        document = switch (document) {
+                            case (null) null;
+                            case (?doc) ?((doc.0, blobify.from_blob(doc.1)));
+                        };
+                        instructions;
+                    });
+                };
+            };
+        };
+
         public func stats() : T.CollectionStats {
             StableCollection.stats(collection);
         };
 
         /// Returns the total number of documents that match the query.
         /// This ignores the limit and skip parameters.
-        public func count(query_builder : QueryBuilder) : T.Result<CountResult, Text> {
+        public func count(query_builder : QueryBuilder) : T.Result<T.CountResult, Text> {
             handleResult(
                 StableCollection.count(collection, query_builder.build()),
                 "Failed to count documents",
             );
         };
 
-        public func replace(id : T.DocumentId, document : Record) : T.Result<ReplaceByIdResult, Text> {
+        public func replace(id : T.DocumentId, document : Record) : T.Result<T.ReplaceByIdResult, Text> {
             handleResult(
                 StableCollection.replace_by_id(collection, id, blobify.to_blob(document)),
                 "Failed to replace document with id: " # debug_show (id),
             );
         };
 
-        public func replaceDocs(documents : [(T.DocumentId, Record)]) : T.Result<ReplaceDocsResult, Text> {
+        public func replaceDocs(documents : [(T.DocumentId, Record)]) : T.Result<T.ReplaceDocsResult, Text> {
             handleResult(
                 StableCollection.replace_docs(
                     collection,
@@ -366,21 +334,21 @@ module {
         };
 
         /// Updates a document by its id with the given update operations.
-        public func updateById(id : T.DocumentId, update_operations : [(Text, T.FieldUpdateOperations)]) : T.Result<UpdateByIdResult, Text> {
+        public func updateById(id : T.DocumentId, update_operations : [(Text, T.FieldUpdateOperations)]) : T.Result<T.UpdateByIdResult, Text> {
             handleResult(
                 StableCollection.update_by_id(collection, id, update_operations),
                 "Failed to update document with id: " # debug_show (id),
             );
         };
 
-        public func update(query_builder : QueryBuilder, update_operations : [(Text, T.FieldUpdateOperations)]) : T.Result<UpdateResult, Text> {
+        public func update(query_builder : QueryBuilder, update_operations : [(Text, T.FieldUpdateOperations)]) : T.Result<T.UpdateResult, Text> {
             handleResult(
                 StableCollection.update_documents(collection, query_builder.build(), update_operations),
                 "Failed to update documents",
             );
         };
 
-        public func deleteById(id : T.DocumentId) : T.Result<DeleteByIdResult<Record>, Text> {
+        public func deleteById(id : T.DocumentId) : T.Result<T.DeleteByIdResult<Record>, Text> {
             switch (
                 handleResult(
                     StableCollection.delete_by_id(collection, id),
@@ -398,7 +366,7 @@ module {
             };
         };
 
-        public func delete(query_builder : QueryBuilder) : T.Result<DeleteResult<Record>, Text> {
+        public func delete(query_builder : QueryBuilder) : T.Result<T.DeleteResult<Record>, Text> {
             handleResult(
                 StableCollection.delete_documents(collection, blobify, query_builder.build()),
                 "Failed to delete documents",
@@ -434,13 +402,27 @@ module {
             StableCollection.clear(collection);
         };
 
-        // public func update_schema(schema : Schema) : T.Result<(), Text> {
+        // public func update_schema(schema : T.Schema) : T.Result<(), Text> {
         //     handleResult(StableCollection.update_schema(collection, schema), "Failed to update schema");
         // };
 
+        // Index Fns
+
+        public func listIndexNames() : [Text] {
+            StableCollection.list_index_names(collection);
+        };
+
+        public func getIndexes() : [(Text, T.IndexStats)] {
+            StableCollection.get_indexes(collection);
+        };
+
+        public func getIndex(name : Text) : ?T.IndexStats {
+            StableCollection.get_index(collection, name);
+        };
+
         /// Creates a new index with the given index keys.
         /// If `is_unique` is true, the index will be unique on the index keys and documents with duplicate index keys will be rejected.
-        public func createIndex(name : Text, index_key_details : [(Text, SortDirection)], opt_options : ?T.CreateIndexOptions) : T.Result<(), Text> {
+        public func createIndex(name : Text, index_key_details : [(Text, T.CreateIndexSortDirection)], opt_options : ?T.CreateIndexOptions) : T.Result<(), Text> {
 
             StableCollection.create_and_populate_index_in_one_call(
                 collection,
@@ -491,28 +473,6 @@ module {
             );
         };
 
-        /// Clears an index from the collection that is not used internally.
-        public func clearIndex(name : Text) : T.Result<(), Text> {
-            handleResult(
-                StableCollection.clear_index(collection, name),
-                "Failed to clear index: " # name,
-            );
-        };
-
-        public func repopulateIndex(name : Text) : T.Result<(), Text> {
-            handleResult(
-                StableCollection.repopulate_index(collection, name),
-                "Failed to populate index: " # name,
-            );
-        };
-
-        public func repopulateIndexes(names : [Text]) : T.Result<(), Text> {
-            handleResult(
-                StableCollection.repopulate_indexes(collection, names),
-                "Failed to populate indexes: " # debug_show (names),
-            );
-        };
-
         /// Hide indexes from query planning.
         public func hideIndexes(index_names : [Text]) : T.Result<(), Text> {
             handleResult(
@@ -529,15 +489,37 @@ module {
             );
         };
 
-        public func createTextIndex(index_name : Text, name : Text, tokenizer : T.Tokenizer) : T.Result<(), Text> {
-            let res = handleResult(
-                StableCollection.create_text_index(collection, index_name, name, tokenizer),
-                "Failed to create text index: " # name,
-            );
+        // /// Clears an index from the collection that is not used internally.
+        // public func clearIndex(name : Text) : T.Result<(), Text> {
+        //     handleResult(
+        //         StableCollection.clear_index(collection, name),
+        //         "Failed to clear index: " # name,
+        //     );
+        // };
 
-            Result.mapOk<T.TextIndex, (), Text>(res, func(_) : () {});
+        // public func repopulateIndex(name : Text) : T.Result<(), Text> {
+        //     handleResult(
+        //         StableCollection.repopulate_index(collection, name),
+        //         "Failed to populate index: " # name,
+        //     );
+        // };
 
-        };
+        // public func repopulateIndexes(names : [Text]) : T.Result<(), Text> {
+        //     handleResult(
+        //         StableCollection.repopulate_indexes(collection, names),
+        //         "Failed to populate indexes: " # debug_show (names),
+        //     );
+        // };
+
+        // public func createTextIndex(index_name : Text, name : Text, tokenizer : T.Tokenizer) : T.Result<(), Text> {
+        //     let res = handleResult(
+        //         StableCollection.create_text_index(collection, index_name, name, tokenizer),
+        //         "Failed to create text index: " # name,
+        //     );
+
+        //     Result.mapOk<T.TextIndex, (), Text>(res, func(_) : () {});
+
+        // };
 
     };
 

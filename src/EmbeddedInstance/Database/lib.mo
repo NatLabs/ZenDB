@@ -94,9 +94,8 @@ module {
         };
 
         /// Retrieves the total number of collections in the database.
-        public func size() : Nat {
-            StableDatabase.size(stable_db);
-        };
+        public func size() : Nat { StableDatabase.size(stable_db) };
+        public func isEmpty() : Bool { size() == 0 };
 
         /// Creates a new collection in the database with the given name and schema.
         /// The name must be unique and not already exist in the database, unless the function will return an #err.
@@ -187,10 +186,34 @@ module {
             stable_db;
         };
 
+        public func renameCollection(prev_collection_name : Text, new_collection_name : Text) : T.Result<(), Text> {
+            StableDatabase.rename_collection(stable_db, prev_collection_name, new_collection_name);
+        };
+
+        public func deleteCollection(collection_name : Text) : T.Result<(), Text> {
+            StableDatabase.delete_collection(stable_db, collection_name);
+        };
+
+        public func listCollectionNames() : [Text] {
+            StableDatabase.list_collection_names(stable_db);
+        };
+
+        public func stats() : T.DatabaseStats {
+            StableDatabase.stats(stable_db);
+        };
+
+        public func getCollectionStats(collection_name : Text) : ?T.CollectionStats {
+            StableDatabase.get_collection_stats(stable_db, collection_name);
+        };
+
+        public func getAllCollectionsStats() : [(Text, T.CollectionStats)] {
+            StableDatabase.get_all_collections_stats(stable_db);
+        };
+
         public func _create_index_on_collection(
             collection_name : Text,
             index_name : Text,
-            index_fields : [(Text, T.SortDirection)],
+            index_fields : [(Text, T.CreateIndexSortDirection)],
             is_unique : Bool,
         ) : T.Result<(), Text> {
             let stable_collection = switch (StableDatabase.get_collection(stable_db, collection_name)) {
