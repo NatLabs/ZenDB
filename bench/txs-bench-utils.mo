@@ -304,7 +304,7 @@ module TxsBenchUtils {
 
         public class CollectionBenchmark(
             collection : ZenDB.Collection<Tx>,
-            indexes : [[(Text, ZenDB.Types.SortDirection)]],
+            indexes : [[(Text, ZenDB.Types.CreateIndexSortDirection)]],
             inputs : Buffer.Buffer<Tx>,
             tx_ids : Buffer.Buffer<Nat>,
             principals : [Principal],

@@ -1,52 +1,50 @@
 name: Makefile CI
 
 on:
-  push:
-    branches:
-      - main
-  pull_request:
-    branches:
-      - "*"
+    push:
+        branches:
+            - main
+    pull_request:
+        branches:
+            - "*"
 
 jobs:
-  build:
-    runs-on: ubuntu-latest
+    build:
+        runs-on: ubuntu-latest
 
-    name: Build and test
-    steps:
-      - uses: actions/checkout@v4
-      - uses: actions/setup-node@v4
-        with:
-          node-version: 20
-      - name: Cache Node modules
-        uses: actions/cache@v4
-        with:
-          path: ~/.npm
-          key: ${{ runner.os }}-node-${{ hashFiles('**/package-lock.json') }}
-          restore-keys: |
-            ${{ runner.os }}-node-
+        name: Build and test
+        steps:
+            - uses: actions/checkout@v4
+            - uses: actions/setup-node@v4
+              with:
+                  node-version: 20
+            - name: Cache Node modules
+              uses: actions/cache@v4
+              with:
+                  path: ~/.npm
+                  key: ${{ runner.os }}-node-${{ hashFiles('**/package-lock.json') }}
+                  restore-keys: |
+                      ${{ runner.os }}-node-
 
-      - name: Install dfx
-        uses: dfinity/setup-dfx@main
-      - name: Confirm successful installation
-        run: dfx --version
+            - name: Install dfx
+              uses: dfinity/setup-dfx@main
+            - name: Confirm successful installation
+              run: dfx --version
 
-      - name: Install dfx cache
-        run: dfx cache install
+            - name: Install dfx cache
+              run: dfx cache install
 
-      - name: Install mops & mocv
-        run: |
-          npm --yes -g i ic-mops
-          mops i
-          mops toolchain init
-          mops toolchain use moc latest
-          mops toolchain use wasmtime 14.0.4
+            - name: Install mops & mocv
+              run: |
+                  npm --yes -g i ic-mops
+                  mops i
+                  mops toolchain init
 
-          # set moc path for dfx to use
-          echo "DFX_MOC_PATH=$(mops toolchain bin moc)" >> $GITHUB_ENV
+                  # set moc path for dfx to use
+                  echo "DFX_MOC_PATH=$(mops toolchain bin moc)" >> $GITHUB_ENV
 
-      - name: Detect warnings
-        run: make check
+            - name: Detect warnings
+              run: make check
 
-      - name: Run Tests
-        run: make test
+            - name: Run Tests
+              run: make test
