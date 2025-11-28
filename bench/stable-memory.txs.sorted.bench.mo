@@ -1,18 +1,17 @@
-import Iter "mo:base/Iter";
-import Array "mo:base/Array";
-import Debug "mo:base/Debug";
-import Prelude "mo:base/Prelude";
-import Text "mo:base/Text";
-import Char "mo:base/Char";
-import Buffer "mo:base/Buffer";
-import Nat "mo:base/Nat";
-import Option "mo:base/Option";
+import Iter "mo:base@0.16.0/Iter";
+import Array "mo:base@0.16.0/Array";
+import Debug "mo:base@0.16.0/Debug";
+import Prelude "mo:base@0.16.0/Prelude";
+import Text "mo:base@0.16.0/Text";
+import Char "mo:base@0.16.0/Char";
+import Buffer "mo:base@0.16.0/Buffer";
+import Nat "mo:base@0.16.0/Nat";
+import Option "mo:base@0.16.0/Option";
 
 import Bench "mo:bench";
 import Fuzz "mo:fuzz";
-import Candid "mo:serde/Candid";
-import Itertools "mo:itertools/Iter";
-import BitMap "mo:bit-map";
+import Candid "mo:serde@3.4.0/Candid";
+import Itertools "mo:itertools@0.2.2/Iter";
 
 import ZenDB "../src";
 import TxsBenchUtils "txs-bench-utils";
@@ -30,15 +29,8 @@ module {
         bench.description("Benchmarking the performance of sorted queries with 1k txs");
 
         bench.cols([
-            // "#heap no index",
             "#stableMemory no index (sorted by ts)",
-
-            // partially covered indexes sorted by tx.amt
-            // "#heap 7 single field indexes (sorted by tx.amt)",
             "#stableMemory 7 single field indexes (sorted by tx.amt)",
-
-            // multi-field indexes sorted by timestamp
-            // "#heap 6 fully covered indexes (sorted by ts)",
             "#stableMemory 6 fully covered indexes (sorted by ts)",
 
         ]);
@@ -46,6 +38,7 @@ module {
         bench.rows([
             "insert with no index",
             "create and populate indexes",
+
             "clear collection entries and indexes",
             "insert with indexes",
 
@@ -63,7 +56,7 @@ module {
 
             // #Or only, 3 queries on the same field (btype == '1xfer' or '2xfer' or '1mint')",
             "query(): #Or (btype == '1xfer' OR '2xfer' OR '1mint')",
-            // "query(): #anyOf (btype either of ['1xfer', '2xfer', '1mint'])",
+            // "query(): #Or (btype == '1xfer' OR '2xfer' OR '1mint')",
 
             // #Or only, 1 query each on 2 different fields (btype, amt)
             "query(): #Or (btype == '1xfer' OR tx.amt >= 500)",
@@ -93,7 +86,7 @@ module {
 
         let limit = 1_000;
 
-        let txs_benchmarks = TxsBenchUtils.TxsBenchmarks(limit);
+        let txs_benchmarks = TxsBenchUtils.TxsBenchmarks(limit, limit);
 
         bench.runner(
             func(col, row) = txs_benchmarks.run_benchmarks(row, col)

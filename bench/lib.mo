@@ -1,14 +1,14 @@
-import Iter "mo:base/Iter";
-import Debug "mo:base/Debug";
-import Prelude "mo:base/Prelude";
-import Text "mo:base/Text";
-import Char "mo:base/Char";
-import Buffer "mo:base/Buffer";
+import Iter "mo:base@0.16.0/Iter";
+import Debug "mo:base@0.16.0/Debug";
+import Prelude "mo:base@0.16.0/Prelude";
+import Text "mo:base@0.16.0/Text";
+import Char "mo:base@0.16.0/Char";
+import Buffer "mo:base@0.16.0/Buffer";
 
 import Bench "mo:bench";
 import Fuzz "mo:fuzz";
-import Candid "mo:serde/Candid";
-import Itertools "mo:itertools/Iter";
+import Candid "mo:serde@3.4.0/Candid";
+import Itertools "mo:itertools@0.2.2/Iter";
 
 import ZenDB "../src";
 
@@ -48,7 +48,7 @@ module {
         let fuzz = Fuzz.Fuzz();
         let { QueryBuilder } = ZenDB;
 
-        let hydra_db = ZenDB.new();
+        let zendb = ZenDB.new();
 
         let limit = 1_000;
 
@@ -164,7 +164,7 @@ module {
         };
 
         let buffer = Buffer.Buffer<StoreItem>(limit);
-        let #ok(collection) = ZenDB.createCollection(hydra_db, "store_items", item_schema, null);
+        let #ok(collection) = ZenDB.createCollection(zendb, "store_items", item_schema, null);
 
         Debug.print(debug_show collection.schema_keys);
         for (i in Itertools.range(0, limit)) {
@@ -178,44 +178,44 @@ module {
                 case ("ZenDB", "put() no index") {
                     for (i in Itertools.range(0, limit)) {
                         let item = buffer.get(i);
-                        let #ok(_) = ZenDB.put<StoreItem>(hydra_db, "store_items", candify_store_item, item);
+                        let #ok(_) = ZenDB.put<StoreItem>(zendb, "store_items", candify_store_item, item);
                     };
                 };
                 case ("ZenDB", "createIndex()") {
-                    let #ok(_) = ZenDB.createIndex(hydra_db, "store_items", ["store", "in_stock", "price"], false);
+                    let #ok(_) = ZenDB.createIndex(zendb, "store_items", ["store", "in_stock", "price"], false);
                 };
                 case ("ZenDB", "clear collection data") {
-                    ZenDB.clear_collection(hydra_db, "store_items");
+                    ZenDB.clear_collection(zendb, "store_items");
                 };
                 case ("ZenDB", "put() with 1 index") {
                     for (i in Itertools.range(0, limit)) {
                         let item = buffer.get(i);
-                        let #ok(_) = ZenDB.put<StoreItem>(hydra_db, "store_items", candify_store_item, item);
+                        let #ok(_) = ZenDB.put<StoreItem>(zendb, "store_items", candify_store_item, item);
                     };
                 };
                 case ("ZenDB", "create 2nd index") {
-                    let #ok(_) = ZenDB.createIndex(hydra_db, "store_items", ["name", "price"], false);
+                    let #ok(_) = ZenDB.createIndex(zendb, "store_items", ["name", "price"], false);
                 };
                 case ("ZenDB", "put() with 2 indexes") {
                     for (i in Itertools.range(0, limit)) {
                         let item = buffer.get(i);
-                        let #ok(_) = ZenDB.put<StoreItem>(hydra_db, "store_items", candify_store_item, item);
+                        let #ok(_) = ZenDB.put<StoreItem>(zendb, "store_items", candify_store_item, item);
                     };
                 };
                 case ("ZenDB", "create 3rd index") {
-                    let #ok(_) = ZenDB.createIndex(hydra_db, "store_items", ["name", "in_stock", "price"], false);
+                    let #ok(_) = ZenDB.createIndex(zendb, "store_items", ["name", "in_stock", "price"], false);
                 };
                 case ("ZenDB", "put() with 3 indexes") {
                     for (i in Itertools.range(0, limit)) {
                         let item = buffer.get(i);
-                        let #ok(_) = ZenDB.put<StoreItem>(hydra_db, "store_items", candify_store_item, item);
+                        let #ok(_) = ZenDB.put<StoreItem>(zendb, "store_items", candify_store_item, item);
                     };
                 };
                 case ("ZenDB", "updateById() 1" or "updateById() 2" or "updateById() 3" or "updateById() 4") {
                     for (i in Itertools.range(0, limit)) {
 
                         let #ok(_) = ZenDB.updateById<StoreItem>(
-                            hydra_db,
+                            zendb,
                             "store_items",
                             candify_store_item,
                             i,
@@ -227,36 +227,36 @@ module {
                 };
                 case ("ZenDB", "get()") {
                     for (i in Itertools.range(0, limit)) {
-                        let #ok(item) = ZenDB.get<StoreItem>(hydra_db, "store_items", candify_store_item, i);
+                        let #ok(item) = ZenDB.get<StoreItem>(zendb, "store_items", candify_store_item, i);
                     };
                 };
                 case ("ZenDB", "scan(): all documents") {
-                    let result = ZenDB.scan<StoreItem>(hydra_db, "store_items", candify_store_item, [], []);
+                    let result = ZenDB.scan<StoreItem>(zendb, "store_items", candify_store_item, [], []);
                     Debug.print("results: " # debug_show (Iter.toArray(result)));
                 };
 
                 case ("ZenDB", "search(): users named 'nam-do-dan'") {
                     let _query = QueryBuilder()._where("name", #eq(#Text("nam-do-san")));
-                    let result = ZenDB.search<StoreItem>(hydra_db, "store_items", candify_store_item, _query);
+                    let result = ZenDB.search<StoreItem>(zendb, "store_items", candify_store_item, _query);
                     Debug.print("results: " # debug_show (Iter.toArray(result)));
                 };
                 case ("ZenDB", "search(): users between the age of 20 and 35") {
                     let _query = QueryBuilder()._where("age", #gte(#Nat(20)))._and("age", #lte(#Nat(35)));
 
-                    let result = ZenDB.search<StoreItem>(hydra_db, "store_items", candify_store_item, _query);
+                    let result = ZenDB.search<StoreItem>(zendb, "store_items", candify_store_item, _query);
                     Debug.print("results: " # debug_show (Iter.toArray(result)));
                 };
                 case ("ZenDB", "search(): users between the age of 20 and 35 and named 'nam-do-dan'") {
                     let _query = QueryBuilder()._where("name", #eq(#Text("nam-do-san")))._and("age", #gte(#Nat(20)))._and("age", #lte(#Nat(35)));
 
-                    let result = ZenDB.search<StoreItem>(hydra_db, "store_items", candify_store_item, _query);
+                    let result = ZenDB.search<StoreItem>(zendb, "store_items", candify_store_item, _query);
                     Debug.print("results: " # debug_show (Iter.toArray(result)));
                 };
 
                 case ("ZenDB", "search(): users between the age of 20 and 35 and named 'nam-do-dan' v2") {
                     let _query = QueryBuilder()._where("email", #eq(#Text("email")))._where("age", #gte(#Nat(20)))._and("age", #lte(#Nat(35)))._and("name", #eq(#Text("nam-do-san")));
 
-                    let result = ZenDB.search<StoreItem>(hydra_db, "store_items", candify_store_item, _query);
+                    let result = ZenDB.search<StoreItem>(zendb, "store_items", candify_store_item, _query);
                     Debug.print("results: " # debug_show (Iter.toArray(result)));
                 };
 

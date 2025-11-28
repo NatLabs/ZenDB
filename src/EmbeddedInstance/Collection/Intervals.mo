@@ -1,0 +1,387 @@
+import Array "mo:base@0.16.0/Array";
+import Debug "mo:base@0.16.0/Debug";
+import Text "mo:base@0.16.0/Text";
+import Result "mo:base@0.16.0/Result";
+import Order "mo:base@0.16.0/Order";
+import Iter "mo:base@0.16.0/Iter";
+import Buffer "mo:base@0.16.0/Buffer";
+import Nat "mo:base@0.16.0/Nat";
+import Hash "mo:base@0.16.0/Hash";
+
+import Map "mo:map@9.0.1/Map";
+import Set "mo:map@9.0.1/Set";
+import Serde "mo:serde@3.4.0";
+import Decoder "mo:serde@3.4.0/Candid/Blob/Decoder";
+import Candid "mo:serde@3.4.0/Candid";
+import Itertools "mo:itertools@0.2.2/Iter";
+import RevIter "mo:itertools@0.2.2/RevIter";
+import Vector "mo:vector@0.4.2";
+
+import TypeUtils "mo:memory-collection@0.3.2/TypeUtils";
+import Int8Cmp "mo:memory-collection@0.3.2/TypeUtils/Int8Cmp";
+import CandidUtils "../CandidUtils";
+
+import T "../Types";
+import Query "../Query";
+import Utils "../Utils";
+
+import CompositeIndex "Index/CompositeIndex";
+import Orchid "Orchid";
+import Schema "Schema";
+import CollectionUtils "CollectionUtils";
+import DocumentStore "DocumentStore";
+import QueryPlan "QueryPlan";
+import C "../Constants";
+import BTree "../BTree";
+
+module {
+
+    public type Map<K, V> = Map.Map<K, V>;
+    public type Set<K> = Set.Set<K>;
+    let { thash; nhash; bhash } = Map;
+
+    public type Result<A, B> = Result.Result<A, B>;
+    public type Buffer<A> = Buffer.Buffer<A>;
+    public type Iter<A> = Iter.Iter<A>;
+    public type RevIter<A> = RevIter.RevIter<A>;
+    type QueryBuilder = Query.QueryBuilder;
+
+    public type TypeUtils<A> = TypeUtils.TypeUtils<A>;
+
+    public type Order = Order.Order;
+    public type Hash = Hash.Hash;
+
+    public type Schema = Candid.CandidType;
+
+    public type CompositeIndex = T.CompositeIndex;
+    public type Candid = T.Candid;
+    public type SortDirection = T.SortDirection;
+    public type State<R> = T.State<R>;
+    public type ZenQueryLang = T.ZenQueryLang;
+
+    public type InternalCandify<A> = T.Candify<A>;
+
+    public type StableCollection = T.StableCollection;
+
+    public type IndexKeyFields = T.IndexKeyFields;
+
+    // Returns the range that is common to all intervals
+    public func intersect(intervals : Buffer.Buffer<T.Interval>) : ?T.Interval {
+
+        var start = intervals.get(0).0;
+        var end = intervals.get(0).1;
+
+        var i = 1;
+
+        while (i < intervals.size()) {
+            start := Nat.max(start, intervals.get(i).0);
+            end := Nat.min(end, intervals.get(i).1);
+        };
+
+        if (end < start) return null;
+
+        ?(start, end);
+    };
+
+    // merges adjacent or overlapping intervals
+    // - done in place
+    public func union(intervals : Buffer.Buffer<T.Interval>) {
+
+        func tuple_sort(a : T.Interval, b : T.Interval) : Order {
+            Nat.compare(a.0, b.0);
+        };
+
+        intervals.sort(tuple_sort);
+
+        var start = intervals.get(0).0;
+        var end = intervals.get(0).1;
+
+        var scan = 1;
+        var insert = 0;
+
+        while (scan < intervals.size()) {
+
+            let interval = intervals.get(scan);
+            let l = interval.0;
+            let r = interval.1;
+
+            if (l <= end) {
+                end := Nat.max(end, r);
+            } else {
+                intervals.put(insert, (start, end));
+                insert += 1;
+                start := l;
+                end := r;
+            };
+
+            scan += 1;
+        };
+
+        intervals.put(insert, (start, end));
+
+        for (_ in Itertools.range(insert + 1, intervals.size())) {
+            ignore intervals.removeLast();
+        };
+
+    };
+
+    // assumes there are no duplicate or overlapping intervals
+    public func count(intervals : Buffer.Buffer<T.Interval>) : Nat {
+        var count = 0;
+        for (interval in intervals.vals()) {
+            count += interval.1 - interval.0;
+        };
+        count;
+    };
+    // tries to to_skip the number of documents requested within the instruction limit
+    // returns the number of documents skipped
+    public func extract_document_ids_in_pagination_range(collection : T.StableCollection, to_skip : Nat, opt_limit : ?Nat, index_name : Text, intervals : [T.Interval], sorted_in_reverse : Bool) : Iter<T.DocumentId> {
+
+        let result = Buffer.Buffer<T.Interval>(intervals.size());
+        var skipped = 0;
+        var collected = 0;
+        let limit = switch (opt_limit) {
+            case (null) null;
+            case (?l) ?l;
+        };
+
+        for (interval in intervals.vals()) {
+            let size = interval.1 - interval.0;
+
+            // Still skipping
+            if (skipped < to_skip) {
+                let can_skip = Nat.min(size, to_skip - skipped);
+                skipped += can_skip;
+
+                // Partial interval after to_skip
+                if (can_skip < size) {
+                    let new_start = interval.0 + can_skip;
+                    let remaining_size = size - can_skip;
+
+                    switch (limit) {
+                        case (null) {
+                            result.add((new_start, interval.1));
+                        };
+                        case (?lim) {
+                            let can_collect = Nat.min(remaining_size, lim - collected);
+                            if (can_collect > 0) {
+                                result.add((new_start, new_start + can_collect));
+                                collected += can_collect;
+                            };
+                        };
+                    };
+                };
+            }
+            // Collecting (to_skip satisfied)
+            else {
+                switch (limit) {
+                    case (null) {
+                        result.add(interval);
+                    };
+                    case (?lim) {
+                        if (collected < lim) {
+                            let can_collect = Nat.min(size, lim - collected);
+                            result.add((interval.0, interval.0 + can_collect));
+                            collected += can_collect;
+                        };
+                    };
+                };
+            };
+
+        };
+
+        return document_ids_from_index_intervals(collection, index_name, Buffer.toArray(result), sorted_in_reverse);
+    };
+
+    public func extract_document_ids_in_pagination_range_for_reversed_intervals(
+        collection : T.StableCollection,
+        to_skip : Nat,
+        opt_limit : ?Nat,
+        index_name : Text,
+        intervals : [T.Interval],
+        sorted_in_reverse : Bool,
+    ) : Iter<T.DocumentId> {
+
+        let result = Buffer.Buffer<T.Interval>(intervals.size());
+        var skipped = 0;
+        var collected = 0;
+        let limit = switch (opt_limit) {
+            case (null) null;
+            case (?l) ?l;
+        };
+
+        // Iterate through intervals in reverse order
+        var i = intervals.size();
+        while (i > 0) {
+            i -= 1;
+            let interval = intervals[i];
+            let size = interval.1 - interval.0;
+
+            // Still skipping
+            if (skipped < to_skip) {
+                let can_skip = Nat.min(size, to_skip - skipped);
+                skipped += can_skip;
+
+                // Partial interval after skip
+                if (can_skip < size) {
+                    let new_end = interval.1 - can_skip;
+                    let remaining_size = size - can_skip;
+
+                    switch (limit) {
+                        case (null) {
+                            result.add((interval.0, new_end));
+                        };
+                        case (?lim) {
+                            let can_collect = Nat.min(remaining_size, lim - collected);
+                            if (can_collect > 0) {
+                                result.add((new_end - can_collect, new_end));
+                                collected += can_collect;
+                            };
+                        };
+                    };
+                };
+            }
+            // Collecting (skip satisfied)
+            else {
+                switch (limit) {
+                    case (null) {
+                        result.add(interval);
+                    };
+                    case (?lim) {
+                        if (collected < lim) {
+                            let can_collect = Nat.min(size, lim - collected);
+                            result.add((interval.1 - can_collect, interval.1));
+                            collected += can_collect;
+                        };
+                    };
+                };
+            };
+        };
+
+        Buffer.reverse(result);
+
+        // Debug.print("Reversed intervals after pagination extraction: " # debug_show (Buffer.toArray(result)));
+
+        return document_ids_from_index_intervals(collection, index_name, Buffer.toArray(result), sorted_in_reverse);
+    };
+
+    public func document_ids_from_index_intervals(collection : T.StableCollection, index_name : Text, _intervals : [T.Interval], sorted_in_reverse : Bool) : Iter<T.DocumentId> {
+
+        let intervals = if (sorted_in_reverse) {
+            Array.reverse(_intervals);
+        } else {
+            _intervals;
+        };
+
+        // Debug.print("document_ids_from_index_intervals: intervals: " # debug_show intervals);
+
+        if (index_name == C.DOCUMENT_ID) {
+            let document_ids = Itertools.flatten(
+                Iter.map(
+                    intervals.vals(),
+                    func(interval : T.Interval) : Iter<(T.DocumentId)> {
+                        let document_ids = DocumentStore.range_keys(collection, interval.0, interval.1);
+
+                        if (sorted_in_reverse) {
+                            return document_ids.rev();
+                        };
+
+                        document_ids;
+                    },
+                )
+            );
+
+            return document_ids;
+        };
+
+        let ?index = Map.get(collection.indexes, Map.thash, index_name) else Debug.trap("Unreachable: IndexMap not found for index: " # index_name);
+
+        let internal_index = switch (index) {
+            case (#text_index(text_index)) text_index.internal_index;
+            case (#composite_index(composite_index)) composite_index;
+        };
+
+        let index_data_utils = CompositeIndex.get_index_data_utils(collection);
+
+        Itertools.flatten(
+            Iter.map(
+                intervals.vals(),
+                func(interval : T.Interval) : Iter<(T.DocumentId)> {
+                    let document_ids = BTree.range_vals(internal_index.data, index_data_utils, interval.0, interval.1);
+
+                    if (sorted_in_reverse) {
+                        return document_ids.rev();
+                    };
+                    document_ids;
+                },
+            )
+        );
+    };
+
+    public func document_ids_and_indexed_fields_from_intervals(collection : T.StableCollection, index_name : Text, _intervals : [T.Interval], sorted_in_reverse : Bool) : Iter<(T.DocumentId, ?[(Text, T.Candid)])> {
+
+        let intervals = if (sorted_in_reverse) {
+            Array.reverse(_intervals);
+        } else {
+            _intervals;
+        };
+
+        if (index_name == C.DOCUMENT_ID) {
+            return Iter.map<T.DocumentId, (T.DocumentId, ?[(Text, T.Candid)])>(
+                document_ids_from_index_intervals(collection, index_name, intervals, sorted_in_reverse),
+                func(doc_id : T.DocumentId) : (T.DocumentId, ?[(Text, T.Candid)]) {
+                    (doc_id, null);
+                },
+            );
+        };
+
+        let ?index = Map.get(collection.indexes, Map.thash, index_name) else Debug.trap("Unreachable: IndexMap not found for index: " # index_name);
+
+        let internal_index = switch (index) {
+            case (#text_index(text_index)) text_index.internal_index;
+            case (#composite_index(composite_index)) composite_index;
+        };
+
+        let index_data_utils = CompositeIndex.get_index_data_utils(collection);
+
+        func process_index_interval(interval : T.Interval) : Iter<(T.DocumentId, ?[(Text, T.Candid)])> {
+            let entries = BTree.range(internal_index.data, index_data_utils, interval.0, interval.1);
+
+            let document_ids_with_fields = RevIter.map<([T.CandidQuery], T.DocumentId), (T.DocumentId, ?[(Text, T.Candid)])>(
+                entries,
+                func(entry : ([T.CandidQuery], T.DocumentId)) : (T.DocumentId, ?[(Text, T.Candid)]) {
+                    // extract_indexed_fields_from_btree_entry
+                    let (index_key_values, doc_id) = entry;
+
+                    // Check if we have valid data to extract
+                    if (internal_index.key_details.size() == 0) {
+                        return (doc_id, null);
+                    };
+
+                    let fields = Array.tabulate<(Text, T.Candid)>(
+                        internal_index.key_details.size(),
+                        func(i : Nat) : (Text, T.Candid) {
+                            let field_name = internal_index.key_details[i].0;
+                            let candid_value : T.Candid = CandidUtils.fromCandidQuery(index_key_values[i]);
+                            (field_name, candid_value);
+                        },
+                    );
+
+                    (doc_id, ?fields);
+                },
+            );
+
+            if (sorted_in_reverse) return document_ids_with_fields.rev();
+
+            document_ids_with_fields;
+        };
+
+        Itertools.flatten(
+            Iter.map(
+                intervals.vals(),
+                process_index_interval,
+            )
+        );
+    };
+
+};

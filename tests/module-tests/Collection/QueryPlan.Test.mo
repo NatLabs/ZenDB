@@ -1,23 +1,23 @@
 // @testmode wasi
-import Debug "mo:base/Debug";
-import Buffer "mo:base/Buffer";
-import Blob "mo:base/Blob";
-import Text "mo:base/Text";
-import Array "mo:base/Array";
-import Principal "mo:base/Principal";
-import Option "mo:base/Option";
-import Iter "mo:base/Iter";
+import Debug "mo:base@0.16.0/Debug";
+import Buffer "mo:base@0.16.0/Buffer";
+import Blob "mo:base@0.16.0/Blob";
+import Text "mo:base@0.16.0/Text";
+import Array "mo:base@0.16.0/Array";
+import Principal "mo:base@0.16.0/Principal";
+import Option "mo:base@0.16.0/Option";
+import Iter "mo:base@0.16.0/Iter";
 
 import { test; suite } "mo:test";
-import Itertools "mo:itertools/Iter";
-import Map "mo:map/Map";
+import Itertools "mo:itertools@0.2.2/Iter";
+import Map "mo:map@9.0.1/Map";
 import Fuzz "mo:fuzz";
 
-import ZenDB "../../../src";
-import QueryPlan "../../../src/Collection/QueryPlan";
-import CollectionUtils "../../../src/Collection/Utils";
-import CandidMap "../../../src/CandidMap";
-import Index "../../../src/Collection/Index";
+import ZenDB "../../../src/EmbeddedInstance";
+import QueryPlan "../../../src/EmbeddedInstance/Collection/QueryPlan";
+import CollectionUtils "../../../src/EmbeddedInstance/Collection/CollectionUtils";
+import CandidMap "../../../src/EmbeddedInstance/CandidMap";
+import CompositeIndex "../../../src/EmbeddedInstance/Collection/Index/CompositeIndex";
 
 let fuzz = Fuzz.fromSeed(0x7eadbeef);
 
@@ -46,7 +46,17 @@ let indexible_fields = [
 suite(
     "Query Plan Tests",
     func() {
-        let zendb = ZenDB.newStableStore(null);
+        let canister_id = fuzz.principal.randomPrincipal(29);
+        let zendb = ZenDB.newStableStore(
+            canister_id,
+            ?{
+                log_level = ?#Info;
+                is_running_locally = ?true;
+                memory_type = ?(#heap);
+                cache_capacity = ?10;
+            },
+        );
+        // ZenDB.setIsRunLocally(zendb, true);
         let db = ZenDB.launchDefaultDB(zendb);
 
         type RecordWithAllTypes = {
@@ -109,7 +119,7 @@ suite(
 
                 let stable_collection = collection._get_stable_state();
 
-                let query_plan = QueryPlan.createQueryPlan(
+                let { query_plan } = QueryPlan.create_query_plan(
                     stable_collection,
                     ZenDB.QueryBuilder().Where(
                         "text",
@@ -144,11 +154,13 @@ suite(
             func() {
 
                 let #ok(collection) = db.createCollection("query_plan_test", RecordWithAllTypesSchema, candify_document, null) else return assert false;
-                let #ok(_) = collection.createIndex("text_idx", [("text", #Ascending)], null) else return assert false;
+                let create_text_index_res = collection.createIndex("text_idx", [("text", #Ascending)], null) else return assert false;
+                Debug.print("Create text index res: " # debug_show create_text_index_res);
+                let #ok() = create_text_index_res else return assert false;
 
                 let stable_collection = collection._get_stable_state();
 
-                let query_plan = QueryPlan.createQueryPlan(
+                let { query_plan } = QueryPlan.create_query_plan(
                     stable_collection,
                     ZenDB.QueryBuilder().Where(
                         "text",

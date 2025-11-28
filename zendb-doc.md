@@ -47,7 +47,12 @@ List of terms as they are used in this library.
 A ZenDB instance is a collection of databases. You should typically create only one ZenDB instance per canister.
 
 ```motoko
-let zendb = ZenDB.newStableStore(null);
+actor class Canister() = canister_reference {
+
+  let canister_id = Principal.fromActor(canister_reference);
+  stable var zendb = ZenDB.newStableStore(canister_id, null);
+
+}
 ```
 
 ### Memory Types: Heap vs Stable Memory
@@ -58,10 +63,13 @@ These memory types have different performance characteristics, as shown in these
 By default, `#stableMemory` is selected for new ZenDB instances, but you can change this to heap memory:
 
 ```motoko
-let zendb = ZenDB.newStableStore(?{
-  ZenDB.defaultSettings with
-  memory_type = #heap; // or #stableMemory;
-});
+let zendb = ZenDB.newStableStore(
+  canister_id, 
+  ?{
+    ZenDB.defaultSettings with
+    memory_type = #heap; // or #stableMemory;
+  }
+);
 ```
 
 **Heap memory** offers better performance by avoiding the overhead of stable memory operations. However, it's currently limited to 6GB, which restricts the amount of data you can store.
@@ -96,7 +104,7 @@ ZenDB provides extensive logging to help you debug issues. The library uses stan
 By default, the minimum log level is set to `#Warn` (the lowest level that typically requires user action). You can adjust this at any time:
 
 ```motoko
-let zendb = ZenDB.newStableStore(null);
+let zendb = ZenDB.newStableStore(canister_id, null);
 ZenDB.setLogLevel(zendb, #Info);
 ```
 
@@ -184,13 +192,16 @@ Here's an example of how to use the tuple schema types in a collection:
         TupleSchema,
         candify,
         ?{
-            schemaConstraints = [#Field("0", [#Min(1)]), #Field("1", [#MinSize(1)]), #Unique(["0"]), #Unique(["1"])];
+            schema_constraints = [#Field("0", [#Min(1)]), #Field("1", [#MinSize(1)]), #Unique(["0"]), #Unique(["1"])];
         },
     ) else return assert false;
 
     let #ok(id) = tuples.insert(ZenDB.Tuple(42, "hello")) else return assert false;
     assert tuples.size() == 1;
-    assert tuples.search(ZenDB.QueryBuilder().Where("0", #eq(#Nat(42)))) == #ok([(0, ZenDB.Tuple(42, "hello"))]);
+    
+    let #ok(search_result) = tuples.search(ZenDB.QueryBuilder().Where("0", #eq(#Nat(42))));
+    assert search_result.documents == [(0, ZenDB.Tuple(42, "hello"))];
+    
     assert tuples.get(id) == ?(ZenDB.Tuple(42, "hello"));
     assert tuples.get(id) == ?({ _0_ = 42; _1_ = "hello" });
     assert switch (tuples.get(id)) {
@@ -221,7 +232,7 @@ let candify : ZenDB.Types.Candify<Text> = {
 ```
 
 ### Schema Constraints
-Schema constraints allow you to define rules and restrictions on the values stored in your collections. These constraints are specified in the `schemaConstraints` field when creating a collection and are automatically enforced during insert and update operations.
+Schema constraints allow you to define rules and restrictions on the values stored in your collections. These constraints are specified in the `schema_constraints` field when creating a collection and are automatically enforced during insert and update operations.
 
 #### Collection-Level Constraints
 | Constraint          | Description                                                                       | Supported Types  | Example                                              |
@@ -245,7 +256,7 @@ let #ok(users_collection) = db.createCollection(
   UserSchema,
   candify,
   ?{
-    schemaConstraints = [
+    schema_constraints = [
       #Unique(["email"]),                    // Email must be unique
       #Unique(["username"]),                 // Username must be unique  
       #Field("age", [#Min(#Nat(0)), #Max(#Nat(120))])   // Age between 0-120
@@ -340,6 +351,29 @@ assert user == ?{
 };
 ```
 
+#### Replacing Documents
+The `replaceById()` method allows you to completely replace a document with a new one:
+
+```motoko
+let new_user : User = {
+  id = Principal.fromText("2vxsx-fae");
+  name = "Alice Smith";
+  age = 31;
+};
+
+let #ok(replace_result) = users_collection.replaceById(userId, new_user);
+// replace_result.instructions contains the instruction count
+```
+
+**Important:** Replace operations completely replace the document with the new value. If you only want to update specific fields, use `updateById()` instead.
+
+##### ReplaceByIdResult Type
+
+The `replaceById()` method returns a `Result<ReplaceByIdResult, Text>` where `ReplaceByIdResult` contains:
+- **`instructions`**: `Nat` - Instructions consumed during the replace operation
+};
+```
+
 #### Updating Documents
 ZenDB provides powerful update capabilities through two methods:
 - `updateById()` - Updates a specific document by its ID
@@ -408,7 +442,7 @@ To delete documents, use one of the delete methods:
 let #ok(deletedUser) = users_collection.deleteById(userId);
 
 // Delete many documents matching criteria
-let #ok(deletedUsers) = users_collection.deleteMany(
+let #ok(deletedUsers) = users_collection.delete(
   ZenDB.QueryBuilder()
     .Where("age", #lt(#Nat(18)))
 );
@@ -425,14 +459,14 @@ let #ok(results) = users_collection.search(
   ZenDB.QueryBuilder()
     .Where("age", #gt(#Nat(18)))              // Find users older than 18
     .And("name", #startsWith(#Text("A")))     // AND whose name starts with "A"
-    .Sort("age", #Ascending)                  // Sort by age in ascending order
+    .SortBy("age", #Ascending)                  // Sort by age in ascending order
     .Limit(10)                                // Return maximum 10 results
 );
 ```
 
 #### Advanced Query Example
 ```motoko
-let #ok(results) = users_collection.search(
+let #ok(search_result) = users_collection.search(
   ZenDB.QueryBuilder()
     .Where("status", #eq(#Text("active")))
     .And("age", #between(#Nat(25), #Nat(50)))
@@ -441,13 +475,17 @@ let #ok(results) = users_collection.search(
         .Where("role", #eq(#Text("admin")))
         .Or("permissions", #anyOf([#Text("write"), #Text("admin")]))
     )
-    .Sort("last_login", #Descending)
+    .SortBy("last_login", #Descending)
     .Skip(20)
     .Limit(10)
 );
 ```
 
-The `search` method returns a list of tuples containing the document ID and the document itself: `[(DocumentId, Document)]`. Query execution is automatically optimized by the internal query planner, which analyzes available indexes and determines the most efficient execution path.
+The `search` method returns a `SearchResult` object containing:
+- **`documents`**: An array of tuples with the document ID and document itself: `[(DocumentId, Document)]`
+- **`instructions`**: The number of instructions used to execute the query
+
+Query execution is automatically optimized by the internal query planner, which analyzes available indexes and determines the most efficient execution path.
 
 #### Nested Field Queries
 ZenDB also supports querying nested fields using dot notation:
@@ -458,7 +496,33 @@ let #ok(results) = users_collection.search(
     .Where("profile.address.city", #eq(#Text("New York")))
     .And("profile.preferences.notifications", #eq(#Bool(true)))
 );
+
+// Access the results
+let results = search_result.documents;
 ```
+
+### Count Operations
+
+The `count()` method allows you to count documents matching a query without retrieving the actual documents. This is more efficient than using `search()` when you only need the count.
+
+```motoko
+let #ok(count_result) = users_collection.count(
+  ZenDB.QueryBuilder()
+    .Where("status", #eq(#Text("active")))
+    .And("age", #gte(#Nat(18)))
+);
+
+Debug.print("Active adult users: " # Nat.toText(count_result.count));
+Debug.print("Query used: " # Nat.toText(count_result.instructions) # " instructions");
+```
+
+#### CountResult Type
+
+The `count()` method returns a `Result<CountResult, Text>` where `CountResult` contains:
+- **`count`**: `Nat` - The number of documents matching the query
+- **`instructions`**: `Nat` - Instructions consumed during the count operation
+
+Note that `count()` ignores `.Limit()` and `.Skip()` parameters in the query builder, as it counts all matching documents.
 
 ### QueryBuilder Methods
 
@@ -490,7 +554,7 @@ ZenDB.QueryBuilder()
 ```
 
 #### Result Control Methods
-- `.Sort(field, #Ascending | #Descending)` - Sorts results by the specified field
+- `.SortBy(field, #Ascending | #Descending)` - Sorts results by the specified field
 - `.Limit(count)` - Limits the number of results returned
 - `.Skip(count)` - Skips the first N results (useful for pagination)
 
@@ -539,7 +603,7 @@ The query planner automatically uses these indexes when they match your query pa
 
 ### Index Encoding Format
 
-ZenDB uses a custom binary encoding format, defined in the "[Orchid](./src/Collection/Orchid.mo)" module, to store composite index keys efficiently in B-tree structures. This encoding ensures proper sorting order while maintaining compact storage.
+ZenDB uses a custom binary encoding format, defined in the "[Orchid](./src/EmbeddedInstance/Collection/Orchid.mo)" module, to store composite index keys efficiently in B-tree structures. This encoding ensures proper sorting order while maintaining compact storage.
 
 #### Encoding Structure
 
@@ -618,10 +682,10 @@ The `stats()` method returns a `CollectionStats` record containing:
 
 ##### Document Storage Metrics
 - **`memory`** - [Memory statistics](#memory-statistics) for the main document storage B-tree
-- **`avgDocumentIdSize`** - Average size of document IDs in bytes
-- **`totalDocumentIdSize`** - Total memory used by all document IDs
-- **`avgDocumentSize`** - Average size of documents in bytes  
-- **`totalDocumentSize`** - Total memory used by all documents
+- **`avg_document_id_size`** - Average size of document IDs in bytes
+- **`total_document_id_size`** - Total memory used by all document IDs
+- **`avg_document_size`** - Average size of documents in bytes  
+- **`total_document_size`** - Total memory used by all documents
 
 ##### Index Statistics
 - **`indexes`** - Array of [IndexStats](#indexstats-structure) for each index in the collection
@@ -634,15 +698,15 @@ Each index provides detailed statistics:
 - **`name`** - The index name
 - **`fields`** - Array of indexed field definitions with sort order
 - **`entries`** - Number of entries in the index
-- **`isUnique`** - Whether the index enforces uniqueness
-- **`usedInternally`** - Whether the index is used internally by ZenDB
+- **`is_unique`** - Whether the index enforces uniqueness
+- **`used_internally`** - Whether the index is used internally by ZenDB
 
 ##### Index Memory Metrics
 - **`memory`** - [Memory statistics](#memory-statistics) for the index B-tree
-- **`avgIndexKeySize`** - Average size of composite index keys in bytes
-- **`totalIndexKeySize`** - Total memory used by index keys
-- **`avgDocumentIdSize`** - Average size of document ID values in bytes
-- **`totalDocumentIdSize`** - Total memory used by document ID references
+- **`avg_index_key_size`** - Average size of composite index keys in bytes
+- **`total_index_key_size`** - Total memory used by index keys
+- **`avg_document_id_size`** - Average size of document ID values in bytes
+- **`total_document_id_size`** - Total memory used by document ID references
 
 ### Memory Statistics
 

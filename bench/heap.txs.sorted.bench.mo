@@ -1,18 +1,17 @@
-import Iter "mo:base/Iter";
-import Array "mo:base/Array";
-import Debug "mo:base/Debug";
-import Prelude "mo:base/Prelude";
-import Text "mo:base/Text";
-import Char "mo:base/Char";
-import Buffer "mo:base/Buffer";
-import Nat "mo:base/Nat";
-import Option "mo:base/Option";
+import Iter "mo:base@0.16.0/Iter";
+import Array "mo:base@0.16.0/Array";
+import Debug "mo:base@0.16.0/Debug";
+import Prelude "mo:base@0.16.0/Prelude";
+import Text "mo:base@0.16.0/Text";
+import Char "mo:base@0.16.0/Char";
+import Buffer "mo:base@0.16.0/Buffer";
+import Nat "mo:base@0.16.0/Nat";
+import Option "mo:base@0.16.0/Option";
 
 import Bench "mo:bench";
 import Fuzz "mo:fuzz";
-import Candid "mo:serde/Candid";
-import Itertools "mo:itertools/Iter";
-import BitMap "mo:bit-map";
+import Candid "mo:serde@3.4.0/Candid";
+import Itertools "mo:itertools@0.2.2/Iter";
 
 import ZenDB "../src";
 import TxsBenchUtils "txs-bench-utils";
@@ -64,7 +63,7 @@ module {
 
         let limit = 1_000;
 
-        let txs_benchmarks = TxsBenchUtils.TxsBenchmarks(limit);
+        let txs_benchmarks = TxsBenchUtils.TxsBenchmarks(limit, limit);
 
         bench.runner(
             func(col, row) = txs_benchmarks.run_benchmarks(row, col)

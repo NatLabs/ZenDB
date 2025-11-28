@@ -1,22 +1,31 @@
 {
-  "version": 1,
-  "canisters": {
-    "stress-test": {
-      "type": "motoko",
-      "main": "./tests/Stress.Test.mo",
-      "args": "--max-stable-pages 6553600"
+    "version": 1,
+    "canisters": {
+        "stress-test": {
+            "type": "motoko",
+            "main": "./tests/Stress.Test.mo",
+            "args": "--max-stable-pages 6553600"
+        },
+        "database": {
+            "type": "motoko",
+            "main": "src/RemoteInstance/CanisterDB/lib.mo"
+        },
+        "cluster-tests": {
+            "type": "motoko",
+            "main": "./tests/cluster-tests/ClusterManager.Test.mo",
+            "args": "--max-stable-pages 6553600"
+        }
+    },
+    "defaults": {
+        "build": {
+            "packtool": "mops sources",
+            "args": ""
+        }
+    },
+    "networks": {
+        "local": {
+            "bind": "127.0.0.1:4943",
+            "type": "ephemeral"
+        }
     }
-  },
-  "defaults": {
-    "build": {
-      "packtool": "mops sources",
-      "args": ""
-    }
-  },
-  "networks": {
-    "local": {
-      "bind": "127.0.0.1:4943",
-      "type": "ephemeral"
-    }
-  }
 }

@@ -1,15 +1,15 @@
 // @testmode wasi
-import Debug "mo:base/Debug";
-import Buffer "mo:base/Buffer";
-import Blob "mo:base/Blob";
-import Text "mo:base/Text";
-import Array "mo:base/Array";
+import Debug "mo:base@0.16.0/Debug";
+import Buffer "mo:base@0.16.0/Buffer";
+import Blob "mo:base@0.16.0/Blob";
+import Text "mo:base@0.16.0/Text";
+import Array "mo:base@0.16.0/Array";
 
-import ZenDB "../../src";
+import ZenDB "../../src/EmbeddedInstance";
 
 import { test; suite } "mo:test";
-import Itertools "mo:itertools/Iter";
-import Map "mo:map/Map";
+import Itertools "mo:itertools@0.2.2/Iter";
+import Map "mo:map@9.0.1/Map";
 import ZenDBSuite "../test-utils/TestFramework";
 
 type SizeVariant = {
@@ -105,20 +105,22 @@ ZenDBSuite.newSuite(
                             ZenDB.QueryBuilder().Where("version.v1.a", #eq(#Int(42)))
                         ) |> Debug.print(debug_show _);
 
-                        assert #ok([(item1_id, item1)]) == data.search(
+                        let #ok(res1) = data.search(
                             ZenDB.QueryBuilder().Where("version.v1.a", #eq(#Int(42)))
-                        );
+                        ) else return assert false;
+                        assert res1.documents == [(item1_id, item1)];
 
                         let new_doc : Doc = {
                             version = #v1({ a = 33; b = "text" });
                         };
                         let #ok(_) = data.replace(item1_id, (new_doc)) else return assert false;
 
-                        assert #ok([]) == data.search(
+                        let #ok(res2) = data.search(
                             ZenDB.QueryBuilder().Where("version.v1.a", #eq(#Int(42)))
-                        );
+                        ) else return assert false;
+                        assert res2.documents == [];
 
-                        assert data.search(
+                        let #ok(res3) = data.search(
                             ZenDB.QueryBuilder().Where(
                                 "version.v1.b",
                                 #eq(#Text("text")),
@@ -126,7 +128,8 @@ ZenDBSuite.newSuite(
                                 "version.v1.a",
                                 #eq(#Int(33)),
                             )
-                        ) == #ok([(item1_id, new_doc)]);
+                        ) else return assert false;
+                        assert res3.documents == [(item1_id, new_doc)];
 
                         item1 := new_doc;
 
@@ -136,9 +139,10 @@ ZenDBSuite.newSuite(
                 test(
                     "replace field value",
                     func() {
-                        assert #ok([(item1_id, item1)]) == data.search(
+                        let #ok(res1) = data.search(
                             ZenDB.QueryBuilder().Where("version.v1.a", #eq(#Int(33)))
-                        );
+                        ) else return assert false;
+                        assert res1.documents == [(item1_id, item1)];
 
                         let #ok(_) = data.updateById(
                             item1_id,
@@ -148,9 +152,10 @@ ZenDBSuite.newSuite(
                         item1 := { version = #v1({ a = 0; b = "text" }) };
                         Debug.print("item1 updated: " # debug_show (data.get(item1_id)));
 
-                        assert data.search(
+                        let #ok(res2) = data.search(
                             ZenDB.QueryBuilder().Where("version.v1.a", #eq(#Int(0)))
-                        ) == #ok([(item1_id, item1)]);
+                        ) else return assert false;
+                        assert res2.documents == [(item1_id, item1)];
                     },
                 );
 
@@ -158,9 +163,10 @@ ZenDBSuite.newSuite(
                     "#addAll field",
                     func() {
 
-                        assert #ok([(item1_id, item1)]) == data.search(
+                        let #ok(res1) = data.search(
                             ZenDB.QueryBuilder().Where("version.v1.a", #eq(#Int(0)))
-                        );
+                        ) else return assert false;
+                        assert res1.documents == [(item1_id, item1)];
 
                         let #ok(_) = data.updateById(
                             item1_id,
@@ -172,9 +178,10 @@ ZenDBSuite.newSuite(
 
                         item1 := { version = #v1({ a = 2; b = "text" }) };
 
-                        assert data.search(
+                        let #ok(res2) = data.search(
                             ZenDB.QueryBuilder().Where("version.v1.a", #eq(#Int(2)))
-                        ) == #ok([(item1_id, item1)]);
+                        ) else return assert false;
+                        assert res2.documents == [(item1_id, item1)];
                     },
                 );
 
@@ -190,9 +197,10 @@ ZenDBSuite.newSuite(
                             )
                         );
 
-                        assert #ok([(item3_id, item3)]) == data.search(
+                        let #ok(res1) = data.search(
                             ZenDB.QueryBuilder().Where("version.v3.size.known", #eq(#Nat(32)))
-                        );
+                        ) else return assert false;
+                        assert res1.documents == [(item3_id, item3)];
 
                         let #ok(_) = data.updateById(
                             item3_id,
@@ -204,9 +212,10 @@ ZenDBSuite.newSuite(
 
                         item3 := { version = #v3({ size = #known(30) }) };
 
-                        assert data.search(
+                        let #ok(res2) = data.search(
                             ZenDB.QueryBuilder().Where("version.v3.size.known", #eq(#Nat(30)))
-                        ) == #ok([(item3_id, item3)]);
+                        ) else return assert false;
+                        assert res2.documents == [(item3_id, item3)];
 
                     },
                 );
@@ -215,9 +224,10 @@ ZenDBSuite.newSuite(
                     "#mulAll field",
                     func() {
 
-                        assert #ok([(item3_id, item3)]) == data.search(
+                        let #ok(res1) = data.search(
                             ZenDB.QueryBuilder().Where("version.v3.size.known", #eq(#Nat(30)))
-                        );
+                        ) else return assert false;
+                        assert res1.documents == [(item3_id, item3)];
 
                         let #ok(_) = data.updateById(
                             item3_id,
@@ -229,9 +239,10 @@ ZenDBSuite.newSuite(
 
                         item3 := { version = #v3({ size = #known(120) }) };
 
-                        assert data.search(
+                        let #ok(res2) = data.search(
                             ZenDB.QueryBuilder().Where("version.v3.size.known", #eq(#Nat(120)))
-                        ) == #ok([(item3_id, item3)]);
+                        ) else return assert false;
+                        assert res2.documents == [(item3_id, item3)];
 
                     },
                 );
@@ -240,9 +251,10 @@ ZenDBSuite.newSuite(
                     "#divAll field",
                     func() {
 
-                        assert #ok([(item3_id, item3)]) == data.search(
+                        let #ok(res1) = data.search(
                             ZenDB.QueryBuilder().Where("version.v3.size.known", #eq(#Nat(120)))
-                        );
+                        ) else return assert false;
+                        assert res1.documents == [(item3_id, item3)];
 
                         let #ok(_) = data.updateById(
                             item3_id,
@@ -254,9 +266,10 @@ ZenDBSuite.newSuite(
 
                         item3 := { version = #v3({ size = #known(30) }) };
 
-                        assert data.search(
+                        let #ok(res2) = data.search(
                             ZenDB.QueryBuilder().Where("version.v3.size.known", #eq(#Nat(30)))
-                        ) == #ok([(item3_id, item3)]);
+                        ) else return assert false;
+                        assert res2.documents == [(item3_id, item3)];
 
                     },
                 );
@@ -265,9 +278,10 @@ ZenDBSuite.newSuite(
                     "[#addAll, #subAll, #mulAll, #divAll]",
                     func() {
 
-                        assert #ok([(item1_id, item1)]) == data.search(
+                        let #ok(res1) = data.search(
                             ZenDB.QueryBuilder().Where("version.v1.a", #eq(#Int(2)))
-                        );
+                        ) else return assert false;
+                        assert res1.documents == [(item1_id, item1)];
 
                         let #ok(_) = data.updateById(
                             item1_id,
@@ -281,9 +295,10 @@ ZenDBSuite.newSuite(
 
                         item1 := { version = #v1({ a = 3; b = "text" }) };
 
-                        assert data.search(
+                        let #ok(res2) = data.search(
                             ZenDB.QueryBuilder().Where("version.v1.a", #eq(#Int(3)))
-                        ) == #ok([(item1_id, item1)]);
+                        ) else return assert false;
+                        assert res2.documents == [(item1_id, item1)];
 
                     },
                 );
@@ -292,9 +307,10 @@ ZenDBSuite.newSuite(
                     "compound fields",
                     func() {
 
-                        assert #ok([(item3_id, item3)]) == data.search(
+                        let #ok(res) = data.search(
                             ZenDB.QueryBuilder().Where("version.v3.size.known", #eq(#Nat(30)))
-                        );
+                        ) else return assert false;
+                        assert res.documents == [(item3_id, item3)];
 
                         let #ok(_) = data.updateById(
                             item3_id,
@@ -315,9 +331,10 @@ ZenDBSuite.newSuite(
                         test(
                             "multi #addAll",
                             func() {
-                                assert #ok([(item5_id, item5)]) == data.search(
+                                let #ok(res1) = data.search(
                                     ZenDB.QueryBuilder().Where("version.v4.units.products", #eq(#Nat(1000)))
-                                );
+                                ) else return assert false;
+                                assert res1.documents == [(item5_id, item5)];
 
                                 let #ok(_) = data.updateById(
                                     item5_id,
@@ -348,9 +365,10 @@ ZenDBSuite.newSuite(
 
                                 data.get(item5_id) |> Debug.print("item5 updated: " # debug_show (_));
 
-                                assert data.search(
+                                let #ok(res2) = data.search(
                                     ZenDB.QueryBuilder().Where("version.v4.total", #eq(#Option(#Nat(2474))))
-                                ) == #ok([(item5_id, item5)]);
+                                ) else return assert false;
+                                assert res2.documents == [(item5_id, item5)];
 
                             },
                         );

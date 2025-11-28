@@ -1,39 +1,39 @@
 // @testmode wasi
-import Array "mo:base/Array";
-import Debug "mo:base/Debug";
-import Buffer "mo:base/Buffer";
-import Blob "mo:base/Blob";
-import Text "mo:base/Text";
-import Char "mo:base/Char";
-import Nat "mo:base/Nat";
-import Nat8 "mo:base/Nat8";
-import Int8 "mo:base/Int8";
-import Iter "mo:base/Iter";
-import Int32 "mo:base/Int32";
-import Int16 "mo:base/Int16";
-import Int64 "mo:base/Int64";
-import Float "mo:base/Float";
-import Nat64 "mo:base/Nat64";
-import Nat16 "mo:base/Nat16";
-import Nat32 "mo:base/Nat32";
-import Int "mo:base/Int";
-import Principal "mo:base/Principal";
-import Bool "mo:base/Bool";
-import Option "mo:base/Option";
+import Array "mo:base@0.16.0/Array";
+import Debug "mo:base@0.16.0/Debug";
+import Buffer "mo:base@0.16.0/Buffer";
+import Blob "mo:base@0.16.0/Blob";
+import Text "mo:base@0.16.0/Text";
+import Char "mo:base@0.16.0/Char";
+import Nat "mo:base@0.16.0/Nat";
+import Nat8 "mo:base@0.16.0/Nat8";
+import Int8 "mo:base@0.16.0/Int8";
+import Iter "mo:base@0.16.0/Iter";
+import Int32 "mo:base@0.16.0/Int32";
+import Int16 "mo:base@0.16.0/Int16";
+import Int64 "mo:base@0.16.0/Int64";
+import Float "mo:base@0.16.0/Float";
+import Nat64 "mo:base@0.16.0/Nat64";
+import Nat16 "mo:base@0.16.0/Nat16";
+import Nat32 "mo:base@0.16.0/Nat32";
+import Int "mo:base@0.16.0/Int";
+import Principal "mo:base@0.16.0/Principal";
+import Bool "mo:base@0.16.0/Bool";
+import Option "mo:base@0.16.0/Option";
 
 import { test; suite } "mo:test";
-import Itertools "mo:itertools/Iter";
-import PeekableIter "mo:itertools/PeekableIter";
-import BpTree "mo:augmented-btrees/BpTree";
-import Cmp "mo:augmented-btrees/Cmp";
+import Itertools "mo:itertools@0.2.2/Iter";
+import PeekableIter "mo:itertools@0.2.2/PeekableIter";
+import BpTree "mo:augmented-btrees@0.7.1/BpTree";
+import Cmp "mo:augmented-btrees@0.7.1/Cmp";
 
-import ZenDB "../../../src";
-import Orchid "../../../src/Collection/Orchid";
+import ZenDB "../../../src/EmbeddedInstance";
+import Orchid "../../../src/EmbeddedInstance/Collection/Orchid";
 import Fuzz "mo:fuzz";
-import CandidMap "../../../src/CandidMap";
-import SchemaMap "../../../src/Collection/SchemaMap";
-import Schema "../../../src/Collection/Schema";
-import Utils "../../../src/Utils";
+import CandidMap "../../../src/EmbeddedInstance/CandidMap";
+import SchemaMap "../../../src/EmbeddedInstance/Collection/SchemaMap";
+import Schema "../../../src/EmbeddedInstance/Collection/Schema";
+import Utils "../../../src/EmbeddedInstance/Utils";
 
 let T = ZenDB.Types;
 
@@ -129,7 +129,7 @@ for (i in Itertools.range(0, limit)) {
 
     let candid_map = CandidMap.new(
         schema_map,
-        0,
+        ("\FF" : Blob),
         #Record([
             ("text", #Text(document.text)),
             ("nat", #Nat(document.nat)),
@@ -781,7 +781,7 @@ suite(
                                     Iter.map<(T.Candid, T.Candid), Int8>(
                                         Itertools.zip(a.vals(), b.vals()),
                                         func((a, b) : (T.Candid, T.Candid)) : Int8 {
-                                            Schema.cmpCandid(MotokoTypesSchema, a, b);
+                                            Schema.cmp_candid(MotokoTypesSchema, a, b);
                                         },
                                     )
                                 );
@@ -898,7 +898,7 @@ suite(
                 let prefix_bytes = get_prefix(a, b);
                 assert prefix_bytes.size() >= 14 + 1; // 14 bytes for the prefix and 1 byte for the type encoding
 
-                let ?prefix = Text.decodeUtf8(Utils.sliceBlob(prefix_bytes, 1, prefix_bytes.size()));
+                let ?prefix = Text.decodeUtf8(Utils.slice_blob(prefix_bytes, 1, prefix_bytes.size()));
 
                 assert Text.endsWith(prefix, #text("this might be "));
 

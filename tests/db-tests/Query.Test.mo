@@ -1,18 +1,18 @@
 // @testmode wasi
-import Debug "mo:base/Debug";
-import Iter "mo:base/Iter";
-import Text "mo:base/Text";
-import Char "mo:base/Char";
-import Buffer "mo:base/Buffer";
+import Debug "mo:base@0.16.0/Debug";
+import Iter "mo:base@0.16.0/Iter";
+import Text "mo:base@0.16.0/Text";
+import Char "mo:base@0.16.0/Char";
+import Buffer "mo:base@0.16.0/Buffer";
 
 import { test; suite } "mo:test";
 
 import Bench "mo:bench";
 import Fuzz "mo:fuzz";
-import Candid "mo:serde/Candid";
-import Record "mo:serde/Candid/Text/Parser/Record";
-import Itertools "mo:itertools/Iter";
-import ZenDB "../../src";
+import Candid "mo:serde@3.4.0/Candid";
+import Record "mo:serde@3.4.0/Candid/Text/Parser/Record";
+import Itertools "mo:itertools@0.2.2/Iter";
+import ZenDB "../../src/EmbeddedInstance";
 import ZenDBSuite "../test-utils/TestFramework";
 
 let fuzz = Fuzz.fromSeed(0x7eadbeef);
@@ -23,7 +23,7 @@ let limit = 10_000;
 ZenDBSuite.newSuite(
     "Query Tests",
     ?{
-        ZenDBSuite.onlyWithIndex with log_level = #Error;
+        ZenDBSuite.onlyWithIndex with log_level = #Debug;
     },
     func query_tests(zendb : ZenDB.Database, suite_utils : ZenDBSuite.SuiteUtils) {
 
@@ -46,14 +46,14 @@ ZenDBSuite.newSuite(
 
         let #ok(_) = suite_utils.createIndex(texts.name(), "value", [("value", #Ascending)], null) else return assert false;
 
-        let #ok(_) = texts.insert({ value = "a" }) else return assert false;
-        let #ok(_) = texts.insert({ value = "alphabet" }) else return assert false;
-        let #ok(_) = texts.insert({ value = "alphabetical" }) else return assert false;
-        let #ok(_) = texts.insert({ value = "and" }) else return assert false;
-        let #ok(_) = texts.insert({ value = "anderson" }) else return assert false;
-        let #ok(_) = texts.insert({ value = "b" }) else return assert false;
-        let #ok(_) = texts.insert({ value = "berry" }) else return assert false;
-        let #ok(_) = texts.insert({ value = "c" }) else return assert false;
+        let #ok(text_a_id) = texts.insert({ value = "a" }) else return assert false;
+        let #ok(text_alphabet_id) = texts.insert({ value = "alphabet" }) else return assert false;
+        let #ok(text_alphabetical_id) = texts.insert({ value = "alphabetical" }) else return assert false;
+        let #ok(text_and_id) = texts.insert({ value = "and" }) else return assert false;
+        let #ok(text_anderson_id) = texts.insert({ value = "anderson" }) else return assert false;
+        let #ok(text_b_id) = texts.insert({ value = "b" }) else return assert false;
+        let #ok(text_berry_id) = texts.insert({ value = "berry" }) else return assert false;
+        let #ok(text_c_id) = texts.insert({ value = "c" }) else return assert false;
 
         func run_query_tests(texts : ZenDB.Collection<Data>) {
             test(
@@ -67,7 +67,8 @@ ZenDBSuite.newSuite(
 
                     Debug.print(debug_show (results));
 
-                    assert results == #ok([(0, { value = "a" })]);
+                    let #ok(res) = results else return assert false;
+                    assert res.documents == [(text_a_id, { value = "a" })];
                 },
             );
 
@@ -83,14 +84,15 @@ ZenDBSuite.newSuite(
                         )
                     );
 
-                    assert texts.search(
+                    let #ok(res) = texts.search(
                         QueryBuilder().Where("value", #gt(#Text("and")))
-                    ) == #ok([
-                        (4, { value = "anderson" }),
-                        (5, { value = "b" }),
-                        (6, { value = "berry" }),
-                        (7, { value = "c" }),
-                    ]);
+                    ) else return assert false;
+                    assert res.documents == [
+                        (text_anderson_id, { value = "anderson" }),
+                        (text_b_id, { value = "b" }),
+                        (text_berry_id, { value = "berry" }),
+                        (text_c_id, { value = "c" }),
+                    ];
 
                     Debug.print(
                         debug_show (
@@ -100,83 +102,90 @@ ZenDBSuite.newSuite(
                         )
                     );
 
-                    assert texts.search(
+                    let #ok(result) = texts.search(
                         QueryBuilder().Where("value", #not_(#gt(#Text("and"))))
-                    ) == #ok([
-                        (0, { value = "a" }),
-                        (1, { value = "alphabet" }),
-                        (2, { value = "alphabetical" }),
-                        (3, { value = "and" }),
-                    ]);
+                    ) else return assert false;
+                    assert result.documents == [
+                        (text_a_id, { value = "a" }),
+                        (text_alphabet_id, { value = "alphabet" }),
+                        (text_alphabetical_id, { value = "alphabetical" }),
+                        (text_and_id, { value = "and" }),
+                    ];
                 },
             );
 
             test(
                 "#gte",
                 func() {
-                    assert texts.search(
+                    let #ok(result1) = texts.search(
                         QueryBuilder().Where("value", #gte(#Text("and")))
-                    ) == #ok([
-                        (3, { value = "and" }),
-                        (4, { value = "anderson" }),
-                        (5, { value = "b" }),
-                        (6, { value = "berry" }),
-                        (7, { value = "c" }),
-                    ]);
+                    ) else return assert false;
+                    assert result1.documents == [
+                        (text_and_id, { value = "and" }),
+                        (text_anderson_id, { value = "anderson" }),
+                        (text_b_id, { value = "b" }),
+                        (text_berry_id, { value = "berry" }),
+                        (text_c_id, { value = "c" }),
+                    ];
 
-                    assert texts.search(
+                    let #ok(result2) = texts.search(
                         QueryBuilder().Where("value", #not_(#gte(#Text("and"))))
-                    ) == #ok([
-                        (0, { value = "a" }),
-                        (1, { value = "alphabet" }),
-                        (2, { value = "alphabetical" }),
-                    ]);
+                    ) else return assert false;
+                    assert result2.documents == [
+                        (text_a_id, { value = "a" }),
+                        (text_alphabet_id, { value = "alphabet" }),
+                        (text_alphabetical_id, { value = "alphabetical" }),
+                    ];
                 },
             );
 
             test(
                 "#lt",
                 func() {
-                    assert texts.search(
+                    let #ok(result1) = texts.search(
                         QueryBuilder().Where("value", #lt(#Text("and")))
-                    ) == #ok([
-                        (0, { value = "a" }),
-                        (1, { value = "alphabet" }),
-                        (2, { value = "alphabetical" }),
-                    ]);
+                    ) else return assert false;
+                    assert result1.documents == [
+                        (text_a_id, { value = "a" }),
+                        (text_alphabet_id, { value = "alphabet" }),
+                        (text_alphabetical_id, { value = "alphabetical" }),
+                    ];
 
-                    assert texts.search(
+                    let #ok(result2) = texts.search(
                         QueryBuilder().Where("value", #not_(#lt(#Text("and"))))
-                    ) == #ok([
-                        (3, { value = "and" }),
-                        (4, { value = "anderson" }),
-                        (5, { value = "b" }),
-                        (6, { value = "berry" }),
-                        (7, { value = "c" }),
-                    ]);
+                    ) else return assert false;
+                    assert result2.documents == [
+                        (text_and_id, { value = "and" }),
+                        (text_anderson_id, { value = "anderson" }),
+                        (text_b_id, { value = "b" }),
+                        (text_berry_id, { value = "berry" }),
+                        (text_c_id, { value = "c" }),
+                    ];
                 },
             );
 
             test(
                 "#lte",
                 func() {
-                    assert texts.search(
+                    let #ok(result1) = texts.search(
                         QueryBuilder().Where("value", #lte(#Text("and")))
-                    ) == #ok([
-                        (0, { value = "a" }),
-                        (1, { value = "alphabet" }),
-                        (2, { value = "alphabetical" }),
-                        (3, { value = "and" }),
-                    ]);
+                    ) else return assert false;
+                    assert result1.documents == [
+                        (text_a_id, { value = "a" }),
+                        (text_alphabet_id, { value = "alphabet" }),
+                        (text_alphabetical_id, { value = "alphabetical" }),
+                        (text_and_id, { value = "and" }),
+                    ];
 
-                    assert texts.search(
+                    let #ok(result2) = texts.search(
                         QueryBuilder().Where("value", #not_(#lte(#Text("and"))))
-                    ) == #ok([
-                        (4, { value = "anderson" }),
-                        (5, { value = "b" }),
-                        (6, { value = "berry" }),
-                        (7, { value = "c" }),
-                    ]);
+                    ) else return assert false;
+                    assert result2.documents == [
+                        (text_anderson_id, { value = "anderson" }),
+                        (text_b_id, { value = "b" }),
+                        (text_berry_id, { value = "berry" }),
+                        (text_c_id, { value = "c" }),
+                    ];
                 },
             );
 
@@ -188,11 +197,13 @@ ZenDBSuite.newSuite(
                         QueryBuilder().Where("value", #anyOf([#Text("a"), #Text("b"), #Text("c")]))
                     );
 
-                    assert res == #ok([
-                        (0, { value = "a" }),
-                        (5, { value = "b" }),
-                        (7, { value = "c" }),
-                    ]);
+                    let #ok(res_result) = res else return assert false;
+                    Debug.print(debug_show { res_result });
+                    assert res_result.documents == [
+                        (text_a_id, { value = "a" }),
+                        (text_b_id, { value = "b" }),
+                        (text_c_id, { value = "c" }),
+                    ];
 
                     //! Executes very slowly
                     // assert texts.search(
@@ -212,11 +223,11 @@ ZenDBSuite.newSuite(
                 func() {
 
                     let expected_response = #ok([
-                        (0, { value = "a" }),
-                        (1, { value = "alphabet" }),
-                        (2, { value = "alphabetical" }),
-                        (3, { value = "and" }),
-                        (4, { value = "anderson" }),
+                        (text_a_id, { value = "a" }),
+                        (text_alphabet_id, { value = "alphabet" }),
+                        (text_alphabetical_id, { value = "alphabetical" }),
+                        (text_and_id, { value = "and" }),
+                        (text_anderson_id, { value = "anderson" }),
                     ]);
 
                     let res0 = texts.search(
@@ -232,9 +243,9 @@ ZenDBSuite.newSuite(
                     assert res1 == expected_response;
 
                     let expected_negative_response = #ok([
-                        (5, { value = "b" }),
-                        (6, { value = "berry" }),
-                        (7, { value = "c" }),
+                        (text_b_id, { value = "b" }),
+                        (text_berry_id, { value = "berry" }),
+                        (text_c_id, { value = "c" }),
                     ]);
 
                     Debug.print(
@@ -271,80 +282,88 @@ ZenDBSuite.newSuite(
 
                     Debug.print(debug_show { res });
 
-                    assert res == #ok([
-                        (0, { value = "a" }),
-                        (1, { value = "alphabet" }),
-                        (2, { value = "alphabetical" }),
-                        (3, { value = "and" }),
-                        (4, { value = "anderson" }),
-                    ]);
+                    let #ok(res_result) = res else return assert false;
+                    assert res_result.documents == [
+                        (text_a_id, { value = "a" }),
+                        (text_alphabet_id, { value = "alphabet" }),
+                        (text_alphabetical_id, { value = "alphabetical" }),
+                        (text_and_id, { value = "and" }),
+                        (text_anderson_id, { value = "anderson" }),
+                    ];
 
-                    assert texts.search(
+                    let #ok(result2) = texts.search(
                         QueryBuilder().Where("value", #not_(#startsWith(#Text("a"))))
-                    ) == #ok([
-                        (5, { value = "b" }),
-                        (6, { value = "berry" }),
-                        (7, { value = "c" }),
-                    ]);
+                    ) else return assert false;
+                    assert result2.documents == [
+                        (text_b_id, { value = "b" }),
+                        (text_berry_id, { value = "berry" }),
+                        (text_c_id, { value = "c" }),
+                    ];
 
                     let res2 = texts.search(
                         QueryBuilder().Where("value", #startsWith(#Text("al")))
                     );
 
-                    assert res2 == #ok([
-                        (1, { value = "alphabet" }),
-                        (2, { value = "alphabetical" }),
-                    ]);
+                    let #ok(res2_result) = res2 else return assert false;
+                    assert res2_result.documents == [
+                        (text_alphabet_id, { value = "alphabet" }),
+                        (text_alphabetical_id, { value = "alphabetical" }),
+                    ];
 
-                    assert texts.search(
+                    let #ok(result3) = texts.search(
                         QueryBuilder().Where("value", #not_(#startsWith(#Text("al"))))
-                    ) == #ok([
-                        (0, { value = "a" }),
-                        (3, { value = "and" }),
-                        (4, { value = "anderson" }),
-                        (5, { value = "b" }),
-                        (6, { value = "berry" }),
-                        (7, { value = "c" }),
-                    ]);
+                    ) else return assert false;
+                    assert result3.documents == [
+                        (text_a_id, { value = "a" }),
+                        (text_and_id, { value = "and" }),
+                        (text_anderson_id, { value = "anderson" }),
+                        (text_b_id, { value = "b" }),
+                        (text_berry_id, { value = "berry" }),
+                        (text_c_id, { value = "c" }),
+                    ];
 
                     let res3 = texts.search(
                         QueryBuilder().Where("value", #startsWith(#Text("and")))
                     );
 
-                    assert res3 == #ok([
-                        (3, { value = "and" }),
-                        (4, { value = "anderson" }),
-                    ]);
+                    let #ok(res3_result) = res3 else return assert false;
+                    assert res3_result.documents == [
+                        (text_and_id, { value = "and" }),
+                        (text_anderson_id, { value = "anderson" }),
+                    ];
 
-                    assert texts.search(
+                    let #ok(result4) = texts.search(
                         QueryBuilder().Where("value", #not_(#startsWith(#Text("and"))))
-                    ) == #ok([
-                        (0, { value = "a" }),
-                        (1, { value = "alphabet" }),
-                        (2, { value = "alphabetical" }),
-                        (5, { value = "b" }),
-                        (6, { value = "berry" }),
-                        (7, { value = "c" }),
-                    ]);
+                    ) else return assert false;
+                    assert result4.documents == [
+                        (text_a_id, { value = "a" }),
+                        (text_alphabet_id, { value = "alphabet" }),
+                        (text_alphabetical_id, { value = "alphabetical" }),
+                        (text_b_id, { value = "b" }),
+                        (text_berry_id, { value = "berry" }),
+                        (text_c_id, { value = "c" }),
+                    ];
 
                     let res4 = texts.search(
                         QueryBuilder().Where("value", #startsWith(#Text("ben")))
                     );
 
-                    assert res4 == #ok([]);
+                    let #ok(res4_result) = res4 else return assert false;
+                    assert res4_result.documents == [];
 
-                    assert texts.search(
+                    let #ok(result5) = texts.search(
                         QueryBuilder().Where("value", #not_(#startsWith(#Text("ben"))))
-                    ) == #ok([
-                        (0, { value = "a" }),
-                        (1, { value = "alphabet" }),
-                        (2, { value = "alphabetical" }),
-                        (3, { value = "and" }),
-                        (4, { value = "anderson" }),
-                        (5, { value = "b" }),
-                        (6, { value = "berry" }),
-                        (7, { value = "c" }),
-                    ]);
+                    ) else return assert false;
+                    assert result5.documents == [
+                        (text_a_id, { value = "a" }),
+                        (text_alphabet_id, { value = "alphabet" }),
+                        (text_alphabetical_id, { value = "alphabetical" }),
+                        (text_and_id, { value = "and" }),
+                        (text_anderson_id, { value = "anderson" }),
+                        (text_b_id, { value = "b" }),
+                        (text_berry_id, { value = "berry" }),
+                        (text_c_id, { value = "c" }),
+                    ];
 
                 },
             );
@@ -357,16 +376,17 @@ ZenDBSuite.newSuite(
                         QueryBuilder().Where("value", #exists)
                     );
 
-                    assert res == #ok([
-                        (0, { value = "a" }),
-                        (1, { value = "alphabet" }),
-                        (2, { value = "alphabetical" }),
-                        (3, { value = "and" }),
-                        (4, { value = "anderson" }),
-                        (5, { value = "b" }),
-                        (6, { value = "berry" }),
-                        (7, { value = "c" }),
-                    ]);
+                    let #ok(res_result) = res else return assert false;
+                    assert res_result.documents == [
+                        (text_a_id, { value = "a" }),
+                        (text_alphabet_id, { value = "alphabet" }),
+                        (text_alphabetical_id, { value = "alphabetical" }),
+                        (text_and_id, { value = "and" }),
+                        (text_anderson_id, { value = "anderson" }),
+                        (text_b_id, { value = "b" }),
+                        (text_berry_id, { value = "berry" }),
+                        (text_c_id, { value = "c" }),
+                    ];
 
                 },
             );
@@ -375,9 +395,9 @@ ZenDBSuite.newSuite(
                 "Negative Query Test",
                 func() {
                     let db_query = QueryBuilder().Where("value", #eq(#Text("item-not-in-store")));
-                    let #ok(documents) = texts.search(db_query) else return assert false;
+                    let #ok(result) = texts.search(db_query) else return assert false;
 
-                    assert documents == [];
+                    assert result.documents == [];
                 },
             );
 

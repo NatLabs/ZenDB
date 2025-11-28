@@ -38,31 +38,25 @@ This architecture allows ZenDB to handle complex queries efficiently, even with 
 ### Installation
 
 - Requires `moc` version `0.14.13` or higher to run.
-- Install with mops: `mops toolchain use moc 0.14.13`  .
-
-#### Install Directly from Mops (Recommended)
+- Install with mops: `mops toolchain use moc 0.14.13`.
 
 ```bash
 mops add zendb
-```
-
-#### Install Specific Github Branch/Commit
-- Replace the value after the pound sign `#` with the branch or the commit hash
-
-```bash
-mops add https://github.com/NatLabs/ZenDB#<branch/commit-hash>
 ```
 
 ### Canister Configuration
 Canisters have a limit of how much stable memory they can use. This limit can be set in the `dfx.json` file in the root of your project. By default, the limit is set to 4GB, but for larger datasets, you can increase it up to 500GB.
 This measurement is in pages, where each page is 64KiB. For a 200GB limit, the limit would be `200 * (1024 * 1024) / 64 = 3276800` pages.
 
+In addition to setting the stable memory limit, it's recommended to use legacy persistence instead of EOP to limit heap allocations. I found that legacy persistence uses 2x less heap allocations and costs 4x less cycles to run for stable memory heavy applications.
+
 ```json
   "canisters": {
     "stress-test" : {
       "type": "motoko",
-      "main": "./tests/Stress.Test.mo",
-      "args": "--max-stable-pages 3276800" 
+      "main": "main.mo",
+      "args": "--max-stable-pages 3276800 --legacy-persistence --force-gc --generational-gc",
+      "optimize": "O3"
     }
   },
 ```
@@ -72,11 +66,13 @@ This measurement is in pages, where each page is 64KiB. For a 200GB limit, the l
 #### 1. Initialize the Database
 
 ```motoko
+import Principal "mo:base/Principal";
 import ZenDB "mo:zendb";
 
-actor {
+actor class Canister() = canister_reference {
 
-  stable var zendb = ZenDB.newStableStore(null);
+  let canister_id = Principal.fromActor(canister_reference);
+  stable var zendb = ZenDB.newStableStore(canister_id, null);
   let db = ZenDB.launchDefaultDB(zendb);
 
 }
@@ -163,11 +159,12 @@ let #ok(queryResults) = users.search(
   ZenDB.QueryBuilder()
     .Where("profile.location", #eq(#Text("San Francisco")))
     .And("profile.age", #gte(#Nat(30)))
-    .Sort("created_at", #Descending)
+    .SortBy("created_at", #Descending)
     .Limit(10)
 );
 
-assert queryResults == [user];
+// Search returns a SearchResult with documents and instruction count
+assert queryResults.documents == [(userId, user)];
 ```
 
 #### 5. Field Updates & Transformations
@@ -188,12 +185,13 @@ assert updatedUser1.profile.location == "New York";
 assert updatedUser1.profile.interests == ["coding", "reading"];
 
 // Update multiple fields referencing the current value of a field
+let currTime = Time.now();
 let #ok(_) = users.update(
   ZenDB.QueryBuilder().Where("email", #eq(#Text(""))),
   [
     ("name", #uppercase(#currValue)),
     ("age", #add(#currValue, #Nat(1))),
-    ("updated_at", #Int(Time.now())),
+    ("updated_at", #Int(currTime)),
     ("email", #lowercase(
       #concatAll([
         #concat(#get("name"), #Text("-in-")),
@@ -208,7 +206,7 @@ let updatedUser2 = users.get(userId);
 
 assert updatedUser2.name == "ALICE";
 assert updatedUser2.age == ?36;
-assert updatedUser2.updated_at == Time.now(); // I believe Time.now() resets after each call, so this will always be the same value as before
+assert updatedUser2.updated_at == currTime;
 assert updatedUser2.email == "alice-in-san-francisco@example.com";
 
 ```
@@ -228,17 +226,19 @@ let stats = users.stats();
 
 ```motoko
 // Find active premium users who joined recently
-let #ok(activeRecentPremiumUsers) = users.search(
+let #ok(search_result) = users.search(
   ZenDB.QueryBuilder()
     .Where("status", #eq(#Text("active")))
     .And("account_type", #eq(#Text("premium")))
     .And("joined_date", #gte(#Int(oneWeekAgo)))
-    .Sort("activity_score", #Descending)
+    .SortBy("activity_score", #Descending)
     .Limit(25)
 );
 
+let activeRecentPremiumUsers = search_result.documents;
+
 // Find users matching any of several criteria
-let #ok(specialCaseUsers) = users.search(
+let #ok(search_result2) = users.search(
   ZenDB.QueryBuilder()
     .Where("role", #eq(#Text("admin")))
     .OrQuery(
@@ -302,7 +302,7 @@ let #ok(results) = users.search(
   ZenDB.QueryBuilder()
     .Where("age", #gt(#Nat(18)))                  // Range filter  
     .And("status", #eq(#Text("active")))          // Equality filter
-    .Sort("created_at", #Descending)              // Sort operation
+    .SortBy("created_at", #Descending)              // Sort operation
 );
 ```
 
@@ -317,6 +317,20 @@ let #ok(_) = users.createIndex(
   ]
 );
 ```
+
+### Search Result Type
+
+The `search()` method returns a `Result<SearchResult<Record>, Text>` where `SearchResult` contains:
+- **`documents`**: An array of tuples `[(DocumentId, Document)]` - the document ID and the document itself
+- **`instructions`**: The number of instructions used to execute the query
+
+```motoko
+let #ok(search_result) = users.search(query);
+let documents = search_result.documents;
+let instructions_used = search_result.instructions;
+```
+
+This allows you to monitor query performance and access both the results and execution metrics.
 
 ## Limitations
 
@@ -344,7 +358,6 @@ let #ok(_) = users.createIndex(
 - [ ] Aggregation functions (min, max, sum, avg, etc.)
 - [ ] Better support for migrations
 - [ ] Full Text search capabilities by implementing an inverted text index
-- [ ] Support for transactions
 - [ ] Data Certification of all documents, using the [ic-certification](https://mops.one/ic-certification) motoko library
 - [ ] Dedicated database canister for use by clients in other languages (e.g. JavaScript, Rust)
 - [ ] Database management tools to handle collection creation, index management, and data migrations
