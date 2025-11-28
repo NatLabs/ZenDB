@@ -459,7 +459,7 @@ let #ok(results) = users_collection.search(
   ZenDB.QueryBuilder()
     .Where("age", #gt(#Nat(18)))              // Find users older than 18
     .And("name", #startsWith(#Text("A")))     // AND whose name starts with "A"
-    .Sort("age", #Ascending)                  // Sort by age in ascending order
+    .SortBy("age", #Ascending)                  // Sort by age in ascending order
     .Limit(10)                                // Return maximum 10 results
 );
 ```
@@ -475,7 +475,7 @@ let #ok(search_result) = users_collection.search(
         .Where("role", #eq(#Text("admin")))
         .Or("permissions", #anyOf([#Text("write"), #Text("admin")]))
     )
-    .Sort("last_login", #Descending)
+    .SortBy("last_login", #Descending)
     .Skip(20)
     .Limit(10)
 );
@@ -554,7 +554,7 @@ ZenDB.QueryBuilder()
 ```
 
 #### Result Control Methods
-- `.Sort(field, #Ascending | #Descending)` - Sorts results by the specified field
+- `.SortBy(field, #Ascending | #Descending)` - Sorts results by the specified field
 - `.Limit(count)` - Limits the number of results returned
 - `.Skip(count)` - Skips the first N results (useful for pagination)
 

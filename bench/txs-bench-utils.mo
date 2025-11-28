@@ -276,7 +276,7 @@ module TxsBenchUtils {
         };
 
         func new_sorted_query(field : Text, dir : ZenDB.Types.SortDirection) : () -> ZenDB.QueryBuilder {
-            func() { ZenDB.QueryBuilder().Sort(field, dir) };
+            func() { ZenDB.QueryBuilder().SortBy(field, dir) };
         };
 
         let single_field_indexes = [

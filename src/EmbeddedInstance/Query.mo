@@ -285,7 +285,7 @@ module {
             self;
         };
 
-        public func Sort(key : Text, direction : T.SortDirection) : QueryBuilder {
+        public func SortBy(key : Text, direction : T.SortDirection) : QueryBuilder {
             _sort_by := ?(key, direction);
             self;
         };

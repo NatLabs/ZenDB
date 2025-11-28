@@ -369,7 +369,7 @@ suite(
             "Sort configuration is preserved",
             func() {
                 let builder = Query.QueryBuilder();
-                let result = builder.Where("name", #eq(#Text("Alice"))).Sort("created_at", #Descending).build();
+                let result = builder.Where("name", #eq(#Text("Alice"))).SortBy("created_at", #Descending).build();
 
                 assert result.query_operations == #And([#Operation("name", #eq(#Text("Alice")))]);
 
@@ -485,7 +485,7 @@ suite(
             "Complex nested query with all operators",
             func() {
                 let builder = Query.QueryBuilder();
-                let result = builder.Where("name", #startsWith(#Text("A"))).And("age", #between(#Nat(18), #Nat(65))).Or("status", #anyOf([#Text("admin"), #Text("moderator")])).And("active", #eq(#Bool(true))).Sort("created_at", #Ascending).Limit(50).Skip(10).build();
+                let result = builder.Where("name", #startsWith(#Text("A"))).And("age", #between(#Nat(18), #Nat(65))).Or("status", #anyOf([#Text("admin"), #Text("moderator")])).And("active", #eq(#Bool(true))).SortBy("created_at", #Ascending).Limit(50).Skip(10).build();
 
                 // Verify structure is correct (specific structure depends on how And/Or are processed)
                 assert result.sort_by == ?("created_at", #Ascending);
@@ -500,7 +500,7 @@ suite(
                 let builder = Query.QueryBuilder();
                 ignore builder.Where("name", #eq(#Text("Alice")));
                 ignore builder.And("age", #gte(#Nat(18)));
-                ignore builder.Sort("created_at", #Descending);
+                ignore builder.SortBy("created_at", #Descending);
                 ignore builder.Limit(10);
 
                 let result1 = builder.build();
@@ -604,7 +604,7 @@ suite(
                 ).And("subscription_type", #not_(#eq(#Text("trial")))).And(
                     "billing_cycle",
                     #anyOf([#Text("monthly"), #Text("yearly")]),
-                ).Sort("price", #Ascending).Limit(100).build();
+                ).SortBy("price", #Ascending).Limit(100).build();
 
                 // Business use case: Find active paid subscriptions in a price range
                 // Excludes trial users, only monthly/yearly billing
@@ -648,7 +648,7 @@ suite(
                 ).Or(
                     "featured",
                     #eq(#Bool(true)),
-                ).Sort("price", #Ascending).build();
+                ).SortBy("price", #Ascending).build();
 
                 // E-commerce: In-stock products in price range, good ratings, excluding clearance
                 // OR featured products (regardless of other filters)
@@ -769,7 +769,7 @@ suite(
             "Financial transactions - fraud detection pattern",
             func() {
                 let builder = Query.QueryBuilder();
-                let result = builder.Where("amount", #gt(#Nat(10000))).And("transaction_hour", #not_(#between(#Nat(6), #Nat(22)))).And("location_verified", #eq(#Bool(false))).Or("velocity_score", #gt(#Nat(8))).And("user_age_days", #lt(#Nat(30))).Sort("amount", #Descending).Limit(50).build();
+                let result = builder.Where("amount", #gt(#Nat(10000))).And("transaction_hour", #not_(#between(#Nat(6), #Nat(22)))).And("location_verified", #eq(#Bool(false))).Or("velocity_score", #gt(#Nat(8))).And("user_age_days", #lt(#Nat(30))).SortBy("amount", #Descending).Limit(50).build();
 
                 // Fraud detection: Large transactions at odd hours, unverified location
                 // OR high-velocity patterns, from new accounts
@@ -796,7 +796,7 @@ suite(
             "Content moderation - multi-flag query",
             func() {
                 let builder = Query.QueryBuilder();
-                let result = builder.Where("status", #eq(#Text("pending_review"))).And("flag_count", #gte(#Nat(3))).And("flag_types", #not_(#eq(#Text("spam")))).Or("ai_confidence", #gte(#Nat(90))).And("reviewed", #eq(#Bool(false))).Sort("flag_count", #Descending).build();
+                let result = builder.Where("status", #eq(#Text("pending_review"))).And("flag_count", #gte(#Nat(3))).And("flag_types", #not_(#eq(#Text("spam")))).Or("ai_confidence", #gte(#Nat(90))).And("reviewed", #eq(#Bool(false))).SortBy("flag_count", #Descending).build();
 
                 // Content mod: Pending items with multiple flags (not just spam)
                 // OR high AI confidence that needs review
@@ -1020,7 +1020,7 @@ suite(
             "Geo-location range query simulation",
             func() {
                 let builder = Query.QueryBuilder();
-                let result = builder.Where("latitude", #between(#Int(40), #Int(42))).And("longitude", #between(#Int(-75), #Int(-73))).And("active", #eq(#Bool(true))).Sort("distance", #Ascending).Limit(20).build();
+                let result = builder.Where("latitude", #between(#Int(40), #Int(42))).And("longitude", #between(#Int(-75), #Int(-73))).And("active", #eq(#Bool(true))).SortBy("distance", #Ascending).Limit(20).build();
 
                 // Bounding box geo query pattern
                 Debug.print("Geo-location query: " # debug_show result.query_operations);
@@ -1040,7 +1040,7 @@ suite(
             func() {
                 let builder = Query.QueryBuilder();
                 let cursor = { last_document_id = ?("\F0\A0\B0\C0" : Blob) };
-                let result = builder.Where("category", #eq(#Text("electronics"))).And("price", #between(#Nat(100), #Nat(1000))).Sort("popularity", #Descending).PaginationToken(cursor).Limit(25).build();
+                let result = builder.Where("category", #eq(#Text("electronics"))).And("price", #between(#Nat(100), #Nat(1000))).SortBy("popularity", #Descending).PaginationToken(cursor).Limit(25).build();
 
                 assert result.pagination.cursor == ?cursor;
                 assert result.pagination.limit == ?25;
@@ -1056,7 +1056,7 @@ suite(
             func() {
                 let builder = Query.QueryBuilder();
                 // Find players with scores strictly greater than 100 and up to 1000
-                let result = builder.Where("score", #betweenLeftOpen(#Nat(100), #Nat(1000))).And("active", #eq(#Bool(true))).Sort("score", #Descending).Limit(10).build();
+                let result = builder.Where("score", #betweenLeftOpen(#Nat(100), #Nat(1000))).And("active", #eq(#Bool(true))).SortBy("score", #Descending).Limit(10).build();
 
                 let expected = #And([
                     #Operation("score", #gt(#Nat(100))),

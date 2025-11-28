@@ -262,7 +262,7 @@ ZenDBSuite.newSuite(
                     sorted_ids : Buffer.Buffer<ZenDB.Types.DocumentId>,
                 ) : Bool {
                     let #ok(results) = sorted_index_types.search(
-                        ZenDB.QueryBuilder().Sort(field, #Ascending)
+                        ZenDB.QueryBuilder().SortBy(field, #Ascending)
                     );
 
                     return sorted_ids.size() == limit and Itertools.all(

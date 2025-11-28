@@ -43,7 +43,7 @@ persistent actor FlyingNinja {
         // We can safely assume that the last entry has the lowest score.
 
         let #ok(lowestScores) = leaderboard.search(
-            ZenDB.QueryBuilder().Sort("score", #Ascending).Limit(1)
+            ZenDB.QueryBuilder().SortBy("score", #Ascending).Limit(1)
         );
 
         return score > lowestScores[0].score;
@@ -59,7 +59,7 @@ persistent actor FlyingNinja {
         // delete the smallest score immediately, if the leaderboard is larger than 10
         if (leaderboard.size() > 10) {
             let #ok(_) = leaderboard.delete(
-                ZenDB.QueryBuilder().Sort("score", #Ascending).Limit(1)
+                ZenDB.QueryBuilder().SortBy("score", #Ascending).Limit(1)
             );
         };
 
@@ -69,7 +69,7 @@ persistent actor FlyingNinja {
     // Returns the current leaderboard.
     public query func getLeaderboard() : async [LeaderboardEntry] {
         let #ok(entries) = leaderboard.search(
-            ZenDB.QueryBuilder().Sort("score", #Descending)
+            ZenDB.QueryBuilder().SortBy("score", #Descending)
         );
 
         return entries;

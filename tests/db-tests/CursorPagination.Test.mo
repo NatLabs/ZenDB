@@ -194,7 +194,7 @@ ZenDBSuite.newSuite(
                     "sorted query - ascending by age",
                     func() {
                         let page_size = 20;
-                        let db_query = ZenDB.QueryBuilder().Sort("age", #Ascending);
+                        let db_query = ZenDB.QueryBuilder().SortBy("age", #Ascending);
 
                         let skip_pages = skip_paginated_query(db_query.clone(), page_size);
                         let cursor_pages = cursor_paginated_query(db_query.clone(), page_size);
@@ -209,7 +209,7 @@ ZenDBSuite.newSuite(
                     "sorted query - descending by name",
                     func() {
                         let page_size = 13;
-                        let db_query = ZenDB.QueryBuilder().Sort("name", #Descending);
+                        let db_query = ZenDB.QueryBuilder().SortBy("name", #Descending);
 
                         let skip_pages = skip_paginated_query(db_query.clone(), page_size);
                         let cursor_pages = cursor_paginated_query(db_query.clone(), page_size);
@@ -224,7 +224,7 @@ ZenDBSuite.newSuite(
                     "filtered and sorted - category basic, sorted by age desc",
                     func() {
                         let page_size = 8;
-                        let db_query = ZenDB.QueryBuilder().Where("category", #eq(#Text("basic"))).Sort("age", #Descending);
+                        let db_query = ZenDB.QueryBuilder().Where("category", #eq(#Text("basic"))).SortBy("age", #Descending);
 
                         let skip_pages = skip_paginated_query(db_query.clone(), page_size);
                         let cursor_pages = cursor_paginated_query(db_query.clone(), page_size);
@@ -378,7 +378,7 @@ ZenDBSuite.newSuite(
                     "filter with sort - age less than 30 sorted by name desc",
                     func() {
                         let page_size = 6;
-                        let db_query = ZenDB.QueryBuilder().Where("age", #lt(#Nat(30))).Sort("name", #Descending);
+                        let db_query = ZenDB.QueryBuilder().Where("age", #lt(#Nat(30))).SortBy("name", #Descending);
 
                         let skip_pages = skip_paginated_query(db_query.clone(), page_size);
                         let cursor_pages = cursor_paginated_query(db_query.clone(), page_size);
@@ -392,7 +392,7 @@ ZenDBSuite.newSuite(
                     "between with sort - age 30-70 sorted by category",
                     func() {
                         let page_size = 15;
-                        let db_query = ZenDB.QueryBuilder().Where("age", #between(#Nat(30), #Nat(70))).Sort("category", #Ascending);
+                        let db_query = ZenDB.QueryBuilder().Where("age", #between(#Nat(30), #Nat(70))).SortBy("category", #Ascending);
 
                         let skip_pages = skip_paginated_query(db_query.clone(), page_size);
                         let cursor_pages = cursor_paginated_query(db_query.clone(), page_size);
@@ -450,7 +450,7 @@ ZenDBSuite.newSuite(
                     "odd page size - 7 items per page with sort",
                     func() {
                         let page_size = 7;
-                        let db_query = ZenDB.QueryBuilder().Sort("age", #Ascending);
+                        let db_query = ZenDB.QueryBuilder().SortBy("age", #Ascending);
 
                         let skip_pages = skip_paginated_query(db_query.clone(), page_size);
                         let cursor_pages = cursor_paginated_query(db_query.clone(), page_size);
@@ -506,7 +506,7 @@ ZenDBSuite.newSuite(
                     "descending sort only - no filters",
                     func() {
                         let page_size = 11;
-                        let db_query = ZenDB.QueryBuilder().Sort("age", #Descending);
+                        let db_query = ZenDB.QueryBuilder().SortBy("age", #Descending);
 
                         let skip_pages = skip_paginated_query(db_query.clone(), page_size);
                         let cursor_pages = cursor_paginated_query(db_query.clone(), page_size);
@@ -520,7 +520,7 @@ ZenDBSuite.newSuite(
                     "ascending sort only - no filters",
                     func() {
                         let page_size = 9;
-                        let db_query = ZenDB.QueryBuilder().Sort("name", #Ascending);
+                        let db_query = ZenDB.QueryBuilder().SortBy("name", #Ascending);
 
                         let skip_pages = skip_paginated_query(db_query.clone(), page_size);
                         let cursor_pages = cursor_paginated_query(db_query.clone(), page_size);
@@ -534,7 +534,7 @@ ZenDBSuite.newSuite(
                     "sort by category ascending",
                     func() {
                         let page_size = 14;
-                        let db_query = ZenDB.QueryBuilder().Sort("category", #Ascending);
+                        let db_query = ZenDB.QueryBuilder().SortBy("category", #Ascending);
 
                         let skip_pages = skip_paginated_query(db_query.clone(), page_size);
                         let cursor_pages = cursor_paginated_query(db_query.clone(), page_size);
@@ -548,7 +548,7 @@ ZenDBSuite.newSuite(
                     "sort by category descending",
                     func() {
                         let page_size = 16;
-                        let db_query = ZenDB.QueryBuilder().Sort("category", #Descending);
+                        let db_query = ZenDB.QueryBuilder().SortBy("category", #Descending);
 
                         let skip_pages = skip_paginated_query(db_query.clone(), page_size);
                         let cursor_pages = cursor_paginated_query(db_query.clone(), page_size);
@@ -562,7 +562,7 @@ ZenDBSuite.newSuite(
                     "anyOf with sort - categories sorted by age",
                     func() {
                         let page_size = 11;
-                        let db_query = ZenDB.QueryBuilder().Where("category", #anyOf([#Text("premium"), #Text("free")])).Sort("age", #Ascending);
+                        let db_query = ZenDB.QueryBuilder().Where("category", #anyOf([#Text("premium"), #Text("free")])).SortBy("age", #Ascending);
 
                         let skip_pages = skip_paginated_query(db_query.clone(), page_size);
                         let cursor_pages = cursor_paginated_query(db_query.clone(), page_size);
@@ -605,7 +605,7 @@ ZenDBSuite.newSuite(
                     "complex query - OR with sorts",
                     func() {
                         let page_size = 7;
-                        let db_query = ZenDB.QueryBuilder().Where("age", #lt(#Nat(20))).Or("age", #gt(#Nat(80))).Sort("age", #Ascending);
+                        let db_query = ZenDB.QueryBuilder().Where("age", #lt(#Nat(20))).Or("age", #gt(#Nat(80))).SortBy("age", #Ascending);
 
                         let skip_pages = skip_paginated_query(db_query.clone(), page_size);
                         let cursor_pages = cursor_paginated_query(db_query.clone(), page_size);
@@ -651,7 +651,7 @@ ZenDBSuite.newSuite(
                         let page_size = 4;
                         let ages = Array.tabulate<ZenDB.Types.Candid>(10, func(i : Nat) : ZenDB.Types.Candid { #Nat((i + 1) * 10) });
                         Debug.print("Ages for anyOf filter: " # debug_show ages);
-                        let db_query = ZenDB.QueryBuilder().Where("age", #anyOf(ages)).Sort("age", #Ascending);
+                        let db_query = ZenDB.QueryBuilder().Where("age", #anyOf(ages)).SortBy("age", #Ascending);
 
                         let skip_pages = skip_paginated_query(db_query.clone(), page_size);
                         let cursor_pages = cursor_paginated_query(db_query.clone(), page_size);
@@ -667,7 +667,7 @@ ZenDBSuite.newSuite(
                         let page_size = 4;
                         let ages = Array.tabulate<ZenDB.Types.Candid>(10, func(i : Nat) : ZenDB.Types.Candid { #Nat((i + 1) * 10) });
                         Debug.print("Ages for anyOf filter: " # debug_show ages);
-                        let db_query = ZenDB.QueryBuilder().Where("age", #anyOf(ages)).Sort("age", #Descending);
+                        let db_query = ZenDB.QueryBuilder().Where("age", #anyOf(ages)).SortBy("age", #Descending);
 
                         Debug.print(
                             "result array: " # debug_show (

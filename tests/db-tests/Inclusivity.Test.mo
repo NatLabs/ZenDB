@@ -724,7 +724,7 @@ ZenDBSuite.newSuite(
                     func() {
                         // Test closest string smaller than target
                         let result = edge_collection.search(
-                            QueryBuilder().Where("text_field", #lt(#Text("abc"))).Sort("text_field", #Descending)
+                            QueryBuilder().Where("text_field", #lt(#Text("abc"))).SortBy("text_field", #Descending)
                         );
                         assert Result.isOk(result);
                         let #ok(search_result) = result else return assert false;

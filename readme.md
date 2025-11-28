@@ -159,7 +159,7 @@ let #ok(queryResults) = users.search(
   ZenDB.QueryBuilder()
     .Where("profile.location", #eq(#Text("San Francisco")))
     .And("profile.age", #gte(#Nat(30)))
-    .Sort("created_at", #Descending)
+    .SortBy("created_at", #Descending)
     .Limit(10)
 );
 
@@ -231,7 +231,7 @@ let #ok(search_result) = users.search(
     .Where("status", #eq(#Text("active")))
     .And("account_type", #eq(#Text("premium")))
     .And("joined_date", #gte(#Int(oneWeekAgo)))
-    .Sort("activity_score", #Descending)
+    .SortBy("activity_score", #Descending)
     .Limit(25)
 );
 
@@ -302,7 +302,7 @@ let #ok(results) = users.search(
   ZenDB.QueryBuilder()
     .Where("age", #gt(#Nat(18)))                  // Range filter  
     .And("status", #eq(#Text("active")))          // Equality filter
-    .Sort("created_at", #Descending)              // Sort operation
+    .SortBy("created_at", #Descending)              // Sort operation
 );
 ```
 

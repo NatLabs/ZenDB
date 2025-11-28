@@ -277,7 +277,7 @@ ZenDBSuite.newSuite(
                 };
 
                 if (options.sort != null) {
-                    ignore Query.Sort(options.sort!);
+                    ignore Query.SortBy(options.sort!);
                 };
 
                 if (options.pagination != null) {
@@ -620,7 +620,7 @@ ZenDBSuite.newSuite(
                 ).Or(
                     "tx.spender.owner",
                     #eq((#Principal(principals[1]))),
-                ).Sort("ts", #Ascending);
+                ).SortBy("ts", #Ascending);
                 expected_query_resolution = #Or([
                     #Operation(
                         "tx.to.owner",
@@ -866,7 +866,7 @@ ZenDBSuite.newSuite(
                         q.query_name,
                         func() {
                             for (sort_condition in q.sort.vals()) {
-                                ignore q.db_query.Sort(sort_condition);
+                                ignore q.db_query.SortBy(sort_condition);
                             };
 
                             let results = get_txs_from_query(q.db_query);

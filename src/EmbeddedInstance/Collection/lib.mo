@@ -226,7 +226,7 @@ module {
         /// - Search for all documents with a field "age" greater than 18, sorted by "age" in descending order:
         /// ```motoko
         /// let #ok(documents_older_than_18) = collection.search(
-        ///     ZenDB.QueryBuilder().Where("age", #gt(18)).Sort("age", #Descending)
+        ///     ZenDB.QueryBuilder().Where("age", #gt(18)).SortBy("age", #Descending)
         /// );
         /// ```
         ///
