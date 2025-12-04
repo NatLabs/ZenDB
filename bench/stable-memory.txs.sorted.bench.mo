@@ -30,7 +30,7 @@ module {
 
         bench.cols([
             "#stableMemory no index (sorted by ts)",
-            "#stableMemory 7 single field indexes (sorted by tx.amt)",
+            "#stableMemory 7 single field indexes (sorted by ts)",
             "#stableMemory 6 fully covered indexes (sorted by ts)",
 
         ]);

@@ -64,14 +64,15 @@ jobs:
               with:
                   ref: benchmark-results
                   path: .benchmark-results-branch/
+
             - name: Move Saved Benchmarks
               run: mv .benchmark-results-branch/.bench .bench 2>/dev/null || mkdir -p .bench
 
-            - name: Benchmarks
+            - name: Pull Request Benchmarks
               if: github.event_name == 'pull_request'
               id: benchmarks
               run: |
-                  mops bench  --gc incremental --compare 2>&1 | tee benchmark_results.txt
+                  mops bench  --gc generational --compare 2>&1 | tee benchmark_results.txt
                   echo "result<<EOF" >> $GITHUB_OUTPUT
                   cat benchmark_results.txt >> $GITHUB_OUTPUT
                   echo "EOF" >> $GITHUB_OUTPUT
@@ -98,7 +99,7 @@ jobs:
               if: github.event_name != 'pull_request'
               run: |
                   set -o pipefail
-                  mops bench  --gc incremental --save --compare 2>&1 | tee bench-results.md
+                  mops bench  --gc generational --save --compare 2>&1 | tee bench-results.md
             - name: Move Generated Results
               if: github.event_name != 'pull_request'
               run: |
