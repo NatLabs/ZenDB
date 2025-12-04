@@ -213,7 +213,7 @@ module {
                                 );
 
                                 let index_key_details = Index.get_key_details_by_name(collection, index_name);
-                                let filter_bounds_buffer = Buffer.fromArray<T.Bounds>([filter_bounds]);
+                                let filter_bounds_buffer = Buffer.fromArray<T.LowerUpperBounds>([filter_bounds]);
 
                                 let document_ids_with_fields = if (CollectionUtils.can_use_indexed_fields_for_filtering(index_key_details, filter_bounds_buffer)) {
                                     Intervals.document_ids_and_indexed_fields_from_intervals(collection, index_name, [interval], false);
@@ -509,10 +509,10 @@ module {
 
     type IndexIntervalFilterDetails = {
         intervals_map : Map<Text, Buffer.Buffer<T.Interval>>;
-        opt_filter_bounds : ?T.Bounds;
+        opt_filter_bounds : ?T.LowerUpperBounds;
     };
 
-    public func get_index_based_filtering_intervals(collection : T.StableCollection, filter_bounds : T.Bounds, operations : [(Text, T.ZqlOperators)]) : IndexIntervalFilterDetails {
+    public func get_index_based_filtering_intervals(collection : T.StableCollection, filter_bounds : T.LowerUpperBounds, operations : [(Text, T.ZqlOperators)]) : IndexIntervalFilterDetails {
         let log = Logger.NamespacedLogger(collection.logger, LOGGER_NAMESPACE).subnamespace("get_index_based_filtering_intervals");
 
         log.lazyDebug(func() = "Finding best indexes for filtering");
@@ -708,7 +708,7 @@ module {
 
     type IndexBasedFilteringResult = {
         bitmap : T.SparseBitMap64;
-        opt_filter_bounds : ?T.Bounds;
+        opt_filter_bounds : ?T.LowerUpperBounds;
     };
 
     public func index_based_interval_filtering(
@@ -969,7 +969,7 @@ module {
 
                     let index_key_details = Index.get_key_details_by_name(collection, index_name);
 
-                    let filter_bounds_buffer = Buffer.fromArray<T.Bounds>([filter_bounds]);
+                    let filter_bounds_buffer = Buffer.fromArray<T.LowerUpperBounds>([filter_bounds]);
 
                     log.lazyDebug(
                         func() : Text = "Determining if indexed fields can be used for filtering"
@@ -1039,7 +1039,7 @@ module {
                                         sort_field,
                                     );
 
-                                    let bounds = Buffer.fromArray<T.Bounds>([(
+                                    let bounds = Buffer.fromArray<T.LowerUpperBounds>([(
                                         [(
                                             sort_field,
                                             Option.map<T.CandidQuery, T.State<T.CandidQuery>>(opt_sort_field_value, func(candid_query : T.CandidQuery) : T.State<T.CandidQuery> { #Exclusive(candid_query) }),
@@ -1269,7 +1269,7 @@ module {
                 };
             };
 
-            let full_scan_filter_bounds = Buffer.Buffer<T.Bounds>(full_scan_details_buffer.size());
+            let full_scan_filter_bounds = Buffer.Buffer<T.LowerUpperBounds>(full_scan_details_buffer.size());
 
             for (full_scan_details in full_scan_details_buffer.vals()) {
                 full_scan_filter_bounds.add(full_scan_details.filter_bounds);
@@ -1634,7 +1634,7 @@ module {
                 " full scan operations in OR operation"
             );
 
-            let full_scan_filter_bounds = Buffer.Buffer<T.Bounds>(full_scan_details_buffer.size());
+            let full_scan_filter_bounds = Buffer.Buffer<T.LowerUpperBounds>(full_scan_details_buffer.size());
 
             for (full_scan_details in full_scan_details_buffer.vals()) {
                 full_scan_filter_bounds.add(full_scan_details.filter_bounds);
@@ -1683,7 +1683,7 @@ module {
                         );
 
                         let bounds = if (sort_direction == #Ascending) {
-                            Buffer.fromArray<T.Bounds>([(
+                            Buffer.fromArray<T.LowerUpperBounds>([(
                                 [
                                     (
                                         sort_field,
@@ -1694,7 +1694,7 @@ module {
                                 [(sort_field, ?#Inclusive(#Maximum)), (C.DOCUMENT_ID, ?#Inclusive(#Maximum))],
                             )]);
                         } else {
-                            Buffer.fromArray<T.Bounds>([(
+                            Buffer.fromArray<T.LowerUpperBounds>([(
                                 [(sort_field, ?#Inclusive(#Minimum)), (C.DOCUMENT_ID, ?#Inclusive(#Minimum))],
                                 [
                                     (

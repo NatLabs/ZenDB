@@ -297,12 +297,28 @@ module CollectionUtils {
         };
     };
 
+    func is_bounds_empty(
+        bounds : Buffer.Buffer<T.LowerUpperBounds>
+    ) : Bool {
+        Itertools.all<T.LowerUpperBounds>(
+            bounds.vals(),
+            func((lower, upper) : T.LowerUpperBounds) : Bool {
+                lower.size() == 0 and upper.size() == 0;
+            },
+        );
+    };
+
     public func multiFilter(
         collection : T.StableCollection,
         documents : Iter<T.DocumentId>,
         bounds : Buffer.Buffer<(lower : [(Text, ?T.CandidInclusivityQuery)], upper : [(Text, ?T.CandidInclusivityQuery)])>,
         is_and : Bool,
     ) : Iter<T.DocumentId> {
+
+        if (is_bounds_empty(bounds)) {
+            // No filtering needed, return all documents
+            return documents;
+        };
 
         Iter.filter<T.DocumentId>(
             documents,
@@ -408,6 +424,11 @@ module CollectionUtils {
         bounds : Buffer.Buffer<(lower : [(Text, ?T.CandidInclusivityQuery)], upper : [(Text, ?T.CandidInclusivityQuery)])>,
         is_and : Bool,
     ) : Iter<(T.DocumentId, ?[(Text, T.Candid)])> {
+
+        if (is_bounds_empty(bounds)) {
+            // No filtering needed, return all documents
+            return documents;
+        };
 
         let indexed_fields_map = Map.new<Text, T.Candid>();
 

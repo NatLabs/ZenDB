@@ -559,7 +559,7 @@ module {
         };
     };
 
-    public func extract_bounds(lower : Map.Map<Text, T.CandidInclusivityQuery>, upper : Map.Map<Text, T.CandidInclusivityQuery>, opt_index_key_details : ?[(Text, T.SortDirection)], opt_fully_covered_equality_and_range_fields : ?Set.Set<Text>) : (T.Bounds, T.Bounds) {
+    public func extract_bounds(lower : Map.Map<Text, T.CandidInclusivityQuery>, upper : Map.Map<Text, T.CandidInclusivityQuery>, opt_index_key_details : ?[(Text, T.SortDirection)], opt_fully_covered_equality_and_range_fields : ?Set.Set<Text>) : (T.LowerUpperBounds, T.LowerUpperBounds) {
 
         assert Option.isSome(opt_index_key_details) == Option.isSome(opt_fully_covered_equality_and_range_fields);
 
@@ -657,7 +657,7 @@ module {
 
     };
 
-    public func convert_simple_ops_to_bounds(is_and_operation : Bool, simple_operations : [(Text, T.ZqlOperators)], opt_index_key_details : ?[(Text, T.SortDirection)], opt_fully_covered_equality_and_range_fields : ?Set.Set<Text>) : (T.Bounds, T.Bounds) {
+    public func convert_simple_ops_to_bounds(is_and_operation : Bool, simple_operations : [(Text, T.ZqlOperators)], opt_index_key_details : ?[(Text, T.SortDirection)], opt_fully_covered_equality_and_range_fields : ?Set.Set<Text>) : (T.LowerUpperBounds, T.LowerUpperBounds) {
 
         let lower_bound = Map.new<Text, T.State<T.CandidQuery>>();
         let upper_bound = Map.new<Text, T.State<T.CandidQuery>>();

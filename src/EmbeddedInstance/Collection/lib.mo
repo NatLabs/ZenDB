@@ -187,7 +187,7 @@ module {
         type DocumentLimits = [(Text, ?T.State<T.CandidQuery>)];
         type FieldLimit = (Text, ?T.State<T.CandidQuery>);
 
-        type Bounds = (DocumentLimits, DocumentLimits);
+        type LowerUpperBounds = (DocumentLimits, DocumentLimits);
 
         type IndexDetails = {
             var sorted_in_reverse : ?Bool;

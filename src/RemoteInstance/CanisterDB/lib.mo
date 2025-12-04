@@ -38,6 +38,7 @@ import Query "../../EmbeddedInstance/Query";
         };
     }
 )
+
 shared ({ caller = owner }) persistent actor class CanisterDB() = this_canister {
 
     transient let Permissions = {
@@ -258,7 +259,6 @@ shared ({ caller = owner }) persistent actor class CanisterDB() = this_canister 
                 Result.mapOk<ZT.StableCollection, (), Text>(collection, func(_) { () });
             },
         );
-
     };
 
     public shared ({ caller }) func zendb_v1_delete_collection(db_name : Text, collection_name : Text) : async (ZT.Result<(), Text>) {
@@ -353,7 +353,7 @@ shared ({ caller = owner }) persistent actor class CanisterDB() = this_canister 
         );
     };
 
-    public shared query ({ caller }) func zendb_v1_collection_search(
+    public shared ({ caller }) func zendb_v1_collection_search(
         db_name : Text,
         collection_name : Text,
         stable_query : ZT.StableQuery,
@@ -442,7 +442,7 @@ shared ({ caller = owner }) persistent actor class CanisterDB() = this_canister 
 
     /// Returns the total number of documents that match the query.
     /// This ignores the limit and skip parameters.
-    public shared query ({ caller }) func zendb_v1_collection_count(db_name : Text, collection_name : Text, stable_query : ZT.StableQuery) : async ZT.CountResult {
+    public shared ({ caller }) func zendb_v1_collection_count(db_name : Text, collection_name : Text, stable_query : ZT.StableQuery) : async ZT.CountResult {
         _zendb_collection_count(caller, db_name, collection_name, stable_query);
     };
     /// Returns the total number of documents that match the query using composite query.

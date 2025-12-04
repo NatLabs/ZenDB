@@ -41,7 +41,7 @@ module {
     type Iter<A> = Iter.Iter<A>;
     type State<A> = T.State<A>;
     type Candid = T.Candid;
-    type Bounds = T.Bounds;
+    type LowerUpperBounds = T.LowerUpperBounds;
     type SortDirection = T.SortDirection;
     type FieldLimit = T.FieldLimit;
     type CompositeIndex = T.CompositeIndex;

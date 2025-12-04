@@ -524,7 +524,7 @@ module StableCollection {
         var documents_to_process = 100; // Start with initial calibration batch size
         var multiplier : Float = 2.0;
 
-        while (multiplier > 1.0) {
+        while (multiplier >= 1.0) {
 
             while (
                 (performance.total_instructions_used() + (batch.avg_instructions_per_document * documents_to_process)) < MAX_INSTRUCTIONS and
@@ -566,7 +566,10 @@ module StableCollection {
                 documents_to_process := Int.abs(Float.toInt(Float.fromInt(documents_to_process) * multiplier));
             };
 
+            // Revert the last multiplication that exceeded the limit, then apply new multiplier
+            documents_to_process := Int.abs(Float.toInt(Float.fromInt(documents_to_process) / multiplier));
             multiplier -= 0.5;
+            documents_to_process := Int.abs(Float.toInt(Float.fromInt(documents_to_process) * multiplier));
 
         };
 

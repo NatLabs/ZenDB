@@ -303,7 +303,7 @@ module T {
 
     public type FieldLimit = (Text, ?State<CandidQuery>);
     public type DocumentLimits = [(Text, ?State<CandidQuery>)];
-    public type Bounds = (DocumentLimits, DocumentLimits);
+    public type LowerUpperBounds = (DocumentLimits, DocumentLimits);
 
     public type ZqlOperators = {
         #eq : Candid;
@@ -367,8 +367,8 @@ module T {
     public type FullScanDetails = {
         requires_additional_sorting : Bool;
         requires_additional_filtering : Bool;
-        scan_bounds : Bounds;
-        filter_bounds : Bounds;
+        scan_bounds : LowerUpperBounds;
+        filter_bounds : LowerUpperBounds;
     };
 
     public type IndexScanDetails = {
@@ -377,8 +377,8 @@ module T {
         requires_additional_filtering : Bool;
         sorted_in_reverse : Bool;
         interval : Interval;
-        scan_bounds : Bounds;
-        filter_bounds : Bounds;
+        scan_bounds : LowerUpperBounds;
+        filter_bounds : LowerUpperBounds;
         simple_operations : [(Text, T.ZqlOperators)];
     };
 
