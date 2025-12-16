@@ -17,29 +17,29 @@
 
 List of terms as they are used in this library.
 
-| Term                                  | Description                                                                                                                                                                         |
-| ------------------------------------- | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| **ZenDB Instance**                    | The main database container that holds multiple databases. Ideally one instance per canister.                                                                                       |
-| **Database**                          | A namespace containing multiple collections. Provides logical grouping of related collections.                                                                                      |
-| **Collection**                        | Equivalent to a table in SQL databases. A group of documents with the same schema definition and type safety.                                                                        |
-| **Document**                          | The smallest data entity in ZenDB. User-defined data that conforms to a collection's schema.                                                                                        |
-| **Schema**                            | Type definition that matches Motoko types. Defines the structure, field types, and constraints for documents in a collection.                                                       |
-| **Schema Constraints**                | Validation rules applied to collections and fields (e.g., unique constraints, min/max values, size limits).                                                                        |
-| **Memory Types**                      | Storage options for collections: `#heap` (faster, 6GB limit) or `#stableMemory` (slower, 500GB limit, persists across upgrades).                                                  |
-| **B-Tree**                            | The underlying data structure used for document storage and indexes. Provides sorted, efficient data access.                                                                        |
-| **Index**                             | A B-Tree data structure that stores document fields in sorted order to accelerate query performance. Can be single-field or composite.                                             |
-| **Composite Index**                   | Multi-field index that optimizes queries filtering or sorting on multiple fields simultaneously.                                                                                    |
-| **Query**                             | A request for data from a collection using filtering, sorting, and pagination criteria.                                                                                             |
-| **Query Builder**                     | A fluent interface for constructing complex queries with automatic logical grouping when switching between AND/OR operations.                                                       |
-| **Logical Group**                     | Automatic bracketing of query conditions that occurs when switching between AND/OR operations in QueryBuilder.                                                                     |
-| **Query Planner**                     | Internal component that analyzes queries and selects optimal indexes for execution.                                                                                                 |
-| **Update Operations**                 | Functions for modifying document fields, including arithmetic operations (add, multiply), text operations (concat, trim), and field references.                                     |
-| **Orchid**                            | ZenDB's custom binary encoding format for composite index keys, ensuring proper sort order and efficient B-tree operations.                                                        |
-| **Candid**                            | The Interface Description Language (IDL) used by the Internet Computer for cross-language communication.                                                                            |
-| **Candify**                           | Type definition containing functions to serialize/deserialize Motoko types to/from Candid binary format.                                                                            |
-| **Stable Memory**                     | Internet Computer feature providing persistent storage across canister upgrades with larger capacity (up to 500GB).                                                                |
-| **Stable Store**                      | Internal state representation that enables ZenDB components to persist across canister upgrades.                                                                                    |
-| **Enhanced Orthogonal Persistence (EOP)** | A Beta feature in motoko that allows heap variables to be stored directly in stable memory while maintaining heap-like access patterns.                                                      |
+| Term                                      | Description                                                                                                                                     |
+| ----------------------------------------- | ----------------------------------------------------------------------------------------------------------------------------------------------- |
+| **ZenDB Instance**                        | The main database container that holds multiple databases. Ideally one instance per canister.                                                   |
+| **Database**                              | A namespace containing multiple collections. Provides logical grouping of related collections.                                                  |
+| **Collection**                            | Equivalent to a table in SQL databases. A group of documents with the same schema definition and type safety.                                   |
+| **Document**                              | The smallest data entity in ZenDB. User-defined data that conforms to a collection's schema.                                                    |
+| **Schema**                                | Type definition that matches Motoko types. Defines the structure, field types, and constraints for documents in a collection.                   |
+| **Schema Constraints**                    | Validation rules applied to collections and fields (e.g., unique constraints, min/max values, size limits).                                     |
+| **Memory Types**                          | Storage options for collections: `#heap` (faster, 6GB limit) or `#stableMemory` (slower, 500GB limit, persists across upgrades).                |
+| **B-Tree**                                | The underlying data structure used for document storage and indexes. Provides sorted, efficient data access.                                    |
+| **Index**                                 | A B-Tree data structure that stores document fields in sorted order to accelerate query performance. Can be single-field or composite.          |
+| **Composite Index**                       | Multi-field index that optimizes queries filtering or sorting on multiple fields simultaneously.                                                |
+| **Query**                                 | A request for data from a collection using filtering, sorting, and pagination criteria.                                                         |
+| **Query Builder**                         | A fluent interface for constructing complex queries with automatic logical grouping when switching between AND/OR operations.                   |
+| **Logical Group**                         | Automatic bracketing of query conditions that occurs when switching between AND/OR operations in QueryBuilder.                                  |
+| **Query Planner**                         | Internal component that analyzes queries and selects optimal indexes for execution.                                                             |
+| **Update Operations**                     | Functions for modifying document fields, including arithmetic operations (add, multiply), text operations (concat, trim), and field references. |
+| **Orchid**                                | ZenDB's custom binary encoding format for composite index keys, ensuring proper sort order and efficient B-tree operations.                     |
+| **Candid**                                | The Interface Description Language (IDL) used by the Internet Computer for cross-language communication.                                        |
+| **Candify**                               | Type definition containing functions to serialize/deserialize Motoko types to/from Candid binary format.                                        |
+| **Stable Memory**                         | Internet Computer feature providing persistent storage across canister upgrades with larger capacity (up to 500GB).                             |
+| **Stable Store**                          | Internal state representation that enables ZenDB components to persist across canister upgrades.                                                |
+| **Enhanced Orthogonal Persistence (EOP)** | A Beta feature in motoko that allows heap variables to be stored directly in stable memory while maintaining heap-like access patterns.         |
 
 ## Getting Started
 
@@ -141,21 +141,21 @@ let #ok(cycles_db) = ZenDB.getDB(zendb, "cycles");
 ### Schema Types
 A schema defines the structure and types of data in your collection. It must match the Motoko type you want to store and consists of a combination of the following types:
 
-| Type                                        | Description                 |
-| ------------------------------------------- | --------------------------- |
-| #Nat                                        | A natural number            |
-| #Int                                        | A signed integer            |
-| Bounded Nats: #Nat8, #Nat16, #Nat32, #Nat64 | Bounded natural numbers     |
-| Bounded Ints: #Int8, #Int16, #Int32, #Int64 | Bounded signed integers     |
-| #Text                                       | A string                    |
-| #Bool                                       | A boolean                   |
-| #Float                                      | A floating point number     |
-| #Blob                                       | A binary blob               |
-| #Principal                                  | A principal                 |
-| #Option(SchemaType)                         | An optional value           |
-| #Array(SchemaType)                          | An array of values          |
-| #Record([("field_name", SchemaType)])       | A document with named fields  |
-| #Variant([("variant_name", SchemaType)])    | A variant with named fields |
+| Type                                        | Description                  |
+| ------------------------------------------- | ---------------------------- |
+| #Nat                                        | A natural number             |
+| #Int                                        | A signed integer             |
+| Bounded Nats: #Nat8, #Nat16, #Nat32, #Nat64 | Bounded natural numbers      |
+| Bounded Ints: #Int8, #Int16, #Int32, #Int64 | Bounded signed integers      |
+| #Text                                       | A string                     |
+| #Bool                                       | A boolean                    |
+| #Float                                      | A floating point number      |
+| #Blob                                       | A binary blob                |
+| #Principal                                  | A principal                  |
+| #Option(SchemaType)                         | An optional value            |
+| #Array(SchemaType)                          | An array of values           |
+| #Record([("field_name", SchemaType)])       | A document with named fields |
+| #Variant([("variant_name", SchemaType)])    | A variant with named fields  |
 
 Your schema definitions must exactly match the Motoko types you're storing. For examples of complex schemas and documents, see [Documents.Test.mo](./tests/Documents.Test.mo).
 
@@ -235,19 +235,19 @@ let candify : ZenDB.Types.Candify<Text> = {
 Schema constraints allow you to define rules and restrictions on the values stored in your collections. These constraints are specified in the `schema_constraints` field when creating a collection and are automatically enforced during insert and update operations.
 
 #### Collection-Level Constraints
-| Constraint          | Description                                                                       | Supported Types  | Example                                              |
-| ------------------- | --------------------------------------------------------------------------------- | ---------------- | ---------------------------------------------------- |
-| `#Unique([fields])` | Ensures that the specified field(s) have unique values across all documents in the collection | All types        | `#Unique(["email"])`, `#Unique(["name", "address"])` |
+| Constraint          | Description                                                                                   | Supported Types | Example                                              |
+| ------------------- | --------------------------------------------------------------------------------------------- | --------------- | ---------------------------------------------------- |
+| `#Unique([fields])` | Ensures that the specified field(s) have unique values across all documents in the collection | All types       | `#Unique(["email"])`, `#Unique(["name", "address"])` |
 
 #### Field-Level Constraints
 Use `#Field(field, constraints)` to apply specific validation rules to individual fields:
 
-| Constraint          | Description                                                                       | Supported Types  | Example                                              |
-| ------------------- | --------------------------------------------------------------------------------- | ---------------- | ---------------------------------------------------- |
-| `#Max(value)`       | Sets a maximum value limit for the field                                         | All Number types | `#Max(#Nat(100))`, `#Max(#Int(1000))`                |
-| `#Min(value)`       | Sets a minimum value limit for the field                                         | All Number types | `#Min(#Nat(1))`, `#Min(#Int(-100))`                  |
-| `#MaxSize(value)`   | Sets a maximum size limit in bytes for the field content                         | `#Text`, `#Blob` | `#MaxSize(#Nat(256))`                                |
-| `#MinSize(value)`   | Sets a minimum size limit in bytes for the field content                         | `#Text`, `#Blob` | `#MinSize(#Nat(1))`                                  |
+| Constraint        | Description                                              | Supported Types  | Example                               |
+| ----------------- | -------------------------------------------------------- | ---------------- | ------------------------------------- |
+| `#Max(value)`     | Sets a maximum value limit for the field                 | All Number types | `#Max(#Nat(100))`, `#Max(#Int(1000))` |
+| `#Min(value)`     | Sets a minimum value limit for the field                 | All Number types | `#Min(#Nat(1))`, `#Min(#Int(-100))`   |
+| `#MaxSize(value)` | Sets a maximum size limit in bytes for the field content | `#Text`, `#Blob` | `#MaxSize(#Nat(256))`                 |
+| `#MinSize(value)` | Sets a minimum size limit in bytes for the field content | `#Text`, `#Blob` | `#MinSize(#Nat(1))`                   |
 
 #### Example Usage
 ```motoko
@@ -560,18 +560,18 @@ ZenDB.QueryBuilder()
 
 ### Query Operators
 
-| Operator      | Description                    | Supported Types  | Example                                                         |
-| ------------- | ------------------------------ | ---------------- | --------------------------------------------------------------- |
-| `#eq`         | Exact equality match           | All types        | `.Where("status", #eq(#Text("active")))`                        |
-| `#lt`         | Less than                      | Number types     | `.Where("age", #lt(#Nat(30)))`                                  |
-| `#gt`         | Greater than                   | Number types     | `.Where("score", #gt(#Nat(100)))`                               |
-| `#lte`        | Less than or equal to          | Number types     | `.Where("priority", #lte(#Nat(3)))`                             |
-| `#gte`        | Greater than or equal to       | Number types     | `.Where("reputation", #gte(#Nat(500)))`                         |
-| `#between`    | Range (inclusive on both ends) | Number types     | `.Where("age", #between(#Nat(18), #Nat(65)))`                   |
-| `#exists`     | Field exists and is not null   | All types        | `.Where("profile.avatar", #exists)`                             |
-| `#startsWith` | Text starts with substring     | `#Text` only     | `.Where("name", #startsWith(#Text("John")))`                    |
-| `#anyOf`      | Value matches any in the list  | All types        | `.Where("status", #anyOf([#Text("active"), #Text("pending")]))` |
-| `#not_`       | Negates any other operator     | All types        | `.Where("role", #not_(#eq(#Text("admin"))))`                    |
+| Operator      | Description                    | Supported Types | Example                                                         |
+| ------------- | ------------------------------ | --------------- | --------------------------------------------------------------- |
+| `#eq`         | Exact equality match           | All types       | `.Where("status", #eq(#Text("active")))`                        |
+| `#lt`         | Less than                      | Number types    | `.Where("age", #lt(#Nat(30)))`                                  |
+| `#gt`         | Greater than                   | Number types    | `.Where("score", #gt(#Nat(100)))`                               |
+| `#lte`        | Less than or equal to          | Number types    | `.Where("priority", #lte(#Nat(3)))`                             |
+| `#gte`        | Greater than or equal to       | Number types    | `.Where("reputation", #gte(#Nat(500)))`                         |
+| `#between`    | Range (inclusive on both ends) | Number types    | `.Where("age", #between(#Nat(18), #Nat(65)))`                   |
+| `#exists`     | Field exists and is not null   | All types       | `.Where("profile.avatar", #exists)`                             |
+| `#startsWith` | Text starts with substring     | `#Text` only    | `.Where("name", #startsWith(#Text("John")))`                    |
+| `#anyOf`      | Value matches any in the list  | All types       | `.Where("status", #anyOf([#Text("active"), #Text("pending")]))` |
+| `#not_`       | Negates any other operator     | All types       | `.Where("role", #not_(#eq(#Text("admin"))))`                    |
 
 ## Indexing
 
@@ -601,6 +601,8 @@ let #ok(_) = users_collection.createIndex("name_age_idx", [("name", #Ascending),
 
 The query planner automatically uses these indexes when they match your query patterns, optimizing both filtering and sorting operations.
 
+### Batch Index Creation & Population
+
 ### Index Encoding Format
 
 ZenDB uses a custom binary encoding format, defined in the "[Orchid](./src/EmbeddedInstance/Collection/Orchid.mo)" module, to store composite index keys efficiently in B-tree structures. This encoding ensures proper sorting order while maintaining compact storage.
@@ -617,22 +619,22 @@ The complete key becomes: `[count_byte][field1_encoding][field2_encoding]...[fie
 
 #### Type Codes and Encoding
 
-| Type Code | Type | Encoding Format |
-|-----------|------|----------------|
-| 1 | Minimum | Type code only (query-only, not stored in indexes) |
-| 2 | Null | Type code only |
-| 3 | Empty | Type code only |
-| 4 | Bool | Type code + 1 byte (0 or 1) |
-| 5-8 | Nat8/Nat16/Nat32/Nat64 | Type code + big-endian bytes |
-| 9-12 | Int8/Int16/Int32/Int64 | Type code + big-endian encoding |
-| 13 | Nat (as Nat64) | Type code + 8 bytes big-endian |
-| 14 | Int (as Int64) | Type code + 8 bytes big-endian |
-| 15 | Float | Type code + 8 bytes big-endian |
-| 16 | Principal | Type code + size byte + principal bytes |
-| 17 | Text | Type code + 2-byte big-endian size + UTF-8 bytes |
-| 18 | Blob | Type code + 2-byte big-endian size + blob bytes |
-| 19 | Option | Type code + encoded inner value |
-| 255 | Maximum | Type code only (query-only, not stored in indexes) |
+| Type Code | Type                   | Encoding Format                                    |
+| --------- | ---------------------- | -------------------------------------------------- |
+| 1         | Minimum                | Type code only (query-only, not stored in indexes) |
+| 2         | Null                   | Type code only                                     |
+| 3         | Empty                  | Type code only                                     |
+| 4         | Bool                   | Type code + 1 byte (0 or 1)                        |
+| 5-8       | Nat8/Nat16/Nat32/Nat64 | Type code + big-endian bytes                       |
+| 9-12      | Int8/Int16/Int32/Int64 | Type code + big-endian encoding                    |
+| 13        | Nat (as Nat64)         | Type code + 8 bytes big-endian                     |
+| 14        | Int (as Int64)         | Type code + 8 bytes big-endian                     |
+| 15        | Float                  | Type code + 8 bytes big-endian                     |
+| 16        | Principal              | Type code + size byte + principal bytes            |
+| 17        | Text                   | Type code + 2-byte big-endian size + UTF-8 bytes   |
+| 18        | Blob                   | Type code + 2-byte big-endian size + blob bytes    |
+| 19        | Option                 | Type code + encoded inner value                    |
+| 255       | Maximum                | Type code only (query-only, not stored in indexes) |
 
 #### Sorting Properties
 

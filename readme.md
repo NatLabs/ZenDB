@@ -5,33 +5,21 @@
 [![Motoko](https://img.shields.io/badge/Language-Motoko-orange)](https://github.com/dfinity/motoko)
 
 
+**ZenDB** is  an embedded document database for Motoko that leverages stable memory to store and query large datasets efficiently. It provides a familiar document-oriented API, similar to MongoDB, allowing developers to store nested records, create collections, define indexes and perform complex queries on their data.
 
-ZenDB is an embedded document database that leverages the Internet Computer's unique features to provide a powerful, scalable, and efficient data storage solution for Motoko applications. With advanced querying capabilities, users can perform complex queries on large datasets efficiently, while also benefiting from the simplicity and safety of Motoko's type system.
-It is designed to work seamlessly with stable memory, allowing developers to store and query complex data models with a storage capacity of up to 500GB in a single canister. 
 
-## Key Features
-- **Full Candid Integration**: Native support for candid which allows users to store all Motoko data types
-- **Compound Indexes**: Support for compound multi-field indexes to accelerate complex queries
-- **Rich Query Language**: Comprehensive set of operators including equality, range, logical operations
-- **Query Builder API**: Intuitive fluent interface for building complex queries
-- **Query Execution Engine**: Performance optimized Query planner programmed to search for the path with the smallest result size to filter/traverse.
-- **Sorting & Pagination**: Efficient ordered result sets with skip/limit pagination
-- **Schema Validation**: Ensure data integrity with schema-based validation for each entry
-- **Schema Constraints**: Add limits on what can be stored in the db
+### Key Features
+- **Indexes**: Support for multi-field indexes to speed up complex queries
+- **Full Candid Integration**: Native support for Candid that allows you to insert and retrieve any motoko data type without creating custom serialization or type mappings
+- **Rich Query Language And Query Builder**: Comprehensive set of operators including equality, range, and logical operations with an intuitive fluent API for building queries
+- **Query Execution Engine**: Performance optimized query planner programmed to search for the best execution path that minimizes in-memory data processing.
+- **Pagination**: Supports both offset and cursor pagination
+- **Partial Field Updates**: Update any nested field without having to re-insert the entire document
+- **Schema Validation And Constraints**: Add restrictions on what specific values can be stored in each collection
 
-## Internal Workflow
 
-When executing a query, ZenDB follows this optimized workflow:
+**Important Note**: Currently, no automatic indexes are created for your data. You'll need to create your own indexes when defining your collection and schema. If no indexes exist that can satisfy a query, ZenDB will run a full collection scan, which is likely to hit the instruction limit for a dataset with as little as ten thousand records.
 
-1. The query is parsed and validated against the collection schema
-2. The query plan generator analyzes available indexes and query patterns
-3. For indexed queries, the system chooses between:
-   - **Index Scan**: Direct B-tree traversal for equality or simple range queries
-   - **Bitmap Intersection**: Converting multiple index scans to bitmaps and intersecting them
-   - **Hybrid Approach**: Combining index scans with in-memory filtering for complex queries
-4. Results are processed, sorted if needed, and paginated according to query parameters
-
-This architecture allows ZenDB to handle complex queries efficiently, even with large datasets, by minimizing the amount of data that needs to be deserialized from stable memory.
 
 ## Getting Started
 
@@ -263,7 +251,7 @@ For more detailed examples and advanced usage, see the [**Complete Documentation
 
 ## Documentation
 
-**[ZenDB Documentation](./zendb-doc.md)** - Comprehensive guide covering:
+**[ZenDB Documentation](https://github.com/NatLabs/ZenDB/blob/main/zendb-doc.md)** - Comprehensive guide covering:
 
 - **Getting Started**: ZenDB instances, memory types, configuration
 - **Schema Definition**: Type system, constraints, validation  
@@ -354,9 +342,9 @@ This allows you to monitor query performance and access both the results and exe
 - [x] Schema validation and Schema constraints
 - [ ] Fully support Array fields and operations on them
 - [ ] Multi-key array indexes - for indexing fields within arrays
-- [ ] Backward compatible schema updates and versioning
+- [ ] Backward compatible schema upgrades and versioning
 - [ ] Aggregation functions (min, max, sum, avg, etc.)
-- [ ] Better support for migrations
+- [ ] Support for migrations
 - [ ] Full Text search capabilities by implementing an inverted text index
 - [ ] Data Certification of all documents, using the [ic-certification](https://mops.one/ic-certification) motoko library
 - [ ] Dedicated database canister for use by clients in other languages (e.g. JavaScript, Rust)
