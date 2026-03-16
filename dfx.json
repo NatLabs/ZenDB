@@ -6,14 +6,21 @@
             "main": "./tests/Stress.Test.mo",
             "args": "--max-stable-pages 6553600"
         },
-        "database": {
-            "type": "motoko",
-            "main": "src/RemoteInstance/CanisterDB/lib.mo"
-        },
         "cluster-tests": {
             "type": "motoko",
             "main": "./tests/cluster-tests/ClusterManager.Test.mo",
             "args": "--max-stable-pages 6553600"
+        },
+        "zendb-canister": {
+            "type": "motoko",
+            "main": "src/RemoteInstance/CanisterDB/lib.mo",
+            "declarations": {
+                "node_compatibility": true
+            },
+            "metadata": [{ "name": "candid:service"  }],
+            "args": "--legacy-persistence --max-stable-pages 6553600 --force-gc --generational-gc",
+            "optimize": "O3",
+            "shrink": true
         }
     },
     "defaults": {

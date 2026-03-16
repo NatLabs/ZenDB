@@ -15,16 +15,6 @@ jobs:
         name: Build and test
         steps:
             - uses: actions/checkout@v4
-            - uses: actions/setup-node@v4
-              with:
-                  node-version: 20
-            - name: Cache Node modules
-              uses: actions/cache@v4
-              with:
-                  path: ~/.npm
-                  key: ${{ runner.os }}-node-${{ hashFiles('**/package-lock.json') }}
-                  restore-keys: |
-                      ${{ runner.os }}-node-
 
             - name: Install dfx
               uses: dfinity/setup-dfx@main
@@ -34,14 +24,7 @@ jobs:
             - name: Install dfx cache
               run: dfx cache install
 
-            - name: Install mops & mocv
-              run: |
-                  npm --yes -g i ic-mops
-                  mops i
-                  mops toolchain init
-
-                  # set moc path for dfx to use
-                  echo "DFX_MOC_PATH=$(mops toolchain bin moc)" >> $GITHUB_ENV
+            - uses: ZenVoich/setup-mops@v1
 
             # - name: Detect warnings
             #   run: make check

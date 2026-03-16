@@ -312,6 +312,20 @@ module {
         #ok(());
     };
 
+    public func deallocate(db : T.StableDatabase) : () {
+        let log = Logger.NamespacedLogger(db.logger, LOGGER_NAMESPACE).subnamespace("deallocate");
+
+        log.logInfo("Deallocating database: " # db.name);
+
+        for (collection in Map.vals(db.collections)) {
+            StableCollection.deallocate(collection);
+        };
+
+        Map.clear(db.collections);
+
+        log.logInfo("Successfully deallocated database: " # db.name);
+    };
+
     public func list_collection_names(db : T.StableDatabase) : [Text] {
         Utils.iter_to_array(Map.keys(db.collections));
     };

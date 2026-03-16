@@ -1,5 +1,6 @@
 import Map "mo:map@9.0.1/Map";
 import Vector "mo:vector@0.4.2";
+import CanisterRBAC "mo:canister-rbac@0.1.0";
 
 import ZenDB_types "../EmbeddedInstance/Types";
 
@@ -82,20 +83,58 @@ module {
         results : ZT.Result<[(ZT.DocumentId, ZT.CandidBlob)], Text>;
     };
 
+    public type UserAccessDetails = [(resource_scope : CanisterRBAC.Types.ResourceScope, role : Text, permissions : [Text])];
+
     public type ClusterApiService = actor {
         zendb_v1_api_version : shared query () -> async Text;
+
+        /// Returns the version of the embedded ZenDB engine (e.g. "v1.0.0").
+        /// Useful for determining whether an upgrade will trigger a data migration.
+        zendb_v1_embedded_version : shared query () -> async Text;
 
         // /// Get cluster layout.
         // get_cluster_layout : shared query () -> async ClusterLayout;
 
-        /// Grant a role to a principal
+        /// Grant scoped access to a user
+        grant_user_access_to : shared (Principal, Text, [(Text, Text)]) -> async (ZT.Result<(), Text>);
+
+        /// Grant access to a specific database
+        grant_database_access : shared (Principal, Text, Text) -> async (ZT.Result<(), Text>);
+
+        /// Grant access to a specific collection
+        grant_collection_access : shared (Principal, Text, Text, Text) -> async (ZT.Result<(), Text>);
+
+        /// Grant global (canister-wide) access
+        grant_global_access : shared (Principal, Text) -> async (ZT.Result<(), Text>);
+
+        /// Grant a role to a principal (global scope alias)
         grant_role : shared (Principal, Text) -> async (ZT.Result<(), Text>);
 
-        /// Grant multiple roles to a principal
-        grant_roles : shared (Principal, [Text]) -> async (ZT.Result<(), Text>);
+        /// Revoke scoped access from a user
+        revoke_user_access_to : shared (Principal, Text, [(Text, Text)]) -> async (ZT.Result<(), Text>);
 
-        /// Revoke a role from a principal
-        revoke_role : shared (Principal, Text) -> async (ZT.Result<(), Text>);
+        /// Revoke access to a specific database
+        revoke_database_access : shared (Principal, Text, Text) -> async (ZT.Result<(), Text>);
+
+        /// Revoke access to a specific collection
+        revoke_collection_access : shared (Principal, Text, Text, Text) -> async (ZT.Result<(), Text>);
+
+        /// Revoke global (canister-wide) access
+        revoke_global_access : shared (Principal, Text) -> async (ZT.Result<(), Text>);
+
+        /// Set (or clear) the db_registry canister that receives push notifications
+        /// after every successful grant or revoke. Pass `null` to disable pushes.
+        set_access_registry : shared (?Principal) -> async (ZT.Result<(), Text>);
+
+        /// Get access details (roles + permissions per scope) for a specific user.
+        /// Self-query is always allowed; querying others requires access-control:read.
+        get_user_access_details : shared query (Principal) -> async (ZT.Result<[([(Text, Text)], Text, [Text])], Text>);
+
+        /// Get the caller's own access details.
+        get_my_access_details : shared query () -> async (ZT.Result<[([(Text, Text)], Text, [Text])], Text>);
+
+        /// Get access details for all users. Requires access-control:read.
+        get_all_users_access_details : shared query () -> async (ZT.Result<[(Principal, [([(Text, Text)], Text, [Text])])], Text>);
 
         /// Creates a new database and returns the database name.
         zendb_v1_create_database : shared (Text) -> async (ZT.Result<(), Text>);

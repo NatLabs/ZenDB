@@ -1,0 +1,121 @@
+name: Release
+
+# Pushing a v*.*.* tag runs tests, publishes the Mops library,
+# and builds + releases the pre-built canister WASM — all in one go.
+
+on:
+    push:
+        tags:
+            - "v*.*.*"
+
+jobs:
+    publish-mops:
+        name: Publish to Mops
+        runs-on: ubuntu-latest
+        steps:
+            - uses: actions/checkout@v4
+    
+            - uses: dfinity/setup-dfx@main
+    
+            - uses: ZenVoich/setup-mops@v1
+              with:
+                  identity-pem: ${{ secrets.MOPS_IDENTITY_PEM }}
+    
+            - name: Install dependencies
+              run: mops install
+    
+            - name: Set version from tag in mops.toml
+              run: sed -i "s/^version = .*/version = \"${GITHUB_REF_NAME#v}\"/" mops.toml
+    
+            - name: Publish
+              run: mops publish
+
+    release-wasm:
+        name: Build and release WASM
+        runs-on: ubuntu-latest
+        steps:
+            - uses: actions/checkout@v4
+
+            - name: Install dfx
+              uses: dfinity/setup-dfx@main
+
+            - name: Install dfx cache
+              run: dfx cache install
+
+            - uses: ZenVoich/setup-mops@v1
+
+            - name: Install mops packages
+              run: mops i
+
+            - name: Start local replica
+              run: dfx start --background
+
+            - name: Build canister WASM
+              run: |
+                  dfx canister create zendb-canister
+                  dfx build zendb-canister
+
+            - name: Stop local replica
+              run: dfx stop
+
+            - name: Cache ic-wasm
+              id: cache-ic-wasm
+              uses: actions/cache@v4
+              with:
+                  path: ~/.cargo/bin/ic-wasm
+                  key: ic-wasm-${{ runner.os }}
+
+            - name: Install ic-wasm
+              if: steps.cache-ic-wasm.outputs.cache-hit != 'true'
+              run: cargo install ic-wasm
+
+            - name: Optimize WASM
+              run: |
+                  WASM_IN=.dfx/local/canisters/zendb-canister/zendb-canister.wasm
+                  WASM_OUT=zendb-canister.wasm
+
+                  ic-wasm $WASM_IN -o $WASM_OUT optimize O3
+                  ic-wasm $WASM_OUT -o $WASM_OUT shrink
+                  gzip -k $WASM_OUT
+
+            - name: Copy candid interface
+              run: cp .dfx/local/canisters/zendb-canister/zendb-canister.did zendb-canister.did
+
+            - name: Extract version from tag
+              id: version
+              # GITHUB_REF_NAME is the full tag e.g. "v1.2.3"
+              # SEMVER strips the leading "v" → "1.2.3" (for mops add / dfx.json)
+              run: |
+                  MOPS_VERSION="${GITHUB_REF_NAME}"
+                  SEMVER="${MOPS_VERSION#v}"
+                  echo "TAG=${GITHUB_REF_NAME}" >> $GITHUB_OUTPUT
+                  echo "MOPS_VERSION=$MOPS_VERSION" >> $GITHUB_OUTPUT
+                  echo "SEMVER=$SEMVER" >> $GITHUB_OUTPUT
+
+            - name: Create GitHub Release
+              uses: softprops/action-gh-release@v2
+              with:
+                  name: ${{ steps.version.outputs.MOPS_VERSION }}
+                  body: |
+                      ## ZenDB ${{ steps.version.outputs.MOPS_VERSION }}
+
+                      ### Deploying the pre-built canister
+
+                      Add to your `dfx.json`:
+                      ```json
+                      {
+                        "type": "custom",
+                        "wasm": "https://github.com/NatLabs/ZenDB/releases/download/${{ steps.version.outputs.TAG }}/zendb-canister.wasm.gz",
+                        "candid": "https://github.com/NatLabs/ZenDB/releases/download/${{ steps.version.outputs.TAG }}/zendb-canister.did"
+                      }
+                      ```
+
+                      ### Using as a Mops library
+
+                      `mops add zendb@${{ steps.version.outputs.SEMVER }}`
+
+                  files: |
+                      zendb-canister.wasm
+                      zendb-canister.wasm.gz
+                      zendb-canister.did
+                  token: ${{ secrets.GITHUB_TOKEN }}

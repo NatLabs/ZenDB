@@ -7,13 +7,13 @@ import Result "mo:base@0.16.0/Result";
 import Debug "mo:base@0.16.0/Debug";
 import Buffer "mo:base@0.16.0/Buffer";
 import Iter "mo:base@0.16.0/Iter";
+import Error "mo:base@0.16.0/Error";
 
 import Map "mo:map@9.0.1/Map";
+import CanisterRBAC "mo:canister-rbac@0.1.0";
 
 import ClusterTypes "../Types";
 import ZenDB "../../EmbeddedInstance";
-import RolesAuth "../RolesAuth";
-import StableRolesAuth "../RolesAuth/StableRolesAuth";
 
 import ZT "../../EmbeddedInstance/Types";
 import EmbeddedInstance "../../EmbeddedInstance";
@@ -27,28 +27,34 @@ import Query "../../EmbeddedInstance/Query";
 (
     with migration = func({
         zendb_instance : ZenDB.Types.PrevVersionedStableStore;
-        roles_sstore : StableRolesAuth.PrevStableRolesAuth;
     }) : ({
         zendb_instance : ZenDB.Types.VersionedStableStore;
-        roles_sstore : StableRolesAuth.StableRolesAuth;
     }) {
         return {
             zendb_instance = ZenDB.upgrade(zendb_instance);
-            roles_sstore = StableRolesAuth.migrate(roles_sstore);
         };
     }
 )
 
 shared ({ caller = owner }) persistent actor class CanisterDB() = this_canister {
 
-    transient let Permissions = {
-        READ = "read";
-        WRITE = "write";
-        MANAGE = "manage";
+     let Resource = {
+          DATABASE = "database";
+          COLLECTION = "collection";
+     };
+
+    let Permissions = {
+        DB_READ = "db:read";
+        DB_WRITE = "db:write";
+        DB_MANAGE = "db:manage";
+
+        ACCESS_CONTROL_READ = "access-control:read";
+        ACCESS_CONTROL_MANAGE = "access-control:manage";
     };
 
-    transient let Roles = {
+    let Roles = {
         ADMIN = "admin";
+        OBSERVER = "observer";
         EDITOR = "editor";
         VIEWER = "viewer";
     };
@@ -56,29 +62,49 @@ shared ({ caller = owner }) persistent actor class CanisterDB() = this_canister 
     transient let default_roles = [
         {
             name = Roles.ADMIN;
-            permissions = [Permissions.MANAGE, Permissions.WRITE, Permissions.READ];
+            permissions = [
+                Permissions.DB_MANAGE, Permissions.DB_WRITE, Permissions.DB_READ,
+                Permissions.ACCESS_CONTROL_MANAGE, Permissions.ACCESS_CONTROL_READ
+            ];
+        },
+        {
+            name = Roles.OBSERVER;
+            permissions = [Permissions.ACCESS_CONTROL_READ];
         },
         {
             name = Roles.EDITOR;
-            permissions = [Permissions.WRITE, Permissions.READ];
+            permissions = [Permissions.DB_WRITE, Permissions.DB_READ];
         },
         {
             name = Roles.VIEWER;
-            permissions = [Permissions.READ];
+            permissions = [Permissions.DB_READ];
         },
     ];
 
-    stable var roles_sstore = RolesAuth.init_stable_store(default_roles);
-    transient let auth = RolesAuth.RolesAuth(roles_sstore);
+    var canister_rbac = CanisterRBAC.initRoles(default_roles);
 
-    ignore auth.assign_roles(owner, [Roles.ADMIN]);
+    transient let canister_id = Principal.fromActor(this_canister);
+    transient let canister_id_as_blob = Principal.toBlob(canister_id);
 
-    stable let canister_id = Principal.fromActor(this_canister);
-    stable let canister_id_as_blob = Principal.toBlob(canister_id);
+    Result.assertOk(
+        CanisterRBAC.grantUserRole(canister_rbac, owner, Roles.ADMIN, [])
+    );
 
-    ignore auth.assign_roles(canister_id, [Roles.ADMIN]);
+    Result.assertOk(
+        CanisterRBAC.grantUserRole(canister_rbac, canister_id, Roles.ADMIN, [])
+    );
 
-    stable var zendb_instance = ZenDB.newStableStore(canister_id, null);
+    var zendb_instance = ZenDB.newStableStore(canister_id, null);
+
+    /// Principal of the db_access_registry canister that receives push notifications
+    /// after every successful grant / revoke. Null means pushes are disabled.
+    var db_access_registry : ?Principal = null;
+
+
+    type AccessUpdateEvent = { #grant; #revoke };
+    type DbAccessRegistryService = actor {
+        push_user_access_update : shared (Principal, AccessUpdateEvent, [(Text, Text)], Text, [Text]) -> async ();
+    };
 
     system func postupgrade<system>() {};
 
@@ -86,168 +112,291 @@ shared ({ caller = owner }) persistent actor class CanisterDB() = this_canister 
     ZenDB.setIsRunLocally(zendb_instance, false);
     ZenDB.updateCacheCapacity(zendb_instance, 1_000_000);
 
-    public shared query func zendb_v1_api_version() : async Text {
-        "0.0.1";
-    };
+     public shared query func zendb_v1_api_version() : async Text {
+          "0.2.0";
+     };
 
-    public shared ({ caller }) func grant_role(target : Principal, role : Text) : async ZT.Result<(), Text> {
-        auth.allow(
+     /// Returns the version of the embedded ZenDB engine running inside this canister.
+     /// Useful for determining whether an upgrade will trigger a data migration as
+     /// major versions of the embedded engine may include breaking changes to the stable store format.
+     public shared query func zendb_v1_embedded_version() : async Text {
+          TypeMigrations.to_text(zendb_instance);
+     };
+
+    /// ::: Access Control API :::
+
+    /// Set (or clear) the db_access_registry canister that receives push notifications.
+    /// Only the canister owner may call this.
+    public shared ({ caller }) func set_db_access_registry(registry : ?Principal) : async ZT.Result<(), Text> {
+
+        CanisterRBAC.allowWithResult(
+            canister_rbac,
             caller,
-            Permissions.MANAGE,
-            "role(" # role # ")",
-            func() : (ZT.Result<(), Text>) {
-                auth.assign_roles(target, [role]);
-            },
+            Permissions.ACCESS_CONTROL_MANAGE,
+            [],
+            func() : ZT.Result<(), Text> {
+                db_access_registry := registry;
+                #ok(())
+            }
         );
+
     };
 
-    public shared ({ caller }) func grant_roles(target : Principal, roles : [Text]) : async ZT.Result<(), Text> {
-        auth.allow(
-            caller,
-            Permissions.MANAGE,
-            "roles",
-            func() : (ZT.Result<(), Text>) {
-                auth.assign_roles(target, roles);
-            },
-        );
+    /// Fire-and-forget: notify the db_access_registry of a specific access change.
+    /// Sends only the single entry that was updated, tagged with the event kind so
+    /// the registry knows whether to append or remove.
+    /// Safe to call from any shared function context; errors are silently discarded.
+    func emit_user_access_details(user : Principal, event : { #grant; #revoke }, role : Text, scope : [(Text, Text)]) : async* () {
+        switch (db_access_registry) {
+            case (?registry_id) {
+                let permissions = switch (CanisterRBAC.getRolePermissions(canister_rbac, role)) {
+                    case (#ok(p)) p;
+                    case (#err(_)) [];
+                };
+                let reg : DbAccessRegistryService = actor(Principal.toText(registry_id));
+                ignore await reg.push_user_access_update(user, event, scope, role, permissions);
+            };
+            case (null) {};
+        };
     };
 
-    public shared ({ caller }) func revoke_role(target : Principal, role : Text) : async ZT.Result<(), Text> {
-        auth.allow(
-            caller,
-            Permissions.MANAGE,
-            "role(" # role # ")",
-            func() : (ZT.Result<(), Text>) {
-                auth.unassign_role(target, role);
-            },
-        );
-    };
+     func _grant_user_access_to(caller: Principal, target: Principal, role: Text, Resource_scope: [(Text, Text)]) : async* ZT.Result<(), Text> {
 
-    public shared query ({ caller }) func list_roles() : async [Text] {
-        auth.allow(
-            caller,
-            Permissions.READ,
-            "roles",
-            func() : [Text] {
-                auth.list_roles();
-            },
-        );
-    };
+          switch(CanisterRBAC.getRole(canister_rbac, role)){
+               case (#ok(_)) {};
+               case (#err(msg)) return #err("grant_role() failed: " # msg)
+          };
 
-    public shared query ({ caller }) func get_role_permissions(role_name : Text) : async ZT.Result<[Text], Text> {
-        auth.allow(
-            caller,
-            Permissions.READ,
-            "role(" # role_name # ")",
-            func() : ZT.Result<[Text], Text> {
-                auth.get_role_permissions(role_name);
-            },
-        );
-    };
+          // Requires access-control:manage at the requested scope.
+          // Enforces a privilege escalation check: the caller can only grant a role
+          // whose full permission set is already possessed by the caller at that scope.
+          // This ensures users can only delegate access they already hold.
+          let res = CanisterRBAC.allowWithResult(
+               canister_rbac,
+               caller,
+               Permissions.ACCESS_CONTROL_MANAGE,
+               Resource_scope,
+               func() : ZT.Result<(), Text> {
+                    let role_perms = switch (CanisterRBAC.getRolePermissions(canister_rbac, role)) {
+                         case (#err(e)) return #err(e);
+                         case (#ok(perms)) perms;
+                    };
+                    for (perm in role_perms.vals()) {
+                         if (not CanisterRBAC.hasPermission(canister_rbac, caller, perm, Resource_scope)) {
+                              return #err("Cannot grant role '" # role # "': you do not have permission '" # perm # "' at this scope");
+                         };
+                    };
 
-    public shared query ({ caller }) func get_user_roles(user : Principal) : async [Text] {
-        // Users can query their own roles, or must have MANAGE permission to query others
-        if (caller == user) {
-            return auth.get_user_roles(user);
+                    CanisterRBAC.grantUserRole(canister_rbac, target, role, Resource_scope);
+
+               },
+          );
+
+          switch (res){
+            case (#ok(_)) await* emit_user_access_details(target, #grant, role, Resource_scope);
+            case (#err(msg)) return #err("grant_role() failed: " # msg)
+          };
+
+          res
+     };
+
+     public shared ({caller}) func grant_user_access_to(target: Principal, role: Text, Resource_scope: [(Text, Text)]) : async (ZT.Result<(), Text>) {
+          await* _grant_user_access_to(caller, target, role, Resource_scope)
+     };
+
+     public shared ({caller}) func grant_database_access(target: Principal, role: Text, db_name: Text) : async (ZT.Result<(), Text>) {
+          await* _grant_user_access_to(caller, target, role, [(Resource.DATABASE, db_name)])
+     };
+
+     public shared ({caller}) func grant_collection_access(target: Principal, role: Text, db_name: Text, collection_name: Text) : async (ZT.Result<(), Text>) {
+          await* _grant_user_access_to(caller, target, role, [(Resource.DATABASE, db_name), (Resource.COLLECTION, collection_name)])
+     };
+
+     public shared ({caller}) func grant_global_access(target: Principal, role: Text) : async (ZT.Result<(), Text>) {
+          await* _grant_user_access_to(caller, target, role, [])
+     };
+
+     public shared ({ caller }) func grant_role(target : Principal, role : Text) : async (ZT.Result<(), Text>) {
+          await* _grant_user_access_to(caller, target, role, [])
+     };
+
+     func _revoke_user_access_to(caller: Principal, target: Principal, role: Text, resource_scope: [(Text, Text)]) : async* (ZT.Result<(), Text>) {
+
+        // Self-revocation: users may always remove their own grants without any permission check.
+        let res = if (caller == target) {
+            CanisterRBAC.revokeUserRole(canister_rbac, target, role, resource_scope);
+        } else {
+            // Revoking another user's grant requires access_control:manage at the same scope.
+            CanisterRBAC.allowWithResult(
+                canister_rbac,
+                caller,
+                Permissions.ACCESS_CONTROL_MANAGE,
+                resource_scope,
+                func() : ZT.Result<(), Text> {
+                    CanisterRBAC.revokeUserRole(canister_rbac, target, role, resource_scope);
+                },
+            );
         };
 
-        auth.allow(
-            caller,
-            Permissions.MANAGE,
-            "user(" # debug_show (user) # ")/roles",
-            func() : [Text] {
-                auth.get_user_roles(user);
-            },
-        );
+        switch (res){
+            case (#ok(_)) await* emit_user_access_details(target, #revoke, role, resource_scope);
+            case (#err(msg)) {};
+        };
+
+        res
+
+     };
+
+     public shared ({ caller }) func revoke_user_access_to(target: Principal, role: Text, Resource_scope: [(Text, Text)]) : async (ZT.Result<(), Text>) {
+          await* _revoke_user_access_to(caller, target, role, Resource_scope)
+     };
+
+     public shared ({ caller }) func revoke_database_access(target: Principal, role: Text, db_name: Text) : async (ZT.Result<(), Text>) {
+          await* _revoke_user_access_to(caller, target, role, [(Resource.DATABASE, db_name)])
+     };
+
+     public shared ({caller}) func revoke_collection_access(target: Principal, role: Text, db_name: Text, collection_name: Text) : async (ZT.Result<(), Text>) {
+          await* _revoke_user_access_to(caller, target, role, [(Resource.COLLECTION, collection_name)])
+     };
+
+     public shared ({caller}) func revoke_global_access(target: Principal, role: Text) : async (ZT.Result<(), Text>) {
+          await* _revoke_user_access_to(caller, target, role, [])
+     };
+
+
+     public type UserAccessDetails = ClusterTypes.UserAccessDetails;
+
+
+     func _get_user_access_details(caller: Principal, user: Principal) : ZT.Result<UserAccessDetails, Text> {
+          // Self-query: users can always view their own grants.
+          if (caller == user) return #ok(CanisterRBAC.getUserGrants(canister_rbac, user));
+
+          CanisterRBAC.allowWithResult(
+               canister_rbac,
+               caller,
+               Permissions.ACCESS_CONTROL_READ,
+               [],
+               func() : ZT.Result<UserAccessDetails, Text> {
+                    #ok(CanisterRBAC.getUserGrants(canister_rbac, user));
+               },
+          );
+     };
+
+     public shared query ({ caller }) func get_user_access_details(user: Principal) : async ZT.Result<UserAccessDetails, Text> {
+          _get_user_access_details(caller, user);
+     };
+
+     public shared query ({ caller }) func get_my_access_details() : async ZT.Result<UserAccessDetails, Text> {
+          _get_user_access_details(caller, caller);
+     };
+
+
+    /// ::: Admin API :::
+
+    public shared query ({caller}) func get_all_users_access_details() : async ZT.Result<[(Principal, UserAccessDetails)], Text> {
+          // Viewing all users' grants is sensitive admin information; requires access-control:read.
+          CanisterRBAC.allowWithResult(
+               canister_rbac,
+               caller,
+               Permissions.ACCESS_CONTROL_READ,
+               [],
+               func() : ZT.Result<[(Principal, UserAccessDetails)], Text> {
+                    #ok(CanisterRBAC.getAllUserGrants(canister_rbac));
+               },
+          );
+     };
+
+    func throw_if_error<A>(res : ZT.Result<A, Text>) : async* () {
+        switch (res) {
+            case (#ok(value)) {};
+            case (#err(msg)) throw Error.reject(msg);
+        };
     };
 
-    public shared query ({ caller }) func get_my_roles() : async [Text] {
-        auth.get_user_roles(caller);
-    };
+    func extract_ok<A>(res : ZT.Result<A, Text>) : A {
+        switch (res) {
+            case (#ok(value)) value;
+            case (#err(e)) Debug.trap("Unexpected error: " # e);
+        };
+     };
 
-    public shared query ({ caller }) func get_all_users_roles() : async [(Principal, [Text])] {
-        auth.allow(
-            caller,
-            Permissions.MANAGE,
-            "users/roles",
-            func() : [(Principal, [Text])] {
-                auth.get_all_users_roles();
-            },
-        );
-    };
+     public shared ({ caller }) func zendb_v1_list_database_names() : async (ZT.Result<[Text], Text>) {
+          CanisterRBAC.allow(
+               canister_rbac,
+               caller,
+               Permissions.DB_READ,
+               [(Resource.DATABASE, "*")],
+               func() : [Text] {
+                    ZenDB.listDatabaseNames(zendb_instance);
+               },
+          );
+     };
 
-    // public shared ({ caller }) func revoke_roles(target : Principal, roles : [Text]) : async ZT.Result<(), Text> {
-    //     auth.allow(
-    //         caller,
-    //         Permissions.MANAGE,
-    //         func() : (ZT.Result<(), Text>) {
-    //             for (role in roles.vals()) {
-    //                 let #ok(_) = auth.unassign_roles(target, role) else return #err("Failed to unassign role");
-    //             };
-    //             #ok(());
-    //         },
-    //     );
-    // };
-
-    // ! supports multiple databases
-    // public shared query func zendb_get_database_name() : async Text {
-    //     db_name;
-    // };
-
-    public shared ({ caller }) func zendb_v1_create_database(db_name : Text) : async (ZT.Result<(), Text>) {
-        auth.allow_rs(
-            caller,
-            Permissions.MANAGE,
-            "database(" # db_name # ")",
-            func() : (ZT.Result<(), Text>) {
-
-                Result.mapOk<Any, (), Text>(
-                    ZenDB.createDB(zendb_instance, db_name),
-                    func(_) { () },
-                );
-
-            },
-        );
-    };
-
-    public shared query ({ caller }) func zendb_v1_list_database_names() : async [Text] {
-        auth.allow(
-            caller,
-            Permissions.READ,
-            "databases",
-            func() : [Text] {
-                ZenDB.listDatabaseNames(zendb_instance);
-            },
-        );
-    };
 
     public shared composite query ({ caller }) func zendb_v1_list_database_names_composite_query() : async [Text] {
-        auth.allow(
+        let res = CanisterRBAC.allow(
+            canister_rbac,
             caller,
-            Permissions.READ,
-            "databases",
+            Permissions.DB_READ,
+            [(Resource.DATABASE, "*")],
             func() : [Text] {
                 ZenDB.listDatabaseNames(zendb_instance);
             },
         );
+
+        await* throw_if_error(res);
+        extract_ok(res)
     };
 
     public shared ({ caller }) func zendb_v1_rename_database(old_name : Text, new_name : Text) : async (ZT.Result<(), Text>) {
-        auth.allow_rs(
+        CanisterRBAC.allowWithResult(
+            canister_rbac,
             caller,
-            Permissions.MANAGE,
-            "database(" # old_name # ")",
+            Permissions.DB_MANAGE,
+            [(Resource.DATABASE, old_name)],
             func() : (ZT.Result<(), Text>) {
+                 // ! users who had access to the database with the previous name will lose access after this rename
+                 // ! you need a way to a Resource name so that you can update the RBAC permissions accordingly
                 ZenDB.renameDB(zendb_instance, old_name, new_name);
             },
         );
     };
 
-    public shared ({ caller }) func zendb_v1_create_collection(db_name : Text, collection_name : Text, schema : ZT.Schema, opt_options : ?ZT.CreateCollectionOptions) : async (ZT.Result<(), Text>) {
-        auth.allow_rs(
+    public shared ({ caller }) func zendb_v1_create_database(db_name : Text) : async (ZT.Result<(), Text>) {
+        CanisterRBAC.allowWithResult(
+            canister_rbac,
             caller,
-            Permissions.MANAGE,
-            "database(" # db_name # ")/collection(" # collection_name # ")",
+            Permissions.DB_MANAGE,
+            [],
+            func() : (ZT.Result<(), Text>) {
+                let res = ZenDB.createDB(zendb_instance, db_name);
+                switch (res) {
+                    case (#err(e)) #err(e);
+                    case (#ok(_)) #ok(());
+                };
+            },
+        );
+    };
+
+    public shared ({ caller }) func zendb_v1_delete_database(db_name : Text) : async (ZT.Result<(), Text>) {
+        CanisterRBAC.allowWithResult(
+            canister_rbac,
+            caller,
+            Permissions.DB_MANAGE,
+            [(Resource.DATABASE, db_name)],
+            func() : (ZT.Result<(), Text>) {
+                ZenDB.deleteDB(zendb_instance, db_name);
+            },
+        );
+    };
+
+
+    public shared ({ caller }) func zendb_v1_create_collection(db_name : Text, collection_name : Text, schema : ZT.Schema, opt_options : ?ZT.CreateCollectionOptions) : async (ZT.Result<(), Text>) {
+        CanisterRBAC.allowWithResult(
+            canister_rbac,
+            caller,
+            Permissions.DB_MANAGE,
+            [(Resource.DATABASE, db_name)],
             func() : (ZT.Result<(), Text>) {
                 let sstore = TypeMigrations.get_current_state(zendb_instance);
                 let ?db = Map.get<Text, ZT.StableDatabase>(sstore.databases, Map.thash, db_name) else {
@@ -262,10 +411,11 @@ shared ({ caller = owner }) persistent actor class CanisterDB() = this_canister 
     };
 
     public shared ({ caller }) func zendb_v1_delete_collection(db_name : Text, collection_name : Text) : async (ZT.Result<(), Text>) {
-        auth.allow_rs(
+        CanisterRBAC.allowWithResult(
+            canister_rbac,
             caller,
-            Permissions.MANAGE,
-            "database(" # db_name # ")/collection(" # collection_name # ")",
+            Permissions.DB_MANAGE,
+            [(Resource.DATABASE, db_name), (Resource.COLLECTION, collection_name)],
             func() : (ZT.Result<(), Text>) {
                 let sstore = TypeMigrations.get_current_state(zendb_instance);
                 let ?db = Map.get<Text, ZT.StableDatabase>(sstore.databases, Map.thash, db_name) else {
@@ -291,10 +441,11 @@ shared ({ caller = owner }) persistent actor class CanisterDB() = this_canister 
     };
 
     public shared ({ caller }) func zendb_v1_collection_insert_document(db_name : Text, collection_name : Text, candid_document_blob : Blob) : async (ZT.Result<ZT.DocumentId, Text>) {
-        auth.allow_rs(
+        CanisterRBAC.allowWithResult(
+            canister_rbac,
             caller,
-            Permissions.WRITE,
-            "database(" # db_name # ")/collection(" # collection_name # ")",
+            Permissions.DB_WRITE,
+            [(Resource.DATABASE, db_name), (Resource.COLLECTION, collection_name)],
             func() : (ZT.Result<ZT.DocumentId, Text>) {
                 let #ok(collection) = get_collection(db_name, collection_name) else return Utils.send_error(get_collection(db_name, collection_name));
 
@@ -304,10 +455,11 @@ shared ({ caller = owner }) persistent actor class CanisterDB() = this_canister 
     };
 
     public shared ({ caller }) func zendb_v1_collection_insert_documents(db_name : Text, collection_name : Text, candid_document_blobs : [Blob]) : async (ZT.Result<[ZT.DocumentId], Text>) {
-        auth.allow_rs(
+        CanisterRBAC.allowWithResult(
+            canister_rbac,
             caller,
-            Permissions.WRITE,
-            "database(" # db_name # ")/collection(" # collection_name # ")",
+            Permissions.DB_WRITE,
+            [(Resource.DATABASE, db_name), (Resource.COLLECTION, collection_name)],
             func() : (ZT.Result<[ZT.DocumentId], Text>) {
                 let #ok(collection) = get_collection(db_name, collection_name) else return Utils.send_error(get_collection(db_name, collection_name));
 
@@ -317,10 +469,11 @@ shared ({ caller = owner }) persistent actor class CanisterDB() = this_canister 
     };
 
     func _zendb_collection_get_document(caller : Principal, db_name : Text, collection_name : Text, document_id : ZT.DocumentId) : (ZT.Result<ZT.CandidBlob, Text>) {
-        auth.allow_rs(
+        CanisterRBAC.allowWithResult(
+            canister_rbac,
             caller,
-            Permissions.READ,
-            "database:" # db_name # "/collection:" # collection_name # "/document:" # debug_show document_id,
+            Permissions.DB_READ,
+            [(Resource.DATABASE, db_name), (Resource.COLLECTION, collection_name)],
             func() : (ZT.Result<ZT.CandidBlob, Text>) {
                 let #ok(collection) = get_collection(db_name, collection_name) else return Utils.send_error(get_collection(db_name, collection_name));
 
@@ -341,10 +494,11 @@ shared ({ caller = owner }) persistent actor class CanisterDB() = this_canister 
     };
 
     func _zendb_collection_search(caller : Principal, db_name : Text, collection_name : Text, query_builder : ZT.StableQuery) : (ZT.Result<ZT.SearchResult<Blob>, Text>) {
-        auth.allow_rs(
+        CanisterRBAC.allowWithResult(
+            canister_rbac,
             caller,
-            Permissions.READ,
-            "database(" # db_name # ")/collection(" # collection_name # ")",
+            Permissions.DB_READ,
+            [(Resource.DATABASE, db_name), (Resource.COLLECTION, collection_name)],
             func() : (ZT.Result<ZT.SearchResult<Blob>, Text>) {
                 let #ok(collection) = get_collection(db_name, collection_name) else return Utils.send_error(get_collection(db_name, collection_name));
 
@@ -370,10 +524,11 @@ shared ({ caller = owner }) persistent actor class CanisterDB() = this_canister 
     };
 
     func _zendb_collection_search_for_one(caller : Principal, db_name : Text, collection_name : Text, query_builder : ZT.StableQuery) : (ZT.Result<ZT.SearchOneResult<Blob>, Text>) {
-        auth.allow_rs(
+        CanisterRBAC.allowWithResult(
+            canister_rbac,
             caller,
-            Permissions.READ,
-            "database(" # db_name # ")/collection(" # collection_name # ")",
+            Permissions.DB_READ,
+            [(Resource.DATABASE, db_name), (Resource.COLLECTION, collection_name)],
             func() : (ZT.Result<ZT.SearchOneResult<Blob>, Text>) {
                 let #ok(collection) = get_collection(db_name, collection_name) else return Utils.send_error(get_collection(db_name, collection_name));
 
@@ -399,10 +554,11 @@ shared ({ caller = owner }) persistent actor class CanisterDB() = this_canister 
     };
 
     func _zendb_collection_size(caller : Principal, db_name : Text, collection_name : Text) : Nat {
-        auth.allow(
+        CanisterRBAC.requirePermission<Nat>(
+            canister_rbac,
             caller,
-            Permissions.READ,
-            "database:" # db_name # "/collection:" # collection_name,
+            Permissions.DB_READ,
+            [(Resource.DATABASE, db_name), (Resource.COLLECTION, collection_name)],
             func() : (Nat) {
                 let collection_res = get_collection(db_name, collection_name);
                 let #ok(collection) = collection_res else return Debug.trap("Collection not found");
@@ -421,10 +577,11 @@ shared ({ caller = owner }) persistent actor class CanisterDB() = this_canister 
     };
 
     func _zendb_collection_count(caller : Principal, db_name : Text, collection_name : Text, stable_query : ZT.StableQuery) : ZT.CountResult {
-        auth.allow(
+        CanisterRBAC.requirePermission<ZT.CountResult>(
+            canister_rbac,
             caller,
-            Permissions.READ,
-            "database:" # db_name # "/collection:" # collection_name,
+            Permissions.DB_READ,
+            [(Resource.DATABASE, db_name), (Resource.COLLECTION, collection_name)],
             func() : ZT.CountResult {
                 let collection_res = get_collection(db_name, collection_name);
                 let #ok(collection) = collection_res else Debug.trap("Collection not found");
@@ -452,10 +609,11 @@ shared ({ caller = owner }) persistent actor class CanisterDB() = this_canister 
     };
 
     func _zendb_stats(caller : Principal) : ZenDB.Types.InstanceStats {
-        auth.allow(
+        CanisterRBAC.requirePermission(
+            canister_rbac,
             caller,
-            Permissions.READ,
-            "instance",
+            Permissions.DB_READ,
+            [],
             func() : (ZenDB.Types.InstanceStats) {
                 ZenDB.stats(zendb_instance);
             },
@@ -471,10 +629,11 @@ shared ({ caller = owner }) persistent actor class CanisterDB() = this_canister 
     };
 
     func _zendb_database_stats(caller : Principal, db_name : Text) : ZT.DatabaseStats {
-        auth.allow(
+        CanisterRBAC.requirePermission(
+            canister_rbac,
             caller,
-            Permissions.READ,
-            "database:" # db_name,
+            Permissions.DB_READ,
+            [(Resource.DATABASE, db_name)],
             func() : ZT.DatabaseStats {
                 let sstore = TypeMigrations.get_current_state(zendb_instance);
                 let ?db = Map.get<Text, ZT.StableDatabase>(sstore.databases, Map.thash, db_name) else {
@@ -495,10 +654,11 @@ shared ({ caller = owner }) persistent actor class CanisterDB() = this_canister 
     };
 
     func _zendb_database_list_collection_names(caller : Principal, db_name : Text) : [Text] {
-        auth.allow(
+        CanisterRBAC.requirePermission(
+            canister_rbac,
             caller,
-            Permissions.READ,
-            "database:" # db_name # "/collections",
+            Permissions.DB_READ,
+            [(Resource.DATABASE, db_name), (Resource.COLLECTION, "*")],
             func() : [Text] {
                 let sstore = TypeMigrations.get_current_state(zendb_instance);
                 let ?db = Map.get<Text, ZT.StableDatabase>(sstore.databases, Map.thash, db_name) else {
@@ -519,10 +679,11 @@ shared ({ caller = owner }) persistent actor class CanisterDB() = this_canister 
     };
 
     func _zendb_database_get_collection_stats(caller : Principal, db_name : Text, collection_name : Text) : ?ZT.CollectionStats {
-        auth.allow(
+        CanisterRBAC.requirePermission(
+            canister_rbac,
             caller,
-            Permissions.READ,
-            "database(" # db_name # ")/collection(" # collection_name # ")",
+            Permissions.DB_READ,
+            [(Resource.DATABASE, db_name), (Resource.COLLECTION, collection_name)],
             func() : ?ZT.CollectionStats {
                 let sstore = TypeMigrations.get_current_state(zendb_instance);
                 let ?db = Map.get<Text, ZT.StableDatabase>(sstore.databases, Map.thash, db_name) else {
@@ -543,10 +704,11 @@ shared ({ caller = owner }) persistent actor class CanisterDB() = this_canister 
     };
 
     func _zendb_database_get_all_collections_stats(caller : Principal, db_name : Text) : [(Text, ZT.CollectionStats)] {
-        auth.allow(
+        CanisterRBAC.requirePermission(
+            canister_rbac,
             caller,
-            Permissions.READ,
-            "database(" # db_name # ")/collections",
+            Permissions.DB_READ,
+            [(Resource.DATABASE, db_name), (Resource.COLLECTION, "*")],
             func() : [(Text, ZT.CollectionStats)] {
                 let sstore = TypeMigrations.get_current_state(zendb_instance);
                 let ?db = Map.get<Text, ZT.StableDatabase>(sstore.databases, Map.thash, db_name) else {
@@ -567,10 +729,11 @@ shared ({ caller = owner }) persistent actor class CanisterDB() = this_canister 
     };
 
     func _zendb_collection_stats(caller : Principal, db_name : Text, collection_name : Text) : ZT.CollectionStats {
-        auth.allow(
+        CanisterRBAC.requirePermission(
+            canister_rbac,
             caller,
-            Permissions.READ,
-            "database(" # db_name # ")/collection(" # collection_name # ")",
+            Permissions.DB_READ,
+            [(Resource.DATABASE, db_name), (Resource.COLLECTION, collection_name)],
             func() : ZT.CollectionStats {
                 let collection_result = get_collection(db_name, collection_name);
                 let #ok(collection) = collection_result else {
@@ -592,10 +755,11 @@ shared ({ caller = owner }) persistent actor class CanisterDB() = this_canister 
     };
 
     func _zendb_collection_get_schema(caller : Principal, db_name : Text, collection_name : Text) : ZT.Result<ZT.Schema, Text> {
-        auth.allow(
+        CanisterRBAC.allowWithResult(
+            canister_rbac,
             caller,
-            Permissions.READ,
-            "database(" # db_name # ")/collection(" # collection_name # ")/schema",
+            Permissions.DB_READ,
+            [(Resource.DATABASE, db_name), (Resource.COLLECTION, collection_name)],
             func() : (ZT.Result<ZT.Schema, Text>) {
                 let collection_res = get_collection(db_name, collection_name);
                 let #ok(collection) = collection_res else return Utils.send_error(collection_res);
@@ -614,10 +778,11 @@ shared ({ caller = owner }) persistent actor class CanisterDB() = this_canister 
     };
 
     func _zendb_collection_list_index_names(caller : Principal, db_name : Text, collection_name : Text) : ZT.Result<[Text], Text> {
-        auth.allow(
+        CanisterRBAC.allowWithResult(
+            canister_rbac,
             caller,
-            Permissions.READ,
-            "database(" # db_name # ")/collection(" # collection_name # ")/indexes",
+            Permissions.DB_READ,
+            [(Resource.DATABASE, db_name), (Resource.COLLECTION, collection_name)],
             func() : ZT.Result<[Text], Text> {
                 let collection_res = get_collection(db_name, collection_name);
                 let #ok(collection) = collection_res else return Utils.send_error(collection_res);
@@ -636,10 +801,11 @@ shared ({ caller = owner }) persistent actor class CanisterDB() = this_canister 
     };
 
     func _zendb_collection_get_indexes(caller : Principal, db_name : Text, collection_name : Text) : ZT.Result<[(Text, ZT.IndexStats)], Text> {
-        auth.allow(
+        CanisterRBAC.allowWithResult(
+            canister_rbac,
             caller,
-            Permissions.READ,
-            "database(" # db_name # ")/collection(" # collection_name # ")/indexes",
+            Permissions.DB_READ,
+            [(Resource.DATABASE, db_name), (Resource.COLLECTION, collection_name)],
             func() : ZT.Result<[(Text, ZT.IndexStats)], Text> {
                 let collection_res = get_collection(db_name, collection_name);
                 let #ok(collection) = collection_res else return Utils.send_error(collection_res);
@@ -658,10 +824,11 @@ shared ({ caller = owner }) persistent actor class CanisterDB() = this_canister 
     };
 
     func _zendb_collection_get_index(caller : Principal, db_name : Text, collection_name : Text, index_name : Text) : ZT.Result<?ZT.IndexStats, Text> {
-        auth.allow(
+        CanisterRBAC.allowWithResult(
+            canister_rbac,
             caller,
-            Permissions.READ,
-            "database(" # db_name # ")/collection(" # collection_name # ")/index(" # index_name # ")",
+            Permissions.DB_READ,
+            [(Resource.DATABASE, db_name), (Resource.COLLECTION, collection_name), ("index", index_name)],
             func() : ZT.Result<?ZT.IndexStats, Text> {
                 let collection_res = get_collection(db_name, collection_name);
                 let #ok(collection) = collection_res else return Utils.send_error(collection_res);
@@ -680,10 +847,11 @@ shared ({ caller = owner }) persistent actor class CanisterDB() = this_canister 
     };
 
     public shared ({ caller }) func zendb_v1_collection_replace_document(db_name : Text, collection_name : Text, id : ZT.DocumentId, document_blob : Blob) : async ZT.Result<ZT.ReplaceByIdResult, Text> {
-        auth.allow_rs(
+        CanisterRBAC.allowWithResult(
+            canister_rbac,
             caller,
-            Permissions.WRITE,
-            "database(" # db_name # ")/collection(" # collection_name # ")",
+            Permissions.DB_WRITE,
+            [(Resource.DATABASE, db_name), (Resource.COLLECTION, collection_name)],
             func() : (ZT.Result<ZT.ReplaceByIdResult, Text>) {
                 let #ok(collection) = get_collection(db_name, collection_name) else return Utils.send_error(get_collection(db_name, collection_name));
 
@@ -694,10 +862,11 @@ shared ({ caller = owner }) persistent actor class CanisterDB() = this_canister 
     };
 
     public shared ({ caller }) func zendb_v1_collection_delete_document_by_id(db_name : Text, collection_name : Text, id : ZT.DocumentId) : async ZT.Result<ZT.DeleteByIdResult<Blob>, Text> {
-        auth.allow_rs(
+        CanisterRBAC.allowWithResult(
+            canister_rbac,
             caller,
-            Permissions.WRITE,
-            "database(" # db_name # ")/collection(" # collection_name # ")",
+            Permissions.DB_WRITE,
+            [(Resource.DATABASE, db_name), (Resource.COLLECTION, collection_name)],
             func() : (ZT.Result<ZT.DeleteByIdResult<Blob>, Text>) {
                 let #ok(collection) = get_collection(db_name, collection_name) else return Utils.send_error(get_collection(db_name, collection_name));
 
@@ -707,10 +876,11 @@ shared ({ caller = owner }) persistent actor class CanisterDB() = this_canister 
     };
 
     public shared ({ caller }) func zendb_v1_collection_delete_documents(db_name : Text, collection_name : Text, db_query : ZT.StableQuery) : async ZT.Result<ZT.DeleteResult<Blob>, Text> {
-        auth.allow_rs(
+        CanisterRBAC.allowWithResult(
+            canister_rbac,
             caller,
-            Permissions.WRITE,
-            "database(" # db_name # ")/collection(" # collection_name # ")",
+            Permissions.DB_WRITE,
+            [(Resource.DATABASE, db_name), (Resource.COLLECTION, collection_name)],
             func() : (ZT.Result<ZT.DeleteResult<Blob>, Text>) {
                 let #ok(collection) = get_collection(db_name, collection_name) else return Utils.send_error(get_collection(db_name, collection_name));
 
@@ -725,10 +895,11 @@ shared ({ caller = owner }) persistent actor class CanisterDB() = this_canister 
     };
 
     public shared ({ caller }) func zendb_v1_collection_update_document_by_id(db_name : Text, collection_name : Text, id : ZT.DocumentId, update_operations : [(Text, ZT.FieldUpdateOperations)]) : async ZT.Result<ZT.UpdateByIdResult, Text> {
-        auth.allow_rs(
+        CanisterRBAC.allowWithResult(
+            canister_rbac,
             caller,
-            Permissions.WRITE,
-            "database(" # db_name # ")/collection(" # collection_name # ")",
+            Permissions.DB_WRITE,
+            [(Resource.DATABASE, db_name), (Resource.COLLECTION, collection_name)],
             func() : (ZT.Result<ZT.UpdateByIdResult, Text>) {
                 let #ok(collection) = get_collection(db_name, collection_name) else return Utils.send_error(get_collection(db_name, collection_name));
 
@@ -738,10 +909,11 @@ shared ({ caller = owner }) persistent actor class CanisterDB() = this_canister 
     };
 
     public shared ({ caller }) func zendb_v1_collection_update_documents(db_name : Text, collection_name : Text, stable_query : ZT.StableQuery, update_operations : [(Text, ZT.FieldUpdateOperations)]) : async ZT.Result<ZT.UpdateResult, Text> {
-        auth.allow_rs(
+        CanisterRBAC.allowWithResult(
+            canister_rbac,
             caller,
-            Permissions.WRITE,
-            "database(" # db_name # ")/collection(" # collection_name # ")",
+            Permissions.DB_WRITE,
+            [(Resource.DATABASE, db_name), (Resource.COLLECTION, collection_name)],
             func() : (ZT.Result<ZT.UpdateResult, Text>) {
                 let collection_res = get_collection(db_name, collection_name);
                 let #ok(collection) = collection_res else return Utils.send_error(collection_res);
@@ -752,10 +924,11 @@ shared ({ caller = owner }) persistent actor class CanisterDB() = this_canister 
     };
 
     public shared ({ caller }) func zendb_v1_collection_create_index(db_name : Text, collection_name : Text, index_name : Text, index_fields : [(Text, ZT.CreateIndexSortDirection)], options : ?ZT.CreateIndexOptions) : async ZT.Result<(), Text> {
-        auth.allow_rs(
+        CanisterRBAC.allowWithResult(
+            canister_rbac,
             caller,
-            Permissions.MANAGE,
-            "database(" # db_name # ")/collection(" # collection_name # ")/index(" # index_name # ")",
+            Permissions.DB_MANAGE,
+            [(Resource.DATABASE, db_name), (Resource.COLLECTION, collection_name)],
             func() : (ZT.Result<(), Text>) {
                 let #ok(collection) = get_collection(db_name, collection_name) else return Utils.send_error(get_collection(db_name, collection_name));
 
@@ -770,10 +943,11 @@ shared ({ caller = owner }) persistent actor class CanisterDB() = this_canister 
     };
 
     public shared ({ caller }) func zendb_v1_collection_delete_index(db_name : Text, collection_name : Text, index_name : Text) : async ZT.Result<(), Text> {
-        auth.allow_rs(
+        CanisterRBAC.allowWithResult(
+            canister_rbac,
             caller,
-            Permissions.MANAGE,
-            "database(" # db_name # ")/collection(" # collection_name # ")/index(" # index_name # ")",
+            Permissions.DB_MANAGE,
+            [(Resource.DATABASE, db_name), (Resource.COLLECTION, collection_name), ("index", index_name)],
             func() : (ZT.Result<(), Text>) {
                 let #ok(collection) = get_collection(db_name, collection_name) else return Utils.send_error(get_collection(db_name, collection_name));
 
@@ -783,10 +957,11 @@ shared ({ caller = owner }) persistent actor class CanisterDB() = this_canister 
     };
 
     public shared ({ caller }) func zendb_v1_collection_delete_indexes(db_name : Text, collection_name : Text, index_names : [Text]) : async ZT.Result<(), Text> {
-        auth.allow_rs(
+        CanisterRBAC.allowWithResult(
+            canister_rbac,
             caller,
-            Permissions.MANAGE,
-            "database(" # db_name # ")/collection(" # collection_name # ")/indexes",
+            Permissions.DB_MANAGE,
+            [(Resource.DATABASE, db_name), (Resource.COLLECTION, collection_name)],
             func() : (ZT.Result<(), Text>) {
                 let #ok(collection) = get_collection(db_name, collection_name) else return Utils.send_error(get_collection(db_name, collection_name));
 
@@ -796,10 +971,11 @@ shared ({ caller = owner }) persistent actor class CanisterDB() = this_canister 
     };
 
     public shared ({ caller }) func zendb_v1_collection_hide_indexes(db_name : Text, collection_name : Text, index_names : [Text]) : async ZT.Result<(), Text> {
-        auth.allow_rs(
+        CanisterRBAC.allowWithResult(
+            canister_rbac,
             caller,
-            Permissions.MANAGE,
-            "database(" # db_name # ")/collection(" # collection_name # ")/indexes",
+            Permissions.DB_MANAGE,
+            [(Resource.DATABASE, db_name), (Resource.COLLECTION, collection_name)],
             func() : (ZT.Result<(), Text>) {
                 let #ok(collection) = get_collection(db_name, collection_name) else return Utils.send_error(get_collection(db_name, collection_name));
 
@@ -809,10 +985,11 @@ shared ({ caller = owner }) persistent actor class CanisterDB() = this_canister 
     };
 
     public shared ({ caller }) func zendb_v1_collection_unhide_indexes(db_name : Text, collection_name : Text, index_names : [Text]) : async ZT.Result<(), Text> {
-        auth.allow_rs(
+        CanisterRBAC.allowWithResult(
+            canister_rbac,
             caller,
-            Permissions.MANAGE,
-            "database(" # db_name # ")/collection(" # collection_name # ")/indexes",
+            Permissions.DB_MANAGE,
+            [(Resource.DATABASE, db_name), (Resource.COLLECTION, collection_name)],
             func() : (ZT.Result<(), Text>) {
                 let #ok(collection) = get_collection(db_name, collection_name) else return Utils.send_error(get_collection(db_name, collection_name));
 
@@ -822,10 +999,11 @@ shared ({ caller = owner }) persistent actor class CanisterDB() = this_canister 
     };
 
     public shared ({ caller }) func zendb_v1_collection_batch_create_indexes(db_name : Text, collection_name : Text, index_configs : [ZT.CreateIndexParams]) : async ZT.Result<Nat, Text> {
-        auth.allow_rs(
+        CanisterRBAC.allowWithResult(
+            canister_rbac,
             caller,
-            Permissions.MANAGE,
-            "database(" # db_name # ")/collection(" # collection_name # ")/indexes",
+            Permissions.DB_MANAGE,
+            [(Resource.DATABASE, db_name), (Resource.COLLECTION, collection_name)],
             func() : (ZT.Result<Nat, Text>) {
                 let #ok(collection) = get_collection(db_name, collection_name) else return Utils.send_error(get_collection(db_name, collection_name));
 
@@ -846,10 +1024,11 @@ shared ({ caller = owner }) persistent actor class CanisterDB() = this_canister 
     };
 
     public shared ({ caller }) func zendb_v1_collection_batch_populate_indexes(db_name : Text, collection_name : Text, index_names : [Text]) : async ZT.Result<Nat, Text> {
-        auth.allow_rs(
+        CanisterRBAC.allowWithResult(
+            canister_rbac,
             caller,
-            Permissions.MANAGE,
-            "database(" # db_name # ")/collection(" # collection_name # ")/indexes",
+            Permissions.DB_MANAGE,
+            [(Resource.DATABASE, db_name), (Resource.COLLECTION, collection_name)],
             func() : (ZT.Result<Nat, Text>) {
                 let #ok(collection) = get_collection(db_name, collection_name) else return Utils.send_error(get_collection(db_name, collection_name));
 
@@ -859,10 +1038,11 @@ shared ({ caller = owner }) persistent actor class CanisterDB() = this_canister 
     };
 
     public shared ({ caller }) func zendb_v1_collection_process_index_batch(db_name : Text, collection_name : Text, batch_id : Nat) : async ZT.Result<Bool, Text> {
-        auth.allow_rs(
+        CanisterRBAC.allowWithResult(
+            canister_rbac,
             caller,
-            Permissions.MANAGE,
-            "database(" # db_name # ")/collection(" # collection_name # ")/batch(" # debug_show (batch_id) # ")",
+            Permissions.DB_MANAGE,
+            [(Resource.DATABASE, db_name), (Resource.COLLECTION, collection_name)],
             func() : (ZT.Result<Bool, Text>) {
                 let #ok(collection) = get_collection(db_name, collection_name) else return Utils.send_error(get_collection(db_name, collection_name));
 
@@ -890,12 +1070,14 @@ shared ({ caller = owner }) persistent actor class CanisterDB() = this_canister 
     };
 
     public shared ({ caller }) func zendb_v1_clear_cache() : async () {
-        auth.allow<()>(
+        ignore CanisterRBAC.allowWithResult(
+            canister_rbac,
             caller,
-            Permissions.MANAGE,
-            "instance/cache",
-            func() : () {
+            Permissions.DB_MANAGE,
+            [(Resource.DATABASE, "*")],
+            func() : (ZT.Result<(), Text>) {
                 ZenDB.clearCache(zendb_instance);
+                #ok(())
             },
         );
     };

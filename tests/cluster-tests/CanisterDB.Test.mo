@@ -1,18 +1,25 @@
-import Debug "mo:base@0.16.0/Debug";
-import Text "mo:base@0.16.0/Text";
-import Array "mo:base@0.16.0/Array";
-import Char "mo:base@0.16.0/Char";
 import Cycles "mo:base@0.16.0/ExperimentalCycles";
 import Principal "mo:base@0.16.0/Principal";
 
 import { test; suite } "mo:test/async";
 
 import CanisterDB "../../src/RemoteInstance/CanisterDB";
-import Client "../../src/RemoteInstance/Client";
+import UserProxy "UserProxy";
 import ZenDB "../../src";
 
 persistent actor {
     transient let TRILLION = 1_000_000_000_000;
+
+    /// Spawns a UserProxy canister pointing at `db`.  Each instance gets its own
+    /// canister principal — the distinct identity CanisterDB will see as the caller.
+    /// We send 2 TRILLION cycles: 500 billion covers the creation fee, ~100 billion
+    /// covers WASM installation (UserProxy imports large type modules), the rest
+    /// stays as the canister's operating balance.
+    func spawnProxy(db : actor {}) : async UserProxy.UserProxy {
+        Cycles.add(2 * TRILLION);
+        await UserProxy.UserProxy(Principal.fromActor(db))
+    };
+
     public func runTests() : async () {
         Cycles.add(5 * TRILLION);
         let canister_db = await CanisterDB.CanisterDB();
@@ -23,84 +30,268 @@ persistent actor {
             is_active : Bool;
         };
 
+        // Shared schema used across all test suites that need a collection.
+        let user_schema : ZenDB.Types.Schema = #Record([
+            ("name", #Text),
+            ("age", #Nat),
+            ("is_active", #Bool),
+        ]);
+
+        // Raw blob used in permission tests where only presence matters.
+        let perm_blob : Blob = to_candid({ name = "Perm"; age = 1; is_active = true } : User);
+
+        // ── Functional tests ───────────────────────────────────────────────────
+
         await suite(
             "CanisterDB Tests",
             func() : async () {
+                let #ok(_) = await canister_db.zendb_v1_create_collection("default", "users", user_schema, null) else return assert false;
 
-                let schema : ZenDB.Types.Schema = #Record([
-                    ("name", #Text),
-                    ("age", #Nat),
-                    ("is_active", #Bool),
-                ]);
+                let alice : User = { name = "Alice"; age = 30; is_active = true };
+                let alice_blob : Blob = to_candid(alice);
 
-                let #ok(_) = await canister_db.zendb_v1_create_collection("default", "users", schema, null) else return assert false;
+                let #ok(alice_id) = await canister_db.zendb_v1_collection_insert_document("default", "users", alice_blob) else return assert false;
 
-                let user_blob = to_candid ({
-                    name = "Alice";
-                    age = 30;
-                    is_active = true;
-                });
+                assert #ok(alice_blob) == (await canister_db.zendb_v1_collection_get_document("default", "users", alice_id));
 
-                let #ok(user_id) = await canister_db.zendb_v1_collection_insert_document("default", "users", user_blob) else return assert false;
+                let #ok(search_result) = await canister_db.zendb_v1_collection_search(
+                    "default", "users", ZenDB.QueryBuilder().Where("age", #gte(#Nat(18))).build()
+                ) else return assert false;
 
-                assert #ok(user_blob) == (await canister_db.zendb_v1_collection_get_document("default", "users", user_id));
+                assert search_result.documents == [(alice_id, alice_blob)];
 
-                let query_results = await canister_db.zendb_v1_collection_search(
-                    "default",
-                    "users",
-                    ZenDB.QueryBuilder().Where(
-                        "age",
-                        #gte(#Nat(18)),
-                    ).build(),
-                );
+                let bob : User = { name = "Bob"; age = 25; is_active = false };
+                let bob_blob : Blob = to_candid(bob);
 
-                switch (query_results) {
-                    case (#ok(result)) {
-                        assert result.documents == [(user_id, user_blob)];
-                    };
-                    case (#err(err)) {
-                        Debug.trap("Search failed: " # err);
-                    };
-                };
+                let #ok(bob_id) = await canister_db.zendb_v1_collection_insert_document("default", "users", bob_blob) else return assert false;
 
-                Debug.print("Search results: " # debug_show (query_results));
-
+                assert #ok(bob_blob) == (await canister_db.zendb_v1_collection_get_document("default", "users", bob_id));
             },
         );
 
-        func named<A>(x : A) : async* (Nat) { 1 };
+        // ── Permission tests ───────────────────────────────────────────────────
+        //
+        // Each suite spawns its own UserProxy canister(s).  The proxy's canister
+        // principal is uniquely generated by the IC and carries no pre-existing
+        // grants, so every suite starts from a clean slate for the user under test.
+        //
+        // The "owner" of canister_db throughout these tests is the test actor
+        // itself (ADMIN at global scope).
 
+        // ── Suite: no-role user cannot access anything ─────────────────────────
         await suite(
-            "using client",
+            "Permissions - no-role user cannot access data or manage access",
             func() : async () {
-                let canister_id = Principal.toText(Principal.fromActor(canister_db));
-                let zendb_client = Client.Client(canister_id);
+                // Insert a document as owner so we have a real id.
+                let #ok(doc_id) = await canister_db.zendb_v1_collection_insert_document("default", "users", perm_blob) else return assert false;
 
-                let db = zendb_client.launchDefaultDB();
+                let stranger = await spawnProxy(canister_db);
+                let stranger_id = await stranger.whoami();
 
-                let candify : ZenDB.Types.Candify<User> = {
-                    to_blob = func(user : User) : Blob { to_candid (user) };
-                    from_blob = func(blob : Blob) : ?User { from_candid (blob) };
-                };
+                // DB reads denied.
+                let #err(_) = await stranger.get("default", "users", doc_id) else return assert false;
+                let #err(_) = await stranger.search("default", "users", ZenDB.QueryBuilder().build()) else return assert false;
 
-                let users = db.getCollection<User>("users", candify);
+                // DB writes denied.
+                let #err(_) = await stranger.insert("default", "users", perm_blob) else return assert false;
 
-                let user_bob : User = {
-                    name = "Bob";
-                    age = 25;
-                    is_active = false;
-                };
+                // DB management denied.
+                let #err(_) = await stranger.create_collection("default", "strangers", user_schema) else return assert false;
 
-                let #ok(user_bob_id) = await* users.insert(user_bob) else return assert false;
+                // Grant operations denied (no access-control:manage).
+                let #err(_) = await stranger.grant_global(stranger_id, "viewer") else return assert false;
 
-                assert #ok(
-                    user_bob
-                ) == users.fromGet(
-                    await* users.get(user_bob_id)
-                );
+                // Self-query on own access details is always allowed.
+                let #ok(_) = await stranger.get_my_access() else return assert false;
 
+                // Viewing all users' access requires access-control:read.
+                let #err(_) = await stranger.get_all_access() else return assert false;
+            },
+        );
+
+        // ── Suite: VIEWER role — read-only access ──────────────────────────────
+        await suite(
+            "Permissions - VIEWER can read but cannot write or manage",
+            func() : async () {
+                let #ok(doc_id) = await canister_db.zendb_v1_collection_insert_document("default", "users", perm_blob) else return assert false;
+
+                let viewer = await spawnProxy(canister_db);
+                let viewer_id = await viewer.whoami();
+
+                let #ok(_) = await canister_db.grant_global_access(viewer_id, "viewer") else return assert false;
+
+                // DB reads allowed.
+                let #ok(_) = await viewer.get("default", "users", doc_id) else return assert false;
+                let #ok(_) = await viewer.search("default", "users", ZenDB.QueryBuilder().build()) else return assert false;
+
+                // DB writes denied (no db:write).
+                let #err(_) = await viewer.insert("default", "users", perm_blob) else return assert false;
+
+                // DB management denied (no db:manage).
+                let #err(_) = await viewer.create_collection("default", "viewer_col", user_schema) else return assert false;
+
+                // Grant operations denied (no access-control:manage).
+                let #err(_) = await viewer.grant_global(viewer_id, "viewer") else return assert false;
+
+                // Viewing all access denied (no access-control:read).
+                let #err(_) = await viewer.get_all_access() else return assert false;
+            },
+        );
+
+        // ── Suite: EDITOR role — read + write, no manage ───────────────────────
+        await suite(
+            "Permissions - EDITOR can read and write but not create collections or grant access",
+            func() : async () {
+                let editor = await spawnProxy(canister_db);
+                let editor_id = await editor.whoami();
+
+                let #ok(_) = await canister_db.grant_global_access(editor_id, "editor") else return assert false;
+
+                // Writes and reads allowed.
+                let #ok(new_id) = await editor.insert("default", "users", perm_blob) else return assert false;
+                let #ok(_) = await editor.get("default", "users", new_id) else return assert false;
+                let #ok(_) = await editor.search("default", "users", ZenDB.QueryBuilder().build()) else return assert false;
+
+                // Collection creation denied (no db:manage).
+                let #err(_) = await editor.create_collection("default", "editor_col", user_schema) else return assert false;
+
+                // Grant operations denied (no access-control:manage).
+                let #err(_) = await editor.grant_global(editor_id, "viewer") else return assert false;
+            },
+        );
+
+        // ── Suite: OBSERVER role — access-control:read only ───────────────────
+        await suite(
+            "Permissions - OBSERVER can read access details but cannot touch DB data",
+            func() : async () {
+                let observer = await spawnProxy(canister_db);
+                let observer_id = await observer.whoami();
+
+                // Spawn a second proxy as the "other user" whose access details
+                // the observer will try to inspect.
+                let other = await spawnProxy(canister_db);
+                let other_id = await other.whoami();
+
+                let #ok(_) = await canister_db.grant_global_access(observer_id, "observer") else return assert false;
+
+                // access-control:read operations allowed.
+                let #ok(_) = await observer.get_all_access() else return assert false;
+                let #ok(_) = await observer.get_user_access(other_id) else return assert false;
+
+                // DB reads denied (no db:read).
+                let #err(_) = await observer.search("default", "users", ZenDB.QueryBuilder().build()) else return assert false;
+
+                // DB writes denied (no db:write).
+                let #err(_) = await observer.insert("default", "users", perm_blob) else return assert false;
+
+                // Grant operations denied (no access-control:manage).
+                let #err(_) = await observer.grant_global(other_id, "viewer") else return assert false;
+            },
+        );
+
+        // ── Suite: privilege escalation — cannot grant beyond own scope ────────
+        //
+        // Key behaviors verified:
+        //   (a) A principal with no ACCESS_CONTROL_MANAGE cannot grant any role.
+        //   (b) A principal with ADMIN at a *database* scope can grant roles at
+        //       that same database scope but NOT at global scope.
+        await suite(
+            "Permissions - privilege escalation prevented",
+            func() : async () {
+                let grantee = await spawnProxy(canister_db);
+                let grantee_id = await grantee.whoami();
+
+                // (a) EDITOR has no ACCESS_CONTROL_MANAGE → cannot grant anything.
+                let editor2 = await spawnProxy(canister_db);
+                let editor2_id = await editor2.whoami();
+                let #ok(_) = await canister_db.grant_global_access(editor2_id, "editor") else return assert false;
+
+                let #err(_) = await editor2.grant_global(grantee_id, "viewer") else return assert false;
+                let #err(_) = await editor2.grant_db(grantee_id, "viewer", "default") else return assert false;
+
+                // (b) ADMIN at database scope can grant at that scope but not globally.
+                let db_admin = await spawnProxy(canister_db);
+                let db_admin_id = await db_admin.whoami();
+                let #ok(_) = await canister_db.grant_database_access(db_admin_id, "admin", "default") else return assert false;
+
+                // Granting at database scope succeeds (has ADMIN + all roles' perms there).
+                let #ok(_) = await db_admin.grant_db(grantee_id, "editor", "default") else return assert false;
+
+                // Granting globally fails (no ACCESS_CONTROL_MANAGE at global scope).
+                let #err(_) = await db_admin.grant_global(grantee_id, "viewer") else return assert false;
+            },
+        );
+
+        // ── Suite: self-revocation requires no permission ──────────────────────
+        await suite(
+            "Permissions - user can revoke their own role without manage permission",
+            func() : async () {
+                let #ok(doc_id) = await canister_db.zendb_v1_collection_insert_document("default", "users", perm_blob) else return assert false;
+
+                let self_revoker = await spawnProxy(canister_db);
+                let self_revoker_id = await self_revoker.whoami();
+
+                let #ok(_) = await canister_db.grant_global_access(self_revoker_id, "viewer") else return assert false;
+
+                // Access works before revocation.
+                let #ok(_) = await self_revoker.get("default", "users", doc_id) else return assert false;
+
+                // Self-revoke succeeds without needing ACCESS_CONTROL_MANAGE.
+                let #ok(_) = await self_revoker.revoke_global(self_revoker_id, "viewer") else return assert false;
+
+                // Access is denied after revocation.
+                let #err(_) = await self_revoker.get("default", "users", doc_id) else return assert false;
+            },
+        );
+
+        // ── Suite: collection-level scope isolation ────────────────────────────
+        //
+        // A grant at (DATABASE, "default", COLLECTION, "users") must NOT give
+        // access to a second collection in the same database.
+        await suite(
+            "Permissions - collection-level grant is isolated to that collection",
+            func() : async () {
+                // Create a second collection so we have two targets.
+                let #ok(_) = await canister_db.zendb_v1_create_collection("default", "items", user_schema, null) else return assert false;
+
+                let coll_user = await spawnProxy(canister_db);
+                let coll_user_id = await coll_user.whoami();
+
+                // Grant EDITOR only on the "users" collection.
+                let #ok(_) = await canister_db.grant_collection_access(coll_user_id, "editor", "default", "users") else return assert false;
+
+                // Can insert and read from the granted collection.
+                let #ok(u_id) = await coll_user.insert("default", "users", perm_blob) else return assert false;
+                let #ok(_) = await coll_user.get("default", "users", u_id) else return assert false;
+
+                // Cannot insert into a different collection (scope doesn't match).
+                let #err(_) = await coll_user.insert("default", "items", perm_blob) else return assert false;
+
+                // Cannot create a new collection (no db:manage anywhere).
+                let #err(_) = await coll_user.create_collection("default", "new_coll", user_schema) else return assert false;
+            },
+        );
+
+        // ── Suite: database-level grant cascades to all child collections ──────
+        await suite(
+            "Permissions - database-level grant cascades to all collections in that database",
+            func() : async () {
+                let db_user = await spawnProxy(canister_db);
+                let db_user_id = await db_user.whoami();
+
+                // Grant EDITOR at database scope — covers every collection under "default".
+                let #ok(_) = await canister_db.grant_database_access(db_user_id, "editor", "default") else return assert false;
+
+                // Can write to both collections (scope hierarchy includes database-level grant).
+                let #ok(_) = await db_user.insert("default", "users", perm_blob) else return assert false;
+                let #ok(_) = await db_user.insert("default", "items", perm_blob) else return assert false;
+
+                // Can read from both collections.
+                let #ok(_) = await db_user.search("default", "users", ZenDB.QueryBuilder().build()) else return assert false;
+                let #ok(_) = await db_user.search("default", "items", ZenDB.QueryBuilder().build()) else return assert false;
             },
         );
 
     };
 };
+

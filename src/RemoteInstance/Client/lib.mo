@@ -56,19 +56,74 @@ module Client {
             await canister_db.zendb_v1_stats();
         };
 
-        /// Grant a role to a principal
-        public func grantRole(target : Principal, role : Text) : async* ZT.Result<(), Text> {
-            await canister_db.grant_role(target, role);
+        // ─── Grant ───────────────────────────────────────────────────────────
+
+        /// Grant a scoped role to a principal
+        public func grantUserAccessTo(target : Principal, role : Text, resource_scope : [(Text, Text)]) : async* ZT.Result<(), Text> {
+            await canister_db.grant_user_access_to(target, role, resource_scope);
         };
 
-        /// Grant multiple roles to a principal
-        public func grantRoles(target : Principal, roles : [Text]) : async* ZT.Result<(), Text> {
-            await canister_db.grant_roles(target, roles);
+        /// Grant a role scoped to a specific database
+        public func grantDatabaseAccess(target : Principal, role : Text, db_name : Text) : async* ZT.Result<(), Text> {
+            await canister_db.grant_database_access(target, role, db_name);
         };
 
-        /// Revoke a role from a principal
-        public func revokeRole(target : Principal, role : Text) : async* ZT.Result<(), Text> {
-            await canister_db.revoke_role(target, role);
+        /// Grant a role scoped to a specific collection
+        public func grantCollectionAccess(target : Principal, role : Text, db_name : Text, collection_name : Text) : async* ZT.Result<(), Text> {
+            await canister_db.grant_collection_access(target, role, db_name, collection_name);
+        };
+
+        /// Grant a role with global (canister-wide) scope
+        public func grantGlobalAccess(target : Principal, role : Text) : async* ZT.Result<(), Text> {
+            await canister_db.grant_global_access(target, role);
+        };
+
+        // ─── Revoke ──────────────────────────────────────────────────────────
+
+        /// Revoke a scoped role from a principal
+        public func revokeUserAccessTo(target : Principal, role : Text, resource_scope : [(Text, Text)]) : async* ZT.Result<(), Text> {
+            await canister_db.revoke_user_access_to(target, role, resource_scope);
+        };
+
+        /// Revoke a role scoped to a specific database
+        public func revokeDatabaseAccess(target : Principal, role : Text, db_name : Text) : async* ZT.Result<(), Text> {
+            await canister_db.revoke_database_access(target, role, db_name);
+        };
+
+        /// Revoke a role scoped to a specific collection
+        public func revokeCollectionAccess(target : Principal, role : Text, db_name : Text, collection_name : Text) : async* ZT.Result<(), Text> {
+            await canister_db.revoke_collection_access(target, role, db_name, collection_name);
+        };
+
+        /// Revoke a role with global (canister-wide) scope
+        public func revokeGlobalAccess(target : Principal, role : Text) : async* ZT.Result<(), Text> {
+            await canister_db.revoke_global_access(target, role);
+        };
+
+        // ─── Registry ────────────────────────────────────────────────────────
+
+        /// Set (or clear) the db_registry canister that receives push notifications
+        /// after every successful grant or revoke. Pass `null` to disable pushes.
+        public func setAccessRegistry(registry : ?Principal) : async* ZT.Result<(), Text> {
+            await canister_db.set_access_registry(registry);
+        };
+
+        // ─── Access details ──────────────────────────────────────────────────
+
+        /// Get access details (roles + permissions per scope) for a specific user.
+        /// Self-query is always allowed; querying others requires access-control:read.
+        public func getUserAccessDetails(user : Principal) : async* ZT.Result<[([(Text, Text)], Text, [Text])], Text> {
+            await canister_db.get_user_access_details(user);
+        };
+
+        /// Get the caller's own access details.
+        public func getMyAccessDetails() : async* ZT.Result<[([(Text, Text)], Text, [Text])], Text> {
+            await canister_db.get_my_access_details();
+        };
+
+        /// Get access details for all users. Requires access-control:read.
+        public func getAllUsersAccessDetails() : async* ZT.Result<[(Principal, [([(Text, Text)], Text, [Text])])], Text> {
+            await canister_db.get_all_users_access_details();
         };
 
         /// Clear the candid map cache
