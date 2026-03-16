@@ -22,30 +22,30 @@ Garbage Collection: ${\color{gray}0\\%}$
 
 |                                                                                                 | #heap no index | #heap 7 single field indexes | #heap 6 fully covered indexes |
 | :---------------------------------------------------------------------------------------------- | -------------: | ---------------------------: | ----------------------------: |
-| insert with no index                                                                            |    150_159_736 |                  150_147_893 |                   150_149_993 |
-| create and populate indexes                                                                     |          1_872 |                1_166_869_126 |                 1_382_958_048 |
-| clear collection entries and indexes                                                            |          7_172 |                       49_190 |                        50_378 |
-| insert with indexes                                                                             |    157_911_305 |                1_297_200_869 |                 1_513_894_476 |
-| query(): no filter (all txs)                                                                    |     24_764_672 |                   24_759_502 |                    24_760_941 |
-| query(): single field (btype = '1mint')                                                         |    124_334_658 |                    5_425_806 |                     5_708_939 |
-| query(): number range (250 < tx.amt <= 400)                                                     |    138_516_658 |                    4_047_436 |                     4_048_134 |
-| query(): #And (btype='1burn' AND tx.amt>=750)                                                   |    128_298_817 |                   25_125_616 |                     2_411_520 |
-| query(): #And (500_000<ts<=1_000_000 AND 200<amt<=600)                                          |    138_150_055 |                   50_569_023 |                    50_516_730 |
-| query(): #Or (btype == '1xfer' OR '2xfer' OR '1mint')                                           |    188_780_074 |                   16_971_368 |                    18_509_298 |
-| query(): #Or (btype == '1xfer' OR tx.amt >= 500)                                                |    180_110_896 |                   23_411_803 |                    23_906_571 |
-| query(): #Or (btype == '1xfer' OR tx.amt >= 500 OR ts > 500_000)                                |    195_831_350 |                   33_165_684 |                    33_729_903 |
-| query(): #Or (500_000<ts<=1_000_000 OR 200<amt<=600)                                            |    264_927_138 |                   28_103_572 |                    27_820_843 |
-| query(): #Or (btype in ['1xfer', '1burn'] OR (tx.amt < 200 OR tx.amt >= 800))                   |    219_789_576 |                   25_283_462 |                    26_746_739 |
-| query() -> principals[0] == tx.to.owner (is recipient)                                          |    154_940_563 |                    1_179_321 |                     1_231_086 |
-| query() -> principals[0..10] == tx.to.owner (is recipient)                                      |    659_807_469 |                   21_563_408 |                    19_116_317 |
-| query() -> all txs involving principals[0]                                                      |    305_750_611 |                    5_990_711 |                     6_095_118 |
-| query() -> all txs involving principals[0..10]                                                  |  1_775_073_235 |                   61_514_319 |                    60_556_070 |
-| update(): single operation -> #add amt += 100                                                   |    507_526_104 |                  783_398_000 |                 1_187_836_418 |
-| update(): multiple independent operations -> #add, #sub, #mul, #div on tx.amt                   |    844_276_501 |                1_120_862_570 |                 1_524_920_456 |
-| update(): multiple nested operations -> #add, #sub, #mul, #div on tx.amt                        |    570_129_587 |                  848_355_588 |                 1_251_557_246 |
-| update(): multiple operations on multiple fields -> #add, #sub, #mul, #div on (tx.amt, ts, fee) |    789_089_143 |                1_617_603_741 |                 3_564_881_508 |
-| replace() -> replace half the tx with new tx                                                    |    413_041_521 |                2_827_786_915 |                 3_187_301_322 |
-| delete()                                                                                        |    155_564_900 |                1_189_124_553 |                 1_384_734_641 |
+| insert with no index                                                                            |    150_293_631 |                  150_281_009 |                   150_283_765 |
+| create and populate indexes                                                                     |          1_936 |                1_167_692_910 |                 1_383_866_677 |
+| clear collection entries and indexes                                                            |          7_236 |                       49_254 |                        50_442 |
+| insert with indexes                                                                             |    157_829_495 |                1_298_386_213 |                 1_515_165_321 |
+| query(): no filter (all txs)                                                                    |     24_703_442 |                   24_696_308 |                    24_696_077 |
+| query(): single field (btype = '1mint')                                                         |    124_273_922 |                    5_414_180 |                     5_697_498 |
+| query(): number range (250 < tx.amt <= 400)                                                     |    138_453_919 |                    4_040_156 |                     4_040_854 |
+| query(): #And (btype='1burn' AND tx.amt>=750)                                                   |    128_268_031 |                   25_116_568 |                     2_410_573 |
+| query(): #And (500_000<ts<=1_000_000 AND 200<amt<=600)                                          |    138_066_574 |                   50_512_755 |                    50_465_192 |
+| query(): #Or (btype == '1xfer' OR '2xfer' OR '1mint')                                           |    188_656_298 |                   16_937_913 |                    18_475_287 |
+| query(): #Or (btype == '1xfer' OR tx.amt >= 500)                                                |    179_949_299 |                   23_255_873 |                    23_760_700 |
+| query(): #Or (btype == '1xfer' OR tx.amt >= 500 OR ts > 500_000)                                |    195_602_472 |                   32_957_154 |                    33_526_221 |
+| query(): #Or (500_000<ts<=1_000_000 OR 200<amt<=600)                                            |    264_643_250 |                   27_920_299 |                    27_665_652 |
+| query(): #Or (btype in ['1xfer', '1burn'] OR (tx.amt < 200 OR tx.amt >= 800))                   |    219_643_650 |                   25_170_194 |                    26_621_974 |
+| query() -> principals[0] == tx.to.owner (is recipient)                                          |    154_908_117 |                    1_180_330 |                     1_232_121 |
+| query() -> principals[0..10] == tx.to.owner (is recipient)                                      |    659_939_797 |                   21_568_092 |                    19_121_361 |
+| query() -> all txs involving principals[0]                                                      |    305_828_017 |                    5_992_501 |                     6_097_842 |
+| query() -> all txs involving principals[0..10]                                                  |  1_775_982_656 |                   61_495_882 |                    60_542_016 |
+| update(): single operation -> #add amt += 100                                                   |    507_961_074 |                  784_070_145 |                 1_188_801_488 |
+| update(): multiple independent operations -> #add, #sub, #mul, #div on tx.amt                   |    845_501_291 |                1_122_322_018 |                 1_526_675_473 |
+| update(): multiple nested operations -> #add, #sub, #mul, #div on tx.amt                        |    571_069_582 |                  849_530_683 |                 1_253_023_934 |
+| update(): multiple operations on multiple fields -> #add, #sub, #mul, #div on (tx.amt, ts, fee) |    790_278_384 |                1_619_476_956 |                 3_567_983_648 |
+| replace() -> replace half the tx with new tx                                                    |    411_697_699 |                2_828_271_748 |                 3_187_886_724 |
+| delete()                                                                                        |    155_448_739 |                1_189_557_923 |                 1_385_179_865 |
 
 
 **Heap**
@@ -86,15 +86,15 @@ Garbage Collection: ${\color{gray}0\\%}$
 | create and populate indexes                                                                     |      16.36 KiB |                    92.95 MiB |                    115.17 MiB |
 | clear collection entries and indexes                                                            |      16.71 KiB |                    16.71 KiB |                     16.71 KiB |
 | insert with indexes                                                                             |      11.48 MiB |                   105.31 MiB |                    127.53 MiB |
-| query(): no filter (all txs)                                                                    |     380.95 KiB |                   380.95 KiB |                    381.02 KiB |
+| query(): no filter (all txs)                                                                    |     381.02 KiB |                   380.95 KiB |                    380.95 KiB |
 | query(): single field (btype = '1mint')                                                         |      10.04 MiB |                   129.99 KiB |                    151.95 KiB |
 | query(): number range (250 < tx.amt <= 400)                                                     |       10.7 MiB |                   116.56 KiB |                    116.56 KiB |
 | query(): #And (btype='1burn' AND tx.amt>=750)                                                   |       10.8 MiB |                     1.96 MiB |                    132.39 KiB |
 | query(): #And (500_000<ts<=1_000_000 AND 200<amt<=600)                                          |      11.15 MiB |                     3.68 MiB |                      3.67 MiB |
-| query(): #Or (btype == '1xfer' OR '2xfer' OR '1mint')                                           |      16.81 MiB |                   434.34 KiB |                    552.93 KiB |
-| query(): #Or (btype == '1xfer' OR tx.amt >= 500)                                                |      14.64 MiB |                   788.54 KiB |                       826 KiB |
+| query(): #Or (btype == '1xfer' OR '2xfer' OR '1mint')                                           |      16.81 MiB |                   434.34 KiB |                    552.86 KiB |
+| query(): #Or (btype == '1xfer' OR tx.amt >= 500)                                                |      14.64 MiB |                   788.54 KiB |                    825.93 KiB |
 | query(): #Or (btype == '1xfer' OR tx.amt >= 500 OR ts > 500_000)                                |      15.99 MiB |                     1.12 MiB |                      1.16 MiB |
-| query(): #Or (500_000<ts<=1_000_000 OR 200<amt<=600)                                            |      19.68 MiB |                   929.61 KiB |                    912.22 KiB |
+| query(): #Or (500_000<ts<=1_000_000 OR 200<amt<=600)                                            |      19.68 MiB |                   929.61 KiB |                    912.15 KiB |
 | query(): #Or (btype in ['1xfer', '1burn'] OR (tx.amt < 200 OR tx.amt >= 800))                   |      19.69 MiB |                   937.17 KiB |                      1.02 MiB |
 | query() -> principals[0] == tx.to.owner (is recipient)                                          |      12.87 MiB |                    73.66 KiB |                     75.66 KiB |
 | query() -> principals[0..10] == tx.to.owner (is recipient)                                      |      71.03 MiB |                   839.72 KiB |                    809.64 KiB |
@@ -131,30 +131,30 @@ Garbage Collection: ${\color{gray}0\\%}$
 
 |                                                                                                 | #heap no index (sorted by ts) | #heap 7 single field indexes (sorted by tx.amt) | #heap 6 fully covered indexes (sorted by ts) |
 | :---------------------------------------------------------------------------------------------- | ----------------------------: | ----------------------------------------------: | -------------------------------------------: |
-| insert with no index                                                                            |                   150_161_477 |                                     150_151_489 |                                  150_151_787 |
-| create and populate indexes                                                                     |                         3_613 |                                   1_166_872_778 |                                1_382_959_842 |
-| clear collection entries and indexes                                                            |                         8_913 |                                          52_786 |                                       52_172 |
-| insert with indexes                                                                             |                   157_913_840 |                                   1_297_209_259 |                                1_513_901_891 |
-| query(): no filter (all txs)                                                                    |                 1_795_093_173 |                                      24_763_115 |                                   24_763_848 |
-| query(): single field (btype = '1mint')                                                         |                   374_566_659 |                                     136_870_225 |                                    5_848_044 |
-| query(): number range (250 < tx.amt <= 400)                                                     |                   310_473_446 |                                       4_063_627 |                                  151_955_372 |
-| query(): #And (btype='1burn' AND tx.amt>=750)                                                   |                   171_366_916 |                                      34_548_811 |                                   28_486_803 |
-| query(): #And (500_000<ts<=1_000_000 AND 200<amt<=600)                                          |                   407_086_655 |                                      54_485_104 |                                   82_359_169 |
-| query(): #Or (btype == '1xfer' OR '2xfer' OR '1mint')                                           |                 1_287_607_743 |                                     414_592_547 |                                   30_692_135 |
-| query(): #Or (btype == '1xfer' OR tx.amt >= 500)                                                |                 1_291_303_684 |                                     155_910_006 |                                  170_004_450 |
-| query(): #Or (btype == '1xfer' OR tx.amt >= 500 OR ts > 500_000)                                |                 1_738_016_706 |                                     283_492_590 |                                  183_811_767 |
-| query(): #Or (500_000<ts<=1_000_000 OR 200<amt<=600)                                            |                 2_068_103_298 |                                     145_575_916 |                                  175_606_247 |
-| query(): #Or (btype in ['1xfer', '1burn'] OR (tx.amt < 200 OR tx.amt >= 800))                   |                 1_330_088_985 |                                     288_852_668 |                                  324_705_688 |
-| query() -> principals[0] == tx.to.owner (is recipient)                                          |                   158_403_399 |                                       5_843_648 |                                    1_370_103 |
-| query() -> principals[0..10] == tx.to.owner (is recipient)                                      |                   828_971_286 |                                     279_513_668 |                                   25_502_093 |
-| query() -> all txs involving principals[0]                                                      |                   330_946_167 |                                      40_140_133 |                                    6_970_725 |
-| query() -> all txs involving principals[0..10]                                                  |                 2_308_533_134 |                                   1_017_238_047 |                                   73_665_490 |
-| update(): single operation -> #add amt += 100                                                   |                   507_528_096 |                                     783_403_470 |                                1_187_838_403 |
-| update(): multiple independent operations -> #add, #sub, #mul, #div on tx.amt                   |                   844_277_304 |                                   1_120_857_469 |                                1_524_933_365 |
-| update(): multiple nested operations -> #add, #sub, #mul, #div on tx.amt                        |                   570_131_825 |                                     848_368_870 |                                1_251_570_020 |
-| update(): multiple operations on multiple fields -> #add, #sub, #mul, #div on (tx.amt, ts, fee) |                   789_091_012 |                                   1_617_595_641 |                                3_564_635_003 |
-| replace() -> replace half the tx with new tx                                                    |                   413_044_579 |                                   2_827_790_400 |                                3_187_322_128 |
-| delete()                                                                                        |                   155_566_723 |                                   1_189_127_728 |                                1_384_736_271 |
+| insert with no index                                                                            |                   150_295_370 |                                     150_284_603 |                                  150_285_557 |
+| create and populate indexes                                                                     |                         3_675 |                                   1_167_696_448 |                                1_383_868_413 |
+| clear collection entries and indexes                                                            |                         8_975 |                                          52_848 |                                       52_234 |
+| insert with indexes                                                                             |                   157_832_348 |                                   1_298_394_683 |                                1_515_173_808 |
+| query(): no filter (all txs)                                                                    |                 1_794_016_688 |                                      24_700_549 |                                   24_699_530 |
+| query(): single field (btype = '1mint')                                                         |                   374_376_290 |                                     136_829_873 |                                    5_837_020 |
+| query(): number range (250 < tx.amt <= 400)                                                     |                   310_320_864 |                                       4_056_442 |                                  151_904_063 |
+| query(): #And (btype='1burn' AND tx.amt>=750)                                                   |                   171_312_481 |                                      34_541_402 |                                   28_480_157 |
+| query(): #And (500_000<ts<=1_000_000 AND 200<amt<=600)                                          |                   406_869_113 |                                      54_451_574 |                                   82_324_560 |
+| query(): #Or (btype == '1xfer' OR '2xfer' OR '1mint')                                           |                 1_286_945_910 |                                     414_476_108 |                                   30_662_883 |
+| query(): #Or (btype == '1xfer' OR tx.amt >= 500)                                                |                 1_290_605_663 |                                     155_847_048 |                                  169_925_898 |
+| query(): #Or (btype == '1xfer' OR tx.amt >= 500 OR ts > 500_000)                                |                 1_737_055_441 |                                     283_361_515 |                                  183_721_839 |
+| query(): #Or (500_000<ts<=1_000_000 OR 200<amt<=600)                                            |                 2_066_924_690 |                                     145_476_810 |                                  175_519_608 |
+| query(): #Or (btype in ['1xfer', '1burn'] OR (tx.amt < 200 OR tx.amt >= 800))                   |                 1_329_414_776 |                                     288_764_549 |                                  324_590_645 |
+| query() -> principals[0] == tx.to.owner (is recipient)                                          |                   158_369_461 |                                       5_844_048 |                                    1_371_432 |
+| query() -> principals[0..10] == tx.to.owner (is recipient)                                      |                   829_011_942 |                                     279_441_615 |                                   25_512_361 |
+| query() -> all txs involving principals[0]                                                      |                   331_010_523 |                                      40_135_217 |                                    6_975_217 |
+| query() -> all txs involving principals[0..10]                                                  |                 2_309_170_705 |                                   1_016_962_629 |                                   73_698_709 |
+| update(): single operation -> #add amt += 100                                                   |                   507_963_023 |                                     784_074_588 |                                1_188_802_159 |
+| update(): multiple independent operations -> #add, #sub, #mul, #div on tx.amt                   |                   845_501_764 |                                   1_122_317_407 |                                1_526_687_544 |
+| update(): multiple nested operations -> #add, #sub, #mul, #div on tx.amt                        |                   571_071_531 |                                     849_545_234 |                                1_253_036_411 |
+| update(): multiple operations on multiple fields -> #add, #sub, #mul, #div on (tx.amt, ts, fee) |                   790_279_677 |                                   1_619_469_141 |                                3_567_738_017 |
+| replace() -> replace half the tx with new tx                                                    |                   411_699_361 |                                   2_828_276_707 |                                3_187_911_472 |
+| delete()                                                                                        |                   155_449_412 |                                   1_189_562_624 |                                1_385_178_869 |
 
 
 **Heap**
@@ -195,7 +195,7 @@ Garbage Collection: ${\color{gray}0\\%}$
 | create and populate indexes                                                                     |                     16.36 KiB |                                       92.95 MiB |                                   115.17 MiB |
 | clear collection entries and indexes                                                            |                     16.71 KiB |                                       16.71 KiB |                                    16.71 KiB |
 | insert with indexes                                                                             |                     11.48 MiB |                                      105.31 MiB |                                   127.53 MiB |
-| query(): no filter (all txs)                                                                    |                       140 MiB |                                      405.56 KiB |                                   405.84 KiB |
+| query(): no filter (all txs)                                                                    |                       140 MiB |                                      405.56 KiB |                                   405.77 KiB |
 | query(): single field (btype = '1mint')                                                         |                     30.46 MiB |                                       11.14 MiB |                                    167.8 KiB |
 | query(): number range (250 < tx.amt <= 400)                                                     |                     24.27 MiB |                                      116.97 KiB |                                    11.83 MiB |
 | query(): #And (btype='1burn' AND tx.amt>=750)                                                   |                     14.32 MiB |                                        2.83 MiB |                                      2.2 MiB |
@@ -203,7 +203,7 @@ Garbage Collection: ${\color{gray}0\\%}$
 | query(): #Or (btype == '1xfer' OR '2xfer' OR '1mint')                                           |                    103.59 MiB |                                       33.74 MiB |                                     1.51 MiB |
 | query(): #Or (btype == '1xfer' OR tx.amt >= 500)                                                |                    102.19 MiB |                                        12.1 MiB |                                    12.57 MiB |
 | query(): #Or (btype == '1xfer' OR tx.amt >= 500 OR ts > 500_000)                                |                    137.69 MiB |                                       21.96 MiB |                                    13.44 MiB |
-| query(): #Or (500_000<ts<=1_000_000 OR 200<amt<=600)                                            |                    161.97 MiB |                                       10.54 MiB |                                     12.9 MiB |
+| query(): #Or (500_000<ts<=1_000_000 OR 200<amt<=600)                                            |                    161.98 MiB |                                       10.54 MiB |                                     12.9 MiB |
 | query(): #Or (btype in ['1xfer', '1burn'] OR (tx.amt < 200 OR tx.amt >= 800))                   |                    107.69 MiB |                                       23.22 MiB |                                    24.83 MiB |
 | query() -> principals[0] == tx.to.owner (is recipient)                                          |                     13.14 MiB |                                      447.48 KiB |                                    91.47 KiB |
 | query() -> principals[0..10] == tx.to.owner (is recipient)                                      |                     84.41 MiB |                                       21.11 MiB |                                     1.33 MiB |
@@ -240,30 +240,30 @@ Garbage Collection: ${\color{gray}0\\%}$
 
 |                                                                                                 | #stableMemory no index | #stableMemory 7 single field indexes | #stableMemory 6 fully covered indexes |
 | :---------------------------------------------------------------------------------------------- | ---------------------: | -----------------------------------: | ------------------------------------: |
-| insert with no index                                                                            |            210_335_611 |                          210_300_027 |                           210_300_388 |
-| create and populate indexes                                                                     |                  2_202 |                        1_248_962_201 |                         1_496_742_180 |
-| clear collection entries and indexes                                                            |                 42_762 |                              315_735 |                               325_019 |
-| insert with indexes                                                                             |            219_470_251 |                        1_408_583_145 |                         1_658_753_496 |
-| query(): no filter (all txs)                                                                    |             73_877_063 |                           73_877_769 |                            73_877_091 |
-| query(): single field (btype = '1mint')                                                         |            183_841_818 |                           14_885_276 |                            15_110_576 |
-| query(): number range (250 < tx.amt <= 400)                                                     |            195_670_284 |                           11_097_831 |                            11_098_908 |
-| query(): #And (btype='1burn' AND tx.amt>=750)                                                   |            180_864_526 |                           35_518_945 |                             4_552_359 |
-| query(): #And (500_000<ts<=1_000_000 AND 200<amt<=600)                                          |            198_362_417 |                           80_718_742 |                            80_665_938 |
-| query(): #Or (btype == '1xfer' OR '2xfer' OR '1mint')                                           |            267_041_601 |                           46_606_408 |                            47_988_422 |
-| query(): #Or (btype == '1xfer' OR tx.amt >= 500)                                                |            258_880_452 |                           53_821_793 |                            54_222_768 |
-| query(): #Or (btype == '1xfer' OR tx.amt >= 500 OR ts > 500_000)                                |            283_991_510 |                           73_620_481 |                            74_090_899 |
-| query(): #Or (500_000<ts<=1_000_000 OR 200<amt<=600)                                            |            399_123_074 |                           63_902_797 |                            63_619_524 |
-| query(): #Or (btype in ['1xfer', '1burn'] OR (tx.amt < 200 OR tx.amt >= 800))                   |            298_349_653 |                           55_153_720 |                            56_298_506 |
-| query() -> principals[0] == tx.to.owner (is recipient)                                          |            205_610_039 |                            1_389_181 |                             1_428_375 |
-| query() -> principals[0..10] == tx.to.owner (is recipient)                                      |            714_956_864 |                           21_129_110 |                            21_630_816 |
-| query() -> all txs involving principals[0]                                                      |            356_237_734 |                            6_244_123 |                             6_416_359 |
-| query() -> all txs involving principals[0..10]                                                  |          1_839_799_728 |                           64_959_288 |                            67_164_512 |
-| update(): single operation -> #add amt += 100                                                   |            652_925_577 |                          964_713_868 |                         1_394_023_758 |
-| update(): multiple independent operations -> #add, #sub, #mul, #div on tx.amt                   |            989_157_852 |                        1_301_128_902 |                         1_735_960_935 |
-| update(): multiple nested operations -> #add, #sub, #mul, #div on tx.amt                        |            714_412_048 |                        1_026_123_866 |                         1_460_354_141 |
-| update(): multiple operations on multiple fields -> #add, #sub, #mul, #div on (tx.amt, ts, fee) |            947_547_435 |                        1_864_316_264 |                         3_912_773_886 |
-| replace() -> replace half the tx with new tx                                                    |            586_388_019 |                        3_154_055_595 |                         3_566_355_943 |
-| delete()                                                                                        |            224_117_783 |                        1_324_048_217 |                         1_534_358_769 |
+| insert with no index                                                                            |            210_469_682 |                          210_433_442 |                           210_434_377 |
+| create and populate indexes                                                                     |                  2_266 |                        1_249_780_121 |                         1_497_651_056 |
+| clear collection entries and indexes                                                            |                 42_826 |                              315_799 |                               325_083 |
+| insert with indexes                                                                             |            219_388_322 |                        1_409_764_483 |                         1_660_022_885 |
+| query(): no filter (all txs)                                                                    |             73_813_910 |                           73_812_864 |                            73_815_206 |
+| query(): single field (btype = '1mint')                                                         |            183_781_123 |                           14_873_527 |                            15_099_217 |
+| query(): number range (250 < tx.amt <= 400)                                                     |            195_607_914 |                           11_090_633 |                            11_091_587 |
+| query(): #And (btype='1burn' AND tx.amt>=750)                                                   |            180_834_601 |                           35_509_815 |                             4_551_412 |
+| query(): #And (500_000<ts<=1_000_000 AND 200<amt<=600)                                          |            198_278_694 |                           80_662_966 |                            80_615_988 |
+| query(): #Or (btype == '1xfer' OR '2xfer' OR '1mint')                                           |            266_916_968 |                           46_571_528 |                            47_958_004 |
+| query(): #Or (btype == '1xfer' OR tx.amt >= 500)                                                |            258_719_083 |                           53_665_658 |                            54_078_977 |
+| query(): #Or (btype == '1xfer' OR tx.amt >= 500 OR ts > 500_000)                                |            283_761_734 |                           73_410_854 |                            73_888_764 |
+| query(): #Or (500_000<ts<=1_000_000 OR 200<amt<=600)                                            |            398_835_377 |                           63_719_278 |                            63_465_839 |
+| query(): #Or (btype in ['1xfer', '1burn'] OR (tx.amt < 200 OR tx.amt >= 800))                   |            298_203_410 |                           55_039_191 |                            56_173_618 |
+| query() -> principals[0] == tx.to.owner (is recipient)                                          |            205_578_331 |                            1_390_190 |                             1_429_328 |
+| query() -> principals[0..10] == tx.to.owner (is recipient)                                      |            715_088_909 |                           21_133_671 |                            21_635_491 |
+| query() -> all txs involving principals[0]                                                      |            356_315_222 |                            6_245_872 |                             6_419_165 |
+| query() -> all txs involving principals[0..10]                                                  |          1_840_706_406 |                           64_940_564 |                            67_150_335 |
+| update(): single operation -> #add amt += 100                                                   |            653_361_982 |                          965_385_562 |                         1_394_985_511 |
+| update(): multiple independent operations -> #add, #sub, #mul, #div on tx.amt                   |            990_383_011 |                        1_302_589_953 |                         1_737_712_233 |
+| update(): multiple nested operations -> #add, #sub, #mul, #div on tx.amt                        |            715_350_567 |                        1_027_299_109 |                         1_461_818_377 |
+| update(): multiple operations on multiple fields -> #add, #sub, #mul, #div on (tx.amt, ts, fee) |            948_736_143 |                        1_866_189_602 |                         3_915_874_189 |
+| replace() -> replace half the tx with new tx                                                    |            585_043_340 |                        3_154_541_805 |                         3_566_939_729 |
+| delete()                                                                                        |            224_002_438 |                        1_324_483_925 |                         1_534_803_814 |
 
 
 **Heap**
@@ -310,7 +310,7 @@ Garbage Collection: ${\color{gray}0\\%}$
 | query(): #And (btype='1burn' AND tx.amt>=750)                                                   |              15.71 MiB |                             2.88 MiB |                            327.77 KiB |
 | query(): #And (500_000<ts<=1_000_000 AND 200<amt<=600)                                          |              16.78 MiB |                             6.43 MiB |                              6.43 MiB |
 | query(): #Or (btype == '1xfer' OR '2xfer' OR '1mint')                                           |              23.99 MiB |                             3.11 MiB |                              3.21 MiB |
-| query(): #Or (btype == '1xfer' OR tx.amt >= 500)                                                |              21.85 MiB |                             3.51 MiB |                              3.54 MiB |
+| query(): #Or (btype == '1xfer' OR tx.amt >= 500)                                                |              21.86 MiB |                             3.51 MiB |                              3.54 MiB |
 | query(): #Or (btype == '1xfer' OR tx.amt >= 500 OR ts > 500_000)                                |              24.08 MiB |                             4.74 MiB |                              4.77 MiB |
 | query(): #Or (500_000<ts<=1_000_000 OR 200<amt<=600)                                            |              32.08 MiB |                             4.13 MiB |                              4.12 MiB |
 | query(): #Or (btype in ['1xfer', '1burn'] OR (tx.amt < 200 OR tx.amt >= 800))                   |              26.89 MiB |                              3.6 MiB |                              3.68 MiB |
@@ -378,30 +378,30 @@ Garbage Collection: ${\color{gray}0\\%}$
 
 |                                                                                                 | #stableMemory no index (sorted by ts) | #stableMemory 7 single field indexes (sorted by ts) | #stableMemory 6 fully covered indexes (sorted by ts) |
 | :---------------------------------------------------------------------------------------------- | ------------------------------------: | --------------------------------------------------: | ---------------------------------------------------: |
-| insert with no index                                                                            |                           210_338_637 |                                         210_303_672 |                                          210_304_353 |
-| create and populate indexes                                                                     |                                 5_228 |                                       1_248_965_846 |                                        1_496_746_145 |
-| clear collection entries and indexes                                                            |                                45_788 |                                             319_380 |                                              328_984 |
-| insert with indexes                                                                             |                           219_473_299 |                                       1_408_588_521 |                                        1_658_756_728 |
-| query(): no filter (all txs)                                                                    |                         2_686_826_012 |                                          74_335_495 |                                           74_336_971 |
-| query(): single field (btype = '1mint')                                                         |                           552_338_280 |                                         196_130_227 |                                           15_252_132 |
-| query(): number range (250 < tx.amt <= 400)                                                     |                           449_555_622 |                                         209_066_895 |                                          209_067_933 |
-| query(): #And (btype='1burn' AND tx.amt>=750)                                                   |                           244_478_921 |                                          99_286_809 |                                           38_906_169 |
-| query(): #And (500_000<ts<=1_000_000 AND 200<amt<=600)                                          |                           595_376_894 |                                         118_236_879 |                                          118_238_653 |
-| query(): #Or (btype == '1xfer' OR '2xfer' OR '1mint')                                           |                         1_889_670_783 |                                         593_267_108 |                                           60_575_319 |
-| query(): #Or (btype == '1xfer' OR tx.amt >= 500)                                                |                         1_902_237_229 |                                         427_759_146 |                                          250_089_991 |
-| query(): #Or (btype == '1xfer' OR tx.amt >= 500 OR ts > 500_000)                                |                         2_563_173_776 |                                         451_889_464 |                                          274_279_351 |
-| query(): #Or (500_000<ts<=1_000_000 OR 200<amt<=600)                                            |                         3_060_128_524 |                                         261_508_345 |                                          261_511_897 |
-| query(): #Or (btype in ['1xfer', '1burn'] OR (tx.amt < 200 OR tx.amt >= 800))                   |                         1_937_959_797 |                                         810_051_103 |                                          454_519_332 |
-| query() -> principals[0] == tx.to.owner (is recipient)                                          |                           210_807_802 |                                           7_053_049 |                                            1_569_884 |
-| query() -> principals[0..10] == tx.to.owner (is recipient)                                      |                           964_611_133 |                                         304_260_269 |                                           28_105_245 |
-| query() -> all txs involving principals[0]                                                      |                           393_811_848 |                                          46_536_573 |                                            7_313_961 |
-| query() -> all txs involving principals[0..10]                                                  |                         2_628_005_208 |                                       1_147_867_914 |                                           80_519_975 |
-| update(): single operation -> #add amt += 100                                                   |                           652_928_603 |                                         964_718_005 |                                        1_394_026_657 |
-| update(): multiple independent operations -> #add, #sub, #mul, #div on tx.amt                   |                           989_160_040 |                                       1_301_130_784 |                                        1_735_964_572 |
-| update(): multiple nested operations -> #add, #sub, #mul, #div on tx.amt                        |                           714_413_434 |                                       1_026_126_978 |                                        1_460_356_917 |
-| update(): multiple operations on multiple fields -> #add, #sub, #mul, #div on (tx.amt, ts, fee) |                           947_549_081 |                                       1_864_321_301 |                                        3_912_394_008 |
-| replace() -> replace half the tx with new tx                                                    |                           586_384_845 |                                       3_154_058_429 |                                        3_566_355_189 |
-| delete()                                                                                        |                           224_123_538 |                                       1_324_051_077 |                                        1_534_334_209 |
+| insert with no index                                                                            |                           210_472_706 |                                         210_437_085 |                                          210_438_340 |
+| create and populate indexes                                                                     |                                 5_290 |                                       1_249_783_708 |                                        1_497_655_019 |
+| clear collection entries and indexes                                                            |                                45_850 |                                             319_442 |                                              329_046 |
+| insert with indexes                                                                             |                           219_392_114 |                                       1_409_766_831 |                                        1_660_029_395 |
+| query(): no filter (all txs)                                                                    |                         2_685_749_941 |                                          74_273_216 |                                           74_274_159 |
+| query(): single field (btype = '1mint')                                                         |                           552_147_911 |                                         196_090_777 |                                           15_241_272 |
+| query(): number range (250 < tx.amt <= 400)                                                     |                           449_404_352 |                                         209_015_668 |                                          209_017_198 |
+| query(): #And (btype='1burn' AND tx.amt>=750)                                                   |                           244_424_199 |                                          99_253_855 |                                           38_900_015 |
+| query(): #And (500_000<ts<=1_000_000 AND 200<amt<=600)                                          |                           595_157_142 |                                         118_204_391 |                                          118_206_042 |
+| query(): #Or (btype == '1xfer' OR '2xfer' OR '1mint')                                           |                         1_889_010_389 |                                         593_151_407 |                                           60_547_696 |
+| query(): #Or (btype == '1xfer' OR tx.amt >= 500)                                                |                         1_901_534_538 |                                         427_650_875 |                                          250_013_478 |
+| query(): #Or (btype == '1xfer' OR tx.amt >= 500 OR ts > 500_000)                                |                         2_562_210_640 |                                         451_771_856 |                                          274_191_995 |
+| query(): #Or (500_000<ts<=1_000_000 OR 200<amt<=600)                                            |                         3_058_945_697 |                                         261_423_458 |                                          261_425_985 |
+| query(): #Or (btype in ['1xfer', '1burn'] OR (tx.amt < 200 OR tx.amt >= 800))                   |                         1_937_282_308 |                                         809_877_048 |                                          454_403_006 |
+| query() -> principals[0] == tx.to.owner (is recipient)                                          |                           210_773_495 |                                           7_052_852 |                                            1_571_131 |
+| query() -> principals[0..10] == tx.to.owner (is recipient)                                      |                           964_648_554 |                                         304_166_575 |                                           28_115_472 |
+| query() -> all txs involving principals[0]                                                      |                           393_876_450 |                                          46_527_553 |                                            7_318_371 |
+| query() -> all txs involving principals[0..10]                                                  |                         2_628_640_323 |                                       1_147_499_767 |                                           80_552_097 |
+| update(): single operation -> #add amt += 100                                                   |                           653_365_416 |                                         965_390_189 |                                        1_394_988_777 |
+| update(): multiple independent operations -> #add, #sub, #mul, #div on tx.amt                   |                           990_384_828 |                                       1_302_593_637 |                                        1_737_717_057 |
+| update(): multiple nested operations -> #add, #sub, #mul, #div on tx.amt                        |                           715_353_386 |                                       1_027_302_875 |                                        1_461_822_709 |
+| update(): multiple operations on multiple fields -> #add, #sub, #mul, #div on (tx.amt, ts, fee) |                           948_738_115 |                                       1_866_193_940 |                                        3_915_497_507 |
+| replace() -> replace half the tx with new tx                                                    |                           585_042_091 |                                       3_154_545_006 |                                        3_566_943_114 |
+| delete()                                                                                        |                           224_007_088 |                                       1_324_487_480 |                                        1_534_779_583 |
 
 
 **Heap**
