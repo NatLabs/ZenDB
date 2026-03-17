@@ -1,14 +1,14 @@
 import ZT "../../EmbeddedInstance/Types";
 
 import CollectionClient "Collection.Client";
-import ClusterTypes "../Types";
+import CanisterDBModule "../CanisterDB";
 
 module {
 
     // public type CollectionClient<Record> = CollectionClient.CollectionClient<Record>;
 
     /// The database connects to a database canister.
-    public class DatabaseClient(canister_db : ClusterTypes.ClusterApiService, db_name : Text) {
+    public class DatabaseClient(canister_db : CanisterDBModule.CanisterDB, db_name : Text) {
 
         public func name() : async* Text {
             db_name;

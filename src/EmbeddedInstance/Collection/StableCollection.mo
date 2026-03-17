@@ -1627,7 +1627,7 @@ module StableCollection {
             total_data_bytes += index_stats.memory.dataBytes;
             total_metadata_bytes += index_stats.memory.metadataBytes;
 
-            total_index_store_bytes += index_stats.memory.allocatedBytes;
+            total_index_store_bytes += index_stats.memory.dataBytes;
         };
 
         let collection_stats : T.CollectionStats = {
@@ -1648,7 +1648,7 @@ module StableCollection {
             total_data_bytes = total_data_bytes;
             total_metadata_bytes = total_metadata_bytes;
 
-            total_document_store_bytes = main_collection_memory.allocatedBytes;
+            total_document_store_bytes = main_collection_memory.dataBytes;
             total_index_store_bytes = total_index_store_bytes;
         };
 

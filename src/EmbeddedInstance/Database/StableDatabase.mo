@@ -352,7 +352,7 @@ module {
             total_allocated_bytes += stats.total_allocated_bytes;
             total_free_bytes += stats.total_free_bytes;
             total_used_bytes += stats.total_used_bytes;
-            total_data_bytes += stats.total_document_size;
+            total_data_bytes += stats.total_data_bytes;
             total_metadata_bytes += stats.total_metadata_bytes;
 
             total_document_store_bytes += stats.total_document_store_bytes;

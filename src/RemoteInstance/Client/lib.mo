@@ -5,13 +5,14 @@ import CollectionClient "Collection.Client";
 import DatabaseClient "Database.Client";
 
 import ClusterTypes "../Types";
+import CanisterDBModule "../CanisterDB";
 
 module Client {
 
     public type CollectionClient<Record> = CollectionClient.CollectionClient<Record>;
 
     public class Client(canister_id : Text) {
-        let canister_db : ClusterTypes.ClusterApiService = actor (canister_id);
+        let canister_db : CanisterDBModule.CanisterDB = actor (canister_id);
 
         public func apiVersion() : async* Text {
             await canister_db.zendb_v1_api_version();

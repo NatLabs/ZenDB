@@ -2,13 +2,13 @@ import Array "mo:base@0.16.0/Array";
 
 import ZT "../../EmbeddedInstance/Types";
 
-import ClusterTypes "../Types";
+import CanisterDBModule "../CanisterDB";
 import Utils "../../EmbeddedInstance/Utils";
 
 module {
 
     public class CollectionClient<Record>(
-        canister_db : ClusterTypes.ClusterApiService,
+        canister_db : CanisterDBModule.CanisterDB,
         db_name : Text,
         collection_name : Text,
         candify : ZT.Candify<Record>,

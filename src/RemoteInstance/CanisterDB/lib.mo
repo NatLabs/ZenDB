@@ -320,7 +320,7 @@ shared ({ caller = owner }) persistent actor class CanisterDB() = this_canister 
         };
      };
 
-     public shared ({ caller }) func zendb_v1_list_database_names() : async (ZT.Result<[Text], Text>) {
+     public shared query ({ caller }) func zendb_v1_list_database_names() : async (ZT.Result<[Text], Text>) {
           CanisterRBAC.allow(
                canister_rbac,
                caller,
@@ -507,7 +507,7 @@ shared ({ caller = owner }) persistent actor class CanisterDB() = this_canister 
         );
     };
 
-    public shared ({ caller }) func zendb_v1_collection_search(
+    public shared query ({ caller }) func zendb_v1_collection_search(
         db_name : Text,
         collection_name : Text,
         stable_query : ZT.StableQuery,
