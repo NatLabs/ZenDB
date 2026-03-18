@@ -1,3 +1,5 @@
+import Prim "mo:prim";
+
 import Debug "mo:base@0.16.0/Debug";
 import Buffer "mo:base@0.16.0/Buffer";
 import Principal "mo:base@0.16.0/Principal";
@@ -30,10 +32,26 @@ module {
     type CandidQuery = T.CandidQuery;
 
     /// Orchid
-    /// This is a module for encoding Composite CompositeIndex Keys, represented as an array of candid values, into its binary representation.
+    /// Encodes composite index keys (arrays of candid values) into a binary representation
+    /// that is lexicographically ordered. Raw byte comparison (e.g. Prim.blobCompare) on
+    /// two encoded blobs produces the same ordering as semantic comparison of the original
+    /// values. This makes the encoding compatible with tail-compressed B+Tree separators.
+    ///
+    /// Ordering properties by type:
+    ///   Fixed-width types (Bool, Nat/Nat8/16/32/64, Int/Int8/16/32/64, Float, Null, Empty):
+    ///     Encoded as [type_code][fixed bytes]. ByteUtils.Sorted ensures signed integers
+    ///     and floats are XOR-adjusted so raw byte order matches semantic order.
+    ///     Note: Nat and Int are encoded as 64-bit values (type codes 13, 14).
+    ///   Variable-length types (Text, Blob, Principal):
+    ///     Encoded as [type_code][escaped bytes][0x00 0x00].
+    ///     Content bytes are escaped: 0x00 → 0x00 0xFF. Terminator is 0x00 0x00.
+    ///     This is lex-correct because the terminator is smaller than any continuation
+    ///     byte, so a shorter value sorts before any longer value that shares its prefix.
+    ///   Option: [TypeCode.Option][inner encoded value]. Null (TypeCode 2) < Option (TypeCode 21).
+    ///   Minimum/Maximum sentinels: single byte 0x01 / 0xFF — below/above all real type codes.
 
     public let TypeCode = {
-        Minimum : Nat8 = 1; // avoid clashing with 0x00, which is reserved for the null terminator
+        Minimum : Nat8 = 1; // below all real type codes
         Null : Nat8 = 2;
         Empty : Nat8 = 3;
         Bool : Nat8 = 4;
@@ -45,18 +63,16 @@ module {
         Int16 : Nat8 = 10;
         Int32 : Nat8 = 11;
         Int64 : Nat8 = 12;
-        NatAsNat64 : Nat8 = 13; // nat64
-        IntAsInt64 : Nat8 = 14; // int64
-        Float : Nat8 = 15;
-
-        Principal : Nat8 = 16; // null terminated utf8 bytes
-        Text : Nat8 = 17; // texts with a size of 0 to 65535 bytes, size prefix of 2 bytes
-        Blob : Nat8 = 18; // blobs with a size 0 to 65535 bytes, size prefix of 2 bytes
-
-        Option : Nat8 = 19;
-
-        Maximum : Nat8 = 255;
-
+        NatAsNat64 : Nat8 = 13; // #Nat encoded as 64-bit
+        IntAsInt64 : Nat8 = 14; // #Int encoded as 64-bit
+        Nat : Nat8 = 15; // reserved for future variable-length encoding
+        Int : Nat8 = 16; // reserved for future variable-length encoding
+        Float : Nat8 = 17;
+        Principal : Nat8 = 18;
+        Text : Nat8 = 19;
+        Blob : Nat8 = 20;
+        Option : Nat8 = 21;
+        Maximum : Nat8 = 255; // above all real type codes
     };
 
     public func type_code_to_text(type_code : Nat8) : Text {
@@ -75,6 +91,8 @@ module {
             (TypeCode.Int64, "Int64"),
             (TypeCode.NatAsNat64, "NatAsNat64"),
             (TypeCode.IntAsInt64, "IntAsInt64"),
+            (TypeCode.Nat, "Nat"),
+            (TypeCode.Int, "Int"),
             (TypeCode.Float, "Float"),
             (TypeCode.Principal, "Principal"),
             (TypeCode.Option, "Option"),
@@ -93,14 +111,64 @@ module {
             ),
             debug_show (type_code),
         );
+    };
 
+    /// Writes all bytes from `src` into `buffer`, escaping every 0x00 byte as 0x00 0xFF,
+    /// then appends the 0x00 0x00 terminator.
+    ///
+    /// Lexicographic correctness:
+    ///   - 0x00 0x00  <  0x00 0xFF  <  0x01..0xFF, so the terminator of a shorter value
+    ///     sorts before any byte of a longer value that shares the same prefix.
+    ///   - Embedded 0x00 bytes (e.g. U+0000 in UTF-8) are escaped to 0x00 0xFF, which
+    ///     sorts above the terminator but below any non-zero continuation byte — correct.
+    func encode_escaped(buffer : Buffer.Buffer<Nat8>, src : Iter.Iter<Nat8>) {
+        for (byte in src) {
+            if (byte == 0x00) {
+                buffer.add(0x00); buffer.add(0xFF);
+            } else {
+                buffer.add(byte);
+            };
+        };
+
+        buffer.add(0x00); buffer.add(0x00); // terminator
+    };
+
+    /// Reads escape-encoded bytes from `src` up to and consuming the 0x00 0x00 terminator.
+    /// 0x00 0xFF sequences are unescaped back to 0x00.
+    /// Returns the decoded byte array (without the terminator).
+    func decode_escaped(src : T.Iter<Nat8>) : [Nat8] {
+        let buf = Buffer.Buffer<Nat8>(16);
+        label l loop {
+            let b1 = switch (src.next()) {
+                case (null) Debug.trap("Orchid: unexpected end of stream - missing terminator");
+                case (?b) b;
+            };
+            if (b1 == 0x00) {
+                let b2 = switch (src.next()) {
+                    case (null) Debug.trap("Orchid: unexpected end of stream inside escaped field");
+                    case (?b) b;
+                };
+                if (b2 == 0x00) {
+                    break l; // terminator — stop
+                } else if (b2 == 0xFF) {
+                    buf.add(0x00); // unescape embedded null
+                } else {
+                    Debug.trap("Orchid: invalid escape sequence 0x00 " # debug_show b2);
+                };
+            } else {
+                buf.add(b1);
+            };
+        };
+        Buffer.toArray(buf)
     };
 
     func encode(buffer : Buffer.Buffer<Nat8>, candid : CandidQuery) {
 
         switch (candid) {
             case (#Minimum) buffer.add(TypeCode.Minimum);
-            case (#Array(_) or #Record(_) or #Map(_) or #Variant(_) or #Tuple(_)) Debug.trap("Orchid does not support compound types: " # debug_show (candid));
+            case (#Array(_) or #Record(_) or #Map(_) or #Variant(_) or #Tuple(_)) {
+                Debug.trap("Orchid does not support compound types: " # debug_show (candid));
+            };
             case (#Option(option_type)) {
                 buffer.add(TypeCode.Option);
                 encode(buffer, option_type);
@@ -108,32 +176,18 @@ module {
 
             case (#Principal(p)) {
                 buffer.add(TypeCode.Principal);
-
-                let blob = Principal.toBlob(p);
-                buffer.add(Nat8.fromNat(blob.size()));
-
-                ByteUtils.Buffer.addBytes(buffer, blob.vals());
-
+                // No size prefix — use escape+terminator for lex correctness
+                encode_escaped(buffer, Principal.toBlob(p).vals());
             };
             case (#Blob(b)) {
-
                 buffer.add(TypeCode.Blob);
-
-                let size = Nat16.fromNat(b.size());
-
-                ByteUtils.Buffer.BigEndian.addNat16(buffer, size);
-                ByteUtils.Buffer.addBytes(buffer, b.vals());
-
+                // No size prefix — use escape+terminator for lex correctness
+                encode_escaped(buffer, b.vals());
             };
             case (#Text(t)) {
                 buffer.add(TypeCode.Text);
-
-                let bytes = Text.encodeUtf8(t);
-                let size = Nat16.fromNat(bytes.size());
-
-                ByteUtils.Buffer.BigEndian.addNat16(buffer, size);
-                ByteUtils.Buffer.addBytes(buffer, bytes.vals());
-
+                // No size prefix — use escape+terminator for lex correctness
+                encode_escaped(buffer, Text.encodeUtf8(t).vals());
             };
             case (#Float(f)) {
                 buffer.add(TypeCode.Float);
@@ -184,9 +238,12 @@ module {
             };
 
             case (#Nat(n)) {
-                let n64 = Nat64.fromNat(n);
                 buffer.add(TypeCode.NatAsNat64);
-                ByteUtils.Buffer.Sorted.addNat64(buffer, n64);
+                ByteUtils.Buffer.Sorted.addNat64(buffer, Nat64.fromNat(n));
+            };
+            case (#Int(int)) {
+                buffer.add(TypeCode.IntAsInt64);
+                ByteUtils.Buffer.Sorted.addInt64(buffer, Int64.fromInt(int));
             };
 
             case (#Bool(b)) {
@@ -209,8 +266,11 @@ module {
         let type_code = read();
 
         if (type_code == TypeCode.NatAsNat64) {
-            let n64 = ByteUtils.Sorted.toNat64(bytes);
-            (#Nat(Nat64.toNat(n64)));
+            #Nat(Nat64.toNat(ByteUtils.Sorted.toNat64(bytes)));
+        } else if (type_code == TypeCode.Nat) {
+            Debug.trap("Orchid: #Nat type code found in encoded data - this type is not supported");
+        } else if (type_code == TypeCode.Int) {
+            Debug.trap("Orchid: #Int type code found in encoded data - this type is not supported");
         } else if (type_code == TypeCode.Nat8) {
             let n = ByteUtils.Sorted.toNat8(bytes);
             (#Nat8(n));
@@ -224,8 +284,7 @@ module {
             let n = ByteUtils.Sorted.toNat64(bytes);
             (#Nat64(n));
         } else if (type_code == TypeCode.IntAsInt64) {
-            let int64 = ByteUtils.Sorted.toInt64(bytes);
-            (#Int(Int64.toInt(int64)));
+            #Int(Int64.toInt(ByteUtils.Sorted.toInt64(bytes)));
         } else if (type_code == TypeCode.Int8) {
             let i = ByteUtils.Sorted.toInt8(bytes);
             (#Int8(i));
@@ -260,45 +319,19 @@ module {
         } else if (type_code == TypeCode.Empty) {
             #Empty;
         } else if (type_code == TypeCode.Principal) {
-            let principal_size = Nat8.toNat(read());
-
-            let p = Principal.fromBlob(
-                Blob.fromArray(
-                    Array.tabulate<Nat8>(
-                        principal_size,
-                        func(i : Nat) : Nat8 = read(),
-                    )
-                )
-            );
-
-            (#Principal(p));
+            // No size prefix — read until escape terminator
+            #Principal(Principal.fromBlob(Blob.fromArray(decode_escaped(bytes))));
         } else if (type_code == TypeCode.Blob) {
-            let blob_size = Nat16.toNat(ByteUtils.BigEndian.toNat16(bytes));
-
-            let blob = Blob.fromArray(
-                Array.tabulate<Nat8>(
-                    blob_size,
-                    func(i : Nat) : Nat8 = read(),
-                )
-            );
-
-            (#Blob(blob));
+            // No size prefix — read until escape terminator
+            #Blob(Blob.fromArray(decode_escaped(bytes)));
         } else if (type_code == TypeCode.Text) {
-            let text_size = Nat16.toNat(ByteUtils.BigEndian.toNat16(bytes));
-
-            let utf8 = Blob.fromArray(
-                Array.tabulate<Nat8>(
-                    text_size,
-                    func(i : Nat) : Nat8 = read(),
-                )
-            );
-
+            // No size prefix — read until escape terminator
+            let utf8 = Blob.fromArray(decode_escaped(bytes));
             let text = switch (Text.decodeUtf8(utf8)) {
-                case (null) Debug.trap("Orchid: invalid utf8 text in CandidQuery");
+                case (null) Debug.trap("Orchid: invalid utf8 in encoded Text field");
                 case (?t) t;
             };
-
-            (#Text(text));
+            #Text(text);
 
         } else Debug.trap("Orchid: unknown type code: " # debug_show (type_code));
 
@@ -341,178 +374,12 @@ module {
         Buffer.toArray(buffer);
     };
 
-    func btree_cmp(a : Blob, b : Blob) : Int8 {
-
-        let iter_a = a.vals();
-        let iter_b = b.vals();
-
-        func next(iter : Iter.Iter<Nat8>) : Nat8 {
-            switch (iter.next()) {
-                case (null) Debug.trap("Orchid: not enough bytes to compare");
-                case (?byte) byte;
-            };
-        };
-
-        func cmp_n_bytes(n : Nat) : Int8 {
-            var i = 0;
-
-            while (i < n) {
-                let byte_a = next_byte_a();
-                let byte_b = next_byte_b();
-
-                if (byte_a < byte_b) return -1;
-                if (byte_a > byte_b) return 1;
-
-                i += 1;
-
-            };
-
-            0;
-
-        };
-
-        func consume_iter(iter : T.Iter<Nat8>) {
-            while (iter.next() != null) {};
-        };
-
-        func cmp_iters<A>(a : T.Iter<Nat8>, b : T.Iter<Nat8>) : Int8 {
-            loop switch (a.next(), b.next()) {
-                case (null, null) return 0;
-                case (null, _) {
-                    consume_iter(b);
-                    return -1;
-                };
-                case (_, null) {
-                    consume_iter(a);
-                    return 1;
-                };
-                case (?a_val, ?b_val) {
-                    let res = Cmp.Nat8(a_val, b_val);
-                    if (res != 0) {
-                        consume_iter(a);
-                        consume_iter(b);
-
-                        return res;
-                    };
-                };
-            };
-
-        };
-
-        func next_byte_a() : Nat8 = next(iter_a);
-        func next_byte_b() : Nat8 = next(iter_b);
-
-        let composite_key_count_in_a = next_byte_a();
-        let composite_key_count_in_b = next_byte_b();
-
-        let composite_key_cnt = Nat8.min(composite_key_count_in_a, composite_key_count_in_b);
-
-        var curr_composite_key : Nat8 = 0;
-
-        func compare_at_type_code() : Int8 {
-            let type_code_a = next_byte_a();
-            let type_code_b = next_byte_b();
-
-            if (type_code_a != type_code_b) {
-                if (type_code_a == TypeCode.Minimum or type_code_b == TypeCode.Minimum) {
-                    // Minimum is a special case, it is always less than any other type code
-                    if (type_code_a == TypeCode.Minimum) return -1;
-                    if (type_code_b == TypeCode.Minimum) return 1;
-                } else if (type_code_a == TypeCode.Maximum or type_code_b == TypeCode.Maximum) {
-                    // Maximum is a special case, it is always greater than any other type code
-                    if (type_code_a == TypeCode.Maximum) return 1;
-                    if (type_code_b == TypeCode.Maximum) return -1;
-                } else if ((type_code_a == TypeCode.Null and type_code_b == TypeCode.Option) or (type_code_a == TypeCode.Option and type_code_b == TypeCode.Null)) {
-                    // Null is less than Option
-                    if (type_code_a == TypeCode.Null) return -1;
-                    if (type_code_b == TypeCode.Null) return 1;
-                } else if (type_code_a == TypeCode.Null or type_code_b == TypeCode.Null) {
-                    // Null is less than any other type code
-                    if (type_code_a == TypeCode.Null) return -1;
-                    if (type_code_b == TypeCode.Null) return 1;
-                } else Debug.trap("Orchid: type codes do not match: " # debug_show (type_code_to_text(type_code_a)) # " != " # debug_show type_code_to_text(type_code_b) # "\n" # debug_show (a, b));
-            };
-
-            let type_code = type_code_a;
-
-            if (type_code == TypeCode.Null or type_code == TypeCode.Empty) {
-                0;
-            } else if (type_code == TypeCode.Bool) {
-                cmp_n_bytes(1);
-            } else if (type_code == TypeCode.Nat8) {
-                cmp_n_bytes(1);
-            } else if (type_code == TypeCode.Nat16) {
-                cmp_n_bytes(2);
-            } else if (type_code == TypeCode.Nat32) {
-                cmp_n_bytes(4);
-            } else if (type_code == TypeCode.Nat64) {
-                cmp_n_bytes(8);
-            } else if (type_code == TypeCode.NatAsNat64) {
-                cmp_n_bytes(8);
-            } else if (type_code == TypeCode.Int8) {
-                cmp_n_bytes(1);
-            } else if (type_code == TypeCode.Int16) {
-                cmp_n_bytes(2);
-            } else if (type_code == TypeCode.Int32) {
-                cmp_n_bytes(4);
-            } else if (type_code == TypeCode.Int64) {
-                cmp_n_bytes(8);
-            } else if (type_code == TypeCode.IntAsInt64) {
-                cmp_n_bytes(8);
-            } else if (type_code == TypeCode.Float) {
-                cmp_n_bytes(8);
-            } else if (type_code == TypeCode.Option) {
-                compare_at_type_code();
-            } else if (type_code == TypeCode.Principal) {
-                let principal_a_size = Nat8.toNat(next_byte_a());
-                let principal_b_size = Nat8.toNat(next_byte_b());
-
-                cmp_iters(
-                    Itertools.take<Nat8>(iter_a, principal_a_size),
-                    Itertools.take<Nat8>(iter_b, principal_b_size),
-                )
-
-            } else if (type_code == TypeCode.Blob) {
-                let blob_size_a = Nat16.toNat(ByteUtils.BigEndian.toNat16(iter_a));
-                let blob_size_b = Nat16.toNat(ByteUtils.BigEndian.toNat16(iter_b));
-
-                cmp_iters(
-                    Itertools.take<Nat8>(iter_a, blob_size_a),
-                    Itertools.take<Nat8>(iter_b, blob_size_b),
-                );
-
-            } else if (type_code == TypeCode.Text) {
-
-                let text_size_a = Nat16.toNat(ByteUtils.BigEndian.toNat16(iter_a));
-                let text_size_b = Nat16.toNat(ByteUtils.BigEndian.toNat16(iter_b));
-
-                let text_bytes_iter_a = Itertools.take<Nat8>(iter_a, text_size_a);
-                let text_bytes_iter_b = Itertools.take<Nat8>(iter_b, text_size_b);
-
-                cmp_iters(text_bytes_iter_a, text_bytes_iter_b);
-
-            } else Debug.trap("Orchid: unknown type code: " # debug_show (type_code));
-
-        };
-
-        while (curr_composite_key < composite_key_cnt) {
-            let res : Int8 = compare_at_type_code();
-
-            if (res != 0) return res;
-
-            curr_composite_key += 1;
-        };
-
-        return 0;
-
-    };
-
     public let Orchid : TypeUtils.TypeUtils<[CandidQuery]> and {
         btree_cmp : (Blob, Blob) -> Int8;
     } = {
         blobify = { to_blob; from_blob };
-        btree_cmp;
-        cmp = #BlobCmp(btree_cmp);
+        btree_cmp = Prim.blobCompare;
+        cmp = #BlobCmp(Prim.blobCompare);
     };
 
 };

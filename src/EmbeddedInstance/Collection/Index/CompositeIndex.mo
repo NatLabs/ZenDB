@@ -617,15 +617,25 @@ module CompositeIndex {
         collection : T.StableCollection,
         index : CompositeIndex,
         interval : T.Interval,
-    ) : [([T.CandidQuery], T.DocumentId)] {
+    ) : T.RevIter<([T.CandidQuery], T.DocumentId)> {
         let index_data_utils = get_index_data_utils(collection);
 
         let (start, end) = interval;
 
+        BTree.range<[T.CandidQuery], T.DocumentId>(index.data, index_data_utils, start, end)
+    };
+
+    public func from_interval_to_array(
+        collection : T.StableCollection,
+        index : CompositeIndex,
+        interval : T.Interval,
+    ) : [([T.CandidQuery], T.DocumentId)] {
+
         Utils.iter_to_array<([T.CandidQuery], T.DocumentId)>(
-            BTree.range<[T.CandidQuery], T.DocumentId>(index.data, index_data_utils, start, end)
+            from_interval(collection, index, interval)
         );
     };
+    
 
     public func entries(
         collection : T.StableCollection,

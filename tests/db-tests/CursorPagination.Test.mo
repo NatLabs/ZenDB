@@ -55,8 +55,8 @@ ZenDBSuite.newSuite(
         };
 
         // Helper function to collect all pages using skip pagination
-        func skip_paginated_query(db_query : ZenDB.QueryBuilder, page_size : Nat) : [[ZenDB.Types.WrapId<User>]] {
-            let pages = Buffer.Buffer<[(ZenDB.Types.DocumentId, User)]>(10);
+        func skip_paginated_query(db_query : ZenDB.QueryBuilder, page_size : Nat) : [[(ZenDB.Types.DocumentId, User, [ZenDB.Types.TextMatch])]] {
+            let pages = Buffer.Buffer<[(ZenDB.Types.DocumentId, User, [ZenDB.Types.TextMatch])]>(10);
             var offset = 0;
             var continue_pagination = true;
 
@@ -82,8 +82,8 @@ ZenDBSuite.newSuite(
         };
 
         // Helper function to collect all pages using cursor pagination
-        func cursor_paginated_query(db_query : ZenDB.QueryBuilder, page_size : Nat) : [[(ZenDB.Types.DocumentId, User)]] {
-            let pages = Buffer.Buffer<[(ZenDB.Types.DocumentId, User)]>(10);
+        func cursor_paginated_query(db_query : ZenDB.QueryBuilder, page_size : Nat) : [[(ZenDB.Types.DocumentId, User, [ZenDB.Types.TextMatch])]] {
+            let pages = Buffer.Buffer<[(ZenDB.Types.DocumentId, User, [ZenDB.Types.TextMatch])]>(10);
             var cursor : ?ZenDB.Types.PaginationToken = null;
             var continue_pagination = true;
 
@@ -107,7 +107,7 @@ ZenDBSuite.newSuite(
             Buffer.toArray(pages);
         };
 
-        func log_pagination_comparison(skip_pages : [[ZenDB.Types.WrapId<User>]], cursor_pages : [[ZenDB.Types.WrapId<User>]]) {
+        func log_pagination_comparison(skip_pages : [[(ZenDB.Types.DocumentId, User, [ZenDB.Types.TextMatch])]], cursor_pages : [[(ZenDB.Types.DocumentId, User, [ZenDB.Types.TextMatch])]]) {
             Debug.print("Skip pages: " # debug_show skip_pages.size());
             Debug.print("Cursor pages: " # debug_show cursor_pages.size());
 

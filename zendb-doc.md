@@ -10,6 +10,8 @@
 - [QueryBuilder Methods](#querybuilder-methods)
 - [Update Operations](#update-operations)
 - [Index Overview](#index-overview)
+- [Text Index](#text-index)
+- [Batch Indexing](#batch-indexing)
 - [Collection Statistics](#collection-statistics)
 - [Memory Statistics](#memory-statistics)
 
@@ -17,29 +19,31 @@
 
 List of terms as they are used in this library.
 
-| Term                                      | Description                                                                                                                                     |
-| ----------------------------------------- | ----------------------------------------------------------------------------------------------------------------------------------------------- |
-| **ZenDB Instance**                        | The main database container that holds multiple databases. Ideally one instance per canister.                                                   |
-| **Database**                              | A namespace containing multiple collections. Provides logical grouping of related collections.                                                  |
-| **Collection**                            | Equivalent to a table in SQL databases. A group of documents with the same schema definition and type safety.                                   |
-| **Document**                              | The smallest data entity in ZenDB. User-defined data that conforms to a collection's schema.                                                    |
-| **Schema**                                | Type definition that matches Motoko types. Defines the structure, field types, and constraints for documents in a collection.                   |
-| **Schema Constraints**                    | Validation rules applied to collections and fields (e.g., unique constraints, min/max values, size limits).                                     |
-| **Memory Types**                          | Storage options for collections: `#heap` (faster, 6GB limit) or `#stableMemory` (slower, 500GB limit, persists across upgrades).                |
-| **B-Tree**                                | The underlying data structure used for document storage and indexes. Provides sorted, efficient data access.                                    |
-| **Index**                                 | A B-Tree data structure that stores document fields in sorted order to accelerate query performance. Can be single-field or composite.          |
-| **Composite Index**                       | Multi-field index that optimizes queries filtering or sorting on multiple fields simultaneously.                                                |
-| **Query**                                 | A request for data from a collection using filtering, sorting, and pagination criteria.                                                         |
-| **Query Builder**                         | A fluent interface for constructing complex queries with automatic logical grouping when switching between AND/OR operations.                   |
-| **Logical Group**                         | Automatic bracketing of query conditions that occurs when switching between AND/OR operations in QueryBuilder.                                  |
-| **Query Planner**                         | Internal component that analyzes queries and selects optimal indexes for execution.                                                             |
-| **Update Operations**                     | Functions for modifying document fields, including arithmetic operations (add, multiply), text operations (concat, trim), and field references. |
-| **Orchid**                                | ZenDB's custom binary encoding format for composite index keys, ensuring proper sort order and efficient B-tree operations.                     |
-| **Candid**                                | The Interface Description Language (IDL) used by the Internet Computer for cross-language communication.                                        |
-| **Candify**                               | Type definition containing functions to serialize/deserialize Motoko types to/from Candid binary format.                                        |
-| **Stable Memory**                         | Internet Computer feature providing persistent storage across canister upgrades with larger capacity (up to 500GB).                             |
-| **Stable Store**                          | Internal state representation that enables ZenDB components to persist across canister upgrades.                                                |
-| **Enhanced Orthogonal Persistence (EOP)** | A Beta feature in motoko that allows heap variables to be stored directly in stable memory while maintaining heap-like access patterns.         |
+| Term                                  | Description                                                                                                                                                                         |
+| ------------------------------------- | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| **ZenDB Instance**                    | The main database container that holds multiple databases. Ideally one instance per canister.                                                                                       |
+| **Database**                          | A namespace containing multiple collections. Provides logical grouping of related collections.                                                                                      |
+| **Collection**                        | Equivalent to a table in SQL databases. A group of documents with the same schema definition and type safety.                                                                        |
+| **Document**                          | The smallest data entity in ZenDB. User-defined data that conforms to a collection's schema.                                                                                        |
+| **Schema**                            | Type definition that matches Motoko types. Defines the structure, field types, and constraints for documents in a collection.                                                       |
+| **Schema Constraints**                | Validation rules applied to collections and fields (e.g., unique constraints, min/max values, size limits).                                                                        |
+| **Memory Types**                      | Storage options for collections: `#heap` (faster, 6GB limit) or `#stableMemory` (slower, 500GB limit, persists across upgrades).                                                  |
+| **B-Tree**                            | The underlying data structure used for document storage and indexes. Provides sorted, efficient data access.                                                                        |
+| **Index**                             | A B-Tree data structure that stores document fields in sorted order to accelerate query performance. Can be single-field or composite.                                             |
+| **Composite Index**                   | Multi-field index that optimizes queries filtering or sorting on multiple fields simultaneously.                                                                                    |
+| **Text Index**                        | An inverted index that tokenizes `#Text` fields at write time and enables full-text search queries such as `#word`, `#phrase`, `#startsWith`, `#anyOf`, and `#allOf`. Only one text index can exist per collection, but it can cover multiple fields. |
+| **Batch Indexing**                    | A pattern for creating and populating indexes in small chunks spread across multiple canister update calls, preventing instruction-limit traps on large collections. |
+| **Query**                             | A request for data from a collection using filtering, sorting, and pagination criteria.                                                                                             |
+| **Query Builder**                     | A fluent interface for constructing complex queries with automatic logical grouping when switching between AND/OR operations.                                                       |
+| **Logical Group**                     | Automatic bracketing of query conditions that occurs when switching between AND/OR operations in QueryBuilder.                                                                     |
+| **Query Planner**                     | Internal component that analyzes queries and selects optimal indexes for execution.                                                                                                 |
+| **Update Operations**                 | Functions for modifying document fields, including arithmetic operations (add, multiply), text operations (concat, trim), and field references.                                     |
+| **Orchid**                            | ZenDB's custom binary encoding format for composite index keys, ensuring proper sort order and efficient B-tree operations.                                                        |
+| **Candid**                            | The Interface Description Language (IDL) used by the Internet Computer for cross-language communication.                                                                            |
+| **Candify**                           | Type definition containing functions to serialize/deserialize Motoko types to/from Candid binary format.                                                                            |
+| **Stable Memory**                     | Internet Computer feature providing persistent storage across canister upgrades with larger capacity (up to 500GB).                                                                |
+| **Stable Store**                      | Internal state representation that enables ZenDB components to persist across canister upgrades.                                                                                    |
+| **Enhanced Orthogonal Persistence (EOP)** | A Beta feature in motoko that allows heap variables to be stored directly in stable memory while maintaining heap-like access patterns.                                                      |
 
 ## Getting Started
 
@@ -560,18 +564,19 @@ ZenDB.QueryBuilder()
 
 ### Query Operators
 
-| Operator      | Description                    | Supported Types | Example                                                         |
-| ------------- | ------------------------------ | --------------- | --------------------------------------------------------------- |
-| `#eq`         | Exact equality match           | All types       | `.Where("status", #eq(#Text("active")))`                        |
-| `#lt`         | Less than                      | Number types    | `.Where("age", #lt(#Nat(30)))`                                  |
-| `#gt`         | Greater than                   | Number types    | `.Where("score", #gt(#Nat(100)))`                               |
-| `#lte`        | Less than or equal to          | Number types    | `.Where("priority", #lte(#Nat(3)))`                             |
-| `#gte`        | Greater than or equal to       | Number types    | `.Where("reputation", #gte(#Nat(500)))`                         |
-| `#between`    | Range (inclusive on both ends) | Number types    | `.Where("age", #between(#Nat(18), #Nat(65)))`                   |
-| `#exists`     | Field exists and is not null   | All types       | `.Where("profile.avatar", #exists)`                             |
-| `#startsWith` | Text starts with substring     | `#Text` only    | `.Where("name", #startsWith(#Text("John")))`                    |
-| `#anyOf`      | Value matches any in the list  | All types       | `.Where("status", #anyOf([#Text("active"), #Text("pending")]))` |
-| `#not_`       | Negates any other operator     | All types       | `.Where("role", #not_(#eq(#Text("admin"))))`                    |
+| Operator      | Description                    | Supported Types  | Example                                                         |
+| ------------- | ------------------------------ | ---------------- | --------------------------------------------------------------- |
+| `#eq`         | Exact equality match           | All types        | `.Where("status", #eq(#Text("active")))`                        |
+| `#lt`         | Less than                      | Number types     | `.Where("age", #lt(#Nat(30)))`                                  |
+| `#gt`         | Greater than                   | Number types     | `.Where("score", #gt(#Nat(100)))`                               |
+| `#lte`        | Less than or equal to          | Number types     | `.Where("priority", #lte(#Nat(3)))`                             |
+| `#gte`        | Greater than or equal to       | Number types     | `.Where("reputation", #gte(#Nat(500)))`                         |
+| `#between`    | Range (inclusive on both ends) | Number types     | `.Where("age", #between(#Nat(18), #Nat(65)))`                   |
+| `#exists`     | Field exists and is not null   | All types        | `.Where("profile.avatar", #exists)`                             |
+| `#startsWith` | Text starts with substring     | `#Text` only     | `.Where("name", #startsWith(#Text("John")))`                    |
+| `#anyOf`      | Value matches any in the list  | All types        | `.Where("status", #anyOf([#Text("active"), #Text("pending")]))` |
+| `#not_`       | Negates any other operator     | All types        | `.Where("role", #not_(#eq(#Text("admin"))))`                    |
+| `#text`       | Token-level full-text search (requires a text index) | `#Text` only | `.Where("body", #text(#word("blockchain")))` |
 
 ## Indexing
 
@@ -601,7 +606,118 @@ let #ok(_) = users_collection.createIndex("name_age_idx", [("name", #Ascending),
 
 The query planner automatically uses these indexes when they match your query patterns, optimizing both filtering and sorting operations.
 
-### Batch Index Creation & Population
+### Text Index
+
+A text index is an inverted index that tokenizes `#Text` fields and enables full-text search queries. Unlike a composite index, which stores exact field values, a text index stores individual tokens (words) extracted from the text along with their positions within the document.
+
+#### Creating a Text Index
+
+```motoko
+let #ok(_) = articles.createTextIndex("text_idx", ["title", "body"]);
+```
+
+| Parameter   | Type        | Description |
+|-------------|-------------|-------------|
+| `name`      | `Text`      | A unique index name for this collection |
+| `fields`    | `[Text]`    | One or more `#Text` fields to tokenize and index |
+
+**Only one text index can exist per collection.** If a text index already exists, the call returns an error.
+
+**Backfill on creation:** When `createTextIndex` is called on a collection that already has documents, all existing documents are automatically indexed (backfilled) before the call returns.
+
+#### Querying Text Indexes
+
+Use `#text(TextOperators)` inside `.Where()` to perform token-level searches:
+
+```motoko
+let #ok(results) = articles.search(
+    ZenDB.QueryBuilder().Where("body", #text(#word("blockchain")))
+) else return assert false;
+```
+
+Text conditions combine naturally with non-text filters using `.And()` and `.Or()`:
+
+```motoko
+let #ok(results) = articles.search(
+    ZenDB.QueryBuilder()
+        .Where("body",    #text(#word("blockchain")))
+        .And("category",  #eq(#Text("tech")))
+        .And("published", #eq(#Bool(true)))
+) else return assert false;
+```
+
+#### Text Operators
+
+| Operator | Description | Example |
+|----------|-------------|---------|
+| `#word(text)` | Exact single-token match | `#text(#word("blockchain"))` |
+| `#phrase(text)` | Consecutive token sequence in order; all words must appear adjacent and in the same order | `#text(#phrase("data scientist"))` |
+| `#startsWith(text)` | Any token in the field begins with the given prefix | `#text(#startsWith("block"))` |
+| `#anyOf([text])` | Field contains at least one of the listed words (OR semantics) | `#text(#anyOf(["data", "system"]))` |
+| `#allOf([text])` | Field contains every listed word in any order (AND semantics) | `#text(#allOf(["data", "system"]))` |
+| `#not_(TextOperator)` | Matches documents that do NOT satisfy the inner operator | `#text(#not_(#word("spam")))` |
+
+Negation via `#not_` can be applied at either level — inside `#text` or outside:
+
+```motoko
+// These two are equivalent:
+.Where("body", #text(#not_(#word("spam"))))
+.Where("body", #not_(#text(#word("spam"))))
+```
+
+### Batch Indexing
+
+Creating an index on a large collection can consume significant compute (instructions). On the Internet Computer, a single update call has a fixed instruction limit, so indexing millions of documents in one shot will trap. ZenDB provides a batch indexing API that spreads the backfill work across multiple update calls.
+
+#### When to Use Batch Indexing
+
+| Situation | Recommended API |
+|-----------|----------------|
+| Small collection, single index | `createIndex` (synchronous, simpler) |
+| Large collection at index-creation time | `batchCreateIndexes` + `processIndexBatch` loop |
+| Multiple new indexes on an existing large collection | `batchCreateIndexes` with all configs at once |
+
+#### Batch Workflow
+
+1. **Create the batch** — registers the index structures and queues a backfill job, returning a `batch_id`:
+
+```motoko
+let #ok(batch_id) = users.batchCreateIndexes([
+    ("name_idx", [("name", #Ascending)], null),
+    ("age_idx",  [("age",  #Ascending)], null),
+]);
+```
+
+2. **Process the batch in a loop** — call `processIndexBatch` until it returns `#ok(false)`. Each call processes as many documents as the remaining instruction budget allows:
+
+```motoko
+label processing loop {
+    switch (users.processIndexBatch(batch_id)) {
+        case (#ok(true))  break processing; // more documents remain; schedule another update call
+        case (#ok(false)) break processing; // all documents indexed — done
+        case (#err(msg))  Debug.trap("Batch indexing failed: " # msg);
+    };
+};
+```
+
+> **Note:** In a production canister, each `processIndexBatch` call should be triggered in a separate update call (e.g. via `ignore async` self-calls, timers, or heartbeats) so each round begins with a full instruction budget the IC allocates per update.
+
+#### Re-populating Existing Indexes
+
+If you need to backfill indexes that were already registered but not yet populated, use `batchPopulateIndexes`:
+
+```motoko
+let #ok(batch_id) = users.batchPopulateIndexes(["name_idx", "age_idx"]);
+// Then process with the same processIndexBatch loop as above
+```
+
+#### API Reference
+
+| Method | Returns | Description |
+|--------|---------|-------------|
+| `batchCreateIndexes(configs)` | `#ok(batch_id : Nat)` | Creates one or more indexes and returns a batch ID for incremental backfill. `configs` is an array of `(name, key_details, ?options)` tuples. |
+| `batchPopulateIndexes(names)` | `#ok(batch_id : Nat)` | Creates a backfill batch for already-registered indexes by name. |
+| `processIndexBatch(batch_id)` | `#ok(Bool)` | Processes one chunk of documents. Returns `#ok(true)` while there are still documents remaining, and `#ok(false)` when indexing is complete. |
 
 ### Index Encoding Format
 

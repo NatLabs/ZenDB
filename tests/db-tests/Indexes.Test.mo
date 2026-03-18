@@ -269,7 +269,7 @@ ZenDBSuite.newSuite(
                         Itertools.zip(
                             Iter.map(
                                 results.documents.vals(),
-                                func((id, _) : (ZenDB.Types.DocumentId, SupportedIndexTypes)) : ZenDB.Types.DocumentId {
+                                func((id, _, _) : (ZenDB.Types.DocumentId, SupportedIndexTypes, [ZenDB.Types.TextMatch])) : ZenDB.Types.DocumentId {
                                     return id;
                                 },
                             ),
@@ -726,7 +726,7 @@ ZenDBSuite.newSuite(
                 let #ok(result1) = test.search(
                     QueryBuilder().Where("opt_nat", #eq(#Null))
                 ) else return assert false;
-                assert result1.documents == [(id3, { opt_nat = null }), (id4, { opt_nat = null })];
+                assert result1.documents == [(id3, { opt_nat = null }, []), (id4, { opt_nat = null }, [])];
 
                 assert test.size() == 4;
 
@@ -737,7 +737,7 @@ ZenDBSuite.newSuite(
                 let #ok(result2) = test.search(
                     QueryBuilder().Where("opt_nat", #not_(#eq(#Null)))
                 ) else return assert false;
-                assert result2.documents == [(id1, { opt_nat = ?1 }), (id2, { opt_nat = ?2 })];
+                assert result2.documents == [(id1, { opt_nat = ?1 }, []), (id2, { opt_nat = ?2 }, [])];
 
             },
         );
@@ -802,7 +802,7 @@ ZenDBSuite.newSuite(
                         );
 
                         assert results.documents.size() == 3;
-                        for ((_, document) in results.documents.vals()) {
+                        for ((_, document, _) in results.documents.vals()) {
                             assert document.first == 10;
                         };
                     },

@@ -96,7 +96,7 @@ ZenDBSuite.newSuite(
                         let #ok(results) = users.search(ZenDB.QueryBuilder()) else return assert false;
                         assert results.documents.size() == Map.size(inputs);
 
-                        for ((id, user) in results.documents.vals()) {
+                        for ((id, user, _) in results.documents.vals()) {
                             assert ?user == Map.get(inputs, Map.bhash, id);
                         };
 
@@ -110,7 +110,7 @@ ZenDBSuite.newSuite(
                         let #ok(results) = users.search(db_query) else return assert false;
 
                         assert results.documents.size() == 10;
-                        for ((_, user) in results.documents.vals()) {
+                        for ((_, user, _) in results.documents.vals()) {
                             assert user.name == "nam-do-san";
                         };
                     },
@@ -124,7 +124,7 @@ ZenDBSuite.newSuite(
                         let #ok(results) = users.search(db_query) else return assert false;
                         // Debug.print("results: " # debug_show (results));
                         assert results.documents.size() == 10;
-                        for ((_, user) in results.documents.vals()) {
+                        for ((_, user, _) in results.documents.vals()) {
                             assert user.age >= 3 and user.age <= 7;
                         };
                     },
@@ -143,7 +143,7 @@ ZenDBSuite.newSuite(
 
                         let #ok(results) = users.search(db_query) else return assert false;
                         assert results.documents.size() == 5;
-                        for ((_, user) in results.documents.vals()) {
+                        for ((_, user, _) in results.documents.vals()) {
                             assert user.name == "nam-do-san";
                             assert user.age >= 3 and user.age <= 7;
                         };
@@ -182,7 +182,7 @@ ZenDBSuite.newSuite(
                         let #ok(results) = users.search(db_query) else return assert false;
 
                         assert results.documents.size() == 5;
-                        for ((_, user) in results.documents.vals()) {
+                        for ((_, user, _) in results.documents.vals()) {
                             assert (
                                 (user.name == "nam-do-san" and user.age >= 0 and user.age <= 2) or
                                 (user.name == "claude" and user.age >= 8 and user.age <= 10)
@@ -204,7 +204,7 @@ ZenDBSuite.newSuite(
 
                         let #ok(results) = users.search(db_query) else return assert false;
                         assert results.documents.size() == 4;
-                        for ((_, user) in results.documents.vals()) {
+                        for ((_, user, _) in results.documents.vals()) {
                             assert user.age == 1 or user.age == 9;
                         };
                     },
@@ -234,7 +234,7 @@ ZenDBSuite.newSuite(
 
                         let #ok(results) = users.search(db_query) else return assert false;
                         assert results.documents.size() == 10;
-                        for ((_, user) in results.documents.vals()) {
+                        for ((_, user, _) in results.documents.vals()) {
                             assert user.name == "nam-do-san";
                         };
 
@@ -245,7 +245,7 @@ ZenDBSuite.newSuite(
                         assert updated.documents.size() == 10;
                         assert update_result.updated_count == 10;
 
-                        for ((_, user) in updated.documents.vals()) {
+                        for ((_, user, _) in updated.documents.vals()) {
                             assert user.name == "nam-do-san";
                             assert user.age == 0;
                         };
@@ -267,7 +267,7 @@ ZenDBSuite.newSuite(
 
                         // Debug.print("results before deletion (" # debug_show (before_count) # ") " # debug_show (before_results));
                         assert before_results.documents.size() == 10;
-                        for ((_, user) in before_results.documents.vals()) {
+                        for ((_, user, _) in before_results.documents.vals()) {
                             assert user.age == 0;
                         };
 

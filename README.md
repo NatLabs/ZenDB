@@ -332,7 +332,12 @@ This allows you to monitor query performance and access both the results and exe
 
 - Schema updates and migrations not yet supported. As a result, changing the schema of an existing collection requires creating a new collection and migrating the data manually.
 
-- Using Limit/Skip Pagination can be inefficient and may hit the instruction limits if the result set is too large. It is recommended to create indexes that fully cover your queries where possible, to avoid this limitation. 
+- Using Limit/Skip Pagination can be inefficient and may hit the instruction limits if the result set is too large. It is recommended to create indexes that fully cover your queries where possible, to avoid this limitation.
+
+- **Index Type Range Limitations**: When indexing `#Nat` or `#Int` types, values are stored using 64-bit encoding:
+  - `#Nat` values must be ≤ 2^64-1 
+  - `#Int` values must be within Int64 range: -2^63 to 2^63-1
+  - Attempting to index values outside these ranges will trap during encoding
 
 
 ## Roadmap

@@ -30,12 +30,7 @@ import BpTree "mo:augmented-btrees@0.7.1/BpTree";
 import BpTreeTypes "mo:augmented-btrees@0.7.1/BpTree/Types";
 import LruCache "mo:lru-cache@2.0.0";
 
-import TypeMigrations "TypeMigrations";
-
 module T {
-
-    public type VersionedStableStore = TypeMigrations.VersionedStableStore;
-    public type PrevVersionedStableStore = TypeMigrations.PrevVersionedStableStore;
 
     public type Vector<A> = Vector.Vector<A>;
     public type Map<K, V> = Map.Map<K, V>;
@@ -308,35 +303,7 @@ module T {
 
     public type FieldLimit = (Text, ?State<CandidQuery>);
     public type DocumentLimits = [(Text, ?State<CandidQuery>)];
-    public type LowerUpperBounds = (DocumentLimits, DocumentLimits);
-
-    // Operators for text-indexed fields.
-    // All matching is case-insensitive; the basic tokenizer lowercases tokens at
-    // index time, and the query planner lowercases the search terms before lookup.
-    public type TextOperators = {
-        // Exact single-token match.  e.g. #word("chen")
-        #word : Text;
-
-        // Consecutive token sequence in order.  e.g. #phrase("data scientist")
-        #phrase : Text;
-
-        // Any token in the field begins with this prefix.
-        // Mirrors ZqlOperators #startsWith but operates on individual tokens.
-        #startsWith : Text;
-
-        // Field contains at least one of the listed words (OR).
-        // Mirrors ZqlOperators #anyOf but takes Text instead of Candid.
-        #anyOf : [Text];
-
-        // Field contains every listed word, in any order (AND).
-        #allOf : [Text];
-
-        // Negation of any text operator: #not_(#word("foo")) matches docs that do NOT contain the token.
-        #not_ : TextOperators;
-
-        // Future convenience: #contains(text) will detect word vs phrase
-        // internally and delegate to #word or #phrase automatically.
-    };
+    public type Bounds = (DocumentLimits, DocumentLimits);
 
     public type ZqlOperators = {
         #eq : Candid;
@@ -354,9 +321,6 @@ module T {
         #betweenRightOpen : (Candid, Candid); // [min, max) - min inclusive, max exclusive
         #exists;
         #startsWith : Candid;
-
-        // Delegates to the field's text index for token-level matching.
-        #text : TextOperators;
 
     };
 
@@ -393,8 +357,6 @@ module T {
 
     public type WrapId<Document> = (DocumentId, Document);
 
-    public type TextMatch = { field : Text; word : Text; token_pos : Nat; char_start : Nat; char_end : Nat };
-
     public type State<T> = {
         #Inclusive : T;
         #Exclusive : T;
@@ -405,8 +367,8 @@ module T {
     public type FullScanDetails = {
         requires_additional_sorting : Bool;
         requires_additional_filtering : Bool;
-        scan_bounds : LowerUpperBounds;
-        filter_bounds : LowerUpperBounds;
+        scan_bounds : Bounds;
+        filter_bounds : Bounds;
     };
 
     public type IndexScanDetails = {
@@ -415,25 +377,17 @@ module T {
         requires_additional_filtering : Bool;
         sorted_in_reverse : Bool;
         interval : Interval;
-        scan_bounds : LowerUpperBounds;
-        filter_bounds : LowerUpperBounds;
+        scan_bounds : Bounds;
+        filter_bounds : Bounds;
         simple_operations : [(Text, T.ZqlOperators)];
     };
 
     public type IndexIntersectionDetails = {
 
     };
-
-    public type TextScanDetails = {
-        field : Text;
-        text_op : TextOperators;
-        negated : Bool;
-    };
-
     public type ScanDetails = {
         #IndexScan : IndexScanDetails;
         #FullScan : FullScanDetails;
-        #TextScan : TextScanDetails;
     };
     public type QueryPlan = {
         is_and_operation : Bool;
@@ -694,7 +648,7 @@ module T {
 
     public type FieldUpdateOperations = {
         #currValue : (); // refers to the current (prior to the update) of the field you are updating
-        #get : (Text); // retrieves the value of the given field path (eg. #get("profile.age") return #Nat(28))
+        #get : (Text);
 
         // multi-value operations
         #addAll : [FieldUpdateOperations];
@@ -767,16 +721,12 @@ module T {
 
     // Custom result types for operations that include instruction counts
     public type SearchResult<Record> = {
-        documents : [(DocumentId, Record, [TextMatch])];
+        documents : [WrapId<Record>];
         instructions : Nat;
         pagination_token : PaginationToken;
         has_more : Bool;
     };
 
-    public type SearchOneResult<Record> = {
-        document : ?(DocumentId, Record, [TextMatch]);
-        instructions : Nat;
-    };
     public type CountResult = {
         count : Nat;
         instructions : Nat;
@@ -790,6 +740,7 @@ module T {
         updated_count : Nat;
         instructions : Nat;
     };
+
     public type ReplaceByIdResult = {
         instructions : Nat;
     };

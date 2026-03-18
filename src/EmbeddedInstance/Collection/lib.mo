@@ -271,10 +271,10 @@ module {
             ) {
                 case (#err(err)) return #err(err);
                 case (#ok(result)) {
-                    let documents = Array.map<T.WrapId<T.CandidBlob>, T.WrapId<Record>>(
+                    let documents = Array.map<(T.DocumentId, T.CandidBlob, [T.TextMatch]), (T.DocumentId, Record, [T.TextMatch])>(
                         result.documents,
-                        func((id, candid_blob) : T.WrapId<T.CandidBlob>) : T.WrapId<Record> {
-                            (id, blobify.from_blob(candid_blob));
+                        func((id, candid_blob, matches)) {
+                            (id, blobify.from_blob(candid_blob), matches);
                         },
                     );
 
@@ -290,7 +290,7 @@ module {
                     #ok({
                         document = switch (document) {
                             case (null) null;
-                            case (?doc) ?((doc.0, blobify.from_blob(doc.1)));
+                            case (?doc) ?((doc.0, blobify.from_blob(doc.1), doc.2));
                         };
                         instructions;
                     });
@@ -511,15 +511,12 @@ module {
         //     );
         // };
 
-        // public func createTextIndex(index_name : Text, name : Text, tokenizer : T.Tokenizer) : T.Result<(), Text> {
-        //     let res = handleResult(
-        //         StableCollection.create_text_index(collection, index_name, name, tokenizer),
-        //         "Failed to create text index: " # name,
-        //     );
-
-        //     Result.mapOk<T.TextIndex, (), Text>(res, func(_) : () {});
-
-        // };
+        public func createTextIndex(index_name : Text, fields : [Text]) : T.Result<(), Text> {
+            handleResult(
+                StableCollection.create_text_index(collection, index_name, fields, #basic),
+                "Failed to create text index",
+            );
+        };
 
     };
 

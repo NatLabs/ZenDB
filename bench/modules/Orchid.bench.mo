@@ -5,8 +5,8 @@ import Array "mo:base/Array";
 import Bench "mo:bench";
 import Fuzz "mo:fuzz";
 
-import Orchid "../src/EmbeddedInstance/Collection/Orchid";
-import T "../src/EmbeddedInstance/Types";
+import Orchid "../../src/EmbeddedInstance/Collection/Orchid";
+import T "../../src/EmbeddedInstance/Types";
 
 module {
     type CandidQuery = T.CandidQuery;
@@ -44,7 +44,7 @@ module {
             "Option(Nat)",
         ]);
 
-        let limit = 1_000;
+        let limit = 10_000;
 
         // Generate random test data for each type
         let null_values : [CandidQuery] = Array.tabulate<CandidQuery>(limit, func(_ : Nat) : CandidQuery = #Null);

@@ -30,7 +30,7 @@ module {
 
         bench.cols([
             "#heap no index (sorted by ts)",
-            "#heap 7 single field indexes (sorted by tx.amt)",
+            "#heap 7 single field indexes (sorted by ts)",
             "#heap 6 fully covered indexes (sorted by ts)",
         ]);
 
@@ -63,7 +63,7 @@ module {
 
         let limit = 1_000;
 
-        let txs_benchmarks = TxsBenchUtils.TxsBenchmarks(limit, limit);
+        let txs_benchmarks = TxsBenchUtils.TxsBenchmarks(limit, limit, null);
 
         bench.runner(
             func(col, row) = txs_benchmarks.run_benchmarks(row, col)

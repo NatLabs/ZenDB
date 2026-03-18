@@ -23,7 +23,6 @@ module {
     public type ZqlOperators = T.ZqlOperators;
     public type ZenQueryLang = T.ZenQueryLang;
     public type Operator = T.Operator;
-    let { thash; bhash } = Map;
 
     type StableQuery = T.StableQuery;
     type PaginationToken = T.PaginationToken;
@@ -183,6 +182,10 @@ module {
                     // #not_(#not_(x)) -> x
                     #Operation(key, nested_op);
                 };
+                case (#text(text_op)) {
+                    // #not_(#text(op)) — keep as-is; QueryPlan will produce a negated TextScan
+                    #Operation(key, #not_(#text(text_op)));
+                };
             };
         };
 
@@ -287,6 +290,11 @@ module {
 
         public func SortBy(key : Text, direction : T.SortDirection) : QueryBuilder {
             _sort_by := ?(key, direction);
+            self;
+        };
+
+        public func NoSort() : QueryBuilder {
+            _sort_by := null;
             self;
         };
 
@@ -401,7 +409,7 @@ module {
     public func validateQuery(collection : T.StableCollection, zendb_query : T.ZenQueryLang) : T.Result<(), Text> {
 
         switch (zendb_query) {
-            case (#Operation(field, op)) {
+            case (#Operation(field, _op)) {
                 // Debug.print(debug_show (Set.toArray(collection.schema_keys_set)));
 
                 if (
@@ -483,6 +491,7 @@ module {
                     case (#exists) #exists;
                     case (#startsWith(prefix)) #startsWith(handle_operator_value(operator_value_type, prefix));
                     case (#anyOf(values)) #anyOf(Array.map(values, func(value : T.Candid) : T.Candid = handle_operator_value(operator_value_type, value)));
+                    case (#text(text_op)) #text(text_op);
                     case (#not_(op)) #not_(handle_operator(op, operator_value_type));
                 };
 

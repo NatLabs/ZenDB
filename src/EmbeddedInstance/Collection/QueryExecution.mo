@@ -9,6 +9,8 @@ import Order "mo:base@0.16.0/Order";
 import Iter "mo:base@0.16.0/Iter";
 import Buffer "mo:base@0.16.0/Buffer";
 import Nat "mo:base@0.16.0/Nat";
+import Nat8 "mo:base@0.16.0/Nat8";
+import Nat64 "mo:base@0.16.0/Nat64";
 import Option "mo:base@0.16.0/Option";
 import Hash "mo:base@0.16.0/Hash";
 
@@ -31,6 +33,7 @@ import MergeSort "../MergeSort";
 
 import CompositeIndex "Index/CompositeIndex";
 import Index "Index";
+import TextIndex "Index/TextIndex";
 import Intervals "Intervals";
 import Orchid "Orchid";
 import Schema "Schema";
@@ -45,7 +48,7 @@ module {
 
     public type Map<K, V> = Map.Map<K, V>;
     public type Set<K> = Set.Set<K>;
-    let { thash; nhash; bhash } = Map;
+    let { thash; nhash; bhash; n64hash } = Map;
 
     public type Result<A, B> = Result.Result<A, B>;
     public type Buffer<A> = Buffer.Buffer<A>;
@@ -77,6 +80,350 @@ module {
     type IndexDetails = {
         var sorted_in_reverse : ?Bool;
         intervals : Buffer.Buffer<T.Interval>;
+    };
+
+    func eval_text_scan(
+        collection : T.StableCollection,
+        field : Text,
+        text_op : T.TextOperators,
+        negated : Bool,
+        text_search_matches_cache : Map<Blob, Map<Nat64, T.TextMatch>>,
+    ) : EvalResult {
+        let ?#text_index(text_index) = Map.get(collection.indexes, Map.thash, TextIndex.KEY) else
+            Debug.trap("TextScan: no text index on collection");
+        let ?(_, field_idx) = TextIndex.verifyIndexedField(text_index, field) else
+            Debug.trap("TextScan: text index does not cover field '" # field # "'");
+
+        let field_idx_n8 = Nat8.fromNat(field_idx);
+
+        // Helper: insert a single match entry into the cache for the given document.
+        // Dedup key: field_idx shifted 32 bits left, OR'd with token_pos — packed into Nat64.
+        // Using bitshift avoids any arbitrary-precision Nat arithmetic.
+        let add_match = func(doc_id : Blob, word : Text, tok_pos : Nat32, char_start : Nat32, char_end : Nat32) {
+            let pos_key : Nat64 = (Nat64.fromNat(Nat8.toNat(field_idx_n8)) << 32) | Nat64.fromNat(Nat32.toNat(tok_pos));
+            let inner = switch (Map.get(text_search_matches_cache, bhash, doc_id)) {
+                case (?m) m;
+                case (null) {
+                    let m = Map.new<Nat64, T.TextMatch>();
+                    ignore Map.put(text_search_matches_cache, bhash, doc_id, m);
+                    m;
+                };
+            };
+            ignore Map.put(inner, n64hash, pos_key, {
+                field;
+                word;
+                token_pos = Nat32.toNat(tok_pos);
+                char_start = Nat32.toNat(char_start);
+                char_end = Nat32.toNat(char_end);
+            });
+        };
+
+        // Helper: lazy, deduplicated iterator of docs containing a single lowercased token.
+        // Populates match_cache as a side effect of each call to next().
+        // Within a single (word, field_idx) BTree prefix, doc_ids are in sorted order so
+        // adjacent-duplicate elimination via last_doc_id is correct — the same doc can appear
+        // multiple times (once per token position) but those entries are consecutive.
+        let scan_word_iter = func(w : Text) : { next : () -> ?(T.DocumentId, ?[(Text, T.Candid)]) } {
+            let lower_word = Text.toLowercase(w);
+            let interval = TextIndex.scan(
+                collection, text_index, field_idx,
+                (lower_word, null, null, null, null),
+                (lower_word, null, null, null, null),
+            );
+            let raw = CompositeIndex.from_interval(collection, text_index.internal_index, interval);
+            var last_doc_id : ?Blob = null;
+            object {
+                public func next() : ?(T.DocumentId, ?[(Text, T.Candid)]) {
+                    loop {
+                        switch (raw.next()) {
+                            case (null) return null;
+                            case (?(key_values, _)) {
+                                let doc_id = switch (key_values[2]) {
+                                    case (#Blob(b)) b;
+                                    case (_) Debug.trap("TextIndex: scan_word_iter: expected Blob doc_id");
+                                };
+                                let tok_pos = switch (key_values[3]) { case (#Nat32(n)) n; case (_) Debug.trap("TextIndex: scan_word_iter: expected Nat32 tok_pos") };
+                                let char_start = switch (key_values[4]) { case (#Nat32(n)) n; case (_) Debug.trap("TextIndex: scan_word_iter: expected Nat32 char_start") };
+                                let char_end = switch (key_values[5]) { case (#Nat32(n)) n; case (_) Debug.trap("TextIndex: scan_word_iter: expected Nat32 char_end") };
+                                add_match(doc_id, lower_word, tok_pos, char_start, char_end);
+                                if (last_doc_id != ?doc_id) {
+                                    last_doc_id := ?doc_id;
+                                    return ?(doc_id, null);
+                                };
+                                // doc_id is a duplicate (same doc, different position) — iterate again.
+                            };
+                        };
+                    }
+                }
+            }
+        };
+
+        // Helper: bitmap of doc IDs containing a single lowercased token; populates match_cache.
+        let scan_word = func(w : Text) : T.SparseBitMap64 {
+            let result = SparseBitMap64.new();
+            for ((doc_id, _) in scan_word_iter(w)) {
+                SparseBitMap64.add(result, Utils.convert_last_8_bytes_to_nat(doc_id));
+            };
+            result
+        };
+
+        // Helper: bitmap of confirmed phrase-matching docs; populates match_cache ONLY for
+        // positions that are part of a verified consecutive token sequence.
+        let scan_phrase = func(phrase_text : Text) : T.SparseBitMap64 {
+            let words = TextIndex.phrase_words(text_index, phrase_text);
+            if (words.size() == 0) return SparseBitMap64.new();
+            if (words.size() == 1) return scan_word(words[0]);
+
+            // Step 1: candidates — docs containing every word (allOf intersection), no match_cache.
+            let word_bitmaps = Buffer.Buffer<T.SparseBitMap64>(words.size());
+            for (w in words.vals()) {
+                let lower_w = Text.toLowercase(w);
+                let iv = TextIndex.scan(collection, text_index, field_idx, (lower_w, null, null, null, null), (lower_w, null, null, null, null));
+                let ids = Intervals.document_ids_and_indexed_fields_from_intervals(collection, text_index.internal_index.name, [iv], false);
+                word_bitmaps.add(SparseBitMap64.fromIter(Iter.map(ids, func((id, _) : (T.DocumentId, ?[(Text, T.Candid)])) : Nat { Utils.convert_last_8_bytes_to_nat(id) })));
+            };
+            let candidates = SparseBitMap64.multiIntersect(word_bitmaps.vals());
+            if (SparseBitMap64.size(candidates) == 0) return SparseBitMap64.new();
+
+            // Step 2: per (doc, tok_pos) of word[0], verify word[k] is at tok_pos+k;
+            //         collect match data only for fully confirmed phrase occurrences.
+            let result = SparseBitMap64.new();
+            let w0 = Text.toLowercase(words[0]);
+            let w0_interval = CompositeIndex.scan_with_bounds(
+                collection,
+                text_index.internal_index,
+                [#Text(w0), #Nat8(field_idx_n8), #Minimum, #Minimum, #Minimum, #Minimum],
+                [#Text(w0), #Nat8(field_idx_n8), #Maximum, #Maximum, #Maximum, #Maximum],
+            );
+            for ((key_values, _) in CompositeIndex.from_interval(collection, text_index.internal_index, w0_interval)) {
+                let doc_id : T.DocumentId = switch (key_values[2]) {
+                    case (#Blob(b)) b;
+                    case (_) Debug.trap("TextIndex: phrase: expected Blob doc_id");
+                };
+                let doc_nat = Utils.convert_last_8_bytes_to_nat(doc_id);
+                if (SparseBitMap64.get(candidates, doc_nat) and not SparseBitMap64.get(result, doc_nat)) {
+                    let tok_pos = switch (key_values[3]) {
+                        case (#Nat32(n)) n;
+                        case (_) Debug.trap("TextIndex: phrase: expected Nat32 token_pos");
+                    };
+                    let w0_cs = switch (key_values[4]) { case (#Nat32(n)) n; case (_) Debug.trap("TextIndex: phrase: expected Nat32 char_start") };
+                    let w0_ce = switch (key_values[5]) { case (#Nat32(n)) n; case (_) Debug.trap("TextIndex: phrase: expected Nat32 char_end") };
+
+                    // Accumulate candidate phrase match positions; committed only on full confirmation.
+                    let phrase_matches = Buffer.Buffer<(Text, Nat32, Nat32, Nat32)>(words.size());
+                    phrase_matches.add((w0, tok_pos, w0_cs, w0_ce));
+
+                    var all_match = true;
+                    var k : Nat = 1;
+                    while (k < words.size() and all_match) {
+                        let wk = Text.toLowercase(words[k]);
+                        let expected_tp = Nat32.fromNat(Nat32.toNat(tok_pos) + k);
+                        let wk_iv = CompositeIndex.scan_with_bounds(
+                            collection,
+                            text_index.internal_index,
+                            [#Text(wk), #Nat8(field_idx_n8), #Blob(doc_id), #Nat32(expected_tp), #Minimum, #Minimum],
+                            [#Text(wk), #Nat8(field_idx_n8), #Blob(doc_id), #Nat32(expected_tp), #Maximum, #Maximum],
+                        );
+                        switch (CompositeIndex.from_interval(collection, text_index.internal_index, wk_iv).next()) {
+                            case (?(wk_kv, _)) {
+                                let wk_cs = switch (wk_kv[4]) { case (#Nat32(n)) n; case (_) Debug.trap("TextIndex: phrase: expected Nat32 char_start") };
+                                let wk_ce = switch (wk_kv[5]) { case (#Nat32(n)) n; case (_) Debug.trap("TextIndex: phrase: expected Nat32 char_end") };
+                                phrase_matches.add((wk, expected_tp, wk_cs, wk_ce));
+                            };
+                            case (null) { all_match := false };
+                        };
+                        k += 1;
+                    };
+                    if (all_match) {
+                        SparseBitMap64.add(result, doc_nat);
+                        for ((w_text, tp, cs, ce) in phrase_matches.vals()) {
+                            add_match(doc_id, w_text, tp, cs, ce);
+                        };
+                    };
+                };
+            };
+            result
+        };
+
+        // Helper: bitmap of docs with a token beginning with the given prefix; populates match_cache
+        // with the actual matched word (not the prefix itself).
+        let scan_prefix = func(p : Text) : T.SparseBitMap64 {
+            let lower_prefix = Text.toLowercase(p);
+            // upper_prefix is lexicographically just past any word starting with lower_prefix
+            // (U+00FF is greater than all common ASCII/Latin-1 letters)
+            let upper_prefix = lower_prefix # "\u{FF}";
+            let interval = TextIndex.scan(
+                collection,
+                text_index,
+                field_idx,
+                (lower_prefix, null, null, null, null),
+                (upper_prefix, null, null, null, null),
+            );
+            let result = SparseBitMap64.new();
+            for ((key_values, _) in CompositeIndex.from_interval(collection, text_index.internal_index, interval)) {
+                let actual_word = switch (key_values[0]) { case (#Text(t)) t; case (_) Debug.trap("TextIndex: scan_prefix: expected Text word") };
+                let doc_id = switch (key_values[2]) { case (#Blob(b)) b; case (_) Debug.trap("TextIndex: scan_prefix: expected Blob doc_id") };
+                let doc_nat = Utils.convert_last_8_bytes_to_nat(doc_id);
+                SparseBitMap64.add(result, doc_nat);
+                let tok_pos = switch (key_values[3]) { case (#Nat32(n)) n; case (_) Debug.trap("TextIndex: scan_prefix: expected Nat32 tok_pos") };
+                let char_start = switch (key_values[4]) { case (#Nat32(n)) n; case (_) Debug.trap("TextIndex: scan_prefix: expected Nat32 char_start") };
+                let char_end = switch (key_values[5]) { case (#Nat32(n)) n; case (_) Debug.trap("TextIndex: scan_prefix: expected Nat32 char_end") };
+                add_match(doc_id, actual_word, tok_pos, char_start, char_end);
+            };
+            result
+        };
+
+        // Fast path: non-negated #word returns a lazy iterator without any bitmap allocation.
+        if (not negated) {
+            switch (text_op) {
+                case (#word(w)) return #Ids(scan_word_iter(w));
+                case _ {};
+            };
+        };
+
+        // For #phrase we also need allOf_bitmap (docs with every phrase word present)
+        // to compute the "wrong-order" set without a full index scan. We capture it here
+        // for every operator but only use it in the #phrase negation branch.
+        var allOf_bitmap_for_phrase : T.SparseBitMap64 = SparseBitMap64.new();
+
+        let positive_bitmap = switch (text_op) {
+            case (#word(w)) scan_word(w);
+            case (#startsWith(p)) scan_prefix(p);
+            case (#phrase(phrase_text)) {
+                let words = TextIndex.phrase_words(text_index, phrase_text);
+                let bufs = Buffer.Buffer<T.SparseBitMap64>(words.size());
+                for (w in words.vals()) { bufs.add(scan_word(w)) };
+                allOf_bitmap_for_phrase := SparseBitMap64.multiIntersect(bufs.vals());
+                scan_phrase(phrase_text)
+            };
+            case (#anyOf(words)) {
+                // OR semantics: union of per-word bitmaps.
+                if (words.size() == 0) return #Empty;
+                SparseBitMap64.multiUnion(Iter.map(words.vals(), scan_word))
+            };
+            case (#allOf(words)) {
+                // AND semantics: intersection of per-word bitmaps.
+                if (words.size() == 0) return #Empty;
+                let bufs = Buffer.Buffer<T.SparseBitMap64>(words.size());
+                for (w in words.vals()) { bufs.add(scan_word(w)) };
+                SparseBitMap64.multiIntersect(bufs.vals())
+            };
+            case (_) Debug.trap("TextScan: unsupported text operator");
+        };
+
+        if (not negated) return #BitMap(positive_bitmap);
+
+        // Build `around_bitmap` via targeted BTree scans instead of a full index scan.
+        //
+        // The composite key order is: (word, field_idx, doc_id, tok_pos, char_start, char_end).
+        //
+        // Per-word bracket helper: two intervals that span the entire index while skipping the
+        // entries for `word` in `field_idx`.  Returns a bitmap of every doc that has at least
+        // one OTHER token in the index.
+        let bracket_bitmap_for_word = func(word : Text) : T.SparseBitMap64 {
+            let iv_before = CompositeIndex.scan_with_bounds(
+                collection, text_index.internal_index,
+                [],
+                [#Text(word), #Nat8(field_idx_n8), #Minimum, #Minimum, #Minimum, #Minimum],
+            );
+            let iv_after = CompositeIndex.scan_with_bounds(
+                collection, text_index.internal_index,
+                [#Text(word), #Nat8(field_idx_n8), #Maximum, #Maximum, #Maximum, #Maximum],
+                [],
+            );
+            let doc_ids = Intervals.document_ids_and_indexed_fields_from_intervals(
+                collection, text_index.internal_index.name, [iv_before, iv_after], false
+            );
+            SparseBitMap64.fromIter(
+                Iter.map(doc_ids, func((id, _) : (T.DocumentId, ?[(Text, T.Candid)])) : Nat {
+                    Utils.convert_last_8_bytes_to_nat(id)
+                })
+            )
+        };
+
+        let around_bitmap = switch (text_op) {
+            case (#word(w)) {
+                // Single word: bracket scan around that exact word.
+                bracket_bitmap_for_word(Text.toLowercase(w))
+            };
+
+            case (#startsWith(prefix)) {
+                // Positive range covers [lower_prefix, upper_prefix) where upper = prefix # "\u{FF}".
+                // Complement: two intervals bracketing that entire range.
+                let lower_prefix = Text.toLowercase(prefix);
+                let upper_prefix = lower_prefix # "\u{FF}";
+                let interval_before = CompositeIndex.scan_with_bounds(
+                    collection, text_index.internal_index,
+                    [],
+                    [#Text(lower_prefix), #Nat8(field_idx_n8), #Minimum, #Minimum, #Minimum, #Minimum],
+                );
+                let interval_after = CompositeIndex.scan_with_bounds(
+                    collection, text_index.internal_index,
+                    [#Text(upper_prefix), #Nat8(field_idx_n8), #Minimum, #Minimum, #Minimum, #Minimum],
+                    [],
+                );
+                let around_doc_ids = Intervals.document_ids_and_indexed_fields_from_intervals(
+                    collection, text_index.internal_index.name, [interval_before, interval_after], false
+                );
+                SparseBitMap64.fromIter(
+                    Iter.map(around_doc_ids, func((id, _) : (T.DocumentId, ?[(Text, T.Candid)])) : Nat {
+                        Utils.convert_last_8_bytes_to_nat(id)
+                    })
+                );
+            };
+
+            case (#anyOf(words)) {
+                // NOT(anyOf(a, b, …)) = NOT(a) AND NOT(b) AND …
+                // A doc is excluded only if it contains NONE of the words.
+                // Equivalently, only docs captured by ALL individual bracket scans survive.
+                // Intersection of per-word bracket bitmaps gives exactly that set.
+                let bufs = Buffer.Buffer<T.SparseBitMap64>(words.size());
+                for (w in words.vals()) {
+                    bufs.add(bracket_bitmap_for_word(Text.toLowercase(w)));
+                };
+                SparseBitMap64.multiIntersect(bufs.vals())
+            };
+
+            case (#allOf(words)) {
+                // NOT(allOf(a, b, …)) = NOT(a) OR NOT(b) OR …   [De Morgan]
+                // Each NOT(word_x) uses a bracket scan.  A doc missing at least one required
+                // word appears in at least one complement, so the union captures all such docs.
+                // This correctly handles docs that have SOME but not ALL required words, which
+                // the multi-word gap approach misses.
+                let bitmap = SparseBitMap64.new();
+                for (w in words.vals()) {
+                    let b = bracket_bitmap_for_word(Text.toLowercase(w));
+                    SparseBitMap64.unionInPlace(bitmap, b);
+                };
+                bitmap
+            };
+
+            case (#phrase(phrase_text)) {
+                // NOT(phrase(words)) breaks into two disjoint components:
+                //   A) docs missing at least one phrase word:  NOT(allOf(words))  [De Morgan]
+                //   B) docs with all phrase words but in wrong order/gaps:  allOf(words) - phrase(words)
+                //
+                // around_phrase = A ∪ B
+                //   = (∪ NOT(word_i)) ∪ (allOf_bitmap - phrase_bitmap)
+                //
+                // No full index scan needed; allOf_bitmap was already built during positive_bitmap computation.
+                let words = TextIndex.phrase_words(text_index, phrase_text);
+                let de_morgan = SparseBitMap64.new();
+                for (w in words.vals()) {
+                    let b = bracket_bitmap_for_word(Text.toLowercase(w));
+                    SparseBitMap64.unionInPlace(de_morgan, b);
+                };
+                // allOf - phrase = docs with all words present but phrase not matched
+                let wrong_order = SparseBitMap64.clone(allOf_bitmap_for_phrase);
+                SparseBitMap64.differenceInPlace(wrong_order, positive_bitmap);
+                SparseBitMap64.unionInPlace(de_morgan, wrong_order);
+                de_morgan
+            };
+
+            case (_) Debug.trap("TextScan: unsupported text operator for negation");
+        };
+        SparseBitMap64.differenceInPlace(around_bitmap, positive_bitmap);
+        #BitMap(around_bitmap)
     };
 
     // avoids sorting
@@ -240,6 +587,21 @@ module {
                         add_interval(intervals_by_index, index_name, interval, false);
                         continue evaluating_query_plan;
                     };
+                };
+                case (#TextScan({ field; text_op; negated })) {
+                    log.lazyDebug(
+                        func() = "Processing text scan on field '" # field # "'"
+                    );
+                    switch (eval_text_scan(collection, field, text_op, negated, Map.new())) {
+                        case (#BitMap(bm)) bitmaps.add(bm);
+                        case (#Ids(iter)) bitmaps.add(
+                            SparseBitMap64.fromIter(Iter.map(iter, func((id, _) : (T.DocumentId, ?[(Text, T.Candid)])) : Nat { Utils.convert_last_8_bytes_to_nat(id) }))
+                        );
+                        case (#Empty) { if (query_plan.is_and_operation) return #Empty };
+                        case (#Interval(name, ivs, rev)) add_interval(intervals_by_index, name, ivs[0], rev);
+                    };
+
+                    continue evaluating_query_plan;
                 };
             };
 
@@ -893,6 +1255,7 @@ module {
         opt_sort_column : ?(Text, T.SortDirection),
         opt_last_pagination_document_id : ?T.DocumentId,
         sort_documents_by_field_cmp : ((T.DocumentId, ?[(Text, T.Candid)]), (T.DocumentId, ?[(Text, T.Candid)])) -> Order,
+        text_search_matches_cache : Map<Blob, Map<Nat64, T.TextMatch>>,
     ) : EvalResult {
         let log = Logger.NamespacedLogger(collection.logger, LOGGER_NAMESPACE).subnamespace("generate_document_ids_for_and_operation");
 
@@ -928,6 +1291,14 @@ module {
                         return #Interval(C.DOCUMENT_ID, [(0, size)], false);
                     };
 
+                };
+                case (#TextScan({ field; text_op; negated })) {
+                    if (not requires_sorting) {
+                        log.lazyDebug(
+                            func() = "Simple text scan on field '" # field # "', returning result directly"
+                        );
+                        return eval_text_scan(collection, field, text_op, negated, text_search_matches_cache);
+                    };
                 };
             };
         };
@@ -1083,6 +1454,19 @@ module {
                     add_interval(intervals_by_index, index_name, interval, sorted_in_reverse);
                 };
             };
+            case (#TextScan({ field; text_op; negated })) {
+                log.lazyDebug(
+                    func() = "Materializing bitmap for text scan on field '" # field # "'"
+                );
+                switch (eval_text_scan(collection, field, text_op, negated, text_search_matches_cache)) {
+                    case (#BitMap(bm)) bitmaps.add(bm);
+                    case (#Ids(iter)) bitmaps.add(
+                        SparseBitMap64.fromIter(Iter.map(iter, func((id, _) : (T.DocumentId, ?[(Text, T.Candid)])) : Nat { Utils.convert_last_8_bytes_to_nat(id) }))
+                    );
+                    case (#Empty) { if (query_plan.is_and_operation) return #Empty };
+                    case (#Interval(_, _, _)) Debug.trap("QueryExecution: text scan cannot return Interval");
+                };
+            };
         };
 
         log.lazyDebug(
@@ -1091,7 +1475,7 @@ module {
 
         for (or_operation_subplan in query_plan.subplans.vals()) {
             log.lazyDebug(func() = "Evaluating OR subplan");
-            let eval_result = generate_document_ids_for_or_operation(collection, or_operation_subplan, opt_sort_column, opt_last_pagination_document_id, sort_documents_by_field_cmp);
+            let eval_result = generate_document_ids_for_or_operation(collection, or_operation_subplan, opt_sort_column, opt_last_pagination_document_id, sort_documents_by_field_cmp, text_search_matches_cache);
 
             switch (eval_result) {
                 case (#Empty) {
@@ -1383,6 +1767,7 @@ module {
         opt_sort_column : ?(Text, T.SortDirection),
         opt_last_pagination_document_id : ?T.DocumentId,
         sort_documents_by_field_cmp : ((T.DocumentId, ?[(Text, T.Candid)]), (T.DocumentId, ?[(Text, T.Candid)])) -> Order,
+        text_search_matches_cache : Map<Blob, Map<Nat64, T.TextMatch>>,
     ) : EvalResult {
         let log = Logger.NamespacedLogger(collection.logger, LOGGER_NAMESPACE).subnamespace("generate_document_ids_for_or_operation");
         assert not query_plan.is_and_operation;
@@ -1415,11 +1800,21 @@ module {
                     requires_additional_filtering;
                 });
             };
+            case (#TextScan({ field; text_op; negated })) {
+                switch (eval_text_scan(collection, field, text_op, negated, text_search_matches_cache)) {
+                    case (#BitMap(bm)) bitmaps.add(bm);
+                    case (#Ids(iter)) bitmaps.add(
+                        SparseBitMap64.fromIter(Iter.map(iter, func((id, _) : (T.DocumentId, ?[(Text, T.Candid)])) : Nat { Utils.convert_last_8_bytes_to_nat(id) }))
+                    );
+                    case (#Empty) {};
+                    case (#Interval(_, _, _)) Debug.trap("QueryExecution: text scan cannot return Interval");
+                };
+            };
         };
 
         for (and_operation_subplan in query_plan.subplans.vals()) {
 
-            let eval_result = generate_document_ids_for_and_operation(collection, and_operation_subplan, opt_sort_column, opt_last_pagination_document_id, sort_documents_by_field_cmp);
+            let eval_result = generate_document_ids_for_and_operation(collection, and_operation_subplan, opt_sort_column, opt_last_pagination_document_id, sort_documents_by_field_cmp, text_search_matches_cache);
 
             switch (eval_result) {
                 case (#Empty) {}; // do nothing if empty set
@@ -1767,6 +2162,7 @@ module {
         { query_plan; opt_last_pagination_document_id } : T.QueryPlanResult,
         opt_sort_column : ?(Text, T.SortDirection),
         sort_documents_by_field_cmp : ((T.DocumentId, ?[(Text, T.Candid)]), (T.DocumentId, ?[(Text, T.Candid)])) -> Order,
+        text_search_matches_cache : Map<Blob, Map<Nat64, T.TextMatch>>,
     ) : EvalResult {
 
         let log = Logger.NamespacedLogger(collection.logger, LOGGER_NAMESPACE).subnamespace("generate_document_ids_for_query_plan");
@@ -1775,9 +2171,9 @@ module {
         log.logDebug("QueryExecution.generate_document_ids_for_query_plan(): Query plan: " # debug_show query_plan);
 
         let result = if (query_plan.is_and_operation) {
-            generate_document_ids_for_and_operation(collection, query_plan, opt_sort_column, opt_last_pagination_document_id, sort_documents_by_field_cmp);
+            generate_document_ids_for_and_operation(collection, query_plan, opt_sort_column, opt_last_pagination_document_id, sort_documents_by_field_cmp, text_search_matches_cache);
         } else {
-            generate_document_ids_for_or_operation(collection, query_plan, opt_sort_column, opt_last_pagination_document_id, sort_documents_by_field_cmp);
+            generate_document_ids_for_or_operation(collection, query_plan, opt_sort_column, opt_last_pagination_document_id, sort_documents_by_field_cmp, text_search_matches_cache);
         };
 
         let elapsed = 0;

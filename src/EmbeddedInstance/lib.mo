@@ -223,19 +223,6 @@ module {
         #ok(Database.Database(db));
     };
 
-    public func deleteDB(versioned_sstore : T.VersionedStableStore, db_name : Text) : T.Result<(), Text> {
-
-        let sstore = TypeMigrations.get_current_state(versioned_sstore);
-
-        switch (Map.remove<Text, T.StableDatabase>(sstore.databases, T.thash, db_name)) {
-            case (null) #err("Database '" # db_name # "' does not exist");
-            case (?db) {
-                StableDatabase.deallocate(db);
-                #ok(());
-            };
-        };
-    };
-
     public func getDB(versioned_sstore : T.VersionedStableStore, db_name : Text) : ?Database.Database {
 
         let sstore = TypeMigrations.get_current_state(versioned_sstore);
@@ -332,5 +319,19 @@ module {
         #ok(());
     };
 
+    public func deleteDB(versioned_sstore : T.VersionedStableStore, db_name : Text) : T.Result<(), Text> {
+        let sstore = TypeMigrations.get_current_state(versioned_sstore);
+
+        switch (Map.get<Text, T.StableDatabase>(sstore.databases, T.thash, db_name)) {
+            case (null) return #err("Database with name '" # db_name # "' does not exist");
+            case (?db) {
+                StableDatabase.deallocate(db);
+            };
+        };
+
+        ignore Map.remove<Text, T.StableDatabase>(sstore.databases, T.thash, db_name);
+
+        #ok(());
+    };
 
 };

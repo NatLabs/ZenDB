@@ -85,7 +85,7 @@ ZenDBSuite.newSuite(
                         let #ok(res1) = data.search(
                             ZenDB.QueryBuilder().Where("version.v1.a", #eq(#Nat(42)))
                         ) else return assert false;
-                        assert res1.documents == [(v1_id, { version = #v1({ a = 42; b = "hello" }) })];
+                        assert res1.documents == [(v1_id, { version = #v1({ a = 42; b = "hello" }) }, [])];
 
                         Debug.print(
                             "searching for version.v3.size.known == 32: " # debug_show (
@@ -98,7 +98,7 @@ ZenDBSuite.newSuite(
                         let #ok(res2) = data.search(
                             ZenDB.QueryBuilder().Where("version.v3.size.known", #eq(#Nat(32)))
                         ) else return assert false;
-                        assert res2.documents == [(v3_known_id, { version = #v3({ size = #known(32) }) })];
+                        assert res2.documents == [(v3_known_id, { version = #v3({ size = #known(32) }) }, [])];
 
                     },
                 );
@@ -110,12 +110,12 @@ ZenDBSuite.newSuite(
                         let #ok(res1) = data.search(
                             ZenDB.QueryBuilder().Where("version.v2.d", #eq(#Bool(true)))
                         ) else return assert false;
-                        assert res1.documents == [(v2_id, { version = #v2({ c = "world"; d = true }) })];
+                        assert res1.documents == [(v2_id, { version = #v2({ c = "world"; d = true }) }, [])];
 
                         let #ok(res2) = data.search(
                             ZenDB.QueryBuilder().Where("version.v2.d", #exists)
                         ) else return assert false;
-                        assert res2.documents == [(v2_id, { version = #v2({ c = "world"; d = true }) })];
+                        assert res2.documents == [(v2_id, { version = #v2({ c = "world"; d = true }) }, [])];
 
                         Debug.print(
                             "exists: " # debug_show (
@@ -128,7 +128,7 @@ ZenDBSuite.newSuite(
                         let #ok(res3) = data.search(
                             ZenDB.QueryBuilder().Where("version.v3.size", #eq(#Text("unknown")))
                         ) else return assert false;
-                        assert res3.documents == [(v3_unknown_id, { version = #v3({ size = #unknown }) })];
+                        assert res3.documents == [(v3_unknown_id, { version = #v3({ size = #unknown }) }, [])];
 
                     },
                 );
@@ -139,30 +139,30 @@ ZenDBSuite.newSuite(
                         let #ok(res1) = data.search(
                             ZenDB.QueryBuilder().Where("version", #eq(#Text("v1")))
                         ) else return assert false;
-                        assert res1.documents == [(v1_id, { version = #v1({ a = 42; b = "hello" }) })];
+                        assert res1.documents == [(v1_id, { version = #v1({ a = 42; b = "hello" }) }, [])];
 
                         let #ok(res2) = data.search(
                             ZenDB.QueryBuilder().Where("version", #eq(#Text("v2")))
                         ) else return assert false;
-                        assert res2.documents == [(v2_id, { version = #v2({ c = "world"; d = true }) })];
+                        assert res2.documents == [(v2_id, { version = #v2({ c = "world"; d = true }) }, [])];
 
                         let #ok(res3) = data.search(
                             ZenDB.QueryBuilder().Where("version", #eq(#Text("v3")))
                         ) else return assert false;
                         assert res3.documents == [
-                            (v3_known_id, { version = #v3({ size = #known(32) }) }),
-                            (v3_unknown_id, { version = #v3({ size = #unknown }) }),
+                            (v3_known_id, { version = #v3({ size = #known(32) }) }, []),
+                            (v3_unknown_id, { version = #v3({ size = #unknown }) }, []),
                         ];
 
                         let #ok(res4) = data.search(
                             ZenDB.QueryBuilder().Where("version.v3.size", #eq(#Text("unknown")))
                         ) else return assert false;
-                        assert res4.documents == [(v3_unknown_id, { version = #v3({ size = #unknown }) })];
+                        assert res4.documents == [(v3_unknown_id, { version = #v3({ size = #unknown }) }, [])];
 
                         let #ok(res5) = data.search(
                             ZenDB.QueryBuilder().Where("version.v3.size", #eq(#Text("known")))
                         ) else return assert false;
-                        assert res5.documents == [(v3_known_id, { version = #v3({ size = #known(32) }) })];
+                        assert res5.documents == [(v3_known_id, { version = #v3({ size = #known(32) }) }, [])];
 
                     },
                 );

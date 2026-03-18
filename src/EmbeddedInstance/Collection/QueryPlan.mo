@@ -18,6 +18,7 @@ import CandidMap "../CandidMap";
 import Utils "../Utils";
 
 import CompositeIndex "Index/CompositeIndex";
+import TextIndex "Index/TextIndex";
 import Index "Index";
 import CollectionUtils "CollectionUtils";
 import C "../Constants";
@@ -38,6 +39,7 @@ module {
     let { nhash; thash } = Map;
     type Map<A, B> = Map.Map<A, B>;
     type Buffer<A> = Buffer.Buffer<A>;
+
     type Iter<A> = Iter.Iter<A>;
     type State<A> = T.State<A>;
     type Candid = T.Candid;
@@ -53,7 +55,7 @@ module {
         sort_column : ?(Text, T.SortDirection),
         last_pagination_document : ?T.CandidMap,
         parent_has_nested_operations : Bool, // this helps us indicate if the results from this operation will be fed into an outer operation via a bitmap intersection (if requires_sorting is false) or a kmerge (if requires_sorting is true)
-    ) : QueryPlan {
+    ) : T.Result<QueryPlan, Text> {
         let log = Logger.NamespacedLogger(collection.logger, LOGGER_NAMESPACE).subnamespace("from_and_operation");
         log.lazyDebug(
             func() = "Creating query plan for AND operation with " #
@@ -75,6 +77,11 @@ module {
 
         var operations = Buffer.Buffer<(Text, T.ZqlOperators)>(8);
 
+        // Text operations are handled separately — they produce #TextScan nodes rather
+        // than BTree range bounds, so they must not be passed to get_best_index or
+        // convert_simple_ops_to_bounds.
+        let text_scans = Buffer.Buffer<ScanDetails>(4);
+
         let sub_query_plans = Buffer.Buffer<QueryPlan>(8);
 
         var num_of_nested_or_operations = 0;
@@ -85,7 +92,7 @@ module {
         if (query_statements.size() == 0 and not requires_sorting) {
             log.lazyDebug(func() = "Empty query with no sorting, using full scan");
 
-            return {
+            return #ok({
                 is_and_operation = true;
                 subplans = [];
                 simple_operations = [];
@@ -131,7 +138,7 @@ module {
                     },
 
                 ];
-            };
+            });
         };
 
         var this_query_has_nested_or_operations = false;
@@ -139,13 +146,38 @@ module {
         for (query_statement in query_statements.vals()) {
             switch (query_statement) {
                 case (#Operation(field, op)) {
-                    log.lazyDebug(
-                        func() = "Adding simple operation on field '" #
-                        field # "': " # debug_show op
-                    );
-                    // ?: what's the difference between these two
-                    simple_operations.add((field, op));
-                    operations.add(field, op);
+                    switch (op) {
+                        case (#text(text_op)) {
+                            // Text operations bypass the BTree index path entirely.
+                            // #text(#not_(inner)) is the normalized negated form.
+                            let (actual_text_op, negated) = switch (text_op) {
+                                case (#not_(inner)) (inner, true);
+                                case (op) (op, false);
+                            };
+                            let ?#text_index(ti) = Map.get(collection.indexes, thash, TextIndex.KEY) else
+                                return #err("No text index found on collection for field '" # field # "'");
+                            let ?_ = TextIndex.verifyIndexedField(ti, field) else
+                                return #err("Text index does not cover field '" # field # "'");
+                            text_scans.add(#TextScan({ field; text_op = actual_text_op; negated }));
+                        };
+                        case (#not_(#text(text_op))) {
+                            // #not_(#text(op)) — negated text scan
+                            let ?#text_index(ti) = Map.get(collection.indexes, thash, TextIndex.KEY) else
+                                return #err("No text index found on collection for field '" # field # "'");
+                            let ?_ = TextIndex.verifyIndexedField(ti, field) else
+                                return #err("Text index does not cover field '" # field # "'");
+                            text_scans.add(#TextScan({ field; text_op; negated = true }));
+                        };
+                        case (_) {
+                            log.lazyDebug(
+                                func() = "Adding simple operation on field '" #
+                                field # "': " # debug_show op
+                            );
+                            // ?: what's the difference between these two
+                            simple_operations.add((field, op));
+                            operations.add(field, op);
+                        };
+                    };
                 };
                 case (#And(_)) Debug.trap("And not allowed in this context");
                 case (#Or(_)) {
@@ -165,14 +197,17 @@ module {
 
                     num_of_nested_or_operations += 1;
 
-                    let sub_query_plan = from_or_operation(
+                    let sub_query_plan = switch (from_or_operation(
                         collection,
                         nested_or_operations,
                         sort_column,
                         last_pagination_document,
                         Buffer.toArray(operations),
                         true, // since we are in a nested OR operation, the parent has nested operations
-                    );
+                    )) {
+                        case (#err(e)) return #err(e);
+                        case (#ok(p)) p;
+                    };
 
                     sub_query_plans.add(sub_query_plan);
 
@@ -198,23 +233,32 @@ module {
                 Nat.toText(sub_query_plans.size()) # " nested OR subplans"
             );
 
-            if (sub_query_plans.size() == 1) {
+            if (sub_query_plans.size() == 1 and text_scans.size() == 0) {
                 log.lazyDebug(func() = "Single subplan, returning it directly");
-                return sub_query_plans.get(0);
+                return #ok(sub_query_plans.get(0));
             };
 
             log.lazyDebug(
                 func() = "Returning combined AND plan with " #
                 Nat.toText(sub_query_plans.size()) # " OR subplans"
             );
-            return {
+            return #ok({
                 is_and_operation = true;
                 subplans = Buffer.toArray(sub_query_plans);
                 simple_operations = [];
-                scans = [];
+                scans = Buffer.toArray(text_scans);
+            });
+        };
 
-                // if there where #Operation types in the operations
-            };
+        // If all operations were text ops (no BTree ops), return TextScans directly.
+        if (operations.size() == 0 and text_scans.size() > 0) {
+            log.lazyDebug(func() = "Text-only query, returning TextScan plan");
+            return #ok({
+                is_and_operation = true;
+                subplans = [];
+                simple_operations = [];
+                scans = Buffer.toArray(text_scans);
+            });
         };
 
         // if there where #Operation types in the operations
@@ -265,25 +309,26 @@ module {
                                 let (scan_bounds, filter_bounds) = Index.convert_simple_ops_to_bounds(true, Buffer.toArray(operations), null, null);
                                 assert not requires_sorting;
 
-                                return {
+                                return #ok({
                                     is_and_operation = true;
                                     subplans = [];
                                     simple_operations = Buffer.toArray(operations);
-                                    scans = [
-
-                                        #IndexScan({
-                                            index_name = C.DOCUMENT_ID;
-                                            requires_additional_sorting = requires_sorting;
-                                            requires_additional_filtering = operations.size() > 0;
-                                            sorted_in_reverse = sort_direction == #Descending;
-                                            interval;
-                                            scan_bounds;
-                                            filter_bounds;
-                                            simple_operations = Buffer.toArray(operations);
-                                        })
-
-                                    ];
-                                };
+                                    scans = Array.append(
+                                        [
+                                            #IndexScan({
+                                                index_name = C.DOCUMENT_ID;
+                                                requires_additional_sorting = requires_sorting;
+                                                requires_additional_filtering = operations.size() > 0;
+                                                sorted_in_reverse = sort_direction == #Descending;
+                                                interval;
+                                                scan_bounds;
+                                                filter_bounds;
+                                                simple_operations = Buffer.toArray(operations);
+                                            }),
+                                        ],
+                                        Buffer.toArray(text_scans),
+                                    );
+                                });
                             };
                         };
                     };
@@ -292,21 +337,22 @@ module {
 
                 let (scan_bounds, filter_bounds) = Index.convert_simple_ops_to_bounds(true, Buffer.toArray(operations), null, null);
 
-                return {
+                return #ok({
                     is_and_operation = true;
                     subplans = [];
                     simple_operations = Buffer.toArray(operations);
-                    scans = [
-
-                        #FullScan({
-                            requires_additional_sorting = requires_sorting;
-                            requires_additional_filtering = operations.size() > 0;
-                            scan_bounds = scan_bounds;
-                            filter_bounds = filter_bounds;
-                        }),
-
-                    ];
-                };
+                    scans = Array.append(
+                        [
+                            #FullScan({
+                                requires_additional_sorting = requires_sorting;
+                                requires_additional_filtering = operations.size() > 0;
+                                scan_bounds = scan_bounds;
+                                filter_bounds = filter_bounds;
+                            }),
+                        ],
+                        Buffer.toArray(text_scans),
+                    );
+                });
 
             };
             case (?best_index_result) {
@@ -360,22 +406,25 @@ module {
             is_and_operation = true;
             subplans = Buffer.toArray(sub_query_plans);
             simple_operations = operations_array;
-            scans = [
-                #IndexScan({
-                    index_name = index.name;
-                    requires_additional_filtering;
-                    requires_additional_sorting;
-                    sorted_in_reverse;
-                    interval;
-                    scan_bounds;
-                    filter_bounds;
-                    simple_operations = operations_array;
-                })
-            ];
+            scans = Array.append(
+                [
+                    #IndexScan({
+                        index_name = index.name;
+                        requires_additional_filtering;
+                        requires_additional_sorting;
+                        sorted_in_reverse;
+                        interval;
+                        scan_bounds;
+                        filter_bounds;
+                        simple_operations = operations_array;
+                    }),
+                ],
+                Buffer.toArray(text_scans),
+            );
         };
 
         log.lazyDebug(func() = "Created index scan query plan using index '" # index.name # "'");
-        return query_plan;
+        return #ok(query_plan);
 
     };
 
@@ -386,7 +435,7 @@ module {
         last_pagination_document : ?T.CandidMap,
         parent_simple_and_operations : [(Text, T.ZqlOperators)],
         parent_has_nested_operations : Bool,
-    ) : QueryPlan {
+    ) : T.Result<QueryPlan, Text> {
         let log = Logger.NamespacedLogger(collection.logger, LOGGER_NAMESPACE).subnamespace("from_or_operation");
         log.lazyDebug(
             func() = "Creating query plan for OR operation with " #
@@ -432,6 +481,32 @@ module {
                     );
 
                     let operations = Array.append(parent_simple_and_operations, [(field, op)]);
+
+                    // Text operations skip the BTree index path entirely.
+                    switch (op) {
+                        case (#text(text_op)) {
+                            let (actual_text_op, negated) = switch (text_op) {
+                                case (#not_(inner)) (inner, true);
+                                case (op) (op, false);
+                            };
+                            let ?#text_index(ti) = Map.get(collection.indexes, thash, TextIndex.KEY) else
+                                return #err("No text index found on collection for field '" # field # "'");
+                            let ?_ = TextIndex.verifyIndexedField(ti, field) else
+                                return #err("Text index does not cover field '" # field # "'");
+                            scans.add(#TextScan({ field; text_op = actual_text_op; negated }));
+                            continue resolving_or_operations;
+                        };
+                        case (#not_(#text(text_op))) {
+                            let ?#text_index(ti) = Map.get(collection.indexes, thash, TextIndex.KEY) else
+                                return #err("No text index found on collection for field '" # field # "'");
+                            let ?_ = TextIndex.verifyIndexedField(ti, field) else
+                                return #err("Text index does not cover field '" # field # "'");
+                            scans.add(#TextScan({ field; text_op; negated = true }));
+                            continue resolving_or_operations;
+                        };
+                        case (_) {};
+                    };
+
                     let opt_index = Index.get_best_index(collection, operations, sort_column, last_pagination_document, has_nested_and_or_operations_in_path);
 
                     let scan_details = switch (opt_index) {
@@ -492,7 +567,7 @@ module {
 
                         };
                         case (?index) {
-                            let sub_query_plan = from_and_operation(
+                            let sub_query_plan = switch (from_and_operation(
                                 collection,
                                 Array.map<(Text, T.ZqlOperators), T.ZenQueryLang>(
                                     operations,
@@ -503,7 +578,10 @@ module {
                                 sort_column,
                                 last_pagination_document,
                                 true,
-                            );
+                            )) {
+                                case (#err(e)) return #err(e);
+                                case (#ok(p)) p;
+                            };
 
                             sub_query_plans.add(sub_query_plan);
                         };
@@ -516,13 +594,16 @@ module {
                         Nat.toText(nested_query_statements.size()) # " statements"
                     );
 
-                    let sub_query_plan = from_and_operation(
+                    let sub_query_plan = switch (from_and_operation(
                         collection,
                         nested_query_statements,
                         sort_column,
                         last_pagination_document,
                         true,
-                    );
+                    )) {
+                        case (#err(e)) return #err(e);
+                        case (#ok(p)) p;
+                    };
 
                     sub_query_plans.add(sub_query_plan);
                 };
@@ -541,7 +622,7 @@ module {
             Nat.toText(sub_query_plans.size()) # " AND subplans and " # Nat.toText(scans.size()) # " scans"
         );
 
-        return query_plan;
+        return #ok(query_plan);
     };
 
     public func create_query_plan(
@@ -549,7 +630,7 @@ module {
         db_query : ZenQueryLang,
         sort_column : ?(Text, T.SortDirection),
         pagination_token : ?T.PaginationToken,
-    ) : T.QueryPlanResult {
+    ) : T.Result<T.QueryPlanResult, Text> {
         let LOGGER_SUB_NAMESPACE = "create_query_plan";
         let log = Logger.NamespacedLogger(collection.logger, LOGGER_NAMESPACE).subnamespace(LOGGER_SUB_NAMESPACE);
 
@@ -566,7 +647,7 @@ module {
             );
         };
 
-        let query_plan = switch (db_query) {
+        let query_plan = switch (switch (db_query) {
             case (#And(operations)) {
                 log.lazyDebug(
                     func() = "Processing top-level AND query with " #
@@ -602,16 +683,19 @@ module {
                 );
                 Debug.trap("createQueryPlan(): Unsupported query type");
             };
+        }) {
+            case (#err(e)) return #err(e);
+            case (#ok(p)) p;
         };
 
         log.lazyInfo(
             func() = "Query plan created successfully -> " # debug_show query_plan
         );
 
-        {
+        #ok({
             query_plan;
             opt_last_pagination_document_id;
-        };
+        });
     };
 
 };

@@ -119,7 +119,7 @@ suite(
 
                 let stable_collection = collection._get_stable_state();
 
-                let { query_plan } = QueryPlan.create_query_plan(
+                let #ok({ query_plan }) = QueryPlan.create_query_plan(
                     stable_collection,
                     ZenDB.QueryBuilder().Where(
                         "text",
@@ -127,7 +127,7 @@ suite(
                     ).build().query_operations,
                     null,
                     null,
-                );
+                ) else return assert false;
 
                 assert query_plan == {
                     is_and_operation = true;
@@ -160,7 +160,7 @@ suite(
 
                 let stable_collection = collection._get_stable_state();
 
-                let { query_plan } = QueryPlan.create_query_plan(
+                let #ok({ query_plan }) = QueryPlan.create_query_plan(
                     stable_collection,
                     ZenDB.QueryBuilder().Where(
                         "text",
@@ -168,7 +168,7 @@ suite(
                     ).build().query_operations,
                     null,
                     null,
-                );
+                ) else return assert false;
 
                 Debug.print("Query Plan: " # debug_show (query_plan));
 

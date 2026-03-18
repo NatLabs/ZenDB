@@ -3,6 +3,7 @@ import Array "mo:base@0.16.0/Array";
 import Debug "mo:base@0.16.0/Debug";
 import Text "mo:base@0.16.0/Text";
 import Char "mo:base@0.16.0/Char";
+import Nat8 "mo:base@0.16.0/Nat8";
 import Nat32 "mo:base@0.16.0/Nat32";
 import Result "mo:base@0.16.0/Result";
 import Order "mo:base@0.16.0/Order";
@@ -14,6 +15,8 @@ import Hash "mo:base@0.16.0/Hash";
 import Float "mo:base@0.16.0/Float";
 import Int "mo:base@0.16.0/Int";
 
+import Map "mo:map@9.0.1/Map";
+
 import T "../../Types";
 import Logger "../../Logger";
 
@@ -24,24 +27,28 @@ import CompositeIndex "CompositeIndex";
 
 module TextIndex {
 
+    /// Internal key used to store the text index in `collection.indexes`.
+    /// The leading/trailing colons make it impossible to collide with user-defined names.
+    public let KEY = ":text_index:";
+
     public func new(
         collection : T.StableCollection,
         name : Text,
-        field : Text,
+        fields : [Text],
         tokenizer : Tokenizer.Tokenizer,
     ) : T.TextIndex {
 
         let internal_index = CompositeIndex.new(
             collection,
             name,
-            [] : [(Text, T.SortDirection)],
+            [] : [(Text, T.SortDirection)], // not all the fields stored in the internal composite index are field values, some are metadata for the text index implementation such as token position and character offsets.
             false, // if true, the index is unique and the document ids are not concatenated with the index key values to make duplicate values appear unique
             false, // cannot be deleted
         );
 
         {
             internal_index;
-            field;
+            fields;
             tokenizer;
         };
 
@@ -57,6 +64,7 @@ module TextIndex {
     public func insert(
         collection : T.StableCollection,
         text_index : T.TextIndex,
+        field_idx : Nat,
         id : T.DocumentId,
         text : Text,
     ) : T.Result<(), Text> {
@@ -68,7 +76,8 @@ module TextIndex {
             for ((start, end) in positions.vals()) {
                 let index_key_values : [T.CandidQuery] = [
                     #Text(word), // word comes first for better prefix compression
-                    #Blob(id), // document_id second for better clustering by document
+                    #Nat8(Nat8.fromNat(field_idx)), // field index within the text_index.fields array (max 255 fields)
+                    #Blob(id), // document_id for clustering by document
                     #Nat32(Nat32.fromNat(token_index)), // token sequence position in document
                     #Nat32(Nat32.fromNat(start)), // character start position for highlighting
                     #Nat32(Nat32.fromNat(end)), // character end position for precise boundaries
@@ -80,7 +89,7 @@ module TextIndex {
                         // Insertion successful, continue
                     };
                     case (#err(msg)) {
-                        let error_msg = "InvertedTextIndex.insert(): Failed to insert word '" # word # "' at position " # debug_show (start) # " for document id " # debug_show (id) # ": " # msg;
+                        let error_msg = "TextIndex.insert(): Failed to insert word '" # word # "' at position " # debug_show (start) # " for document id " # debug_show (id) # ": " # msg;
                         return #err(error_msg);
                     };
                 };
@@ -91,16 +100,17 @@ module TextIndex {
 
     };
 
-    func get_text_from_candid_map(
+    func get_text_for_field(
         collection : T.StableCollection,
-        text_index : T.TextIndex,
+        field : Text,
         document_id : T.DocumentId,
         candid_map : T.CandidMap,
     ) : ?Text {
 
-        switch (CollectionUtils.getIndexColumns(collection, [(text_index.field, #Ascending)], document_id, candid_map)) {
+        switch (CollectionUtils.getIndexColumns(collection, [(field, #Ascending)], document_id, candid_map)) {
             case (?index_key_values) switch (index_key_values[0]) {
                 case (#Text(text)) { ?text };
+                case (_) { null };
             };
             case (null) { null };
         };
@@ -114,20 +124,28 @@ module TextIndex {
         candid_map : T.CandidMap,
     ) : T.Result<(), Text> {
 
-        switch (get_text_from_candid_map(collection, text_index, document_id, candid_map)) {
-            case (?existing_text) {
-                insert(collection, text_index, document_id, existing_text);
+        var field_idx : Nat = 0;
+        for (field in text_index.fields.vals()) {
+            switch (get_text_for_field(collection, field, document_id, candid_map)) {
+                case (?existing_text) {
+                    switch (insert(collection, text_index, field_idx, document_id, existing_text)) {
+                        case (#err(msg)) { return #err(msg) };
+                        case (#ok(())) {};
+                    };
+                };
+                case (null) {}; // field not present in document, skip
             };
-            case (null) {
-                return #err("InvertedTextIndex.insertWithCandidMap(): Failed to find existing text for document id " # debug_show (document_id) # " in the provided candid map");
-            };
+            field_idx += 1;
         };
+
+        #ok();
 
     };
 
     public func remove(
         collection : T.StableCollection,
         text_index : T.TextIndex,
+        field_idx : Nat,
         id : T.DocumentId,
         text : Text,
     ) : T.Result<(), Text> {
@@ -139,7 +157,8 @@ module TextIndex {
             for ((start, end) in positions.vals()) {
                 let index_key_values : [T.CandidQuery] = [
                     #Text(word), // word comes first for better prefix compression
-                    #Blob(id), // document_id second for better clustering by document
+                    #Nat8(Nat8.fromNat(field_idx)), // field index within the text_index.fields array (max 255 fields)
+                    #Blob(id), // document_id for clustering by document
                     #Nat32(Nat32.fromNat(token_index)), // token sequence position in document
                     #Nat32(Nat32.fromNat(start)), // character start position for highlighting
                     #Nat32(Nat32.fromNat(end)), // character end position for precise boundaries
@@ -151,7 +170,7 @@ module TextIndex {
                         // Removal successful, continue
                     };
                     case (#err(msg)) {
-                        let error_msg = "InvertedTextIndex.remove(): Failed to remove word '" # word # "' at position " # debug_show (start) # " for document id " # debug_show (id) # ": " # msg;
+                        let error_msg = "TextIndex.remove(): Failed to remove word '" # word # "' at position " # debug_show (start) # " for document id " # debug_show (id) # ": " # msg;
                         return #err(error_msg);
                     };
                 };
@@ -169,26 +188,35 @@ module TextIndex {
         candid_map : T.CandidMap,
     ) : T.Result<(), Text> {
 
-        switch (get_text_from_candid_map(collection, text_index, document_id, candid_map)) {
-            case (?existing_text) {
-                return remove(collection, text_index, document_id, existing_text);
+        var field_idx : Nat = 0;
+        for (field in text_index.fields.vals()) {
+            switch (get_text_for_field(collection, field, document_id, candid_map)) {
+                case (?existing_text) {
+                    switch (remove(collection, text_index, field_idx, document_id, existing_text)) {
+                        case (#err(msg)) { return #err(msg) };
+                        case (#ok(())) {};
+                    };
+                };
+                case (null) {}; // field not present in document, skip
             };
-            case (null) {
-                return #err("InvertedTextIndex.removeWithCandidMap(): Failed to find existing text for document id " # debug_show (document_id) # " in the provided candid map");
-            };
+            field_idx += 1;
         };
+
+        #ok();
 
     };
 
     public func scan(
         collection : T.StableCollection,
         text_index : T.TextIndex,
+        field_idx : Nat,
         start_query : (Text, ?Nat, ?Nat, ?Nat, ?Nat),
         end_query : (Text, ?Nat, ?Nat, ?Nat, ?Nat),
     ) : (Nat, Nat) {
 
         let lower_bound : [T.CandidQuery] = [
             #Text(start_query.0),
+            #Nat8(Nat8.fromNat(field_idx)),
             if (start_query.1 == null) #Minimum else #Nat(Option.get(start_query.1, 0)),
             if (start_query.2 == null) #Minimum else #Nat32(Nat32.fromNat(Option.get(start_query.2, 0))),
             if (start_query.3 == null) #Minimum else #Nat32(Nat32.fromNat(Option.get(start_query.3, 0))),
@@ -197,6 +225,7 @@ module TextIndex {
 
         let upper_bound : [T.CandidQuery] = [
             #Text(end_query.0),
+            #Nat8(Nat8.fromNat(field_idx)),
             if (end_query.1 == null) #Maximum else #Nat(Option.get(end_query.1, 0)),
             if (end_query.2 == null) #Maximum else #Nat32(Nat32.fromNat(Option.get(end_query.2, 0))),
             if (end_query.3 == null) #Maximum else #Nat32(Nat32.fromNat(Option.get(end_query.3, 0))),
@@ -217,6 +246,48 @@ module TextIndex {
         text_index : T.TextIndex,
     ) {
         CompositeIndex.clear(collection, text_index.internal_index);
+    };
+
+    public func get_matches_for_doc(
+        collection : T.StableCollection,
+        text_index : T.TextIndex,
+        field_idx : Nat,
+        word : Text,
+        doc_id : T.DocumentId,
+    ) : [T.TextMatch] {
+        let field_idx_n8 = Nat8.fromNat(field_idx);
+        let lower_bound : [T.CandidQuery] = [#Text(word), #Nat8(field_idx_n8), #Blob(doc_id), #Minimum, #Minimum, #Minimum];
+        let upper_bound : [T.CandidQuery] = [#Text(word), #Nat8(field_idx_n8), #Blob(doc_id), #Maximum, #Maximum, #Maximum];
+        let interval = CompositeIndex.scan_with_bounds(collection, text_index.internal_index, lower_bound, upper_bound);
+        let entries = CompositeIndex.from_interval_to_array(collection, text_index.internal_index, interval);
+        let field = if (field_idx < text_index.fields.size()) text_index.fields[field_idx] else "";
+        Array.map(
+            entries,
+            func((key_values, _) : ([T.CandidQuery], T.DocumentId)) : T.TextMatch {
+                let stored_word = switch (key_values[0]) { case (#Text(w)) w; case (_) Debug.trap("TextIndex: expected Text key") };
+                let token_pos = switch (key_values[3]) { case (#Nat32(n)) Nat32.toNat(n); case (_) Debug.trap("TextIndex: expected Nat32 token_pos") };
+                let char_start = switch (key_values[4]) { case (#Nat32(n)) Nat32.toNat(n); case (_) Debug.trap("TextIndex: expected Nat32 char_start") };
+                let char_end = switch (key_values[5]) { case (#Nat32(n)) Nat32.toNat(n); case (_) Debug.trap("TextIndex: expected Nat32 char_end") };
+                { field; word = stored_word; token_pos; char_start; char_end };
+            },
+        );
+    };
+
+    /// Returns the tokenized words from `phrase_text` using the index's own tokenizer,
+    /// in text-position order.  Used by phrase-search to enumerate constituent words.
+    public func phrase_words(text_index : T.TextIndex, phrase_text : Text) : [Text] {
+        let tokens = Tokenizer.tokenize(text_index.tokenizer, phrase_text);
+        Array.map(tokens, func((w, _) : (Text, [(Nat, Nat)])) : Text { w });
+    };
+
+    /// Returns `?(index_name, field_idx)` if `field` is covered by this text index, else `null`.
+    public func verifyIndexedField(text_index : T.TextIndex, field : Text) : ?(Text, Nat) {
+        var i : Nat = 0;
+        for (f in text_index.fields.vals()) {
+            if (f == field) return ?(text_index.internal_index.name, i);
+            i += 1;
+        };
+        null
     };
 
 };

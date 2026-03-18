@@ -73,13 +73,14 @@ module {
             };
         };
 
-        func search_results_from_blobs(results : [(ZT.DocumentId, Blob)]) : [(ZT.DocumentId, Record)] {
-            Array.map<(ZT.DocumentId, Blob), (ZT.DocumentId, Record)>(
+        func search_results_from_blobs(results : [(ZT.DocumentId, Blob, [ZT.TextMatch])]) : [(ZT.DocumentId, Record, [ZT.TextMatch])] {
+            Array.map<(ZT.DocumentId, Blob, [ZT.TextMatch]), (ZT.DocumentId, Record, [ZT.TextMatch])>(
                 results,
-                func(response_tuple : (ZT.DocumentId, Blob)) : (ZT.DocumentId, Record) {
+                func((id, blob, matches) : (ZT.DocumentId, Blob, [ZT.TextMatch])) : (ZT.DocumentId, Record, [ZT.TextMatch]) {
                     (
-                        response_tuple.0,
-                        internal_candify.from_blob(response_tuple.1),
+                        id,
+                        internal_candify.from_blob(blob),
+                        matches,
                     );
                 },
             );
@@ -111,7 +112,7 @@ module {
                     #ok({
                         result with
                         document = switch (result.document) {
-                            case (?document) ?search_results_from_blobs([document])[0];
+                            case (?(id, blob, matches)) ?(id, internal_candify.from_blob(blob), matches);
                             case (null) null;
                         };
                     });

@@ -208,7 +208,7 @@ module TxsBenchUtils {
         };
     };
 
-    public class TxsBenchmarks(input_limit : Nat, iteration_limit : Nat) {
+    public class TxsBenchmarks(input_limit : Nat, iteration_limit : Nat, opt_cache_capacity : ?Nat) {
 
         let fuzz = Fuzz.fromSeed(0x7eadbeef);
 
@@ -237,16 +237,20 @@ module TxsBenchUtils {
         );
 
         let predefined_txs = Buffer.Buffer<Tx>(input_limit);
+        let txs_to_replace = Buffer.Buffer<Tx>(input_limit);
         let tx_ids = Buffer.Buffer<Blob>(input_limit);
 
         for (i in Iter.range(0, input_limit - 1)) {
             let tx = TxsBenchUtils.new_tx(fuzz, principals);
             predefined_txs.add(tx);
+
+            let new_tx = TxsBenchUtils.new_tx(fuzz, principals);
+            txs_to_replace.add(new_tx);
         };
 
         let canister_id = fuzz.principal.randomPrincipal(29);
 
-        let heap_db_sstore = ZenDB.newStableStore(canister_id, ?{ ZenDB.defaultSettings with memory_type = ?(#heap); cache_capacity = ?(iteration_limit / 100) }); // 1% cache
+        let heap_db_sstore = ZenDB.newStableStore(canister_id, ?{ ZenDB.defaultSettings with memory_type = ?(#heap); cache_capacity = opt_cache_capacity });
         let heap_db = ZenDB.launchDefaultDB(heap_db_sstore);
         let #ok(heap_no_index) = heap_db.createCollection<Tx>("heap_no_index", TxSchema, candify_tx, null);
         let #ok(heap_single_field_indexes) = heap_db.createCollection<Tx>("heap_single_field_indexes", TxSchema, candify_tx, null);
@@ -258,7 +262,7 @@ module TxsBenchUtils {
         let #ok(heap_sorted_amt_single_field_indexes) = heap_db.createCollection<Tx>("heap_sorted_amt_single_field_indexes", TxSchema, candify_tx, null);
         let #ok(heap_sorted_amt_fully_covered_indexes) = heap_db.createCollection<Tx>("heap_sorted_amt_fully_covered_indexes", TxSchema, candify_tx, null);
 
-        let stable_memory_db_sstore = ZenDB.newStableStore(canister_id, ?{ ZenDB.defaultSettings with memory_type = ?(#stableMemory); cache_capacity = ?(iteration_limit / 100) }); // 1% cache
+        let stable_memory_db_sstore = ZenDB.newStableStore(canister_id, ?{ ZenDB.defaultSettings with memory_type = ?(#stableMemory); cache_capacity = opt_cache_capacity });
         let stable_memory_db = ZenDB.launchDefaultDB(stable_memory_db_sstore);
         let #ok(stable_memory_no_index) = stable_memory_db.createCollection<Tx>("stable_memory_no_index", TxSchema, candify_tx, null);
         let #ok(stable_memory_single_field_indexes) = stable_memory_db.createCollection<Tx>("stable_memory_single_field_indexes", TxSchema, candify_tx, null);
@@ -346,7 +350,8 @@ module TxsBenchUtils {
                 switch (benchmark_name) {
                     case ("insert with no index") {
                         for (tx in inputs.vals()) {
-                            let #ok(_) = collection.insert(tx);
+                            let #ok(id) = collection.insert(tx);
+                            tx_ids.add(Utils.nat_from_12_byte_blob(id));
                         };
 
                         // Debug.print("stats: " # debug_show (collection.stats()));
@@ -408,6 +413,7 @@ module TxsBenchUtils {
                     };
 
                     case ("insert with indexes") {
+                        tx_ids.clear();
                         for (tx in inputs.vals()) {
                             let #ok(id) = collection.insert(tx);
                             tx_ids.add(Utils.nat_from_12_byte_blob(id));
@@ -415,13 +421,13 @@ module TxsBenchUtils {
                     };
 
                     case ("query(): no filter (all txs)") {
-                        let db_query = new_query();
+                        let db_query = new_query().Limit(iteration_limit);
                         let #ok(matching_txs) = collection.search(db_query);
                         // assert matching_txs.size() == iteration_limit;
                     };
 
                     case ("query(): single field (btype = '1mint')") {
-                        let db_query = new_query().Where(
+                        let db_query = new_query().Limit(iteration_limit).Where(
                             "btype",
                             #eq(#Text("1mint")),
                         );
@@ -430,7 +436,7 @@ module TxsBenchUtils {
                     };
 
                     case ("query(): number range (250 < tx.amt <= 400)") {
-                        let db_query = new_query().Where(
+                        let db_query = new_query().Limit(iteration_limit).Where(
                             "tx.amt",
                             #gt(#Nat(250)),
                         ).And(
@@ -442,7 +448,7 @@ module TxsBenchUtils {
                     };
 
                     case ("query(): #And (btype='1burn' AND tx.amt>=750)") {
-                        let db_query = new_query().Where(
+                        let db_query = new_query().Limit(iteration_limit).Where(
                             "btype",
                             #eq(#Text("1burn")),
                         ).And(
@@ -454,7 +460,7 @@ module TxsBenchUtils {
                     };
 
                     case ("query(): #And (500_000<ts<=1_000_000 AND 200<amt<=600)") {
-                        let db_query = new_query().Where(
+                        let db_query = new_query().Limit(iteration_limit).Where(
                             "ts",
                             #gt(#Nat(500_000)),
                         ).And(
@@ -472,7 +478,7 @@ module TxsBenchUtils {
                     };
 
                     case ("query(): #Or (btype == '1xfer' OR '2xfer' OR '1mint')") {
-                        let db_query = new_query().Where(
+                        let db_query = new_query().Limit(iteration_limit).Where(
                             "btype",
                             #anyOf([#Text("1xfer"), #Text("2xfer"), #Text("1mint")]),
                         );
@@ -481,7 +487,7 @@ module TxsBenchUtils {
                     };
 
                     case ("query(): #Or (btype == '1xfer' OR tx.amt >= 500)") {
-                        let db_query = new_query().Where(
+                        let db_query = new_query().Limit(iteration_limit).Where(
                             "btype",
                             #eq(#Text("1xfer")),
                         ).Or(
@@ -493,7 +499,7 @@ module TxsBenchUtils {
                     };
 
                     case ("query(): #Or (btype == '1xfer' OR tx.amt >= 500 OR ts > 500_000)") {
-                        let db_query = new_query().Where(
+                        let db_query = new_query().Limit(iteration_limit).Where(
                             "btype",
                             #eq(#Text("1xfer")),
                         ).Or(
@@ -508,7 +514,7 @@ module TxsBenchUtils {
                     };
 
                     case ("query(): #Or (500_000<ts<=1_000_000 OR 200<amt<=600)") {
-                        let db_query = new_query().Where(
+                        let db_query = new_query().Limit(iteration_limit).Where(
                             "ts",
                             #gt(#Nat(500_000)),
                         ).And(
@@ -526,7 +532,7 @@ module TxsBenchUtils {
                     };
 
                     case ("query(): #Or (btype in ['1xfer', '1burn'] OR (tx.amt < 200 OR tx.amt >= 800))") {
-                        let db_query = new_query().Where(
+                        let db_query = new_query().Limit(iteration_limit).Where(
                             "btype",
                             #anyOf([#Text("1xfer"), #Text("1burn")]),
                         ).Or(
@@ -541,7 +547,7 @@ module TxsBenchUtils {
                     };
 
                     case ("query() -> principals[0] == tx.to.owner (is recipient)") {
-                        let db_query = new_query().Where(
+                        let db_query = new_query().Limit(iteration_limit).Where(
                             "tx.to.owner",
                             #eq(#Principal(principals.get(0))),
                         );
@@ -550,7 +556,7 @@ module TxsBenchUtils {
                     };
 
                     case ("query() -> principals[0..10] == tx.to.owner (is recipient)") {
-                        let db_query = new_query().Where(
+                        let db_query = new_query().Limit(iteration_limit).Where(
                             "tx.to.owner",
                             #anyOf(candid_principals_0_10),
                         );
@@ -559,7 +565,7 @@ module TxsBenchUtils {
                     };
 
                     case ("query() -> all txs involving principals[0]") {
-                        let db_query = new_query().Where(
+                        let db_query = new_query().Limit(iteration_limit).Where(
                             "tx.to.owner",
                             #eq(#Principal(principals.get(0))),
                         ).Or(
@@ -575,7 +581,7 @@ module TxsBenchUtils {
 
                     case ("query() -> all txs involving principals[0..10]") {
 
-                        let db_query = new_query().Where(
+                        let db_query = new_query().Limit(iteration_limit).Where(
                             "tx.to.owner",
                             #anyOf(candid_principals_0_10),
                         ).Or(
@@ -588,60 +594,61 @@ module TxsBenchUtils {
 
                         let #ok(matching_txs) = collection.search(db_query);
                     };
+
                     case ("update(): single operation -> #add amt += 100") {
-                        // Debug.print("tx_ids.size(): " # debug_show (tx_ids.size()));
-                        for (i in Itertools.take(tx_ids.vals(), iteration_limit)) {
-                            let #ok(_) = collection.updateById(Utils.nat_to_12_byte_blob(i), [("tx.amt", #add(#currValue, #Nat(100)))]);
-                        };
+                        let #ok(_) = collection.update(new_query().NoSort(), [("tx.amt", #add(#currValue, #Nat(100)))]);
                     };
 
                     case ("update(): multiple independent operations -> #add, #sub, #mul, #div on tx.amt") {
-                        for (i in Itertools.take(tx_ids.vals(), iteration_limit)) {
-                            let #ok(_) = collection.updateById(
-                                Utils.nat_to_12_byte_blob(i),
-                                [
-                                    ("tx.amt", #add(#currValue, #Nat(100))),
-                                    ("tx.amt", #sub(#currValue, #Nat(50))),
-                                    ("tx.amt", #mul(#currValue, #Nat(2))),
-                                    ("tx.amt", #div(#currValue, #Nat(2))),
-                                ],
-                            );
-                        };
+                        let #ok(_) = collection.update(
+                            new_query().NoSort(),
+                            [
+                                ("tx.amt", #add(#currValue, #Nat(100))),
+                                ("tx.amt", #sub(#currValue, #Nat(50))),
+                                ("tx.amt", #mul(#currValue, #Nat(2))),
+                                ("tx.amt", #div(#currValue, #Nat(2))),
+                            ],
+                        );
                     };
 
                     case ("update(): multiple nested operations -> #add, #sub, #mul, #div on tx.amt") {
-                        for (i in Itertools.take(tx_ids.vals(), iteration_limit)) {
-                            let #ok(_) = collection.updateById(
-                                Utils.nat_to_12_byte_blob(i),
-                                [("tx.amt", #div(#mul(#sub(#add(#currValue, #Nat(100)), #Nat(50)), #Nat(2)), #Nat(2)))],
-                            );
-                        };
+                        let #ok(_) = collection.update(
+                            new_query().NoSort(),
+                            [("tx.amt", #div(#mul(#sub(#add(#currValue, #Nat(100)), #Nat(50)), #Nat(2)), #Nat(2)))],
+                        );
+
                     };
 
                     case ("update(): multiple operations on multiple fields -> #add, #sub, #mul, #div on (tx.amt, ts, fee)") {
-                        for (i in Itertools.take(tx_ids.vals(), iteration_limit)) {
-                            let #ok(_) = collection.updateById(
-                                Utils.nat_to_12_byte_blob(i),
-                                [
-                                    ("tx.amt", #add(#currValue, #Nat(100))),
-                                    ("ts", #sub(#currValue, #Nat(50))),
-                                    ("fee", #mul(#currValue, #Nat(2))),
-                                    ("tx.amt", #div(#currValue, #Nat(2))),
-                                ],
-                            );
-                        };
+                        let #ok(_) = collection.update(
+                            new_query().NoSort(),
+                            [
+                                ("tx.amt", #add(#currValue, #Nat(100))),
+                                ("ts", #sub(#currValue, #Nat(0))),
+                                ("fee", #mul(#currValue, #Nat(2))),
+                                ("tx.amt", #div(#currValue, #Nat(2))),
+                            ],
+                        );
                     };
 
                     case ("replace() -> replace half the tx with new tx") {
-                        for (i in Itertools.take(tx_ids.vals(), iteration_limit)) {
-                            let #ok(_) = collection.replace(Utils.nat_to_12_byte_blob(i), new_tx(fuzz, principals));
-                        };
+
+                        let doc_replacements = Array.tabulate<(Blob, Tx)>(
+                            tx_ids.size(),
+                            func(i : Nat) : (Blob, Tx) {
+                                let id = Utils.nat_to_12_byte_blob(tx_ids.get(i));
+                                let new_tx = txs_to_replace.get(i);
+
+                                (id, new_tx);
+                            },
+                        );
+
+                        let #ok(_) = collection.replaceDocs(doc_replacements);
+
                     };
 
                     case ("delete()") {
-                        for (i in Itertools.take(tx_ids.vals(), iteration_limit)) {
-                            let #ok(_) = collection.deleteById(Utils.nat_to_12_byte_blob(i));
-                        };
+                        let #ok(_) = collection.delete(new_query().NoSort());
                     };
 
                     case (_) {

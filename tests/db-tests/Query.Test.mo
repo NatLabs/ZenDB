@@ -68,7 +68,7 @@ ZenDBSuite.newSuite(
                     Debug.print(debug_show (results));
 
                     let #ok(res) = results else return assert false;
-                    assert res.documents == [(text_a_id, { value = "a" })];
+                    assert res.documents == [(text_a_id, { value = "a" }, [])];
                 },
             );
 
@@ -88,10 +88,10 @@ ZenDBSuite.newSuite(
                         QueryBuilder().Where("value", #gt(#Text("and")))
                     ) else return assert false;
                     assert res.documents == [
-                        (text_anderson_id, { value = "anderson" }),
-                        (text_b_id, { value = "b" }),
-                        (text_berry_id, { value = "berry" }),
-                        (text_c_id, { value = "c" }),
+                        (text_anderson_id, { value = "anderson" }, []),
+                        (text_b_id, { value = "b" }, []),
+                        (text_berry_id, { value = "berry" }, []),
+                        (text_c_id, { value = "c" }, []),
                     ];
 
                     Debug.print(
@@ -106,10 +106,10 @@ ZenDBSuite.newSuite(
                         QueryBuilder().Where("value", #not_(#gt(#Text("and"))))
                     ) else return assert false;
                     assert result.documents == [
-                        (text_a_id, { value = "a" }),
-                        (text_alphabet_id, { value = "alphabet" }),
-                        (text_alphabetical_id, { value = "alphabetical" }),
-                        (text_and_id, { value = "and" }),
+                        (text_a_id, { value = "a" }, []),
+                        (text_alphabet_id, { value = "alphabet" }, []),
+                        (text_alphabetical_id, { value = "alphabetical" }, []),
+                        (text_and_id, { value = "and" }, []),
                     ];
                 },
             );
@@ -121,20 +121,20 @@ ZenDBSuite.newSuite(
                         QueryBuilder().Where("value", #gte(#Text("and")))
                     ) else return assert false;
                     assert result1.documents == [
-                        (text_and_id, { value = "and" }),
-                        (text_anderson_id, { value = "anderson" }),
-                        (text_b_id, { value = "b" }),
-                        (text_berry_id, { value = "berry" }),
-                        (text_c_id, { value = "c" }),
+                        (text_and_id, { value = "and" }, []),
+                        (text_anderson_id, { value = "anderson" }, []),
+                        (text_b_id, { value = "b" }, []),
+                        (text_berry_id, { value = "berry" }, []),
+                        (text_c_id, { value = "c" }, []),
                     ];
 
                     let #ok(result2) = texts.search(
                         QueryBuilder().Where("value", #not_(#gte(#Text("and"))))
                     ) else return assert false;
                     assert result2.documents == [
-                        (text_a_id, { value = "a" }),
-                        (text_alphabet_id, { value = "alphabet" }),
-                        (text_alphabetical_id, { value = "alphabetical" }),
+                        (text_a_id, { value = "a" }, []),
+                        (text_alphabet_id, { value = "alphabet" }, []),
+                        (text_alphabetical_id, { value = "alphabetical" }, []),
                     ];
                 },
             );
@@ -146,20 +146,20 @@ ZenDBSuite.newSuite(
                         QueryBuilder().Where("value", #lt(#Text("and")))
                     ) else return assert false;
                     assert result1.documents == [
-                        (text_a_id, { value = "a" }),
-                        (text_alphabet_id, { value = "alphabet" }),
-                        (text_alphabetical_id, { value = "alphabetical" }),
+                        (text_a_id, { value = "a" }, []),
+                        (text_alphabet_id, { value = "alphabet" }, []),
+                        (text_alphabetical_id, { value = "alphabetical" }, []),
                     ];
 
                     let #ok(result2) = texts.search(
                         QueryBuilder().Where("value", #not_(#lt(#Text("and"))))
                     ) else return assert false;
                     assert result2.documents == [
-                        (text_and_id, { value = "and" }),
-                        (text_anderson_id, { value = "anderson" }),
-                        (text_b_id, { value = "b" }),
-                        (text_berry_id, { value = "berry" }),
-                        (text_c_id, { value = "c" }),
+                        (text_and_id, { value = "and" }, []),
+                        (text_anderson_id, { value = "anderson" }, []),
+                        (text_b_id, { value = "b" }, []),
+                        (text_berry_id, { value = "berry" }, []),
+                        (text_c_id, { value = "c" }, []),
                     ];
                 },
             );
@@ -171,20 +171,20 @@ ZenDBSuite.newSuite(
                         QueryBuilder().Where("value", #lte(#Text("and")))
                     ) else return assert false;
                     assert result1.documents == [
-                        (text_a_id, { value = "a" }),
-                        (text_alphabet_id, { value = "alphabet" }),
-                        (text_alphabetical_id, { value = "alphabetical" }),
-                        (text_and_id, { value = "and" }),
+                        (text_a_id, { value = "a" }, []),
+                        (text_alphabet_id, { value = "alphabet" }, []),
+                        (text_alphabetical_id, { value = "alphabetical" }, []),
+                        (text_and_id, { value = "and" }, []),
                     ];
 
                     let #ok(result2) = texts.search(
                         QueryBuilder().Where("value", #not_(#lte(#Text("and"))))
                     ) else return assert false;
                     assert result2.documents == [
-                        (text_anderson_id, { value = "anderson" }),
-                        (text_b_id, { value = "b" }),
-                        (text_berry_id, { value = "berry" }),
-                        (text_c_id, { value = "c" }),
+                        (text_anderson_id, { value = "anderson" }, []),
+                        (text_b_id, { value = "b" }, []),
+                        (text_berry_id, { value = "berry" }, []),
+                        (text_c_id, { value = "c" }, []),
                     ];
                 },
             );
@@ -200,20 +200,20 @@ ZenDBSuite.newSuite(
                     let #ok(res_result) = res else return assert false;
                     Debug.print(debug_show { res_result });
                     assert res_result.documents == [
-                        (text_a_id, { value = "a" }),
-                        (text_b_id, { value = "b" }),
-                        (text_c_id, { value = "c" }),
+                        (text_a_id, { value = "a" }, []),
+                        (text_b_id, { value = "b" }, []),
+                        (text_c_id, { value = "c" }, []),
                     ];
 
                     //! Executes very slowly
                     // assert texts.search(
                     //     QueryBuilder().Where("value", #not_(#anyOf([#Text("a"), #Text("b"), #Text("c")])))
                     // ) == #ok([
-                    //     (1, { value = "alphabet" }),
-                    //     (2, { value = "alphabetical" }),
-                    //     (3, { value = "and" }),
-                    //     (4, { value = "anderson" }),
-                    //     (6, { value = "berry" }),
+                    //     (1, { value = "alphabet" }, []),
+                    //     (2, { value = "alphabetical" }, []),
+                    //     (3, { value = "and" }, []),
+                    //     (4, { value = "anderson" }, []),
+                    //     (6, { value = "berry" }, []),
                     // ]);
                 },
             );
@@ -223,11 +223,11 @@ ZenDBSuite.newSuite(
                 func() {
 
                     let expected_response = #ok([
-                        (text_a_id, { value = "a" }),
-                        (text_alphabet_id, { value = "alphabet" }),
-                        (text_alphabetical_id, { value = "alphabetical" }),
-                        (text_and_id, { value = "and" }),
-                        (text_anderson_id, { value = "anderson" }),
+                        (text_a_id, { value = "a" }, []),
+                        (text_alphabet_id, { value = "alphabet" }, []),
+                        (text_alphabetical_id, { value = "alphabetical" }, []),
+                        (text_and_id, { value = "and" }, []),
+                        (text_anderson_id, { value = "anderson" }, []),
                     ]);
 
                     let res0 = texts.search(
@@ -243,9 +243,9 @@ ZenDBSuite.newSuite(
                     assert res1 == expected_response;
 
                     let expected_negative_response = #ok([
-                        (text_b_id, { value = "b" }),
-                        (text_berry_id, { value = "berry" }),
-                        (text_c_id, { value = "c" }),
+                        (text_b_id, { value = "b" }, []),
+                        (text_berry_id, { value = "berry" }, []),
+                        (text_c_id, { value = "c" }, []),
                     ]);
 
                     Debug.print(
@@ -284,20 +284,20 @@ ZenDBSuite.newSuite(
 
                     let #ok(res_result) = res else return assert false;
                     assert res_result.documents == [
-                        (text_a_id, { value = "a" }),
-                        (text_alphabet_id, { value = "alphabet" }),
-                        (text_alphabetical_id, { value = "alphabetical" }),
-                        (text_and_id, { value = "and" }),
-                        (text_anderson_id, { value = "anderson" }),
+                        (text_a_id, { value = "a" }, []),
+                        (text_alphabet_id, { value = "alphabet" }, []),
+                        (text_alphabetical_id, { value = "alphabetical" }, []),
+                        (text_and_id, { value = "and" }, []),
+                        (text_anderson_id, { value = "anderson" }, []),
                     ];
 
                     let #ok(result2) = texts.search(
                         QueryBuilder().Where("value", #not_(#startsWith(#Text("a"))))
                     ) else return assert false;
                     assert result2.documents == [
-                        (text_b_id, { value = "b" }),
-                        (text_berry_id, { value = "berry" }),
-                        (text_c_id, { value = "c" }),
+                        (text_b_id, { value = "b" }, []),
+                        (text_berry_id, { value = "berry" }, []),
+                        (text_c_id, { value = "c" }, []),
                     ];
 
                     let res2 = texts.search(
@@ -306,20 +306,20 @@ ZenDBSuite.newSuite(
 
                     let #ok(res2_result) = res2 else return assert false;
                     assert res2_result.documents == [
-                        (text_alphabet_id, { value = "alphabet" }),
-                        (text_alphabetical_id, { value = "alphabetical" }),
+                        (text_alphabet_id, { value = "alphabet" }, []),
+                        (text_alphabetical_id, { value = "alphabetical" }, []),
                     ];
 
                     let #ok(result3) = texts.search(
                         QueryBuilder().Where("value", #not_(#startsWith(#Text("al"))))
                     ) else return assert false;
                     assert result3.documents == [
-                        (text_a_id, { value = "a" }),
-                        (text_and_id, { value = "and" }),
-                        (text_anderson_id, { value = "anderson" }),
-                        (text_b_id, { value = "b" }),
-                        (text_berry_id, { value = "berry" }),
-                        (text_c_id, { value = "c" }),
+                        (text_a_id, { value = "a" }, []),
+                        (text_and_id, { value = "and" }, []),
+                        (text_anderson_id, { value = "anderson" }, []),
+                        (text_b_id, { value = "b" }, []),
+                        (text_berry_id, { value = "berry" }, []),
+                        (text_c_id, { value = "c" }, []),
                     ];
 
                     let res3 = texts.search(
@@ -328,20 +328,20 @@ ZenDBSuite.newSuite(
 
                     let #ok(res3_result) = res3 else return assert false;
                     assert res3_result.documents == [
-                        (text_and_id, { value = "and" }),
-                        (text_anderson_id, { value = "anderson" }),
+                        (text_and_id, { value = "and" }, []),
+                        (text_anderson_id, { value = "anderson" }, []),
                     ];
 
                     let #ok(result4) = texts.search(
                         QueryBuilder().Where("value", #not_(#startsWith(#Text("and"))))
                     ) else return assert false;
                     assert result4.documents == [
-                        (text_a_id, { value = "a" }),
-                        (text_alphabet_id, { value = "alphabet" }),
-                        (text_alphabetical_id, { value = "alphabetical" }),
-                        (text_b_id, { value = "b" }),
-                        (text_berry_id, { value = "berry" }),
-                        (text_c_id, { value = "c" }),
+                        (text_a_id, { value = "a" }, []),
+                        (text_alphabet_id, { value = "alphabet" }, []),
+                        (text_alphabetical_id, { value = "alphabetical" }, []),
+                        (text_b_id, { value = "b" }, []),
+                        (text_berry_id, { value = "berry" }, []),
+                        (text_c_id, { value = "c" }, []),
                     ];
 
                     let res4 = texts.search(
@@ -355,14 +355,14 @@ ZenDBSuite.newSuite(
                         QueryBuilder().Where("value", #not_(#startsWith(#Text("ben"))))
                     ) else return assert false;
                     assert result5.documents == [
-                        (text_a_id, { value = "a" }),
-                        (text_alphabet_id, { value = "alphabet" }),
-                        (text_alphabetical_id, { value = "alphabetical" }),
-                        (text_and_id, { value = "and" }),
-                        (text_anderson_id, { value = "anderson" }),
-                        (text_b_id, { value = "b" }),
-                        (text_berry_id, { value = "berry" }),
-                        (text_c_id, { value = "c" }),
+                        (text_a_id, { value = "a" }, []),
+                        (text_alphabet_id, { value = "alphabet" }, []),
+                        (text_alphabetical_id, { value = "alphabetical" }, []),
+                        (text_and_id, { value = "and" }, []),
+                        (text_anderson_id, { value = "anderson" }, []),
+                        (text_b_id, { value = "b" }, []),
+                        (text_berry_id, { value = "berry" }, []),
+                        (text_c_id, { value = "c" }, []),
                     ];
 
                 },
@@ -378,14 +378,14 @@ ZenDBSuite.newSuite(
 
                     let #ok(res_result) = res else return assert false;
                     assert res_result.documents == [
-                        (text_a_id, { value = "a" }),
-                        (text_alphabet_id, { value = "alphabet" }),
-                        (text_alphabetical_id, { value = "alphabetical" }),
-                        (text_and_id, { value = "and" }),
-                        (text_anderson_id, { value = "anderson" }),
-                        (text_b_id, { value = "b" }),
-                        (text_berry_id, { value = "berry" }),
-                        (text_c_id, { value = "c" }),
+                        (text_a_id, { value = "a" }, []),
+                        (text_alphabet_id, { value = "alphabet" }, []),
+                        (text_alphabetical_id, { value = "alphabetical" }, []),
+                        (text_and_id, { value = "and" }, []),
+                        (text_anderson_id, { value = "anderson" }, []),
+                        (text_b_id, { value = "b" }, []),
+                        (text_berry_id, { value = "berry" }, []),
+                        (text_c_id, { value = "c" }, []),
                     ];
 
                 },

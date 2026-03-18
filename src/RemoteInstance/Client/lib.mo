@@ -27,13 +27,18 @@ module Client {
         };
 
         /// List all database names
-        public func listDatabaseNames() : async* [Text] {
+        public func listDatabaseNames() : async* ZT.Result<[Text], Text> {
             await canister_db.zendb_v1_list_database_names();
         };
 
         /// Rename a database
         public func renameDB(old_name : Text, new_name : Text) : async* (ZT.Result<(), Text>) {
             await canister_db.zendb_v1_rename_database(old_name, new_name);
+        };
+
+        /// Delete a database
+        public func deleteDB(db_name : Text) : async* (ZT.Result<(), Text>) {
+            await canister_db.zendb_v1_delete_database(db_name);
         };
 
         public func launchDefaultDB() : DatabaseClient.DatabaseClient {
@@ -106,7 +111,7 @@ module Client {
         /// Set (or clear) the db_registry canister that receives push notifications
         /// after every successful grant or revoke. Pass `null` to disable pushes.
         public func setAccessRegistry(registry : ?Principal) : async* ZT.Result<(), Text> {
-            await canister_db.set_access_registry(registry);
+            await canister_db.set_db_access_registry(registry);
         };
 
         // ─── Access details ──────────────────────────────────────────────────

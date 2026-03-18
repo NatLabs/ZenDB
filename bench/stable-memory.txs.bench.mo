@@ -64,7 +64,7 @@ module {
 
         let limit = 1_000;
 
-        let txs_benchmarks = TxsBenchUtils.TxsBenchmarks(limit, limit);
+        let txs_benchmarks = TxsBenchUtils.TxsBenchmarks(limit, limit, null);
 
         bench.runner(
             func(col, row) = txs_benchmarks.run_benchmarks(row, col)

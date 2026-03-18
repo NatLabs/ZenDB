@@ -647,24 +647,41 @@ module StableCollection {
     public func create_text_index(
         collection : T.StableCollection,
         index_name : Text,
-        field : Text,
+        fields : [Text],
         tokenizer : T.Tokenizer,
-    ) : T.Result<T.TextIndex, Text> {
+    ) : T.Result<(), Text> {
         let log = Logger.NamespacedLogger(collection.logger, LOGGER_NAMESPACE).subnamespace("create_text_index");
+
+        // Reject if a text index already exists on this collection
+        if (Map.has(collection.indexes, Map.thash, TextIndex.KEY)) {
+            return #err("A text index already exists on this collection");
+        };
 
         let text_index = TextIndex.new(
             collection,
-            index_name,
-            field,
+            TextIndex.KEY,
+            fields,
             tokenizer,
         );
+        ignore Map.put(collection.indexes, Map.thash, TextIndex.KEY, #text_index(text_index));
 
-        // todo: wip
-        ignore Map.put<Text, T.Index>(collection.indexes, Map.thash, index_name, #text_index(text_index));
+        // Backfill any documents that were inserted before this text index was created,
+        // mirroring what internal_populate_indexes does for composite indexes.
+        var backfill_count = 0;
+        for ((id, candid_blob) in entries(collection)) {
+            let candid_map = CollectionUtils.get_candid_map_no_cache(collection, id, ?candid_blob);
+            switch (TextIndex.insertWithCandidMap(collection, text_index, id, candid_map)) {
+                case (#err(err)) {
+                    return #err("create_text_index: backfill failed at document " # debug_show id # ": " # err);
+                };
+                case (#ok(())) {};
+            };
+            backfill_count += 1;
+        };
 
-        log.lazyInfo(func() = "Successfully created text index: " # index_name);
+        log.lazyInfo(func() = "Successfully created text index: " # index_name # " (backfilled " # debug_show backfill_count # " documents)");
 
-        #ok(text_index);
+        #ok();
     };
 
     public func clear_index(
@@ -1372,26 +1389,38 @@ module StableCollection {
 
         log.lazyDebug(func() = "Executing search with query: " # debug_show (stable_query));
 
-        switch (internal_search(collection, stable_query)) {
+        let text_search_matches_cache = Map.new<Blob, Map.Map<Nat64, T.TextMatch>>();
+        switch (evaluate_query(collection, stable_query, text_search_matches_cache)) {
             case (#err(err)) {
                 return #err("Search failed: " # err);
             };
             case (#ok(document_ids_iter)) {
-                let candid_blob_iter = ids_to_candid_blobs(collection, document_ids_iter);
-                let candid_blobs = Iter.toArray(candid_blob_iter);
-                log.lazyDebug(func() = "Search completed, found " # debug_show (candid_blobs.size()) # " results");
+                let documents = Iter.toArray(
+                    Iter.map<T.DocumentId, (T.DocumentId, T.CandidBlob, [T.TextMatch])>(
+                        document_ids_iter,
+                        func(id : T.DocumentId) : (T.DocumentId, T.CandidBlob, [T.TextMatch]) {
+                            let candid_blob = CollectionUtils.lookupCandidBlob(collection, id);
+                            let matches = switch (Map.get(text_search_matches_cache, Map.bhash, id)) {
+                                case (?inner) Iter.toArray(Map.vals(inner));
+                                case (null) [];
+                            };
+                            (id, candid_blob, matches);
+                        },
+                    )
+                );
+                log.lazyDebug(func() = "Search completed, found " # debug_show (documents.size()) # " results");
 
                 let pagination_token = {
-                    last_document_id = if (candid_blobs.size() == Option.get(stable_query.pagination.limit, 2 ** 64)) {
-                        ?candid_blobs[candid_blobs.size() - 1].0;
+                    last_document_id = if (documents.size() == Option.get(stable_query.pagination.limit, 2 ** 64)) {
+                        ?documents[documents.size() - 1].0;
                     } else (null);
                 };
 
                 let instructions = performance.total_instructions_used();
 
                 #ok({
-                    documents = candid_blobs;
-                    instructions = instructions;
+                    documents;
+                    instructions;
                     pagination_token;
                     has_more = Option.isSome(pagination_token.last_document_id);
                 });
@@ -1416,14 +1445,14 @@ module StableCollection {
             case (#err(err)) #err(err);
             case (#ok({ documents; instructions; pagination_token; has_more })) {
                 #ok({
-                    document = if (documents.size() == 0) null else ?documents[0];
+                    document = if (documents.size() == 0) null else ?(documents[0].0, documents[0].1, documents[0].2);
                     instructions;
                 });
             };
         };
     };
 
-    public func evaluate_query(collection : T.StableCollection, stable_query : T.StableQuery) : T.Result<T.Iter<T.DocumentId>, Text> {
+    public func evaluate_query(collection : T.StableCollection, stable_query : T.StableQuery, text_search_matches_cache : Map.Map<Blob, Map.Map<Nat64, T.TextMatch>>) : T.Result<T.Iter<T.DocumentId>, Text> {
         let log = Logger.NamespacedLogger(collection.logger, LOGGER_NAMESPACE).subnamespace("evaluate_query");
         log.lazyDebug(func() = "Evaluating query with operations: " # debug_show (stable_query.query_operations));
 
@@ -1449,19 +1478,22 @@ module StableCollection {
             func() = "Formatted query operations: " # debug_show formatted_query_operations
         );
 
-        let query_plan = QueryPlan.create_query_plan(
+        let query_plan = switch (QueryPlan.create_query_plan(
             collection,
             formatted_query_operations,
             sort_by,
             pagination.cursor,
-        );
+        )) {
+            case (#err(e)) return #err("Failed to create query plan: " # e);
+            case (#ok(r)) r;
+        };
 
         let sort_documents_by_field_cmp = switch (sort_by) {
             case (?sort_by) get_document_field_cmp(collection, sort_by);
             case (null) func(_ : (T.DocumentId, ?[(Text, T.Candid)]), _ : (T.DocumentId, ?[(Text, T.Candid)])) : T.Order = #equal;
         };
 
-        let eval = QueryExecution.generate_document_ids_for_query_plan(collection, query_plan, sort_by, sort_documents_by_field_cmp);
+        let eval = QueryExecution.generate_document_ids_for_query_plan(collection, query_plan, sort_by, sort_documents_by_field_cmp, text_search_matches_cache);
         var iter = paginate(collection, eval, Option.get(pagination.skip, 0), pagination.limit);
 
         ignore do ? {
@@ -1500,7 +1532,7 @@ module StableCollection {
 
     public func internal_search(collection : T.StableCollection, stable_query : T.StableQuery) : T.Result<T.Iter<T.DocumentId>, Text> {
         // let stable_query = query_builder.build();
-        switch (evaluate_query(collection, stable_query)) {
+        switch (evaluate_query(collection, stable_query, Map.new())) {
             case (#err(err)) return #err(err);
             case (#ok(eval_result)) #ok(eval_result);
         };
@@ -1683,12 +1715,15 @@ module StableCollection {
 
         log.lazyDebug(func() = "Counting documents with query: " # debug_show (stable_query));
 
-        let { query_plan } = QueryPlan.create_query_plan(
+        let { query_plan } = switch (QueryPlan.create_query_plan(
             collection,
             stable_query.query_operations,
             null,
             null,
-        );
+        )) {
+            case (#err(e)) return #err("Failed to create query plan: " # e);
+            case (#ok(r)) r;
+        };
 
         let count = switch (QueryExecution.get_unique_document_ids_from_query_plan(collection, Map.new(), query_plan)) {
             case (#Empty) 0;
@@ -1718,16 +1753,19 @@ module StableCollection {
     public func exists(collection : T.StableCollection, query_builder : QueryBuilder) : T.Result<Bool, Text> {
         let stable_query = query_builder.Limit(1).build();
 
-        let query_plan = QueryPlan.create_query_plan(
+        let query_plan = switch (QueryPlan.create_query_plan(
             collection,
             stable_query.query_operations,
             null,
             null,
-        );
+        )) {
+            case (#err(e)) return #err("Failed to create query plan: " # e);
+            case (#ok(r)) r;
+        };
 
         let sort_documents_by_field_cmp = func(_ : (T.DocumentId, ?[(Text, T.Candid)]), _ : (T.DocumentId, ?[(Text, T.Candid)])) : T.Order = #equal;
 
-        let eval = QueryExecution.generate_document_ids_for_query_plan(collection, query_plan, null, sort_documents_by_field_cmp);
+        let eval = QueryExecution.generate_document_ids_for_query_plan(collection, query_plan, null, sort_documents_by_field_cmp, Map.new());
 
         let greater_than_0 = switch (eval) {
             case (#Empty) false;

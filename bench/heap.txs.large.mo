@@ -30,8 +30,8 @@ module {
 
         bench.cols([
             "#heap no index",
-            "#heap 7 single field indexes",
-            "#heap 6 fully covered indexes",
+            // "#heap 7 single field indexes",
+            // "#heap 6 fully covered indexes",
         ]);
 
         bench.rows([
@@ -53,22 +53,22 @@ module {
             "query(): #Or (btype in ['1xfer', '1burn'] OR (tx.amt < 200 OR tx.amt >= 800))",
             "query() -> principals[0] == tx.to.owner (is recipient)",
             "query() -> principals[0..10] == tx.to.owner (is recipient)",
-            // "query() -> all txs involving principals[0]",
-            // "query() -> all txs involving principals[0..10]",
-            // "update(): single operation -> #add amt += 100",
-            // "update(): multiple independent operations -> #add, #sub, #mul, #div on tx.amt",
-            // "update(): multiple nested operations -> #add, #sub, #mul, #div on tx.amt",
-            // "update(): multiple operations on multiple fields -> #add, #sub, #mul, #div on (tx.amt, ts, fee)",
-            // "replace() -> replace half the tx with new tx",
-            // "delete()",
+            "query() -> all txs involving principals[0]",
+            "query() -> all txs involving principals[0..10]",
+            "update(): single operation -> #add amt += 100",
+            "update(): multiple independent operations -> #add, #sub, #mul, #div on tx.amt",
+            "update(): multiple nested operations -> #add, #sub, #mul, #div on tx.amt",
+            "update(): multiple operations on multiple fields -> #add, #sub, #mul, #div on (tx.amt, ts, fee)",
+            "replace() -> replace half the tx with new tx",
+            "delete()",
 
         ]);
 
-        let input_limit = 20_000;
+        let input_limit = 10_000;
 
-        let limit = 1_000;
+        let limit = 10_000;
 
-        let txs_benchmarks = TxsBenchUtils.TxsBenchmarks(input_limit, limit);
+        let txs_benchmarks = TxsBenchUtils.TxsBenchmarks(input_limit, limit, null);
 
         bench.runner(
             func(col, row) = txs_benchmarks.run_benchmarks(row, col)
