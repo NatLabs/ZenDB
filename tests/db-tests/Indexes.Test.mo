@@ -1,36 +1,37 @@
 // @testmode wasi
-import Debug "mo:base@0.16.0/Debug";
-import Buffer "mo:base@0.16.0/Buffer";
-import Blob "mo:base@0.16.0/Blob";
-import Text "mo:base@0.16.0/Text";
-import Order "mo:base@0.16.0/Order";
-import Nat8 "mo:base@0.16.0/Nat8";
-import Nat16 "mo:base@0.16.0/Nat16";
-import Nat32 "mo:base@0.16.0/Nat32";
-import Nat64 "mo:base@0.16.0/Nat64";
-import Int8 "mo:base@0.16.0/Int8";
-import Int16 "mo:base@0.16.0/Int16";
-import Int32 "mo:base@0.16.0/Int32";
-import Int64 "mo:base@0.16.0/Int64";
-import Int "mo:base@0.16.0/Int";
-import Nat "mo:base@0.16.0/Nat";
-import Float "mo:base@0.16.0/Float";
-import Principal "mo:base@0.16.0/Principal";
-import Iter "mo:base@0.16.0/Iter";
-import Bool "mo:base@0.16.0/Bool";
-import Array "mo:base@0.16.0/Array";
-import Char "mo:base@0.16.0/Char";
-import Result "mo:base@0.16.0/Result";
+import Debug "mo:core@2.4/Debug";
+import Buffer "mo:base@0.16/Buffer";
+import Blob "mo:core@2.4/Blob";
+import Text "mo:core@2.4/Text";
+import Order "mo:core@2.4/Order";
+import Nat8 "mo:core@2.4/Nat8";
+import Nat16 "mo:core@2.4/Nat16";
+import Nat32 "mo:core@2.4/Nat32";
+import Nat64 "mo:core@2.4/Nat64";
+import Int8 "mo:core@2.4/Int8";
+import Int16 "mo:core@2.4/Int16";
+import Int32 "mo:core@2.4/Int32";
+import Int64 "mo:core@2.4/Int64";
+import Int "mo:core@2.4/Int";
+import Nat "mo:core@2.4/Nat";
+import Float "mo:core@2.4/Float";
+import Principal "mo:core@2.4/Principal";
+import Iter "mo:core@2.4/Iter";
+import Bool "mo:core@2.4/Bool";
+import Array "mo:core@2.4/Array";
+import Char "mo:core@2.4/Char";
+import Result "mo:core@2.4/Result";
 
 import ZenDB "../../src/EmbeddedInstance";
 import CompositeIndex "../../src/EmbeddedInstance/Collection/Index/CompositeIndex";
 import Utils "../../src/EmbeddedInstance/Utils";
 
 import { test; suite } "mo:test";
-import Itertools "mo:itertools@0.2.2/Iter";
+import Itertools "mo:itertools@0.2/Iter";
 import Fuzz "mo:fuzz";
-import Map "mo:map@9.0.1/Map";
+import Map "mo:map@9.0/Map";
 import ZenDBSuite "../test-utils/TestFramework";
+import Runtime "mo:core@2.4/Runtime";
 
 let fuzz = Fuzz.fromSeed(0x7eadbeef);
 let { QueryBuilder } = ZenDB;
@@ -433,7 +434,7 @@ ZenDBSuite.newSuite(
         //                 case ("principal") get_candid_principal;
         //                 case ("blob") get_candid_blob;
         //                 case ("bool") get_candid_bool;
-        //                 case (_) Debug.trap("Unsupported type");
+        //                 case (_) Runtime.trap("Unsupported type");
         //             };
 
         //             let getter_b = switch (type_b) {
@@ -452,7 +453,7 @@ ZenDBSuite.newSuite(
         //                 case ("principal") get_candid_principal;
         //                 case ("blob") get_candid_blob;
         //                 case ("bool") get_candid_bool;
-        //                 case (_) Debug.trap("Unsupported type");
+        //                 case (_) Runtime.trap("Unsupported type");
         //             };
 
         //             test(

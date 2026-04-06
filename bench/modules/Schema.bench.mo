@@ -1,6 +1,6 @@
-import Debug "mo:base/Debug";
-import Nat "mo:base/Nat";
-import Array "mo:base/Array";
+import Debug "mo:core@2.4/Debug";
+import Nat "mo:core@2.4/Nat";
+import Array "mo:core@2.4/Array";
 
 import Bench "mo:bench";
 import Fuzz "mo:fuzz";

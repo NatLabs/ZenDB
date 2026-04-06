@@ -1,16 +1,16 @@
-import Debug "mo:base/Debug";
-import Nat "mo:base/Nat";
-import Array "mo:base/Array";
-import Blob "mo:base/Blob";
-import Iter "mo:base/Iter";
-import Principal "mo:base/Principal";
+import Debug "mo:core@2.4/Debug";
+import Nat "mo:core@2.4/Nat";
+import Array "mo:core@2.4/Array";
+import Blob "mo:core@2.4/Blob";
+import Iter "mo:core@2.4/Iter";
+import Principal "mo:core@2.4/Principal";
 
 import Bench "mo:bench";
 import Fuzz "mo:fuzz";
-import Map "mo:map@9.0.1/Map";
-import Set "mo:map@9.0.1/Set";
-import Vector "mo:vector@0.4.2";
-import Candid "mo:serde@3.4.0/Candid";
+import Map "mo:map@9.0/Map";
+import Set "mo:map@9.0/Set";
+import Vector "mo:vector@0.4";
+import Candid "mo:serde@3.5/Candid";
 
 import StableCollection "../../src/EmbeddedInstance/Collection/StableCollection";
 import CompositeIndex "../../src/EmbeddedInstance/Collection/Index/CompositeIndex";
@@ -20,6 +20,7 @@ import SchemaMap "../../src/EmbeddedInstance/Collection/SchemaMap";
 import Logger "../../src/EmbeddedInstance/Logger";
 import Ids "../../src/EmbeddedInstance/Ids";
 import TwoQueueCache "../../src/EmbeddedInstance/TwoQueueCache";
+import Runtime "mo:core@2.4/Runtime";
 
 module {
     type Schema = T.Schema;
@@ -83,6 +84,7 @@ module {
                 logger = Logger.init(#Warn, false);
                 memory_type;
                 is_running_locally = false;
+                is_compression_enabled = null;
             };
         };
 
@@ -113,7 +115,7 @@ module {
             func(c : Candid) : Blob {
                 switch (Candid.encode([c], null)) {
                     case (#ok(blob)) blob;
-                    case (#err(msg)) Debug.trap("Failed to encode: " # msg);
+                    case (#err(msg)) Runtime.trap("Failed to encode: " # msg);
                 };
             },
         );
@@ -165,7 +167,7 @@ module {
             func(c : Candid) : Blob {
                 switch (Candid.encode([c], null)) {
                     case (#ok(blob)) blob;
-                    case (#err(msg)) Debug.trap("Failed to encode: " # msg);
+                    case (#err(msg)) Runtime.trap("Failed to encode: " # msg);
                 };
             },
         );
@@ -247,7 +249,7 @@ module {
             func(c : Candid) : Blob {
                 switch (Candid.encode([c], null)) {
                     case (#ok(blob)) blob;
-                    case (#err(msg)) Debug.trap("Failed to encode: " # msg);
+                    case (#err(msg)) Runtime.trap("Failed to encode: " # msg);
                 };
             },
         );

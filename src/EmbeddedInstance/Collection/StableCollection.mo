@@ -1,42 +1,42 @@
 import Prim "mo:prim";
 
-import Principal "mo:base@0.16.0/Principal";
-import Array "mo:base@0.16.0/Array";
-import Debug "mo:base@0.16.0/Debug";
-import Text "mo:base@0.16.0/Text";
-import Char "mo:base@0.16.0/Char";
-import Nat32 "mo:base@0.16.0/Nat32";
-import Result "mo:base@0.16.0/Result";
-import Order "mo:base@0.16.0/Order";
-import Iter "mo:base@0.16.0/Iter";
-import Buffer "mo:base@0.16.0/Buffer";
-import Nat "mo:base@0.16.0/Nat";
-import Option "mo:base@0.16.0/Option";
-import Hash "mo:base@0.16.0/Hash";
-import Float "mo:base@0.16.0/Float";
-import Int "mo:base@0.16.0/Int";
-import Int32 "mo:base@0.16.0/Int32";
-import Blob "mo:base@0.16.0/Blob";
-import Nat64 "mo:base@0.16.0/Nat64";
-import Int16 "mo:base@0.16.0/Int16";
-import Int64 "mo:base@0.16.0/Int64";
-import Int8 "mo:base@0.16.0/Int8";
-import Nat16 "mo:base@0.16.0/Nat16";
-import Nat8 "mo:base@0.16.0/Nat8";
-import ExperimentalInternetComputer "mo:base@0.16.0/ExperimentalInternetComputer";
-import ExperimentalCycles "mo:base@0.16.0/ExperimentalCycles";
+import Principal "mo:core@2.4/Principal";
+import Array "mo:core@2.4/Array";
+import Debug "mo:core@2.4/Debug";
+import Text "mo:core@2.4/Text";
+import Char "mo:core@2.4/Char";
+import Nat32 "mo:core@2.4/Nat32";
+import Result "mo:core@2.4/Result";
+import Order "mo:core@2.4/Order";
+import Iter "mo:core@2.4/Iter";
+import Buffer "mo:base@0.16/Buffer";
+import Nat "mo:core@2.4/Nat";
+import Option "mo:core@2.4/Option";
+import Hash "mo:base@0.16/Hash";
+import Float "mo:core@2.4/Float";
+import Int "mo:core@2.4/Int";
+import Int32 "mo:core@2.4/Int32";
+import Blob "mo:core@2.4/Blob";
+import Nat64 "mo:core@2.4/Nat64";
+import Int16 "mo:core@2.4/Int16";
+import Int64 "mo:core@2.4/Int64";
+import Int8 "mo:core@2.4/Int8";
+import Nat16 "mo:core@2.4/Nat16";
+import Nat8 "mo:core@2.4/Nat8";
+import ExperimentalInternetComputer "mo:core@2.4/InternetComputer";
+import Cycles "mo:core@2.4/Cycles";
 
-import Map "mo:map@9.0.1/Map";
-import Set "mo:map@9.0.1/Set";
-import Serde "mo:serde@3.4.0";
-import Decoder "mo:serde@3.4.0/Candid/Blob/Decoder";
-import Candid "mo:serde@3.4.0/Candid";
-import Itertools "mo:itertools@0.2.2/Iter";
-import RevIter "mo:itertools@0.2.2/RevIter";
-import SparseBitMap64 "mo:bit-map@1.1.0/SparseBitMap64";
-import Vector "mo:vector@0.4.2";
-import MemoryBTree "mo:memory-collection@0.3.2/MemoryBTree/Stable";
-import ByteUtils "mo:byte-utils@0.1.1";
+import Map "mo:map@9.0/Map";
+import Set "mo:map@9.0/Set";
+import Serde "mo:serde@3.5";
+import Decoder "mo:serde@3.5/Candid/Blob/Decoder";
+import Candid "mo:serde@3.5/Candid";
+import Itertools "mo:itertools@0.2/Iter";
+import RevIter "mo:itertools@0.2/RevIter";
+import SparseBitMap64 "mo:bit-map@1.1/SparseBitMap64";
+import Vector "mo:vector@0.4";
+import MemoryBTree "mo:memory-collection@0.4/MemoryBTree/Stable";
+import ByteUtils "mo:byte-utils@0.2";
 import Ids "../Ids";
 
 import T "../Types";
@@ -61,6 +61,7 @@ import CandidUtils "../CandidUtils";
 import Logger "../Logger";
 import UpdateOps "UpdateOps";
 import BTree "../BTree";
+import Runtime "mo:core@2.4/Runtime";
 
 module StableCollection {
     let LOGGER_NAMESPACE = "StableCollection";
@@ -125,9 +126,13 @@ module StableCollection {
     };
 
     // BTree methods
-
     public func entries(collection : T.StableCollection) : T.Iter<(T.DocumentId, Blob)> {
-        DocumentStore.entries(collection);
+        Iter.map<(T.DocumentId, T.CandidBlob), (T.DocumentId, Blob)>(
+            DocumentStore.entries(collection), 
+            func((id, partial_candid_blob): (T.DocumentId, T.CandidBlob)): (T.DocumentId, Blob) {
+                (id, CollectionUtils.appendTypeHeaderToCandidBlob(collection, partial_candid_blob));
+            }
+        );
     };
 
     public func keys(collection : T.StableCollection) : T.Iter<T.DocumentId> {
@@ -135,11 +140,22 @@ module StableCollection {
     };
 
     public func vals(collection : T.StableCollection) : T.Iter<Blob> {
-        DocumentStore.vals(collection);
+        Iter.map<T.CandidBlob, Blob>(
+            DocumentStore.vals(collection), 
+            func(partial_candid_blob: T.CandidBlob): Blob {
+                CollectionUtils.appendTypeHeaderToCandidBlob(collection, partial_candid_blob);
+            }
+        );
+        
     };
 
     public func range(collection : T.StableCollection, start : Nat, end : Nat) : T.Iter<(T.DocumentId, Blob)> {
-        DocumentStore.range(collection, start, end);
+        Iter.map<(T.DocumentId, T.CandidBlob), (T.DocumentId, Blob)>(
+            DocumentStore.range(collection, start, end),
+            func((id, partial_candid_blob): (T.DocumentId, T.CandidBlob)): (T.DocumentId, Blob) {
+                (id, CollectionUtils.appendTypeHeaderToCandidBlob(collection, partial_candid_blob));
+            }
+        );
     };
 
     public func range_keys(collection : T.StableCollection, start : Nat, end : Nat) : T.Iter<T.DocumentId> {
@@ -147,7 +163,12 @@ module StableCollection {
     };
 
     public func range_vals(collection : T.StableCollection, start : Nat, end : Nat) : T.Iter<Blob> {
-        DocumentStore.range_vals(collection, start, end);
+        Iter.map<T.CandidBlob, Blob>(
+            DocumentStore.range_vals(collection, start, end),
+            func(partial_candid_blob: T.CandidBlob): Blob {
+                CollectionUtils.appendTypeHeaderToCandidBlob(collection, partial_candid_blob);
+            }
+        );
     };
 
     // public func update_schema<NewRecord>(collection : T.StableCollection, schema : T.Schema) : T.Result<(), Text> {
@@ -186,7 +207,7 @@ module StableCollection {
                 // Return the existing index directly
                 switch (index) {
                     case (#composite_index(composite_index)) return #ok(composite_index);
-                    case (#text_index(_)) Debug.trap("Expected composite index but found text index");
+                    case (#text_index(_)) Runtime.trap("Expected composite index but found text index");
                 };
             };
             case (null) {};
@@ -354,8 +375,8 @@ module StableCollection {
         let errors = Buffer.Buffer<Text>(collection.indexes.size());
         var processed_documents = 0;
 
-        for ((document_id, candid_blob) in Itertools.take(entries_iter, num_documents_to_process)) {
-            let candid_map = CollectionUtils.get_candid_map_no_cache(collection, document_id, ?candid_blob);
+        for ((document_id, partial_candid_blob) in Itertools.take(entries_iter, num_documents_to_process)) {
+            let candid_map = CollectionUtils.get_candid_map_no_cache(collection, document_id, ?partial_candid_blob);
 
             let processed_indexes = Buffer.Buffer<T.Index>(collection.indexes.size());
 
@@ -478,28 +499,28 @@ module StableCollection {
 
     };
 
-    class Cycles(is_running_locally : Bool) {
+    // class Cycles(is_running_locally : Bool) {
 
-        let balance = if (is_running_locally) 0 else ExperimentalCycles.balance();
+    //     let balance = if (is_running_locally) 0 else Cycles.balance();
 
-        public func cycles_used(opt_accepted_cycles : ?Nat) : Nat {
-            if (is_running_locally) return 0;
+    //     public func cycles_used(opt_accepted_cycles : ?Nat) : Nat {
+    //         if (is_running_locally) return 0;
 
-            let current_balance = ExperimentalCycles.balance();
+    //         let current_balance = Cycles.balance();
 
-            switch (opt_accepted_cycles) {
-                case (?accepted_cycles) {
-                    // subtract the accepted cycles from the balance difference
-                    balance + accepted_cycles - current_balance;
-                };
-                case (null) {
-                    balance - current_balance;
-                };
-            };
+    //         switch (opt_accepted_cycles) {
+    //             case (?accepted_cycles) {
+    //                 // subtract the accepted cycles from the balance difference
+    //                 balance + accepted_cycles - current_balance;
+    //             };
+    //             case (null) {
+    //                 balance - current_balance;
+    //             };
+    //         };
 
-        };
+    //     };
 
-    };
+    // };
 
     public func populate_indexes_in_batch(
         collection : T.StableCollection,
@@ -668,8 +689,8 @@ module StableCollection {
         // Backfill any documents that were inserted before this text index was created,
         // mirroring what internal_populate_indexes does for composite indexes.
         var backfill_count = 0;
-        for ((id, candid_blob) in entries(collection)) {
-            let candid_map = CollectionUtils.get_candid_map_no_cache(collection, id, ?candid_blob);
+        for ((id, partial_candid_blob) in DocumentStore.entries(collection)) {
+            let candid_map = CollectionUtils.get_candid_map_no_cache(collection, id, ?partial_candid_blob);
             switch (TextIndex.insertWithCandidMap(collection, text_index, id, candid_map)) {
                 case (#err(err)) {
                     return #err("create_text_index: backfill failed at document " # debug_show id # ": " # err);
@@ -714,8 +735,8 @@ module StableCollection {
         log.lazyInfo(func() = "Populating " # debug_show indexes.size() # " indexes");
 
         var count = 0;
-        for ((id, candid_blob) in entries) {
-            let candid_map = CollectionUtils.get_candid_map_no_cache(collection, id, ?candid_blob);
+        for ((id, partial_candid_blob) in entries) {
+            let candid_map = CollectionUtils.get_candid_map_no_cache(collection, id, ?partial_candid_blob);
 
             for (index in indexes.vals()) {
                 switch (Index.insertWithCandidMap(collection, index, id, candid_map)) {
@@ -744,37 +765,6 @@ module StableCollection {
         let max_entries = max_instructions / (decode_cost + insert_cost * num_indexes);
 
         max_entries;
-    };
-
-    public func repopulate_index(
-        collection : T.StableCollection,
-        index_name : Text,
-    ) : T.Result<(), Text> {
-        repopulate_indexes(collection, [index_name]);
-    };
-
-    public func repopulate_indexes(
-        collection : T.StableCollection,
-        index_names : [Text],
-    ) : T.Result<(), Text> {
-        let log = Logger.NamespacedLogger(collection.logger, LOGGER_NAMESPACE).subnamespace("repopulate_indexes");
-
-        log.lazyInfo(func() = "Starting to populate indexes: " # debug_show index_names);
-
-        let indexes = Buffer.Buffer<T.Index>(index_names.size());
-
-        for (index_name in index_names.vals()) {
-            let ?index = Map.get(collection.indexes, Map.thash, index_name) else {
-                return #err("CompositeIndex '" # index_name # "' does not exist");
-            };
-
-            indexes.add(index);
-        };
-
-        log.lazyDebug(func() = "Collected " # debug_show indexes.size() # " indexes to populate");
-
-        Index.populate_indexes(collection, Buffer.toArray(indexes));
-
     };
 
     public func delete_index(
@@ -1084,7 +1074,8 @@ module StableCollection {
 
         let prev_candid_map = CollectionUtils.get_candid_map_no_cache(collection, document_id, null);
 
-        let new_candid_value = CollectionUtils.decodeCandidBlob(collection, new_candid_blob);
+        let new_partial_candid_blob = CollectionUtils.stripCandidBlobTypeHeader(collection, new_candid_blob);
+        let new_candid_value = CollectionUtils.decodePartialCandidBlob(collection, new_partial_candid_blob);
         let new_candid_map = CandidMap.new(collection.schema_map, document_id, new_candid_value);
 
         switch (Schema.validate(collection.schema, new_candid_value)) {
@@ -1102,7 +1093,7 @@ module StableCollection {
             };
         };
 
-        assert Option.isSome(DocumentStore.put(collection, document_id, new_candid_blob));
+        assert Option.isSome(DocumentStore.put(collection, document_id, new_partial_candid_blob));
 
         for (index in Map.vals(collection.indexes)) {
             let #ok(_) = update_indexed_document_fields(collection, index, document_id, new_candid_map, ?prev_candid_map) else {
@@ -1239,14 +1230,14 @@ module StableCollection {
             };
         };
 
-        let new_candid_blob = switch (Candid.TypedSerializer.encode(collection.candid_serializer, [new_candid_document])) {
-            case (#ok(new_candid_blob)) new_candid_blob;
+        let new_partial_candid_blob = switch (Candid.TypedSerializer.encodeWithNoTypeHeader(collection.candid_serializer, [new_candid_document])) {
+            case (#ok(new_partial_candid_blob)) new_partial_candid_blob;
             case (#err(msg)) {
                 return #err("Failed to encode new candid blob: " # msg);
             };
         };
 
-        assert Option.isSome(DocumentStore.put(collection, id, new_candid_blob));
+        assert Option.isSome(DocumentStore.put(collection, id, new_partial_candid_blob));
 
         let updated_keys = Array.map<(Text, Any), Text>(
             field_updates,
@@ -1273,13 +1264,15 @@ module StableCollection {
     public func insert(collection : T.StableCollection, candid_blob : T.CandidBlob) : T.Result<T.DocumentId, Text> {
         let log = Logger.NamespacedLogger(collection.logger, LOGGER_NAMESPACE).subnamespace("insert");
 
+        let partial_candid_blob = CollectionUtils.stripCandidBlobTypeHeader(collection, candid_blob);
+
         let next_id = Ids.next(collection.ids);
         let next_id_as_blob = Blob.fromArray(ByteUtils.BigEndian.fromNat64(Nat64.fromNat(next_id)));
         let document_id = Utils.concat_blob(collection.instance_id, next_id_as_blob);
 
         log.lazyInfo(func() = "ZenDB Collection.put(): Inserting document with id " # debug_show document_id);
 
-        let candid = CollectionUtils.decodeCandidBlob(collection, candid_blob);
+        let candid = CollectionUtils.decodePartialCandidBlob(collection, partial_candid_blob);
 
         log.lazyDebug(func() = "ZenDB Collection.put(): Inserting document with id " # debug_show document_id # " and candid " # debug_show candid);
 
@@ -1301,12 +1294,12 @@ module StableCollection {
             };
         };
 
-        let opt_prev = DocumentStore.put(collection, document_id, candid_blob);
+        let opt_prev = DocumentStore.put(collection, document_id, partial_candid_blob);
 
         switch (opt_prev) {
             case (null) {};
             case (?prev) {
-                Debug.trap("put(): Record with id " # debug_show document_id # " already exists. Internal error found, report this to the developers");
+                Runtime.trap("put(): Record with id " # debug_show document_id # " already exists. Internal error found, report this to the developers");
             };
         };
 
@@ -1372,7 +1365,7 @@ module StableCollection {
         collection : T.StableCollection,
         id : T.DocumentId,
     ) : ?T.CandidBlob {
-        DocumentStore.get(collection, id);
+        CollectionUtils.getOptFullCandidBlob(collection, id);
     };
 
     public type SearchResult = {
@@ -1399,7 +1392,7 @@ module StableCollection {
                     Iter.map<T.DocumentId, (T.DocumentId, T.CandidBlob, [T.TextMatch])>(
                         document_ids_iter,
                         func(id : T.DocumentId) : (T.DocumentId, T.CandidBlob, [T.TextMatch]) {
-                            let candid_blob = CollectionUtils.lookupCandidBlob(collection, id);
+                            let candid_blob = CollectionUtils.lookupFullCandidBlob(collection, id);
                             let matches = switch (Map.get(text_search_matches_cache, Map.bhash, id)) {
                                 case (?inner) Iter.toArray(Map.vals(inner));
                                 case (null) [];
@@ -1502,7 +1495,7 @@ module StableCollection {
 
             let last_pagination_document = CollectionUtils.get_and_cache_candid_map(collection, last_document_id);
             let ?last_sort_value = CandidMap.get(last_pagination_document, collection.schema_map, sort_column) else {
-                Debug.trap("Couldn't get sort value from last pagination document for key: " # sort_column);
+                Runtime.trap("Couldn't get sort value from last pagination document for key: " # sort_column);
             };
 
             let sort_order = stable_query.sort_by!.1;
@@ -1511,7 +1504,7 @@ module StableCollection {
                 iter,
                 func(curr_id : T.DocumentId) : Bool {
                     let current_document_candid_map = CollectionUtils.get_and_cache_candid_map(collection, curr_id);
-                    let ?current_sort_value = CandidMap.get(current_document_candid_map, collection.schema_map, sort_column) else Debug.trap("Couldn't get sort value from current document for key: " # sort_column);
+                    let ?current_sort_value = CandidMap.get(current_document_candid_map, collection.schema_map, sort_column) else Runtime.trap("Couldn't get sort value from current document for key: " # sort_column);
                     let order = Schema.cmp_candid(#Empty, current_sort_value, last_sort_value);
 
                     order == 0 and (if (sort_order == #Ascending) last_document_id >= curr_id else last_document_id <= curr_id);
@@ -1542,7 +1535,7 @@ module StableCollection {
         Iter.map<T.DocumentId, (T.DocumentId, Record)>(
             iter,
             func(id : T.DocumentId) : (T.DocumentId, Record) {
-                let document = CollectionUtils.lookupDocument<Record>(collection, blobify, id);
+                let document = CollectionUtils.lookupMotokoDocument<Record>(collection, blobify, id);
                 (id, document);
             },
         );
@@ -1552,7 +1545,7 @@ module StableCollection {
         Iter.map<T.DocumentId, (T.DocumentId, T.CandidBlob)>(
             iter,
             func(id : T.DocumentId) : (T.DocumentId, T.CandidBlob) {
-                let candid_blob = CollectionUtils.lookupCandidBlob(collection, id);
+                let candid_blob = CollectionUtils.lookupFullCandidBlob(collection, id);
                 (id, candid_blob);
             },
         );
@@ -1593,7 +1586,7 @@ module StableCollection {
 
                 // Sort field not in indexed fields, fetch from document
                 let ?candid_value = CandidMap.get(CollectionUtils.get_and_cache_candid_map(collection, id), collection.schema_map, sort_field.0) else {
-                    Debug.trap("Couldn't get value from CandidMap for key: " # sort_field.0);
+                    Runtime.trap("Couldn't get value from CandidMap for key: " # sort_field.0);
                 };
 
                 candid_value;
@@ -1833,11 +1826,11 @@ module StableCollection {
 
         log.lazyInfo(func() = "Deleting document with id: " # debug_show id);
 
-        let ?prev_candid_blob = DocumentStore.remove(collection, id) else {
+        let ?prev_partial_candid_blob = DocumentStore.remove(collection, id) else {
             return #err("Record not found");
         };
 
-        let prev_candid_map = CollectionUtils.get_candid_map_no_cache(collection, id, ?prev_candid_blob);
+        let prev_candid_map = CollectionUtils.get_candid_map_no_cache(collection, id, ?prev_partial_candid_blob);
 
         for ((index_name, index) in Map.entries(collection.indexes)) {
 
@@ -1856,7 +1849,7 @@ module StableCollection {
         let instructions = performance.total_instructions_used();
 
         #ok({
-            deleted_document = prev_candid_blob;
+            deleted_document = CollectionUtils.appendTypeHeaderToCandidBlob(collection, prev_partial_candid_blob);
             instructions = instructions;
         });
     };

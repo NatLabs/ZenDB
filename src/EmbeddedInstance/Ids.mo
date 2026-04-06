@@ -1,4 +1,4 @@
-import Option "mo:base@0.16.0/Option";
+import Option "mo:core@2.4/Option";
 
 module {
     public func new() : [var Nat] {

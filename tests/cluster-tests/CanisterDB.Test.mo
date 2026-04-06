@@ -1,5 +1,4 @@
-import Cycles "mo:base@0.16.0/ExperimentalCycles";
-import Principal "mo:base@0.16.0/Principal";
+import Principal "mo:core@2.4/Principal";
 
 import { test; suite } "mo:test/async";
 
@@ -16,13 +15,11 @@ persistent actor {
     /// covers WASM installation (UserProxy imports large type modules), the rest
     /// stays as the canister's operating balance.
     func spawnProxy(db : actor {}) : async UserProxy.UserProxy {
-        Cycles.add(2 * TRILLION);
-        await UserProxy.UserProxy(Principal.fromActor(db))
+        await (with cycles = 2 * TRILLION) UserProxy.UserProxy(Principal.fromActor(db))
     };
 
     public func runTests() : async () {
-        Cycles.add(5 * TRILLION);
-        let canister_db = await CanisterDB.CanisterDB();
+        let canister_db = await (with cycles = 5 * TRILLION) CanisterDB.CanisterDB();
 
         type User = {
             name : Text;

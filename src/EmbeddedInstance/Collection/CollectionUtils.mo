@@ -1,42 +1,42 @@
-import Principal "mo:base@0.16.0/Principal";
-import Array "mo:base@0.16.0/Array";
-import Debug "mo:base@0.16.0/Debug";
-import Text "mo:base@0.16.0/Text";
-import Char "mo:base@0.16.0/Char";
-import Nat32 "mo:base@0.16.0/Nat32";
-import Result "mo:base@0.16.0/Result";
-import Order "mo:base@0.16.0/Order";
-import Iter "mo:base@0.16.0/Iter";
-import Buffer "mo:base@0.16.0/Buffer";
-import Nat "mo:base@0.16.0/Nat";
-import Option "mo:base@0.16.0/Option";
-import Hash "mo:base@0.16.0/Hash";
-import Float "mo:base@0.16.0/Float";
-import Int "mo:base@0.16.0/Int";
-import Int32 "mo:base@0.16.0/Int32";
-import Blob "mo:base@0.16.0/Blob";
-import Nat64 "mo:base@0.16.0/Nat64";
-import Int16 "mo:base@0.16.0/Int16";
-import Int64 "mo:base@0.16.0/Int64";
-import Int8 "mo:base@0.16.0/Int8";
-import Nat16 "mo:base@0.16.0/Nat16";
-import Nat8 "mo:base@0.16.0/Nat8";
-import InternetComputer "mo:base@0.16.0/ExperimentalInternetComputer";
+import Principal "mo:core@2.4/Principal";
+import Array "mo:core@2.4/Array";
+import Debug "mo:core@2.4/Debug";
+import Text "mo:core@2.4/Text";
+import Char "mo:core@2.4/Char";
+import Nat32 "mo:core@2.4/Nat32";
+import Result "mo:core@2.4/Result";
+import Order "mo:core@2.4/Order";
+import Iter "mo:core@2.4/Iter";
+import Buffer "mo:base@0.16/Buffer";
+import Nat "mo:core@2.4/Nat";
+import Option "mo:core@2.4/Option";
+import Hash "mo:base@0.16/Hash";
+import Float "mo:core@2.4/Float";
+import Int "mo:core@2.4/Int";
+import Int32 "mo:core@2.4/Int32";
+import Blob "mo:core@2.4/Blob";
+import Nat64 "mo:core@2.4/Nat64";
+import Int16 "mo:core@2.4/Int16";
+import Int64 "mo:core@2.4/Int64";
+import Int8 "mo:core@2.4/Int8";
+import Nat16 "mo:core@2.4/Nat16";
+import Nat8 "mo:core@2.4/Nat8";
+import InternetComputer "mo:core@2.4/InternetComputer";
 
-import Map "mo:map@9.0.1/Map";
-import Set "mo:map@9.0.1/Set";
-import Serde "mo:serde@3.4.0";
-import Decoder "mo:serde@3.4.0/Candid/Blob/Decoder";
-import Candid "mo:serde@3.4.0/Candid";
-import Itertools "mo:itertools@0.2.2/Iter";
-import RevIter "mo:itertools@0.2.2/RevIter";
-import ByteUtils "mo:byte-utils@0.1.1";
+import Map "mo:map@9.0/Map";
+import Set "mo:map@9.0/Set";
+import Serde "mo:serde@3.5";
+import Decoder "mo:serde@3.5/Candid/Blob/Decoder";
+import Candid "mo:serde@3.5/Candid";
+import Itertools "mo:itertools@0.2/Iter";
+import RevIter "mo:itertools@0.2/RevIter";
+import ByteUtils "mo:byte-utils@0.2";
 
-import MemoryBTree "mo:memory-collection@0.3.2/MemoryBTree/Stable";
-import TypeUtils "mo:memory-collection@0.3.2/TypeUtils";
-import Int8Cmp "mo:memory-collection@0.3.2/TypeUtils/Int8Cmp";
-import Cmp "mo:augmented-btrees@0.7.1/Cmp";
-import Vector "mo:vector@0.4.2";
+import MemoryBTree "mo:memory-collection@0.4/MemoryBTree/Stable";
+import TypeUtils "mo:memory-collection@0.4/TypeUtils";
+import Int8Cmp "mo:memory-collection@0.4/TypeUtils/Int8Cmp";
+import Cmp "mo:augmented-btrees@0.9/Cmp";
+import Vector "mo:vector@0.4";
 
 import T "../Types";
 import Query "../Query";
@@ -51,6 +51,7 @@ import SchemaMap "SchemaMap";
 import BTree "../BTree";
 import DocumentStore "DocumentStore";
 import TwoQueueCache "../TwoQueueCache";
+import Runtime "mo:core@2.4/Runtime";
 
 module CollectionUtils {
     let LOGGER_NAMESPACE = "CollectionUtils";
@@ -92,7 +93,11 @@ module CollectionUtils {
                         #stableMemory(memory_btree);
                     };
                     case (null) {
-                        BTree.newStableMemory();
+                        if (Option.get(collection.is_compression_enabled, true)) {
+                            BTree.newStableMemory();
+                        } else {
+                            BTree.newStableMemoryUncompressed();
+                        };
                     };
                 };
             };
@@ -198,29 +203,77 @@ module CollectionUtils {
 
     };
 
-    public func lookupDocument<Record>(collection : T.StableCollection, blobify : T.InternalCandify<Record>, id : T.DocumentId) : Record {
-        let ?documentDetails = DocumentStore.get(collection, id) else Debug.trap("lookupDocument: document not found for id: " # debug_show id);
-        let document = blobify.from_blob(documentDetails);
+    public func stripCandidBlobTypeHeader(collection : T.StableCollection, candid_blob : Blob) : Blob {
+        let header_size = Candid.TypedSerializer.getTypeHeader(collection.candid_serializer).size();
+        Utils.slice_blob(candid_blob, header_size, candid_blob.size());
+    };
+
+    public func appendTypeHeaderToCandidBlob(collection : T.StableCollection, candid_blob : Blob) : Blob {
+        let candid_blob_type_header = Candid.TypedSerializer.getTypeHeader(collection.candid_serializer);
+
+        Blob.fromArray(
+            Array.concat(
+                candid_blob_type_header,
+                Blob.toArray(candid_blob),
+            )
+        );
+    };
+
+
+    public func getOptPartialCandidBlob(collection : T.StableCollection, id : T.DocumentId) : ?Blob {
+        DocumentStore.get(collection, id); 
+    };
+
+    public func getOptFullCandidBlob(collection : T.StableCollection, id : T.DocumentId) : ?Blob {
+        let ?partial_candid_blob = getOptPartialCandidBlob(collection, id) else return null;
+        let candid_blob_type_header = Candid.TypedSerializer.getTypeHeader(collection.candid_serializer);
+
+        ?(appendTypeHeaderToCandidBlob(collection, partial_candid_blob));
+    };
+
+    public func lookupPartialCandidBlob(collection : T.StableCollection, id : T.DocumentId) : Blob {
+        let ?documentCandidBlob : ?Blob = getOptPartialCandidBlob(collection, id) else Runtime.trap("lookupPartialCandidBlob: document not found for id: " # debug_show id);
+        
+        documentCandidBlob;
+    };
+
+    public func lookupFullCandidBlob(collection : T.StableCollection, id : T.DocumentId) : Blob {
+        let ?candid_blob = getOptFullCandidBlob(collection, id) else Runtime.trap("lookupFullCandidBlob: document not found for id: " # debug_show id);
+        candid_blob;
+    };
+
+    public func lookupMotokoDocument<Record>(collection : T.StableCollection, blobify : T.InternalCandify<Record>, id : T.DocumentId) : Record {
+        let documentCandidBlob = lookupFullCandidBlob(collection, id);
+        let document = blobify.from_blob(documentCandidBlob);
         document;
     };
 
-    public func lookupCandidBlob(collection : T.StableCollection, id : T.DocumentId) : Blob {
-        let ?documentDetails : ?Blob = DocumentStore.get(collection, id) else Debug.trap("lookupCandidBlob: document not found for id: " # debug_show id);
-        documentDetails;
+    public func decodePartialCandidBlob(collection : T.StableCollection, candid_blob : Blob) : Candid.Candid {
+        let candid_result = Candid.TypedSerializer.decodeWithNoTypeHeader(collection.candid_serializer, candid_blob);
+        let #ok(candid_values) = candid_result else Runtime.trap("decodePartialCandidBlob: decoding candid blob failed: " # debug_show candid_result);
+        let candid = candid_values[0];
+        candid;
     };
 
-    public func decodeCandidBlob(collection : T.StableCollection, candid_blob : Blob) : Candid.Candid {
+
+    /// Only used for testing purposes, internally we should be using decodePartialCandidBlob to avoid the overhead of encoding/decoding the type header 
+    public func decodeFullCandidBlob(collection : T.StableCollection, candid_blob : Blob) : Candid.Candid {
         let candid_result = Candid.TypedSerializer.decode(collection.candid_serializer, candid_blob);
-        let #ok(candid_values) = candid_result else Debug.trap("decodeCandidBlob: decoding candid blob failed: " # debug_show candid_result);
+        let #ok(candid_values) = candid_result else Runtime.trap("decodeFullCandidBlob: decoding candid blob failed: " # debug_show candid_result);
         let candid = candid_values[0];
         candid;
     };
 
     public func lookupCandidDocument(collection : T.StableCollection, id : T.DocumentId) : ?Candid.Candid {
-        let ?document_details = DocumentStore.get(collection, id) else return null;
-        let candid = decodeCandidBlob(collection, document_details);
+        let document_details = lookupPartialCandidBlob(collection, id);
+        let candid = decodePartialCandidBlob(collection, document_details);
 
         ?candid;
+    };
+
+    public func removeCandidBlob(collection : T.StableCollection, id : T.DocumentId) : ?Blob {
+        let ?partial_candid_blob = DocumentStore.remove(collection, id) else return null;
+        ?appendTypeHeaderToCandidBlob(collection, partial_candid_blob);
     };
 
     public func candidMapFilterCondition(collection : T.StableCollection, id : T.DocumentId, candid_map : T.CandidMap, lower : [(Text, ?T.CandidInclusivityQuery)], upper : [(Text, ?T.CandidInclusivityQuery)]) : Bool {
@@ -290,7 +343,7 @@ module CollectionUtils {
     };
 
     public func get_composite_index(collection : T.StableCollection, index_name : Text) : T.CompositeIndex {
-        let ?index = Map.get(collection.indexes, Map.thash, index_name) else Debug.trap("Unreachable: IndexMap not found for index: " # index_name);
+        let ?index = Map.get(collection.indexes, Map.thash, index_name) else Runtime.trap("Unreachable: IndexMap not found for index: " # index_name);
         let internal_index = switch (index) {
             case (#text_index(text_index)) text_index.internal_index;
             case (#composite_index(composite_index)) composite_index;
@@ -378,7 +431,7 @@ module CollectionUtils {
                 assert key == upper_key;
 
                 // Caller should have verified all fields are present - trap if not to catch bugs
-                let ?field_value = Map.get(indexed_fields_map, Map.thash, key) else Debug.trap("filter_with_indexed_fields: field '" # key # "' not found in indexed_fields_map. This indicates a bug in the precondition check.");
+                let ?field_value = Map.get(indexed_fields_map, Map.thash, key) else Runtime.trap("filter_with_indexed_fields: field '" # key # "' not found in indexed_fields_map. This indicates a bug in the precondition check.");
 
                 var res = true;
 
@@ -447,7 +500,7 @@ module CollectionUtils {
 
                 if (use_indexed_fields) {
                     // Populate indexed fields map for filtering
-                    let ?indexed_fields = opt_indexed_fields else Debug.trap("multiFilterWithIndexedFields: indexed_fields should be present");
+                    let ?indexed_fields = opt_indexed_fields else Runtime.trap("multiFilterWithIndexedFields: indexed_fields should be present");
                     for ((field_name, candid_value) in indexed_fields.vals()) {
                         ignore Map.put(indexed_fields_map, Map.thash, field_name, candid_value);
                     };
@@ -466,7 +519,7 @@ module CollectionUtils {
 
     public func get_and_cache_candid_map(collection : T.StableCollection, id : T.DocumentId) : T.CandidMap {
         func lookup_candid_map(id : T.DocumentId) : T.CandidMap {
-            let ?candid_document = CollectionUtils.lookupCandidDocument(collection, id) else Debug.trap("Couldn't find document with id: " # debug_show id);
+            let ?candid_document = CollectionUtils.lookupCandidDocument(collection, id) else Runtime.trap("Couldn't find document with id: " # debug_show id);
             CandidMap.new(collection.schema_map, id, candid_document);
         };
 
@@ -485,7 +538,7 @@ module CollectionUtils {
 
     public func get_candid_map_no_cache(collection : T.StableCollection, id : T.DocumentId, opt_candid_blob : ?T.CandidBlob) : T.CandidMap {
         func lookup_candid_map(id : T.DocumentId) : T.CandidMap {
-            let ?candid_document = CollectionUtils.lookupCandidDocument(collection, id) else Debug.trap("Couldn't find document with id: " # debug_show id);
+            let ?candid_document = CollectionUtils.lookupCandidDocument(collection, id) else Runtime.trap("Couldn't find document with id: " # debug_show id);
             CandidMap.new(collection.schema_map, id, candid_document);
         };
 
@@ -493,7 +546,7 @@ module CollectionUtils {
             case (?candid) candid;
             case (null) switch (opt_candid_blob) {
                 case (?candid_blob) {
-                    let candid = CollectionUtils.decodeCandidBlob(collection, candid_blob);
+                    let candid = CollectionUtils.decodePartialCandidBlob(collection, candid_blob);
                     CandidMap.new(collection.schema_map, id, candid);
                 };
                 case (null) lookup_candid_map(id);

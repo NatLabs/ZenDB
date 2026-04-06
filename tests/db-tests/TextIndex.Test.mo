@@ -90,7 +90,7 @@
 //
 // ===========================================================================
 
-import Array "mo:base/Array";
+import Array "mo:core@2.4/Array";
 
 import ZenDB "../../src/EmbeddedInstance";
 

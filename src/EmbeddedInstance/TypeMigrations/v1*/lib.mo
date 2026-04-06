@@ -1,6 +1,7 @@
-import Debug "mo:base@0.16.0/Debug";
+import Debug "mo:core@2.4/Debug";
 
 import V1_0_0_types "v1.0.0/types";
+import Runtime "mo:core@2.4/Runtime";
 
 // the versions are seperated into the types and methods directories to prevent circular dependencies
 module {
@@ -27,7 +28,7 @@ module {
     public func get_current_state(asset_versions : VersionedStableStore) : V1_0_0_types.StableStore {
         switch (asset_versions) {
             case (#v1_0_0(stable_store)) { stable_store };
-            case (_) Debug.trap(
+            case (_) Runtime.trap(
                 "
                 Invalid version of stable store " # debug_show (to_text(asset_versions)) # ". Expected v1.0.0. Please call upgrade() on the stable store.
                 "

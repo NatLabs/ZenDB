@@ -1,15 +1,16 @@
-import Iter "mo:base/Iter";
-import Debug "mo:base/Debug";
+import Iter "mo:core@2.4/Iter";
+import Debug "mo:core@2.4/Debug";
 import Buffer "mo:base/Buffer";
-import Text "mo:base/Text";
-import Nat "mo:base/Nat";
-import Nat64 "mo:base/Nat64";
-import Char "mo:base/Char";
+import Text "mo:core@2.4/Text";
+import Nat "mo:core@2.4/Nat";
+import Nat64 "mo:core@2.4/Nat64";
+import Char "mo:core@2.4/Char";
 
 import Bench "mo:bench";
 import Fuzz "mo:fuzz";
 
 import BasicTokenizer "../src/EmbeddedInstance/Collection/Index/Tokenizers/BasicTokenizer";
+import Runtime "mo:core@2.4/Runtime";
 
 module {
 
@@ -43,7 +44,7 @@ module {
                     ignore BasicTokenizer.tokenize(random_text);
                 };
                 case (_) {
-                    Debug.trap("Should not reach with row = " # debug_show row # " and col = " # debug_show col);
+                    Runtime.trap("Should not reach with row = " # debug_show row # " and col = " # debug_show col);
                 };
             }
         );

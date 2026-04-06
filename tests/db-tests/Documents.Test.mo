@@ -1,17 +1,17 @@
 // @testmode wasi
-import Debug "mo:base@0.16.0/Debug";
-import Buffer "mo:base@0.16.0/Buffer";
-import Blob "mo:base@0.16.0/Blob";
-import Text "mo:base@0.16.0/Text";
-import Array "mo:base@0.16.0/Array";
-import Principal "mo:base@0.16.0/Principal";
-import Option "mo:base@0.16.0/Option";
+import Debug "mo:core@2.4/Debug";
+import Buffer "mo:base@0.16/Buffer";
+import Blob "mo:core@2.4/Blob";
+import Text "mo:core@2.4/Text";
+import Array "mo:core@2.4/Array";
+import Principal "mo:core@2.4/Principal";
+import Option "mo:core@2.4/Option";
 
 import ZenDB "../../src/EmbeddedInstance";
 
 import { test; suite } "mo:test";
-import Itertools "mo:itertools@0.2.2/Iter";
-import Map "mo:map@9.0.1/Map";
+import Itertools "mo:itertools@0.2/Iter";
+import Map "mo:map@9.0/Map";
 import ZenDBSuite "../test-utils/TestFramework";
 
 ZenDBSuite.newSuite(

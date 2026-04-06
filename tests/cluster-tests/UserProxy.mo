@@ -5,10 +5,11 @@
 // makes to CanisterDB are attributed to that principal — exactly what we need
 // to simulate different users with different roles.
 
-import Principal "mo:base@0.16.0/Principal";
+import Principal "mo:core@2.4/Principal";
 
 import ZT "../../src/EmbeddedInstance/Types";
 import ClusterTypes "../../src/RemoteInstance/Types";
+import CanisterDBModule "../../src/RemoteInstance/CanisterDB";
 
 persistent actor class UserProxy(db_principal : Principal) = this_proxy {
 
@@ -16,7 +17,7 @@ persistent actor class UserProxy(db_principal : Principal) = this_proxy {
     // on upgrade without losing track of the database canister.
     var _db_principal = db_principal;
 
-    transient let db : ClusterTypes.ClusterApiService =
+    transient let db : CanisterDBModule.CanisterDB =
         actor (Principal.toText(_db_principal));
 
     /// Returns this proxy's canister principal — the identity CanisterDB sees.

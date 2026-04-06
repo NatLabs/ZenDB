@@ -1,21 +1,21 @@
-import Principal "mo:base@0.16.0/Principal";
-import Array "mo:base@0.16.0/Array";
-import Debug "mo:base@0.16.0/Debug";
-import Text "mo:base@0.16.0/Text";
-import Char "mo:base@0.16.0/Char";
-import Nat8 "mo:base@0.16.0/Nat8";
-import Nat32 "mo:base@0.16.0/Nat32";
-import Result "mo:base@0.16.0/Result";
-import Order "mo:base@0.16.0/Order";
-import Iter "mo:base@0.16.0/Iter";
-import Buffer "mo:base@0.16.0/Buffer";
-import Nat "mo:base@0.16.0/Nat";
-import Option "mo:base@0.16.0/Option";
-import Hash "mo:base@0.16.0/Hash";
-import Float "mo:base@0.16.0/Float";
-import Int "mo:base@0.16.0/Int";
+import Principal "mo:core@2.4/Principal";
+import Array "mo:core@2.4/Array";
+import Debug "mo:core@2.4/Debug";
+import Text "mo:core@2.4/Text";
+import Char "mo:core@2.4/Char";
+import Nat8 "mo:core@2.4/Nat8";
+import Nat32 "mo:core@2.4/Nat32";
+import Result "mo:core@2.4/Result";
+import Order "mo:core@2.4/Order";
+import Iter "mo:core@2.4/Iter";
+import Buffer "mo:base@0.16/Buffer";
+import Nat "mo:core@2.4/Nat";
+import Option "mo:core@2.4/Option";
+import Hash "mo:base@0.16/Hash";
+import Float "mo:core@2.4/Float";
+import Int "mo:core@2.4/Int";
 
-import Map "mo:map@9.0.1/Map";
+import Map "mo:map@9.0/Map";
 
 import T "../../Types";
 import Logger "../../Logger";
@@ -24,6 +24,7 @@ import CollectionUtils "../CollectionUtils";
 
 import Tokenizer "Tokenizers";
 import CompositeIndex "CompositeIndex";
+import Runtime "mo:core@2.4/Runtime";
 
 module TextIndex {
 
@@ -264,10 +265,10 @@ module TextIndex {
         Array.map(
             entries,
             func((key_values, _) : ([T.CandidQuery], T.DocumentId)) : T.TextMatch {
-                let stored_word = switch (key_values[0]) { case (#Text(w)) w; case (_) Debug.trap("TextIndex: expected Text key") };
-                let token_pos = switch (key_values[3]) { case (#Nat32(n)) Nat32.toNat(n); case (_) Debug.trap("TextIndex: expected Nat32 token_pos") };
-                let char_start = switch (key_values[4]) { case (#Nat32(n)) Nat32.toNat(n); case (_) Debug.trap("TextIndex: expected Nat32 char_start") };
-                let char_end = switch (key_values[5]) { case (#Nat32(n)) Nat32.toNat(n); case (_) Debug.trap("TextIndex: expected Nat32 char_end") };
+                let stored_word = switch (key_values[0]) { case (#Text(w)) w; case (_) Runtime.trap("TextIndex: expected Text key") };
+                let token_pos = switch (key_values[3]) { case (#Nat32(n)) Nat32.toNat(n); case (_) Runtime.trap("TextIndex: expected Nat32 token_pos") };
+                let char_start = switch (key_values[4]) { case (#Nat32(n)) Nat32.toNat(n); case (_) Runtime.trap("TextIndex: expected Nat32 char_start") };
+                let char_end = switch (key_values[5]) { case (#Nat32(n)) Nat32.toNat(n); case (_) Runtime.trap("TextIndex: expected Nat32 char_end") };
                 { field; word = stored_word; token_pos; char_start; char_end };
             },
         );

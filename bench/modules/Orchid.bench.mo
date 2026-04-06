@@ -1,12 +1,13 @@
-import Debug "mo:base/Debug";
-import Nat "mo:base/Nat";
-import Array "mo:base/Array";
+import Debug "mo:core@2.4/Debug";
+import Nat "mo:core@2.4/Nat";
+import Array "mo:core@2.4/Array";
 
 import Bench "mo:bench";
 import Fuzz "mo:fuzz";
 
 import Orchid "../../src/EmbeddedInstance/Collection/Orchid";
 import T "../../src/EmbeddedInstance/Types";
+import Runtime "mo:core@2.4/Runtime";
 
 module {
     type CandidQuery = T.CandidQuery;
@@ -44,7 +45,7 @@ module {
             "Option(Nat)",
         ]);
 
-        let limit = 10_000;
+        let limit = 1_000;
 
         // Generate random test data for each type
         let null_values : [CandidQuery] = Array.tabulate<CandidQuery>(limit, func(_ : Nat) : CandidQuery = #Null);
@@ -302,7 +303,7 @@ module {
                 };
 
                 case (_) {
-                    Debug.trap("Should not reach with row = " # debug_show row # " and col = " # debug_show col);
+                    Runtime.trap("Should not reach with row = " # debug_show row # " and col = " # debug_show col);
                 };
             }
         );

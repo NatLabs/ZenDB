@@ -1,6 +1,6 @@
-import Array "mo:base@0.16.0/Array";
-import Int "mo:base@0.16.0/Int";
-import Nat "mo:base@0.16.0/Nat";
+import Array "mo:core@2.4/Array";
+import Int "mo:core@2.4/Int";
+import Nat "mo:core@2.4/Nat";
 import Types "Types";
 
 module {

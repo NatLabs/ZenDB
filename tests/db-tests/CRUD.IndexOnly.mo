@@ -1,16 +1,16 @@
 // @testmode wasi
-import Debug "mo:base@0.16.0/Debug";
-import Buffer "mo:base@0.16.0/Buffer";
-import Blob "mo:base@0.16.0/Blob";
-import Text "mo:base@0.16.0/Text";
-import Array "mo:base@0.16.0/Array";
-import Principal "mo:base@0.16.0/Principal";
-import Option "mo:base@0.16.0/Option";
-import Iter "mo:base@0.16.0/Iter";
+import Debug "mo:core@2.4/Debug";
+import Buffer "mo:base@0.16/Buffer";
+import Blob "mo:core@2.4/Blob";
+import Text "mo:core@2.4/Text";
+import Array "mo:core@2.4/Array";
+import Principal "mo:core@2.4/Principal";
+import Option "mo:core@2.4/Option";
+import Iter "mo:core@2.4/Iter";
 
 import { test; suite } "mo:test";
-import Itertools "mo:itertools@0.2.2/Iter";
-import Map "mo:map@9.0.1/Map";
+import Itertools "mo:itertools@0.2/Iter";
+import Map "mo:map@9.0/Map";
 import Fuzz "mo:fuzz";
 
 import ZenDB "../../src/EmbeddedInstance";
@@ -144,7 +144,7 @@ ZenDBSuite.newSuite(
                             let #ok(id) = crud_collection.insert(document) else return assert false;
                             assert crud_collection.get(id) == ?document;
 
-                            let candid_document = CollectionUtils.decodeCandidBlob(
+                            let candid_document = CollectionUtils.decodeFullCandidBlob(
                                 crud_collection._get_stable_state(),
                                 candify_document.to_blob(document),
                             );
@@ -167,7 +167,7 @@ ZenDBSuite.newSuite(
 
                             for (field in indexible_fields.vals()) {
                                 let ?field_value = CandidMap.get(candid_map, schema_map, field) else return assert false;
-                                // Debug.print("id" # debug_show id # " Field " # field # " value: " # debug_show field_value);
+                                Debug.print("id" # debug_show id # " Field " # field # " value: " # debug_show field_value);
 
                                 let #ok(results) = crud_collection.search(
                                     QueryBuilder().Where(

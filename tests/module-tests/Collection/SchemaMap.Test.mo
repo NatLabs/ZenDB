@@ -1,11 +1,11 @@
-import Debug "mo:base@0.16.0/Debug";
-import Iter "mo:base@0.16.0/Iter";
-import Text "mo:base@0.16.0/Text";
-import Nat "mo:base@0.16.0/Nat";
-import Map "mo:map@9.0.1/Map";
+import Debug "mo:core@2.4/Debug";
+import Iter "mo:core@2.4/Iter";
+import Text "mo:core@2.4/Text";
+import Nat "mo:core@2.4/Nat";
+import Map "mo:map@9.0/Map";
 
 import { test; suite } "mo:test";
-import Candid "mo:serde@3.4.0/Candid";
+import Candid "mo:serde@3.5/Candid";
 import SchemaMap "../../../src/EmbeddedInstance/Collection/SchemaMap";
 import T "../../../src/EmbeddedInstance/Types";
 import ZenDB "../../../src";

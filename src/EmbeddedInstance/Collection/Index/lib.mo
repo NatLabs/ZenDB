@@ -1,24 +1,24 @@
-import Text "mo:base@0.16.0/Text";
-import Array "mo:base@0.16.0/Array";
-import Buffer "mo:base@0.16.0/Buffer";
-import Order "mo:base@0.16.0/Order";
-import Debug "mo:base@0.16.0/Debug";
-import Nat "mo:base@0.16.0/Nat";
-import Int "mo:base@0.16.0/Int";
-import Option "mo:base@0.16.0/Option";
-import Iter "mo:base@0.16.0/Iter";
-import Float "mo:base@0.16.0/Float";
+import Text "mo:core@2.4/Text";
+import Array "mo:core@2.4/Array";
+import Buffer "mo:base@0.16/Buffer";
+import Order "mo:core@2.4/Order";
+import Debug "mo:core@2.4/Debug";
+import Nat "mo:core@2.4/Nat";
+import Int "mo:core@2.4/Int";
+import Option "mo:core@2.4/Option";
+import Iter "mo:core@2.4/Iter";
+import Float "mo:core@2.4/Float";
 
-import Map "mo:map@9.0.1/Map";
-import Set "mo:map@9.0.1/Set";
-import Serde "mo:serde@3.4.0";
-import Decoder "mo:serde@3.4.0/Candid/Blob/Decoder";
-import Candid "mo:serde@3.4.0/Candid";
-import Itertools "mo:itertools@0.2.2/Iter";
-import RevIter "mo:itertools@0.2.2/RevIter";
-import SparseBitMap64 "mo:bit-map@1.1.0/SparseBitMap64";
-import MemoryBTree "mo:memory-collection@0.3.2/MemoryBTree/Stable";
-import TypeUtils "mo:memory-collection@0.3.2/TypeUtils";
+import Map "mo:map@9.0/Map";
+import Set "mo:map@9.0/Set";
+import Serde "mo:serde@3.5";
+import Decoder "mo:serde@3.5/Candid/Blob/Decoder";
+import Candid "mo:serde@3.5/Candid";
+import Itertools "mo:itertools@0.2/Iter";
+import RevIter "mo:itertools@0.2/RevIter";
+import SparseBitMap64 "mo:bit-map@1.1/SparseBitMap64";
+import MemoryBTree "mo:memory-collection@0.4/MemoryBTree/Stable";
+import TypeUtils "mo:memory-collection@0.4/TypeUtils";
 
 import T "../../Types";
 import Logger "../../Logger";
@@ -33,6 +33,7 @@ import CandidMap "../../CandidMap";
 
 import CompositeIndex "CompositeIndex";
 import TextIndex "TextIndex";
+import Runtime "mo:core@2.4/Runtime";
 
 module {
     // Helper function to get index from collection by name
@@ -69,7 +70,7 @@ module {
         };
 
         let ?index = get_index(collection, index_name) else {
-            Debug.trap("Index '" # index_name # "' not found in collection");
+            Runtime.trap("Index '" # index_name # "' not found in collection");
         };
 
         size(index);
@@ -82,7 +83,7 @@ module {
         };
 
         let ?index = get_index(collection, index_name) else {
-            Debug.trap("Index '" # index_name # "' not found in collection");
+            Runtime.trap("Index '" # index_name # "' not found in collection");
         };
 
         name(index);
@@ -91,7 +92,7 @@ module {
     // Internal function - use get_config() or get_key_details() for external access
     func get_internal_index(collection : T.StableCollection, index_name : Text) : T.CompositeIndex {
         let ?index = get_index(collection, index_name) else {
-            Debug.trap("Index '" # index_name # "' not found in collection");
+            Runtime.trap("Index '" # index_name # "' not found in collection");
         };
 
         get_internal_index_from_index(index);
@@ -102,7 +103,7 @@ module {
         index_name : Text,
     ) {
         let ?index = get_index(collection, index_name) else {
-            Debug.trap("Index '" # index_name # "' not found in collection");
+            Runtime.trap("Index '" # index_name # "' not found in collection");
         };
 
         deallocate(collection, index);
@@ -139,7 +140,7 @@ module {
         index_name : Text,
     ) {
         let ?index = get_index(collection, index_name) else {
-            Debug.trap("Index '" # index_name # "' not found in collection");
+            Runtime.trap("Index '" # index_name # "' not found in collection");
         };
 
         clear(collection, index);
@@ -169,7 +170,7 @@ module {
         };
 
         let ?index = get_index(collection, index_name) else {
-            Debug.trap("Index '" # index_name # "' not found in collection");
+            Runtime.trap("Index '" # index_name # "' not found in collection");
         };
 
         stats(collection, index, entries);
@@ -187,7 +188,7 @@ module {
         };
 
         let ?index = get_index(collection, index_name) else {
-            Debug.trap("Index '" # index_name # "' not found in collection");
+            Runtime.trap("Index '" # index_name # "' not found in collection");
         };
 
         get_config(index);
@@ -200,7 +201,7 @@ module {
         };
 
         let ?index = get_index(collection, index_name) else {
-            Debug.trap("Index '" # index_name # "' not found in collection");
+            Runtime.trap("Index '" # index_name # "' not found in collection");
         };
 
         get_key_details(index);
@@ -424,8 +425,8 @@ module {
             return #err("Cannot populate non-empty indexes: " # debug_show index_names);
         };
 
-        for ((document_id, candid_blob) in DocumentStore.entries(collection)) {
-            let candid_map = CollectionUtils.get_candid_map_no_cache(collection, document_id, ?candid_blob);
+        for ((document_id, partial_candid_blob) in DocumentStore.entries(collection)) {
+            let candid_map = CollectionUtils.get_candid_map_no_cache(collection, document_id, ?partial_candid_blob);
 
             for (index in indexes.vals()) {
 
@@ -456,35 +457,6 @@ module {
         #ok();
 
     };
-
-    // public func repopulate_indexes(
-    //     collection : T.StableCollection,
-    //     index_names : [Text],
-    // ) : T.Result<(), Text> {
-
-    //     Logger.lazyInfo(
-    //         collection.logger,
-    //         func() = "Starting to populate indexes: " # debug_show index_names,
-    //     );
-
-    //     let indexes = Buffer.Buffer<T.Index>(index_names.size());
-
-    //     for (index_name in index_names.vals()) {
-    //         let ?index = Map.get(collection.indexes, Map.thash, index_name) else {
-    //             return #err("CompositeIndex '" # index_name # "' does not exist");
-    //         };
-
-    //         indexes.add(index);
-    //     };
-
-    //     Logger.lazyDebug(
-    //         collection.logger,
-    //         func() = "Collected " # debug_show indexes.size() # " indexes to populate",
-    //     );
-
-    //     CompositeIndex.repopulate_indexes(collection, Buffer.toArray(indexes));
-
-    // };
 
     let EQUALITY_SCORE = 4;
     let SORT_SCORE = 2;
@@ -554,7 +526,7 @@ module {
 
             // aliases should be handled by the query builder
             case (#anyOf(_) or #between(_, _) or #startsWith(_) or #not_(_)) {
-                Debug.trap(debug_show op # " not allowed in this context. Should have been expanded by the query builder");
+                Runtime.trap(debug_show op # " not allowed in this context. Should have been expanded by the query builder");
             };
         };
     };
@@ -682,7 +654,7 @@ module {
                             let has_equality = Set.has(fields_with_equality_ops, Map.thash, field);
 
                             if (Option.isSome(opt_exists_in_lower) or Option.isSome(opt_exists_in_upper) or has_equality) {
-                                Debug.trap("Contradictory operations on the same field");
+                                Runtime.trap("Contradictory operations on the same field");
                             };
 
                             Set.add(fields_with_equality_ops, Map.thash, field);

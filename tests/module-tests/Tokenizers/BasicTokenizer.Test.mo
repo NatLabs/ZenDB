@@ -1,7 +1,7 @@
-import Debug "mo:base/Debug";
-import Text "mo:base/Text";
-import Array "mo:base/Array";
-import Char "mo:base/Char";
+import Debug "mo:core@2.4/Debug";
+import Text "mo:core@2.4/Text";
+import Array "mo:core@2.4/Array";
+import Char "mo:core@2.4/Char";
 
 import { test; suite } "mo:test";
 import Fuzz "mo:fuzz";

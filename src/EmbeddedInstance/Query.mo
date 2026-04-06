@@ -1,14 +1,14 @@
-import Array "mo:base@0.16.0/Array";
+import Array "mo:core@2.4/Array";
 
-import Text "mo:base@0.16.0/Text";
-import Debug "mo:base@0.16.0/Debug";
+import Text "mo:core@2.4/Text";
+import Debug "mo:core@2.4/Debug";
 
-import Buffer "mo:base@0.16.0/Buffer";
-import Option "mo:base@0.16.0/Option";
-import Nat "mo:base@0.16.0/Nat";
+import Buffer "mo:base@0.16/Buffer";
+import Option "mo:core@2.4/Option";
+import Nat "mo:core@2.4/Nat";
 
-import Map "mo:map@9.0.1/Map";
-import Set "mo:map@9.0.1/Set";
+import Map "mo:map@9.0/Map";
+import Set "mo:map@9.0/Set";
 
 import T "Types";
 import C "Constants";
@@ -16,6 +16,7 @@ import Logger "Logger";
 import Schema "Collection/Schema";
 import SchemaMap "Collection/SchemaMap";
 import CandidUtils "CandidUtils";
+import Runtime "mo:core@2.4/Runtime";
 
 module {
     let LOGGER_NAMESPACE = "Query";
@@ -125,14 +126,14 @@ module {
                 case (#exists) {
                     // #not_(#exists)
                     // buffer.add(#Operation(key, #eq(#Null)));
-                    Debug.trap("QueryBuilder: #not_(#exists) is not supported");
+                    Runtime.trap("QueryBuilder: #not_(#exists) is not supported");
                 };
                 case (#startsWith(prefix)) {
                     let prefix_lower_bound = prefix;
                     let res = CandidUtils.Ops.concatBytes(prefix, "\FF");
                     switch (res) {
                         case (#err(msg)) {
-                            Debug.trap("QueryBuilder: Failed to create upper bound for #startsWith. " # msg);
+                            Runtime.trap("QueryBuilder: Failed to create upper bound for #startsWith. " # msg);
                         };
                         case (#ok(prefix_upper_bound)) {
                             // #not_(#startsWith(prefix))
@@ -226,7 +227,7 @@ module {
                 case (#startsWith(prefix)) {
                     let prefix_lower_bound = prefix;
                     let #ok(prefix_upper_bound) = CandidUtils.Ops.concatBytes(prefix, "\FF") else {
-                        Debug.trap("QueryBuilder: Failed to create upper bound for #startsWith");
+                        Runtime.trap("QueryBuilder: Failed to create upper bound for #startsWith");
                     };
 
                     reduce_op(key, #between(prefix_lower_bound, prefix_upper_bound));
@@ -301,7 +302,7 @@ module {
         public func SortDirection(direction : T.SortDirection) : QueryBuilder {
             switch (_sort_by) {
                 case (null) {
-                    Debug.trap("QueryBuilder: SortDirection() called before SortField()");
+                    Runtime.trap("QueryBuilder: SortDirection() called before SortField()");
                 };
                 case (?(key, _)) {
                     _sort_by := ?(key, direction);
@@ -338,7 +339,7 @@ module {
         public func Skip(skip : Nat) : QueryBuilder {
             switch (_pagination_token) {
                 case (?_) {
-                    Debug.trap("QueryBuilder: Cannot use Skip() when PaginationToken() is set");
+                    Runtime.trap("QueryBuilder: Cannot use Skip() when PaginationToken() is set");
                 };
                 case (null) {};
             };

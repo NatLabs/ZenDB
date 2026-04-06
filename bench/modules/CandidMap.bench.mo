@@ -1,17 +1,17 @@
-import Debug "mo:base/Debug";
-import Nat "mo:base/Nat";
-import Nat64 "mo:base/Nat64";
-import Array "mo:base/Array";
-import Blob "mo:base/Blob";
+import Debug "mo:core@2.4/Debug";
+import Nat "mo:core@2.4/Nat";
+import Nat64 "mo:core@2.4/Nat64";
+import Array "mo:core@2.4/Array";
+import Blob "mo:core@2.4/Blob";
 
 import Bench "mo:bench";
 import Fuzz "mo:fuzz";
-import Map "mo:map@9.0.1/Map";
+import Map "mo:map@9.0/Map";
 
 import CandidMap "../../src/EmbeddedInstance/CandidMap";
 import SchemaMap "../../src/EmbeddedInstance/Collection/SchemaMap";
 import T "../../src/EmbeddedInstance/Types";
-import ByteUtils "mo:byte-utils@0.1.1";
+import ByteUtils "mo:byte-utils@0.2";
 
 module {
     type Schema = T.Schema;
@@ -45,7 +45,7 @@ module {
             "Mixed Types",
         ]);
 
-        let limit = 10_000;
+        let limit = 1_000;
 
         // Helper to create document ID
         func makeDocId(n : Nat) : Blob {

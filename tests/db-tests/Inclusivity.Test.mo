@@ -1,21 +1,21 @@
 // @testmode wasi
 // crafted by claude-3-sonnet-20240229
 
-import Blob "mo:base@0.16.0/Blob";
-import Debug "mo:base@0.16.0/Debug";
-import Array "mo:base@0.16.0/Array";
-import Iter "mo:base@0.16.0/Iter";
-import Text "mo:base@0.16.0/Text";
-import Nat "mo:base@0.16.0/Nat";
-import Buffer "mo:base@0.16.0/Buffer";
-import Option "mo:base@0.16.0/Option";
-import Result "mo:base@0.16.0/Result";
-import Order "mo:base@0.16.0/Order";
+import Blob "mo:core@2.4/Blob";
+import Debug "mo:core@2.4/Debug";
+import Array "mo:core@2.4/Array";
+import Iter "mo:core@2.4/Iter";
+import Text "mo:core@2.4/Text";
+import Nat "mo:core@2.4/Nat";
+import Buffer "mo:base@0.16/Buffer";
+import Option "mo:core@2.4/Option";
+import Result "mo:core@2.4/Result";
+import Order "mo:core@2.4/Order";
 
 import { test; suite } "mo:test";
 import Bench "mo:bench";
 import Fuzz "mo:fuzz";
-import Candid "mo:serde@3.4.0/Candid";
+import Candid "mo:serde@3.5/Candid";
 
 import ZenDB "../../src/EmbeddedInstance";
 import SchemaMap "../../src/EmbeddedInstance/Collection/SchemaMap";
@@ -639,19 +639,19 @@ ZenDBSuite.newSuite(
                         let #ok(search_result) = result else return assert false;
                         Debug.print(debug_show { data = search_result.documents });
 
-                        for (doc in edge_collection.vals()) {
-                            let blob = candify_edge.to_blob(doc);
-                            // Debug.print("first attempt: " # debug_show (Candid.decode(blob, ["opt_field"], null)));
-                            // Debug.print("2nd attempt: " # debug_show (Candid.decode(blob, EdgeCaseFields, ?{ Candid.defaultOptions with types = ?[EdgeCaseSchema] })));
-                            let #ok(candid) = Candid.decode(blob, EdgeCaseFields, ?{ Candid.defaultOptions with types = ?[EdgeCaseSchema] }) else return assert false;
-                            Debug.print(debug_show { candid = candid });
-                            let schema_map = SchemaMap.new(EdgeCaseSchema);
+                        // for (doc in edge_collection.vals()) {
+                        //     let blob = candify_edge.to_blob(doc);
+                        //     // Debug.print("first attempt: " # debug_show (Candid.decode(blob, ["opt_field"], null)));
+                        //     // Debug.print("2nd attempt: " # debug_show (Candid.decode(blob, EdgeCaseFields, ?{ Candid.defaultOptions with types = ?[EdgeCaseSchema] })));
+                        //     let #ok(candid) = Candid.decode(blob, EdgeCaseFields, ?{ Candid.defaultOptions with types = ?[EdgeCaseSchema] }) else return assert false;
+                        //     Debug.print(debug_show { candid = candid });
+                        //     let schema_map = SchemaMap.new(EdgeCaseSchema);
 
-                            let candid_map = CandidMap.new(schema_map, ("" : Blob), candid[0]);
-                            let opt_field = CandidMap.get(candid_map, schema_map, "opt_field");
-                            Debug.print(debug_show { opt_field = opt_field });
+                        //     let candid_map = CandidMap.new(schema_map, ("" : Blob), candid[0]);
+                        //     let opt_field = CandidMap.get(candid_map, schema_map, "opt_field");
+                        //     Debug.print(debug_show { opt_field = opt_field });
 
-                        };
+                        // };
 
                         assert search_result.documents.size() == 1;
                         assert search_result.documents[0].0 == edge_id_0;

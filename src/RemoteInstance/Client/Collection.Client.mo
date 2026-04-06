@@ -1,4 +1,4 @@
-import Array "mo:base@0.16.0/Array";
+import Array "mo:core@2.4/Array";
 
 import ZT "../../EmbeddedInstance/Types";
 
@@ -27,6 +27,11 @@ module {
             listIndexNames = canister_db.zendb_v1_collection_list_index_names_composite_query;
             getIndexes = canister_db.zendb_v1_collection_get_indexes_composite_query;
             getIndex = canister_db.zendb_v1_collection_get_index_composite_query;
+        };
+
+        public let updateCall = {
+            search = canister_db.zendb_v1_collection_search_update;
+            searchForOne = canister_db.zendb_v1_collection_search_for_one_update;
         };
 
         public func name() : async* Text {
@@ -148,6 +153,10 @@ module {
 
         public func createIndex(index_name : Text, index_fields : [(Text, ZT.CreateIndexSortDirection)], options : ?ZT.CreateIndexOptions) : async* (ZT.Result<(), Text>) {
             await canister_db.zendb_v1_collection_create_index(db_name, collection_name, index_name, index_fields, options);
+        };
+
+        public func createTextIndex(index_name : Text, fields : [Text]) : async* (ZT.Result<(), Text>) {
+            await canister_db.zendb_v1_collection_create_text_index(db_name, collection_name, index_name, fields);
         };
 
         public func batchCreateIndexes(index_configs : [ZT.CreateIndexParams]) : async* (ZT.Result<Nat, Text>) {

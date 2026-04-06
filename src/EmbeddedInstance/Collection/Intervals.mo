@@ -1,24 +1,24 @@
-import Array "mo:base@0.16.0/Array";
-import Debug "mo:base@0.16.0/Debug";
-import Text "mo:base@0.16.0/Text";
-import Result "mo:base@0.16.0/Result";
-import Order "mo:base@0.16.0/Order";
-import Iter "mo:base@0.16.0/Iter";
-import Buffer "mo:base@0.16.0/Buffer";
-import Nat "mo:base@0.16.0/Nat";
-import Hash "mo:base@0.16.0/Hash";
+import Array "mo:core@2.4/Array";
+import Debug "mo:core@2.4/Debug";
+import Text "mo:core@2.4/Text";
+import Result "mo:core@2.4/Result";
+import Order "mo:core@2.4/Order";
+import Iter "mo:core@2.4/Iter";
+import Buffer "mo:base@0.16/Buffer";
+import Nat "mo:core@2.4/Nat";
+import Hash "mo:base@0.16/Hash";
 
-import Map "mo:map@9.0.1/Map";
-import Set "mo:map@9.0.1/Set";
-import Serde "mo:serde@3.4.0";
-import Decoder "mo:serde@3.4.0/Candid/Blob/Decoder";
-import Candid "mo:serde@3.4.0/Candid";
-import Itertools "mo:itertools@0.2.2/Iter";
-import RevIter "mo:itertools@0.2.2/RevIter";
-import Vector "mo:vector@0.4.2";
+import Map "mo:map@9.0/Map";
+import Set "mo:map@9.0/Set";
+import Serde "mo:serde@3.5";
+import Decoder "mo:serde@3.5/Candid/Blob/Decoder";
+import Candid "mo:serde@3.5/Candid";
+import Itertools "mo:itertools@0.2/Iter";
+import RevIter "mo:itertools@0.2/RevIter";
+import Vector "mo:vector@0.4";
 
-import TypeUtils "mo:memory-collection@0.3.2/TypeUtils";
-import Int8Cmp "mo:memory-collection@0.3.2/TypeUtils/Int8Cmp";
+import TypeUtils "mo:memory-collection@0.4/TypeUtils";
+import Int8Cmp "mo:memory-collection@0.4/TypeUtils/Int8Cmp";
 import CandidUtils "../CandidUtils";
 
 import T "../Types";
@@ -33,6 +33,7 @@ import DocumentStore "DocumentStore";
 import QueryPlan "QueryPlan";
 import C "../Constants";
 import BTree "../BTree";
+import Runtime "mo:core@2.4/Runtime";
 
 module {
 
@@ -294,7 +295,7 @@ module {
             return document_ids;
         };
 
-        let ?index = Map.get(collection.indexes, Map.thash, index_name) else Debug.trap("Unreachable: IndexMap not found for index: " # index_name);
+        let ?index = Map.get(collection.indexes, Map.thash, index_name) else Runtime.trap("Unreachable: IndexMap not found for index: " # index_name);
 
         let internal_index = switch (index) {
             case (#text_index(text_index)) text_index.internal_index;
@@ -335,7 +336,7 @@ module {
             );
         };
 
-        let ?index = Map.get(collection.indexes, Map.thash, index_name) else Debug.trap("Unreachable: IndexMap not found for index: " # index_name);
+        let ?index = Map.get(collection.indexes, Map.thash, index_name) else Runtime.trap("Unreachable: IndexMap not found for index: " # index_name);
 
         let internal_index = switch (index) {
             case (#text_index(text_index)) text_index.internal_index;

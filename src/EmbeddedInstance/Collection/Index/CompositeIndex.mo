@@ -1,25 +1,25 @@
-import Text "mo:base@0.16.0/Text";
-import Array "mo:base@0.16.0/Array";
-import Buffer "mo:base@0.16.0/Buffer";
-import Order "mo:base@0.16.0/Order";
-import Debug "mo:base@0.16.0/Debug";
-import Nat "mo:base@0.16.0/Nat";
-import Int "mo:base@0.16.0/Int";
-import Option "mo:base@0.16.0/Option";
-import Iter "mo:base@0.16.0/Iter";
-import Float "mo:base@0.16.0/Float";
+import Text "mo:core@2.4/Text";
+import Array "mo:core@2.4/Array";
+import Buffer "mo:base@0.16/Buffer";
+import Order "mo:core@2.4/Order";
+import Debug "mo:core@2.4/Debug";
+import Nat "mo:core@2.4/Nat";
+import Int "mo:core@2.4/Int";
+import Option "mo:core@2.4/Option";
+import Iter "mo:core@2.4/Iter";
+import Float "mo:core@2.4/Float";
 
-import Map "mo:map@9.0.1/Map";
-import Set "mo:map@9.0.1/Set";
-import Serde "mo:serde@3.4.0";
-import Decoder "mo:serde@3.4.0/Candid/Blob/Decoder";
-import Candid "mo:serde@3.4.0/Candid";
-import Itertools "mo:itertools@0.2.2/Iter";
-import RevIter "mo:itertools@0.2.2/RevIter";
-import SparseBitMap64 "mo:bit-map@1.1.0/SparseBitMap64";
-import MemoryBTree "mo:memory-collection@0.3.2/MemoryBTree/Stable";
-import TypeUtils "mo:memory-collection@0.3.2/TypeUtils";
-import Vector "mo:vector@0.4.2";
+import Map "mo:map@9.0/Map";
+import Set "mo:map@9.0/Set";
+import Serde "mo:serde@3.5";
+import Decoder "mo:serde@3.5/Candid/Blob/Decoder";
+import Candid "mo:serde@3.5/Candid";
+import Itertools "mo:itertools@0.2/Iter";
+import RevIter "mo:itertools@0.2/RevIter";
+import SparseBitMap64 "mo:bit-map@1.1/SparseBitMap64";
+import MemoryBTree "mo:memory-collection@0.4/MemoryBTree/Stable";
+import TypeUtils "mo:memory-collection@0.4/TypeUtils";
+import Vector "mo:vector@0.4";
 
 import T "../../Types";
 import CandidMap "../../CandidMap";
@@ -37,6 +37,7 @@ import Schema "../Schema";
 import SchemaMap "../SchemaMap";
 import DocumentStore "../DocumentStore";
 import MergeSort "../../MergeSort";
+import Runtime "mo:core@2.4/Runtime";
 
 module CompositeIndex {
 
@@ -71,14 +72,14 @@ module CompositeIndex {
                 func(index_key_detail : (Text, T.SortDirection)) : Bool {
                     switch (SchemaMap.get(collection.schema_map, index_key_detail.0)) {
                         case (?#Option(_)) true;
-                        case (null) Debug.trap("CompositeIndex key details must be a valid field in the schema map");
+                        case (null) Runtime.trap("CompositeIndex key details must be a valid field in the schema map");
                         case (_) false;
                     };
                 },
             );
 
             if (contains_option_type) {
-                Array.append(
+                Array.concat(
                     index_key_details,
                     [(C.UNIQUE_INDEX_NULL_EXEMPT_ID, #Ascending)],
                 );
@@ -87,7 +88,7 @@ module CompositeIndex {
             }
 
         } else {
-            Array.append(
+            Array.concat(
                 index_key_details,
                 [(C.DOCUMENT_ID, #Ascending)],
             );
@@ -264,8 +265,8 @@ module CompositeIndex {
     ) : T.Result<(), Text> {
         assert CompositeIndex.size(index) == 0;
 
-        for ((document_id, candid_blob) in DocumentStore.entries(collection)) {
-            let candid_map = CollectionUtils.get_candid_map_no_cache(collection, document_id, ?candid_blob);
+        for ((document_id, partial_candid_blob) in DocumentStore.entries(collection)) {
+            let candid_map = CollectionUtils.get_candid_map_no_cache(collection, document_id, ?partial_candid_blob);
 
             switch (CompositeIndex.insertWithCandidMap(collection, index, document_id, candid_map)) {
                 case (#err(err)) {
@@ -318,8 +319,8 @@ module CompositeIndex {
 
         let candid_map_document_entries = Iter.map<(T.DocumentId, T.CandidBlob), (T.DocumentId, T.CandidMap)>(
             DocumentStore.entries(collection),
-            func((id, candid_blob) : (T.DocumentId, T.CandidBlob)) : (T.DocumentId, T.CandidMap) {
-                let candid_map = CollectionUtils.get_candid_map_no_cache(collection, id, ?candid_blob);
+            func((id, partial_candid_blob) : (T.DocumentId, T.CandidBlob)) : (T.DocumentId, T.CandidMap) {
+                let candid_map = CollectionUtils.get_candid_map_no_cache(collection, id, ?partial_candid_blob);
                 (id, candid_map);
             },
         );
@@ -331,29 +332,6 @@ module CompositeIndex {
             func(_index : T.CompositeIndex) {},
         );
 
-    };
-
-    public func repopulate_indexes(
-        collection : T.StableCollection,
-        indexes : [T.CompositeIndex],
-    ) : T.Result<(), Text> {
-
-        let candid_map_document_entries = Iter.map<(T.DocumentId, T.CandidBlob), (T.DocumentId, T.CandidMap)>(
-            DocumentStore.entries(collection),
-            func((id, candid_blob) : (T.DocumentId, T.CandidBlob)) : (T.DocumentId, T.CandidMap) {
-                let candid_map = CollectionUtils.get_candid_map_no_cache(collection, id, ?candid_blob);
-                (id, candid_map);
-            },
-        );
-
-        populate_indexes_From_candid_map_document_entries(
-            collection,
-            indexes,
-            candid_map_document_entries,
-            func(index : T.CompositeIndex) {
-                CompositeIndex.clear(collection, index);
-            },
-        );
     };
 
     // public func exists(
@@ -400,12 +378,12 @@ module CompositeIndex {
         let index_data_utils = get_index_data_utils(collection);
 
         func sort_by_key_details(a : (Text, Any), b : (Text, Any)) : Order {
-            let pos_a = switch (Array.indexOf<(Text, T.SortDirection)>((a.0, #Ascending), index.key_details, Utils.tuple_eq(Text.equal))) {
+            let pos_a = switch (Array.indexOf<(Text, T.SortDirection)>(index.key_details, Utils.tuple_eq(Text.equal), (a.0, #Ascending))) {
                 case (?pos) pos;
                 case (null) index.key_details.size();
             };
 
-            let pos_b = switch (Array.indexOf<(Text, T.SortDirection)>((b.0, #Ascending), index.key_details, Utils.tuple_eq(Text.equal))) {
+            let pos_b = switch (Array.indexOf<(Text, T.SortDirection)>(index.key_details, Utils.tuple_eq(Text.equal), (b.0, #Ascending))) {
                 case (?pos) pos;
                 case (null) index.key_details.size();
             };

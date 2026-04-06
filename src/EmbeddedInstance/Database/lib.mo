@@ -1,26 +1,26 @@
-import Principal "mo:base@0.16.0/Principal";
-import Array "mo:base@0.16.0/Array";
-import Debug "mo:base@0.16.0/Debug";
-import Text "mo:base@0.16.0/Text";
-import Char "mo:base@0.16.0/Char";
-import Nat32 "mo:base@0.16.0/Nat32";
-import Result "mo:base@0.16.0/Result";
-import Order "mo:base@0.16.0/Order";
-import Iter "mo:base@0.16.0/Iter";
-import Buffer "mo:base@0.16.0/Buffer";
-import Nat "mo:base@0.16.0/Nat";
-import Option "mo:base@0.16.0/Option";
-import Hash "mo:base@0.16.0/Hash";
-import Float "mo:base@0.16.0/Float";
-import Int "mo:base@0.16.0/Int";
+import Principal "mo:core@2.4/Principal";
+import Array "mo:core@2.4/Array";
+import Debug "mo:core@2.4/Debug";
+import Text "mo:core@2.4/Text";
+import Char "mo:core@2.4/Char";
+import Nat32 "mo:core@2.4/Nat32";
+import Result "mo:core@2.4/Result";
+import Order "mo:core@2.4/Order";
+import Iter "mo:core@2.4/Iter";
+import Buffer "mo:base@0.16/Buffer";
+import Nat "mo:core@2.4/Nat";
+import Option "mo:core@2.4/Option";
+import Hash "mo:base@0.16/Hash";
+import Float "mo:core@2.4/Float";
+import Int "mo:core@2.4/Int";
 
-import Map "mo:map@9.0.1/Map";
-import Set "mo:map@9.0.1/Set";
-import Serde "mo:serde@3.4.0";
-import Decoder "mo:serde@3.4.0/Candid/Blob/Decoder";
-import Candid "mo:serde@3.4.0/Candid";
-import Itertools "mo:itertools@0.2.2/Iter";
-import RevIter "mo:itertools@0.2.2/RevIter";
+import Map "mo:map@9.0/Map";
+import Set "mo:map@9.0/Set";
+import Serde "mo:serde@3.5";
+import Decoder "mo:serde@3.5/Candid/Blob/Decoder";
+import Candid "mo:serde@3.5/Candid";
+import Itertools "mo:itertools@0.2/Iter";
+import RevIter "mo:itertools@0.2/RevIter";
 
 import Collection "../Collection";
 import Utils "../Utils";
@@ -30,6 +30,7 @@ import Schema "../Collection/Schema";
 import StableDatabase "StableDatabase";
 import StableCollection "../Collection/StableCollection";
 import CollectionUtils "../Collection/CollectionUtils";
+import Runtime "mo:core@2.4/Runtime";
 
 module {
 
@@ -54,7 +55,7 @@ module {
                 from_blob = func(blob : Blob) : A {
                     switch (external_candify.from_blob(blob)) {
                         case (?document) document;
-                        case (null) Debug.trap("
+                        case (null) Runtime.trap("
                         Could not convert candid blob (" # debug_show blob # ") to motoko using the '" # collection_name # "' collection's schema.
                         If the schema and the candify encoding function are correct, then the blob might be corrupted or not a valid candid blob.
                         Please report this issue to the developers by creating a new issue on the GitHub repository.  ");

@@ -1,5 +1,5 @@
 import ZT "../../EmbeddedInstance/Types";
-import Principal "mo:base@0.16.0/Principal";
+import Principal "mo:core@2.4/Principal";
 
 import CollectionClient "Collection.Client";
 import DatabaseClient "Database.Client";

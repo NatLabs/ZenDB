@@ -1,30 +1,31 @@
 import Prim "mo:prim";
 
-import Debug "mo:base@0.16.0/Debug";
-import Buffer "mo:base@0.16.0/Buffer";
-import Principal "mo:base@0.16.0/Principal";
-import Array "mo:base@0.16.0/Array";
-import Text "mo:base@0.16.0/Text";
-import Char "mo:base@0.16.0/Char";
-import Nat32 "mo:base@0.16.0/Nat32";
-import Nat "mo:base@0.16.0/Nat";
-import Int "mo:base@0.16.0/Int";
-import Int32 "mo:base@0.16.0/Int32";
-import Blob "mo:base@0.16.0/Blob";
-import Nat64 "mo:base@0.16.0/Nat64";
-import Int16 "mo:base@0.16.0/Int16";
-import Int64 "mo:base@0.16.0/Int64";
-import Int8 "mo:base@0.16.0/Int8";
-import Nat16 "mo:base@0.16.0/Nat16";
-import Nat8 "mo:base@0.16.0/Nat8";
-import Option "mo:base@0.16.0/Option";
-import Iter "mo:base@0.16.0/Iter";
+import Runtime "mo:core@2.4/Runtime";
+import Debug "mo:core@2.4/Debug";
+import Buffer "mo:base@0.16/Buffer";
+import Principal "mo:core@2.4/Principal";
+import Array "mo:core@2.4/Array";
+import Text "mo:core@2.4/Text";
+import Char "mo:core@2.4/Char";
+import Nat32 "mo:core@2.4/Nat32";
+import Nat "mo:core@2.4/Nat";
+import Int "mo:core@2.4/Int";
+import Int32 "mo:core@2.4/Int32";
+import Blob "mo:core@2.4/Blob";
+import Nat64 "mo:core@2.4/Nat64";
+import Int16 "mo:core@2.4/Int16";
+import Int64 "mo:core@2.4/Int64";
+import Int8 "mo:core@2.4/Int8";
+import Nat16 "mo:core@2.4/Nat16";
+import Nat8 "mo:core@2.4/Nat8";
+import Option "mo:core@2.4/Option";
+import Iter "mo:core@2.4/Iter";
 
-import TypeUtils "mo:memory-collection@0.3.2/TypeUtils";
-import ByteUtils "mo:byte-utils@0.1.1";
-import Itertools "mo:itertools@0.2.2/Iter";
-import Cmp "mo:augmented-btrees@0.7.1/Cmp";
-import Map "mo:map@9.0.1/Map";
+import TypeUtils "mo:memory-collection@0.4/TypeUtils";
+import ByteUtils "mo:byte-utils@0.2";
+import Itertools "mo:itertools@0.2/Iter";
+import Cmp "mo:augmented-btrees@0.9/Cmp";
+import Map "mo:map@9.0/Map";
 
 import T "../Types";
 
@@ -140,12 +141,12 @@ module {
         let buf = Buffer.Buffer<Nat8>(16);
         label l loop {
             let b1 = switch (src.next()) {
-                case (null) Debug.trap("Orchid: unexpected end of stream - missing terminator");
+                case (null) Runtime.trap("Orchid: unexpected end of stream - missing terminator");
                 case (?b) b;
             };
             if (b1 == 0x00) {
                 let b2 = switch (src.next()) {
-                    case (null) Debug.trap("Orchid: unexpected end of stream inside escaped field");
+                    case (null) Runtime.trap("Orchid: unexpected end of stream inside escaped field");
                     case (?b) b;
                 };
                 if (b2 == 0x00) {
@@ -153,7 +154,7 @@ module {
                 } else if (b2 == 0xFF) {
                     buf.add(0x00); // unescape embedded null
                 } else {
-                    Debug.trap("Orchid: invalid escape sequence 0x00 " # debug_show b2);
+                    Runtime.trap("Orchid: invalid escape sequence 0x00 " # debug_show b2);
                 };
             } else {
                 buf.add(b1);
@@ -167,7 +168,7 @@ module {
         switch (candid) {
             case (#Minimum) buffer.add(TypeCode.Minimum);
             case (#Array(_) or #Record(_) or #Map(_) or #Variant(_) or #Tuple(_)) {
-                Debug.trap("Orchid does not support compound types: " # debug_show (candid));
+                Runtime.trap("Orchid does not support compound types: " # debug_show (candid));
             };
             case (#Option(option_type)) {
                 buffer.add(TypeCode.Option);
@@ -259,7 +260,7 @@ module {
 
     func decode(bytes : T.Iter<Nat8>) : T.Candid {
         func read() : Nat8 {
-            let ?byte = bytes.next() else Debug.trap("Orchid: not enough bytes to read");
+            let ?byte = bytes.next() else Runtime.trap("Orchid: not enough bytes to read");
             byte;
         };
 
@@ -268,9 +269,9 @@ module {
         if (type_code == TypeCode.NatAsNat64) {
             #Nat(Nat64.toNat(ByteUtils.Sorted.toNat64(bytes)));
         } else if (type_code == TypeCode.Nat) {
-            Debug.trap("Orchid: #Nat type code found in encoded data - this type is not supported");
+            Runtime.trap("Orchid: #Nat type code found in encoded data - this type is not supported");
         } else if (type_code == TypeCode.Int) {
-            Debug.trap("Orchid: #Int type code found in encoded data - this type is not supported");
+            Runtime.trap("Orchid: #Int type code found in encoded data - this type is not supported");
         } else if (type_code == TypeCode.Nat8) {
             let n = ByteUtils.Sorted.toNat8(bytes);
             (#Nat8(n));
@@ -328,12 +329,12 @@ module {
             // No size prefix — read until escape terminator
             let utf8 = Blob.fromArray(decode_escaped(bytes));
             let text = switch (Text.decodeUtf8(utf8)) {
-                case (null) Debug.trap("Orchid: invalid utf8 in encoded Text field");
+                case (null) Runtime.trap("Orchid: invalid utf8 in encoded Text field");
                 case (?t) t;
             };
             #Text(text);
 
-        } else Debug.trap("Orchid: unknown type code: " # debug_show (type_code));
+        } else Runtime.trap("Orchid: unknown type code: " # debug_show (type_code));
 
     };
 
@@ -358,7 +359,7 @@ module {
         let bytes = Itertools.peekable(blob.vals());
 
         func read() : Nat8 {
-            let ?byte = bytes.next() else Debug.trap("Orchid: not enough bytes to read");
+            let ?byte = bytes.next() else Runtime.trap("Orchid: not enough bytes to read");
             byte;
         };
 
@@ -366,7 +367,7 @@ module {
 
         let buffer = Buffer.Buffer<CandidQuery>(candid_values_size);
 
-        for (_ in Iter.range(1, candid_values_size)) {
+        for (_ in Nat.rangeInclusive(1, candid_values_size)) {
             let res = decode(bytes);
             buffer.add(res);
         };

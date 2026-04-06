@@ -1,27 +1,27 @@
-import Principal "mo:base@0.16.0/Principal";
-import Array "mo:base@0.16.0/Array";
-import Debug "mo:base@0.16.0/Debug";
-import Text "mo:base@0.16.0/Text";
-import Char "mo:base@0.16.0/Char";
-import Nat32 "mo:base@0.16.0/Nat32";
-import Result "mo:base@0.16.0/Result";
-import Order "mo:base@0.16.0/Order";
-import Iter "mo:base@0.16.0/Iter";
-import Buffer "mo:base@0.16.0/Buffer";
-import Nat "mo:base@0.16.0/Nat";
-import Nat8 "mo:base@0.16.0/Nat8";
-import Nat64 "mo:base@0.16.0/Nat64";
-import Option "mo:base@0.16.0/Option";
-import Hash "mo:base@0.16.0/Hash";
+import Principal "mo:core@2.4/Principal";
+import Array "mo:core@2.4/Array";
+import Debug "mo:core@2.4/Debug";
+import Text "mo:core@2.4/Text";
+import Char "mo:core@2.4/Char";
+import Nat32 "mo:core@2.4/Nat32";
+import Result "mo:core@2.4/Result";
+import Order "mo:core@2.4/Order";
+import Iter "mo:core@2.4/Iter";
+import Buffer "mo:base@0.16/Buffer";
+import Nat "mo:core@2.4/Nat";
+import Nat8 "mo:core@2.4/Nat8";
+import Nat64 "mo:core@2.4/Nat64";
+import Option "mo:core@2.4/Option";
+import Hash "mo:base@0.16/Hash";
 
-import Map "mo:map@9.0.1/Map";
-import Set "mo:map@9.0.1/Set";
-import Serde "mo:serde@3.4.0";
-import Decoder "mo:serde@3.4.0/Candid/Blob/Decoder";
-import Candid "mo:serde@3.4.0/Candid";
-import Itertools "mo:itertools@0.2.2/Iter";
-import RevIter "mo:itertools@0.2.2/RevIter";
-import SparseBitMap64 "mo:bit-map@1.1.0/SparseBitMap64";
+import Map "mo:map@9.0/Map";
+import Set "mo:map@9.0/Set";
+import Serde "mo:serde@3.5";
+import Decoder "mo:serde@3.5/Candid/Blob/Decoder";
+import Candid "mo:serde@3.5/Candid";
+import Itertools "mo:itertools@0.2/Iter";
+import RevIter "mo:itertools@0.2/RevIter";
+import SparseBitMap64 "mo:bit-map@1.1/SparseBitMap64";
 
 import T "../Types";
 import Query "../Query";
@@ -41,6 +41,7 @@ import CollectionUtils "CollectionUtils";
 import QueryPlan "QueryPlan";
 import DocumentStore "DocumentStore";
 import CandidMap "../CandidMap";
+import Runtime "mo:core@2.4/Runtime";
 
 module {
 
@@ -90,9 +91,9 @@ module {
         text_search_matches_cache : Map<Blob, Map<Nat64, T.TextMatch>>,
     ) : EvalResult {
         let ?#text_index(text_index) = Map.get(collection.indexes, Map.thash, TextIndex.KEY) else
-            Debug.trap("TextScan: no text index on collection");
+            Runtime.trap("TextScan: no text index on collection");
         let ?(_, field_idx) = TextIndex.verifyIndexedField(text_index, field) else
-            Debug.trap("TextScan: text index does not cover field '" # field # "'");
+            Runtime.trap("TextScan: text index does not cover field '" # field # "'");
 
         let field_idx_n8 = Nat8.fromNat(field_idx);
 
@@ -124,7 +125,7 @@ module {
         // adjacent-duplicate elimination via last_doc_id is correct — the same doc can appear
         // multiple times (once per token position) but those entries are consecutive.
         let scan_word_iter = func(w : Text) : { next : () -> ?(T.DocumentId, ?[(Text, T.Candid)]) } {
-            let lower_word = Text.toLowercase(w);
+            let lower_word = Text.toLower(w);
             let interval = TextIndex.scan(
                 collection, text_index, field_idx,
                 (lower_word, null, null, null, null),
@@ -140,11 +141,11 @@ module {
                             case (?(key_values, _)) {
                                 let doc_id = switch (key_values[2]) {
                                     case (#Blob(b)) b;
-                                    case (_) Debug.trap("TextIndex: scan_word_iter: expected Blob doc_id");
+                                    case (_) Runtime.trap("TextIndex: scan_word_iter: expected Blob doc_id");
                                 };
-                                let tok_pos = switch (key_values[3]) { case (#Nat32(n)) n; case (_) Debug.trap("TextIndex: scan_word_iter: expected Nat32 tok_pos") };
-                                let char_start = switch (key_values[4]) { case (#Nat32(n)) n; case (_) Debug.trap("TextIndex: scan_word_iter: expected Nat32 char_start") };
-                                let char_end = switch (key_values[5]) { case (#Nat32(n)) n; case (_) Debug.trap("TextIndex: scan_word_iter: expected Nat32 char_end") };
+                                let tok_pos = switch (key_values[3]) { case (#Nat32(n)) n; case (_) Runtime.trap("TextIndex: scan_word_iter: expected Nat32 tok_pos") };
+                                let char_start = switch (key_values[4]) { case (#Nat32(n)) n; case (_) Runtime.trap("TextIndex: scan_word_iter: expected Nat32 char_start") };
+                                let char_end = switch (key_values[5]) { case (#Nat32(n)) n; case (_) Runtime.trap("TextIndex: scan_word_iter: expected Nat32 char_end") };
                                 add_match(doc_id, lower_word, tok_pos, char_start, char_end);
                                 if (last_doc_id != ?doc_id) {
                                     last_doc_id := ?doc_id;
@@ -177,7 +178,7 @@ module {
             // Step 1: candidates — docs containing every word (allOf intersection), no match_cache.
             let word_bitmaps = Buffer.Buffer<T.SparseBitMap64>(words.size());
             for (w in words.vals()) {
-                let lower_w = Text.toLowercase(w);
+                let lower_w = Text.toLower(w);
                 let iv = TextIndex.scan(collection, text_index, field_idx, (lower_w, null, null, null, null), (lower_w, null, null, null, null));
                 let ids = Intervals.document_ids_and_indexed_fields_from_intervals(collection, text_index.internal_index.name, [iv], false);
                 word_bitmaps.add(SparseBitMap64.fromIter(Iter.map(ids, func((id, _) : (T.DocumentId, ?[(Text, T.Candid)])) : Nat { Utils.convert_last_8_bytes_to_nat(id) })));
@@ -188,7 +189,7 @@ module {
             // Step 2: per (doc, tok_pos) of word[0], verify word[k] is at tok_pos+k;
             //         collect match data only for fully confirmed phrase occurrences.
             let result = SparseBitMap64.new();
-            let w0 = Text.toLowercase(words[0]);
+            let w0 = Text.toLower(words[0]);
             let w0_interval = CompositeIndex.scan_with_bounds(
                 collection,
                 text_index.internal_index,
@@ -198,16 +199,16 @@ module {
             for ((key_values, _) in CompositeIndex.from_interval(collection, text_index.internal_index, w0_interval)) {
                 let doc_id : T.DocumentId = switch (key_values[2]) {
                     case (#Blob(b)) b;
-                    case (_) Debug.trap("TextIndex: phrase: expected Blob doc_id");
+                    case (_) Runtime.trap("TextIndex: phrase: expected Blob doc_id");
                 };
                 let doc_nat = Utils.convert_last_8_bytes_to_nat(doc_id);
                 if (SparseBitMap64.get(candidates, doc_nat) and not SparseBitMap64.get(result, doc_nat)) {
                     let tok_pos = switch (key_values[3]) {
                         case (#Nat32(n)) n;
-                        case (_) Debug.trap("TextIndex: phrase: expected Nat32 token_pos");
+                        case (_) Runtime.trap("TextIndex: phrase: expected Nat32 token_pos");
                     };
-                    let w0_cs = switch (key_values[4]) { case (#Nat32(n)) n; case (_) Debug.trap("TextIndex: phrase: expected Nat32 char_start") };
-                    let w0_ce = switch (key_values[5]) { case (#Nat32(n)) n; case (_) Debug.trap("TextIndex: phrase: expected Nat32 char_end") };
+                    let w0_cs = switch (key_values[4]) { case (#Nat32(n)) n; case (_) Runtime.trap("TextIndex: phrase: expected Nat32 char_start") };
+                    let w0_ce = switch (key_values[5]) { case (#Nat32(n)) n; case (_) Runtime.trap("TextIndex: phrase: expected Nat32 char_end") };
 
                     // Accumulate candidate phrase match positions; committed only on full confirmation.
                     let phrase_matches = Buffer.Buffer<(Text, Nat32, Nat32, Nat32)>(words.size());
@@ -216,7 +217,7 @@ module {
                     var all_match = true;
                     var k : Nat = 1;
                     while (k < words.size() and all_match) {
-                        let wk = Text.toLowercase(words[k]);
+                        let wk = Text.toLower(words[k]);
                         let expected_tp = Nat32.fromNat(Nat32.toNat(tok_pos) + k);
                         let wk_iv = CompositeIndex.scan_with_bounds(
                             collection,
@@ -226,8 +227,8 @@ module {
                         );
                         switch (CompositeIndex.from_interval(collection, text_index.internal_index, wk_iv).next()) {
                             case (?(wk_kv, _)) {
-                                let wk_cs = switch (wk_kv[4]) { case (#Nat32(n)) n; case (_) Debug.trap("TextIndex: phrase: expected Nat32 char_start") };
-                                let wk_ce = switch (wk_kv[5]) { case (#Nat32(n)) n; case (_) Debug.trap("TextIndex: phrase: expected Nat32 char_end") };
+                                let wk_cs = switch (wk_kv[4]) { case (#Nat32(n)) n; case (_) Runtime.trap("TextIndex: phrase: expected Nat32 char_start") };
+                                let wk_ce = switch (wk_kv[5]) { case (#Nat32(n)) n; case (_) Runtime.trap("TextIndex: phrase: expected Nat32 char_end") };
                                 phrase_matches.add((wk, expected_tp, wk_cs, wk_ce));
                             };
                             case (null) { all_match := false };
@@ -248,7 +249,7 @@ module {
         // Helper: bitmap of docs with a token beginning with the given prefix; populates match_cache
         // with the actual matched word (not the prefix itself).
         let scan_prefix = func(p : Text) : T.SparseBitMap64 {
-            let lower_prefix = Text.toLowercase(p);
+            let lower_prefix = Text.toLower(p);
             // upper_prefix is lexicographically just past any word starting with lower_prefix
             // (U+00FF is greater than all common ASCII/Latin-1 letters)
             let upper_prefix = lower_prefix # "\u{FF}";
@@ -261,13 +262,13 @@ module {
             );
             let result = SparseBitMap64.new();
             for ((key_values, _) in CompositeIndex.from_interval(collection, text_index.internal_index, interval)) {
-                let actual_word = switch (key_values[0]) { case (#Text(t)) t; case (_) Debug.trap("TextIndex: scan_prefix: expected Text word") };
-                let doc_id = switch (key_values[2]) { case (#Blob(b)) b; case (_) Debug.trap("TextIndex: scan_prefix: expected Blob doc_id") };
+                let actual_word = switch (key_values[0]) { case (#Text(t)) t; case (_) Runtime.trap("TextIndex: scan_prefix: expected Text word") };
+                let doc_id = switch (key_values[2]) { case (#Blob(b)) b; case (_) Runtime.trap("TextIndex: scan_prefix: expected Blob doc_id") };
                 let doc_nat = Utils.convert_last_8_bytes_to_nat(doc_id);
                 SparseBitMap64.add(result, doc_nat);
-                let tok_pos = switch (key_values[3]) { case (#Nat32(n)) n; case (_) Debug.trap("TextIndex: scan_prefix: expected Nat32 tok_pos") };
-                let char_start = switch (key_values[4]) { case (#Nat32(n)) n; case (_) Debug.trap("TextIndex: scan_prefix: expected Nat32 char_start") };
-                let char_end = switch (key_values[5]) { case (#Nat32(n)) n; case (_) Debug.trap("TextIndex: scan_prefix: expected Nat32 char_end") };
+                let tok_pos = switch (key_values[3]) { case (#Nat32(n)) n; case (_) Runtime.trap("TextIndex: scan_prefix: expected Nat32 tok_pos") };
+                let char_start = switch (key_values[4]) { case (#Nat32(n)) n; case (_) Runtime.trap("TextIndex: scan_prefix: expected Nat32 char_start") };
+                let char_end = switch (key_values[5]) { case (#Nat32(n)) n; case (_) Runtime.trap("TextIndex: scan_prefix: expected Nat32 char_end") };
                 add_match(doc_id, actual_word, tok_pos, char_start, char_end);
             };
             result
@@ -308,7 +309,7 @@ module {
                 for (w in words.vals()) { bufs.add(scan_word(w)) };
                 SparseBitMap64.multiIntersect(bufs.vals())
             };
-            case (_) Debug.trap("TextScan: unsupported text operator");
+            case (_) Runtime.trap("TextScan: unsupported text operator");
         };
 
         if (not negated) return #BitMap(positive_bitmap);
@@ -344,13 +345,13 @@ module {
         let around_bitmap = switch (text_op) {
             case (#word(w)) {
                 // Single word: bracket scan around that exact word.
-                bracket_bitmap_for_word(Text.toLowercase(w))
+                bracket_bitmap_for_word(Text.toLower(w))
             };
 
             case (#startsWith(prefix)) {
                 // Positive range covers [lower_prefix, upper_prefix) where upper = prefix # "\u{FF}".
                 // Complement: two intervals bracketing that entire range.
-                let lower_prefix = Text.toLowercase(prefix);
+                let lower_prefix = Text.toLower(prefix);
                 let upper_prefix = lower_prefix # "\u{FF}";
                 let interval_before = CompositeIndex.scan_with_bounds(
                     collection, text_index.internal_index,
@@ -379,7 +380,7 @@ module {
                 // Intersection of per-word bracket bitmaps gives exactly that set.
                 let bufs = Buffer.Buffer<T.SparseBitMap64>(words.size());
                 for (w in words.vals()) {
-                    bufs.add(bracket_bitmap_for_word(Text.toLowercase(w)));
+                    bufs.add(bracket_bitmap_for_word(Text.toLower(w)));
                 };
                 SparseBitMap64.multiIntersect(bufs.vals())
             };
@@ -392,7 +393,7 @@ module {
                 // the multi-word gap approach misses.
                 let bitmap = SparseBitMap64.new();
                 for (w in words.vals()) {
-                    let b = bracket_bitmap_for_word(Text.toLowercase(w));
+                    let b = bracket_bitmap_for_word(Text.toLower(w));
                     SparseBitMap64.unionInPlace(bitmap, b);
                 };
                 bitmap
@@ -410,7 +411,7 @@ module {
                 let words = TextIndex.phrase_words(text_index, phrase_text);
                 let de_morgan = SparseBitMap64.new();
                 for (w in words.vals()) {
-                    let b = bracket_bitmap_for_word(Text.toLowercase(w));
+                    let b = bracket_bitmap_for_word(Text.toLower(w));
                     SparseBitMap64.unionInPlace(de_morgan, b);
                 };
                 // allOf - phrase = docs with all words present but phrase not matched
@@ -420,7 +421,7 @@ module {
                 de_morgan
             };
 
-            case (_) Debug.trap("TextScan: unsupported text operator for negation");
+            case (_) Runtime.trap("TextScan: unsupported text operator for negation");
         };
         SparseBitMap64.differenceInPlace(around_bitmap, positive_bitmap);
         #BitMap(around_bitmap)
@@ -731,7 +732,7 @@ module {
                 let sorted_intervals_by_index_iter = sorted_intervals_by_index.vals();
 
                 if (bitmaps.size() == 0) {
-                    let ?(index_name, interval_details) = sorted_intervals_by_index_iter.next() else Debug.trap("QueryExecution.get_unique_document_ids_from_query_plan: No elements in intervals_by_index map when size is greater than 0");
+                    let ?(index_name, interval_details) = sorted_intervals_by_index_iter.next() else Runtime.trap("QueryExecution.get_unique_document_ids_from_query_plan: No elements in intervals_by_index map when size is greater than 0");
                     load_interval_into_bitmap(bitmap, index_name, Buffer.toArray(interval_details.intervals));
                 };
 
@@ -1464,7 +1465,7 @@ module {
                         SparseBitMap64.fromIter(Iter.map(iter, func((id, _) : (T.DocumentId, ?[(Text, T.Candid)])) : Nat { Utils.convert_last_8_bytes_to_nat(id) }))
                     );
                     case (#Empty) { if (query_plan.is_and_operation) return #Empty };
-                    case (#Interval(_, _, _)) Debug.trap("QueryExecution: text scan cannot return Interval");
+                    case (#Interval(_, _, _)) Runtime.trap("QueryExecution: text scan cannot return Interval");
                 };
             };
         };
@@ -1807,7 +1808,7 @@ module {
                         SparseBitMap64.fromIter(Iter.map(iter, func((id, _) : (T.DocumentId, ?[(Text, T.Candid)])) : Nat { Utils.convert_last_8_bytes_to_nat(id) }))
                     );
                     case (#Empty) {};
-                    case (#Interval(_, _, _)) Debug.trap("QueryExecution: text scan cannot return Interval");
+                    case (#Interval(_, _, _)) Runtime.trap("QueryExecution: text scan cannot return Interval");
                 };
             };
         };

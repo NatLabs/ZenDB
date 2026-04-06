@@ -1,24 +1,25 @@
 // @testmode wasi
-import Debug "mo:base@0.16.0/Debug";
-import Iter "mo:base@0.16.0/Iter";
-import Text "mo:base@0.16.0/Text";
-import Char "mo:base@0.16.0/Char";
-import Buffer "mo:base@0.16.0/Buffer";
-import Principal "mo:base@0.16.0/Principal";
-import Array "mo:base@0.16.0/Array";
+import Debug "mo:core@2.4/Debug";
+import Iter "mo:core@2.4/Iter";
+import Text "mo:core@2.4/Text";
+import Char "mo:core@2.4/Char";
+import Buffer "mo:base@0.16/Buffer";
+import Principal "mo:core@2.4/Principal";
+import Array "mo:core@2.4/Array";
 
 import { test; suite } "mo:test";
 
 import Bench "mo:bench";
 import Fuzz "mo:fuzz";
-import Candid "mo:serde@3.4.0/Candid";
-import Itertools "mo:itertools@0.2.2/Iter";
-import SparseBitMap64 "mo:bit-map@1.1.0/SparseBitMap64";
+import Candid "mo:serde@3.5/Candid";
+import Itertools "mo:itertools@0.2/Iter";
+import SparseBitMap64 "mo:bit-map@1.1/SparseBitMap64";
 
 import ZenDB "../../src/EmbeddedInstance";
 import TestUtils "../test-utils/TestUtils";
 import ZenDBSuite "../test-utils/TestFramework";
 import Utils "../../src/EmbeddedInstance/Utils";
+import Runtime "mo:core@2.4/Runtime";
 
 let fuzz = Fuzz.fromSeed(0x7eadbeef);
 let { QueryBuilder } = ZenDB;
@@ -296,7 +297,7 @@ ZenDBSuite.newSuite(
             let Query = options_to_query(options);
 
             let query_res = txs.search(Query);
-            let #ok(result) = query_res else Debug.trap("get_txs failed: " # debug_show query_res);
+            let #ok(result) = query_res else Runtime.trap("get_txs failed: " # debug_show query_res);
 
             result.documents;
 
@@ -305,7 +306,7 @@ ZenDBSuite.newSuite(
         func get_txs_from_query(db_query : ZenDB.QueryBuilder) : [(ZenDB.Types.DocumentId, Tx, [ZenDB.Types.TextMatch])] {
 
             let query_res = txs.search(db_query);
-            let #ok(result) = query_res else Debug.trap("get_txs failed: " # debug_show query_res);
+            let #ok(result) = query_res else Runtime.trap("get_txs failed: " # debug_show query_res);
 
             result.documents;
 
@@ -336,7 +337,7 @@ ZenDBSuite.newSuite(
                     let nat_id = Utils.convert_last_8_bytes_to_nat(id);
 
                     if (SparseBitMap64.get(bitmap, nat_id)) {
-                        Debug.trap("Duplicate entry for id " # debug_show id);
+                        Runtime.trap("Duplicate entry for id " # debug_show id);
                     } else {
                         SparseBitMap64.set(bitmap, nat_id, true);
                     };
@@ -365,12 +366,12 @@ ZenDBSuite.newSuite(
         //         switch (opt_cursor, ?(documents.get(documents.size() - 1).0)) {
         //             case (?cursor, ?new_cursor) if (cursor == new_cursor) {
         //                 // break pagination;
-        //                 Debug.trap("PaginationToken is not moving");
+        //                 Runtime.trap("PaginationToken is not moving");
         //             } else {
         //                 opt_cursor := ?new_cursor;
         //             };
         //             case (null, new_cursor) opt_cursor := new_cursor;
-        //             case (_, null) Debug.trap("Should be unreachable");
+        //             case (_, null) Runtime.trap("Should be unreachable");
 
         //         };
 
@@ -386,7 +387,7 @@ ZenDBSuite.newSuite(
         //             documents.add((id, tx));
 
         //             if (SparseBitMap64.get(bitmap, id)) {
-        //                 Debug.trap("Duplicate entry for id " # debug_show id);
+        //                 Runtime.trap("Duplicate entry for id " # debug_show id);
         //             } else {
         //                 SparseBitMap64.set(bitmap, id, true);
         //             };

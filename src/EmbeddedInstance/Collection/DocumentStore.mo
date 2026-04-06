@@ -1,18 +1,19 @@
-import Debug "mo:base@0.16.0/Debug";
-import Option "mo:base@0.16.0/Option";
+import Debug "mo:core@2.4/Debug";
+import Option "mo:core@2.4/Option";
 
-import BpTree "mo:augmented-btrees@0.7.1/BpTree";
-import Cmp "mo:augmented-btrees@0.7.1/Cmp";
-import BpTreeTypes "mo:augmented-btrees@0.7.1/BpTree/Types";
-import BpTreeMethods "mo:augmented-btrees@0.7.1/BpTree/Methods";
-import MemoryBTree "mo:memory-collection@0.3.2/MemoryBTree/Stable";
-import TypeUtils "mo:memory-collection@0.3.2/TypeUtils";
-import RevIter "mo:itertools@0.2.2/RevIter";
+import BpTree "mo:augmented-btrees@0.9/BpTree";
+import Cmp "mo:augmented-btrees@0.9/Cmp";
+import BpTreeTypes "mo:augmented-btrees@0.9/BpTree/Types";
+import BpTreeMethods "mo:augmented-btrees@0.9/BpTree/Methods";
+import MemoryBTree "mo:memory-collection@0.4/MemoryBTree/Stable";
+import TypeUtils "mo:memory-collection@0.4/TypeUtils";
+import RevIter "mo:itertools@0.2/RevIter";
 
 import T "../Types";
 import C "../Constants";
 import BTree "../BTree";
 import Utils "../Utils";
+import Runtime "mo:core@2.4/Runtime";
 
 /// BTree api wrapper for storing documents and handling their various versions.
 /// This module acts as an extension of the StableCollection module.
@@ -29,14 +30,6 @@ module DocumentStore {
         #heap(BpTree.new(?C.HEAP_BTREE_ORDER));
     };
 
-    public func new(is_stable_memory : Bool) : T.BTree<T.DocumentId, T.Document> {
-        if (is_stable_memory) {
-            new_stable_memory();
-        } else {
-            new_heap();
-        };
-    };
-
     let stable_memory_document_blobify : T.Blobify<T.Document> = {
         to_blob = func(document : T.Document) : Blob {
             switch (document) {
@@ -50,7 +43,7 @@ module DocumentStore {
 
             switch (version_id) {
                 case (0) { #v0(Utils.slice_blob(blob, 1, blob.size())) };
-                case (_) Debug.trap("Decoding document failed: Unsupported version id " # debug_show version_id);
+                case (_) Runtime.trap("Decoding document failed: Unsupported version id " # debug_show version_id);
             };
 
         };
@@ -110,7 +103,7 @@ module DocumentStore {
         let cmp = getBtreeUtils(collection);
         let document = switch (C.CURRENT_DOCUMENT_VERSION) {
             case (0) { #v0(candid_blob) };
-            case (_) Debug.trap("Unsupported document version " # debug_show C.CURRENT_DOCUMENT_VERSION);
+            case (_) Runtime.trap("Unsupported document version " # debug_show C.CURRENT_DOCUMENT_VERSION);
         };
 
         Option.map<T.Document, Blob>(

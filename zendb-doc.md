@@ -100,7 +100,7 @@ Configure this in your `dfx.json` file:
 ```
 
 ### Error Handling
-ZenDB follows a robust error handling philosophy: every foreseeable error returns a `Result` type, allowing you to handle errors gracefully. This minimizes the use of `Debug.trap()` which would terminate execution.
+ZenDB follows a robust error handling philosophy: every foreseeable error returns a `Result` type, allowing you to handle errors gracefully. This minimizes the use of `Runtime.trap()` which would terminate execution.
 
 ### Logging
 ZenDB provides extensive logging to help you debug issues. The library uses standard log levels from lowest to highest priority: `#Debug`, `#Info`, `#Warn`, `#Error`, `#Trap`.
@@ -695,7 +695,7 @@ label processing loop {
     switch (users.processIndexBatch(batch_id)) {
         case (#ok(true))  break processing; // more documents remain; schedule another update call
         case (#ok(false)) break processing; // all documents indexed — done
-        case (#err(msg))  Debug.trap("Batch indexing failed: " # msg);
+        case (#err(msg))  Runtime.trap("Batch indexing failed: " # msg);
     };
 };
 ```

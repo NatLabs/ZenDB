@@ -1,39 +1,40 @@
-import Principal "mo:base@0.16.0/Principal";
-import Array "mo:base@0.16.0/Array";
-import Debug "mo:base@0.16.0/Debug";
-import Text "mo:base@0.16.0/Text";
-import Char "mo:base@0.16.0/Char";
-import Nat32 "mo:base@0.16.0/Nat32";
-import Nat64 "mo:base@0.16.0/Nat64";
-import Result "mo:base@0.16.0/Result";
-import Order "mo:base@0.16.0/Order";
-import Iter "mo:base@0.16.0/Iter";
-import Buffer "mo:base@0.16.0/Buffer";
-import Nat "mo:base@0.16.0/Nat";
-import Option "mo:base@0.16.0/Option";
-import Hash "mo:base@0.16.0/Hash";
-import Float "mo:base@0.16.0/Float";
-import Blob "mo:base@0.16.0/Blob";
-import Prelude "mo:base@0.16.0/Prelude";
-import Heap "mo:base@0.16.0/Heap";
+import Principal "mo:core@2.4/Principal";
+import Array "mo:core@2.4/Array";
+import VarArray "mo:core@2.4/VarArray";
+import Debug "mo:core@2.4/Debug";
+import Text "mo:core@2.4/Text";
+import Char "mo:core@2.4/Char";
+import Nat32 "mo:core@2.4/Nat32";
+import Nat64 "mo:core@2.4/Nat64";
+import Result "mo:core@2.4/Result";
+import Order "mo:core@2.4/Order";
+import Iter "mo:core@2.4/Iter";
+import Buffer "mo:base@0.16/Buffer";
+import Nat "mo:core@2.4/Nat";
+import Option "mo:core@2.4/Option";
+import Hash "mo:base@0.16/Hash";
+import Float "mo:core@2.4/Float";
+import Blob "mo:core@2.4/Blob";
+import Runtime "mo:core@2.4/Runtime";
+import PriorityQueue "mo:core@2.4/PriorityQueue";
 
-import Int "mo:base@0.16.0/Int";
+import Int "mo:core@2.4/Int";
 
-import Map "mo:map@9.0.1/Map";
-import Set "mo:map@9.0.1/Set";
-import Serde "mo:serde@3.4.0";
-import Decoder "mo:serde@3.4.0/Candid/Blob/Decoder";
-import Candid "mo:serde@3.4.0/Candid";
-import Itertools "mo:itertools@0.2.2/Iter";
-import PeekableIter "mo:itertools@0.2.2/PeekableIter";
-import RevIter "mo:itertools@0.2.2/RevIter";
+import Map "mo:map@9.0/Map";
+import Set "mo:map@9.0/Set";
+import Serde "mo:serde@3.5";
+import Decoder "mo:serde@3.5/Candid/Blob/Decoder";
+import Candid "mo:serde@3.5/Candid";
+import Itertools "mo:itertools@0.2/Iter";
+import PeekableIter "mo:itertools@0.2/PeekableIter";
+import RevIter "mo:itertools@0.2/RevIter";
 import Logger "Logger";
 
-import _TypeUtils "mo:memory-collection@0.3.2/TypeUtils";
-import Int8Cmp "mo:memory-collection@0.3.2/TypeUtils/Int8Cmp";
+import _TypeUtils "mo:memory-collection@0.4/TypeUtils";
+import Int8Cmp "mo:memory-collection@0.4/TypeUtils/Int8Cmp";
 
 import T "Types";
-import ByteUtils "mo:byte-utils@0.1.1";
+import ByteUtils "mo:byte-utils@0.2";
 import MinHeap "MinHeap";
 
 module {
@@ -47,7 +48,7 @@ module {
             from_blob = func(blob : Blob) : A {
                 switch (external_candify.from_blob(blob)) {
                     case (?document) document;
-                    case (null) Debug.trap("
+                    case (null) Runtime.trap("
                         Could not convert candid blob (" # debug_show blob # ") to motoko using the '" # collection_name # "' collection's schema.
                         If the schema and the candify encoding function are correct, then the blob might be corrupted or not a valid candid blob.
                         Please report this issue to the developers by creating a new issue on the GitHub repository.  ");
@@ -157,7 +158,7 @@ module {
                 ).vals()
             );
 
-            if (nat > 0) nat *= (Nat64.toNat(Nat64.maximumValue) + 1);
+            if (nat > 0) nat *= (Nat64.toNat(Nat64.maxValue) + 1);
             nat += Nat64.toNat(n64);
 
             if (i >= 8) i -= 8;
@@ -170,13 +171,13 @@ module {
 
     public func send_error<OldOk, NewOk, Error>(res : T.Result<OldOk, Error>) : T.Result<NewOk, Error> {
         switch (res) {
-            case (#ok(_)) Prelude.unreachable();
+            case (#ok(_)) Runtime.unreachable();
             case (#err(errorMsg)) #err(errorMsg);
         };
     };
 
     public func ignore_this() : None {
-        Debug.trap("trap caused by ignoreThis()");
+        Runtime.trap("trap caused by ignoreThis()");
     };
 
     public func concat_blob(blob1 : Blob, blob2 : Blob) : Blob {
@@ -243,7 +244,7 @@ module {
         while (not terminate_loop) {
 
             buckets.add(
-                Array.tabulateVar<?A>(
+                VarArray.tabulate<?A>(
                     bucket_init_size,
                     func(i : Nat) : ?A {
                         if (terminate_loop) null else (
@@ -276,7 +277,7 @@ module {
 
                 switch (res) {
                     case (?elem) elem;
-                    case (null) Debug.trap("iter_to_array: unexpected null value at index " # debug_show i # " in bucket " # debug_show current_bucket_idx # " (offset: " # debug_show offset # ", expected total items: " # debug_show items # ")");
+                    case (null) Runtime.trap("iter_to_array: unexpected null value at index " # debug_show i # " in bucket " # debug_show current_bucket_idx # " (offset: " # debug_show offset # ", expected total items: " # debug_show items # ")");
                 };
             },
         );
@@ -330,12 +331,13 @@ module {
             cmp(a.0, b.0);
         };
 
-        let heap = Heap.Heap<Index<A>>(cmpIters);
+        let heap = PriorityQueue.empty<Index<A>>();
+        let minCmp = func(a : Index<A>, b : Index<A>) : Order.Order { cmpIters(b, a) }; // reverse order so the priority queue behaves like a min heap
 
         for ((i, iter) in Itertools.enumerate(iters.vals())) {
             switch (iter.next()) {
                 case (?a) {
-                    heap.put((a, i));
+                    PriorityQueue.push(heap, minCmp, (a, i));
                 };
                 case (_) {
 
@@ -348,12 +350,12 @@ module {
         object {
             public func next() : ?A {
                 loop {
-                    switch (heap.removeMin()) {
+                    switch (PriorityQueue.pop(heap, minCmp)) {
                         case (?(min, i)) {
                             // Try to get the next element from the same iterator
                             switch (iters[i].next()) {
                                 case (?a) {
-                                    heap.put((a, i));
+                                    PriorityQueue.push(heap, minCmp, (a, i));
                                 };
                                 case (_) {
                                     // Iterator exhausted, continue with remaining elements
@@ -547,14 +549,14 @@ module {
     public func unwrap_or_err<A>(res : T.Result<A, Text>) : A {
         switch (res) {
             case (#ok(success)) success;
-            case (#err(err)) Debug.trap("unwrapOrErr: " # err);
+            case (#err(err)) Runtime.trap("unwrapOrErr: " # err);
         };
     };
 
     public func assert_result<A>(res : T.Result<A, Text>) {
         switch (res) {
             case (#ok(_)) ();
-            case (#err(err)) Debug.trap("assertResult: " # err);
+            case (#err(err)) Runtime.trap("assertResult: " # err);
         };
     };
 
@@ -604,14 +606,14 @@ module {
     };
 
     public class ReusableBuffer<A>(init_capacity : Nat) {
-        var elems : [var ?A] = Array.init(init_capacity, null);
+        var elems : [var ?A] = VarArray.repeat(null, init_capacity);
         var count : Nat = 0;
 
         public func size() : Nat = count;
 
         public func add(elem : A) {
             if (count == elems.size()) {
-                elems := Array.tabulateVar(
+                elems := VarArray.tabulate(
                     elems.size() * 2,
                     func(i : Nat) : ?A {
                         if (i < count) {
@@ -634,7 +636,7 @@ module {
         public func get(i : Nat) : A {
             switch (elems[i]) {
                 case (?elem) elem;
-                case (null) Debug.trap "CompositeIndex out of bounds";
+                case (null) Runtime.trap "CompositeIndex out of bounds";
             };
         };
 

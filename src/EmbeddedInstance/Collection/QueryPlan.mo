@@ -1,17 +1,17 @@
-import Array "mo:base@0.16.0/Array";
-import Debug "mo:base@0.16.0/Debug";
-import Buffer "mo:base@0.16.0/Buffer";
-import Option "mo:base@0.16.0/Option";
-import Iter "mo:base@0.16.0/Iter";
-import Nat "mo:base@0.16.0/Nat";
-import Order "mo:base@0.16.0/Order";
-import Text "mo:base@0.16.0/Text";
+import Array "mo:core@2.4/Array";
+import Debug "mo:core@2.4/Debug";
+import Buffer "mo:base@0.16/Buffer";
+import Option "mo:core@2.4/Option";
+import Iter "mo:core@2.4/Iter";
+import Nat "mo:core@2.4/Nat";
+import Order "mo:core@2.4/Order";
+import Text "mo:core@2.4/Text";
 
-import Candid "mo:serde@3.4.0/Candid";
-import Map "mo:map@9.0.1/Map";
-import Set "mo:map@9.0.1/Set";
-import SparseBitMap64 "mo:bit-map@1.1.0/SparseBitMap64";
-import Itertools "mo:itertools@0.2.2/Iter";
+import Candid "mo:serde@3.5/Candid";
+import Map "mo:map@9.0/Map";
+import Set "mo:map@9.0/Set";
+import SparseBitMap64 "mo:bit-map@1.1/SparseBitMap64";
+import Itertools "mo:itertools@0.2/Iter";
 
 import T "../Types";
 import CandidMap "../CandidMap";
@@ -26,6 +26,7 @@ import Schema "Schema";
 import Logger "../Logger";
 import DocumentStore "DocumentStore";
 import Query "../Query";
+import Runtime "mo:core@2.4/Runtime";
 
 module {
     let LOGGER_NAMESPACE = "QueryPlan";
@@ -100,7 +101,7 @@ module {
                     switch (last_pagination_document) {
                         case (?cursor_document) {
 
-                            let ?#Blob(id) = CandidMap.get(cursor_document, collection.schema_map, C.DOCUMENT_ID) else Debug.trap("Pagination cursor document is missing document ID field");
+                            let ?#Blob(id) = CandidMap.get(cursor_document, collection.schema_map, C.DOCUMENT_ID) else Runtime.trap("Pagination cursor document is missing document ID field");
 
                             let last_document_pos = DocumentStore.get_expected_index(collection, id);
                             let pos = switch (last_document_pos) {
@@ -179,7 +180,7 @@ module {
                         };
                     };
                 };
-                case (#And(_)) Debug.trap("And not allowed in this context");
+                case (#And(_)) Runtime.trap("And not allowed in this context");
                 case (#Or(_)) {
                     this_query_has_nested_or_operations := true;
                 };
@@ -275,8 +276,8 @@ module {
                         switch (sort_column) {
                             case (?(sort_field, sort_direction)) {
 
-                                let ?cursor_value = CandidMap.get(cursor_document, collection.schema_map, sort_field) else Debug.trap("Pagination cursor document is missing sort field");
-                                let ?#Blob(id) = CandidMap.get(cursor_document, collection.schema_map, C.DOCUMENT_ID) else Debug.trap("Pagination cursor document is missing document ID field");
+                                let ?cursor_value = CandidMap.get(cursor_document, collection.schema_map, sort_field) else Runtime.trap("Pagination cursor document is missing sort field");
+                                let ?#Blob(id) = CandidMap.get(cursor_document, collection.schema_map, C.DOCUMENT_ID) else Runtime.trap("Pagination cursor document is missing document ID field");
 
                                 switch (sort_direction) {
                                     case (#Ascending) {
@@ -294,7 +295,7 @@ module {
                             };
                             case (null) {
 
-                                let ?#Blob(id) = CandidMap.get(cursor_document, collection.schema_map, C.DOCUMENT_ID) else Debug.trap("Pagination cursor document is missing document ID field");
+                                let ?#Blob(id) = CandidMap.get(cursor_document, collection.schema_map, C.DOCUMENT_ID) else Runtime.trap("Pagination cursor document is missing document ID field");
 
                                 let pos = switch (DocumentStore.get_expected_index(collection, id)) {
                                     case (#Found(pos)) pos;
@@ -313,7 +314,7 @@ module {
                                     is_and_operation = true;
                                     subplans = [];
                                     simple_operations = Buffer.toArray(operations);
-                                    scans = Array.append(
+                                    scans = Array.concat(
                                         [
                                             #IndexScan({
                                                 index_name = C.DOCUMENT_ID;
@@ -341,7 +342,7 @@ module {
                     is_and_operation = true;
                     subplans = [];
                     simple_operations = Buffer.toArray(operations);
-                    scans = Array.append(
+                    scans = Array.concat(
                         [
                             #FullScan({
                                 requires_additional_sorting = requires_sorting;
@@ -406,7 +407,7 @@ module {
             is_and_operation = true;
             subplans = Buffer.toArray(sub_query_plans);
             simple_operations = operations_array;
-            scans = Array.append(
+            scans = Array.concat(
                 [
                     #IndexScan({
                         index_name = index.name;
@@ -461,7 +462,7 @@ module {
             query_statements.vals(),
             func(qs : T.ZenQueryLang) : Bool {
                 switch (qs) {
-                    case (#Or(_)) Debug.trap("Directly nested #Or not allowed in this context");
+                    case (#Or(_)) Runtime.trap("Directly nested #Or not allowed in this context");
                     case (#And(nested_qs)) true;
                     case (_) false;
                 };
@@ -473,14 +474,14 @@ module {
         label resolving_or_operations for (query_statement in query_statements.vals()) {
 
             switch (query_statement) {
-                case (#Or(_)) Debug.trap("Directly nested #Or not allowed in this context");
+                case (#Or(_)) Runtime.trap("Directly nested #Or not allowed in this context");
                 case (#Operation(field, op)) {
                     log.lazyDebug(
                         func() = "Processing operation on field '" #
                         field # "': " # debug_show op
                     );
 
-                    let operations = Array.append(parent_simple_and_operations, [(field, op)]);
+                    let operations = Array.concat(parent_simple_and_operations, [(field, op)]);
 
                     // Text operations skip the BTree index path entirely.
                     switch (op) {
@@ -533,7 +534,7 @@ module {
                                         };
                                         case (null) {
 
-                                            let ?#Blob(id) = CandidMap.get(cursor_document, collection.schema_map, C.DOCUMENT_ID) else Debug.trap("Pagination cursor document is missing document ID field");
+                                            let ?#Blob(id) = CandidMap.get(cursor_document, collection.schema_map, C.DOCUMENT_ID) else Runtime.trap("Pagination cursor document is missing document ID field");
 
                                             let pos = switch (DocumentStore.get_expected_index(collection, id)) {
                                                 case (#Found(pos)) pos;
@@ -681,7 +682,7 @@ module {
                 log.lazyError(
                     func() = "Unsupported query type: " # debug_show db_query
                 );
-                Debug.trap("createQueryPlan(): Unsupported query type");
+                Runtime.trap("createQueryPlan(): Unsupported query type");
             };
         }) {
             case (#err(e)) return #err(e);

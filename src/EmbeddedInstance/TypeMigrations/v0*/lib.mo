@@ -1,6 +1,7 @@
-import Debug "mo:base@0.16.0/Debug";
+import Debug "mo:core@2.4/Debug";
 
 import Types_v0_1_0 "v0.1.0/types";
+import Runtime "mo:core@2.4/Runtime";
 
 module {
 
@@ -18,7 +19,7 @@ module {
                 #v0_1_0(state);
             };
             case (_) {
-                Debug.trap("Invalid version " # to_text(prev_store) # " of stable store. Expected v0.2.4. Please call upgrade() on the stable store.");
+                Runtime.trap("Invalid version " # to_text(prev_store) # " of stable store. Expected v0.2.4. Please call upgrade() on the stable store.");
             };
         };
     };
@@ -32,7 +33,7 @@ module {
         switch (upgraded) {
             case (#v0_1_0(state)) state;
             case (_) {
-                Debug.trap("Invalid version of stable store " # to_text(store) # ". Expected v0.2.4. Please call upgrade() on the stable store.");
+                Runtime.trap("Invalid version of stable store " # to_text(store) # ". Expected v0.2.4. Please call upgrade() on the stable store.");
             };
 
         };

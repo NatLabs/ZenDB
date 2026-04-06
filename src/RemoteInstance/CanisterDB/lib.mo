@@ -1,16 +1,16 @@
-import Array "mo:base@0.16.0/Array";
-import Principal "mo:base@0.16.0/Principal";
-import Random "mo:base@0.16.0/Random";
-import Int64 "mo:base@0.16.0/Int64";
-import Blob "mo:base@0.16.0/Blob";
-import Result "mo:base@0.16.0/Result";
-import Debug "mo:base@0.16.0/Debug";
-import Buffer "mo:base@0.16.0/Buffer";
-import Iter "mo:base@0.16.0/Iter";
-import Error "mo:base@0.16.0/Error";
+import Array "mo:core@2.4/Array";
+import Principal "mo:core@2.4/Principal";
+import Random "mo:core@2.4/Random";
+import Int64 "mo:core@2.4/Int64";
+import Blob "mo:core@2.4/Blob";
+import Result "mo:core@2.4/Result";
+import Debug "mo:core@2.4/Debug";
+import Buffer "mo:base@0.16/Buffer";
+import Iter "mo:core@2.4/Iter";
+import Error "mo:core@2.4/Error";
 
-import Map "mo:map@9.0.1/Map";
-import CanisterRBAC "mo:canister-rbac@0.1.0";
+import Map "mo:map@9.0/Map";
+import CanisterRBAC "mo:canister-rbac@0.1";
 
 import ClusterTypes "../Types";
 import ZenDB "../../EmbeddedInstance";
@@ -23,6 +23,7 @@ import CollectionUtils "../../EmbeddedInstance/Collection/CollectionUtils";
 import Utils "../../EmbeddedInstance/Utils";
 import TypeMigrations "../../EmbeddedInstance/TypeMigrations";
 import Query "../../EmbeddedInstance/Query";
+import Runtime "mo:core@2.4/Runtime";
 
 (
     with migration = func({
@@ -316,7 +317,7 @@ shared ({ caller = owner }) persistent actor class CanisterDB() = this_canister 
     func extract_ok<A>(res : ZT.Result<A, Text>) : A {
         switch (res) {
             case (#ok(value)) value;
-            case (#err(e)) Debug.trap("Unexpected error: " # e);
+            case (#err(e)) Runtime.trap("Unexpected error: " # e);
         };
      };
 
@@ -507,7 +508,15 @@ shared ({ caller = owner }) persistent actor class CanisterDB() = this_canister 
         );
     };
 
-    public shared ({ caller }) func zendb_v1_collection_search(
+    public shared query ({ caller }) func zendb_v1_collection_search(
+        db_name : Text,
+        collection_name : Text,
+        stable_query : ZT.StableQuery,
+    ) : async (ZT.Result<ZT.SearchResult<Blob>, Text>) {
+        _zendb_collection_search(caller, db_name, collection_name, stable_query);
+    };
+
+    public shared ({ caller }) func zendb_v1_collection_search_update(
         db_name : Text,
         collection_name : Text,
         stable_query : ZT.StableQuery,
@@ -545,6 +554,14 @@ shared ({ caller = owner }) persistent actor class CanisterDB() = this_canister 
         _zendb_collection_search_for_one(caller, db_name, collection_name, stable_query);
     };
 
+    public shared ({ caller }) func zendb_v1_collection_search_for_one_update(
+        db_name : Text,
+        collection_name : Text,
+        stable_query : ZT.StableQuery,
+    ) : async (ZT.Result<ZT.SearchOneResult<Blob>, Text>) {
+        _zendb_collection_search_for_one(caller, db_name, collection_name, stable_query);
+    };
+
     public shared composite query ({ caller }) func zendb_v1_collection_search_for_one_composite_query(
         db_name : Text,
         collection_name : Text,
@@ -561,7 +578,7 @@ shared ({ caller = owner }) persistent actor class CanisterDB() = this_canister 
             [(Resource.DATABASE, db_name), (Resource.COLLECTION, collection_name)],
             func() : (Nat) {
                 let collection_res = get_collection(db_name, collection_name);
-                let #ok(collection) = collection_res else return Debug.trap("Collection not found");
+                let #ok(collection) = collection_res else return Runtime.trap("Collection not found");
                 StableCollection.size(collection);
 
             },
@@ -584,12 +601,12 @@ shared ({ caller = owner }) persistent actor class CanisterDB() = this_canister 
             [(Resource.DATABASE, db_name), (Resource.COLLECTION, collection_name)],
             func() : ZT.CountResult {
                 let collection_res = get_collection(db_name, collection_name);
-                let #ok(collection) = collection_res else Debug.trap("Collection not found");
+                let #ok(collection) = collection_res else Runtime.trap("Collection not found");
 
                 let count_result = StableCollection.count(collection, stable_query);
                 let #ok(response) = count_result else {
-                    let #err(err_msg) = count_result else Debug.trap("Unexpected error");
-                    Debug.trap(err_msg);
+                    let #err(err_msg) = count_result else Runtime.trap("Unexpected error");
+                    Runtime.trap(err_msg);
                 };
 
                 response;
@@ -637,7 +654,7 @@ shared ({ caller = owner }) persistent actor class CanisterDB() = this_canister 
             func() : ZT.DatabaseStats {
                 let sstore = TypeMigrations.get_current_state(zendb_instance);
                 let ?db = Map.get<Text, ZT.StableDatabase>(sstore.databases, Map.thash, db_name) else {
-                    Debug.trap("Database '" # db_name # "' does not exist");
+                    Runtime.trap("Database '" # db_name # "' does not exist");
                 };
 
                 StableDatabase.stats(db);
@@ -662,7 +679,7 @@ shared ({ caller = owner }) persistent actor class CanisterDB() = this_canister 
             func() : [Text] {
                 let sstore = TypeMigrations.get_current_state(zendb_instance);
                 let ?db = Map.get<Text, ZT.StableDatabase>(sstore.databases, Map.thash, db_name) else {
-                    Debug.trap("Database '" # db_name # "' does not exist");
+                    Runtime.trap("Database '" # db_name # "' does not exist");
                 };
 
                 StableDatabase.list_collection_names(db);
@@ -687,7 +704,7 @@ shared ({ caller = owner }) persistent actor class CanisterDB() = this_canister 
             func() : ?ZT.CollectionStats {
                 let sstore = TypeMigrations.get_current_state(zendb_instance);
                 let ?db = Map.get<Text, ZT.StableDatabase>(sstore.databases, Map.thash, db_name) else {
-                    Debug.trap("Database '" # db_name # "' does not exist");
+                    Runtime.trap("Database '" # db_name # "' does not exist");
                 };
 
                 StableDatabase.get_collection_stats(db, collection_name);
@@ -712,7 +729,7 @@ shared ({ caller = owner }) persistent actor class CanisterDB() = this_canister 
             func() : [(Text, ZT.CollectionStats)] {
                 let sstore = TypeMigrations.get_current_state(zendb_instance);
                 let ?db = Map.get<Text, ZT.StableDatabase>(sstore.databases, Map.thash, db_name) else {
-                    Debug.trap("Database '" # db_name # "' does not exist");
+                    Runtime.trap("Database '" # db_name # "' does not exist");
                 };
 
                 StableDatabase.get_all_collections_stats(db);
@@ -737,8 +754,8 @@ shared ({ caller = owner }) persistent actor class CanisterDB() = this_canister 
             func() : ZT.CollectionStats {
                 let collection_result = get_collection(db_name, collection_name);
                 let #ok(collection) = collection_result else {
-                    let #err(err_msg) = collection_result else Debug.trap("Unexpected error");
-                    Debug.trap(err_msg);
+                    let #err(err_msg) = collection_result else Runtime.trap("Unexpected error");
+                    Runtime.trap(err_msg);
                 };
 
                 StableCollection.stats(collection);
@@ -828,7 +845,7 @@ shared ({ caller = owner }) persistent actor class CanisterDB() = this_canister 
             canister_rbac,
             caller,
             Permissions.DB_READ,
-            [(Resource.DATABASE, db_name), (Resource.COLLECTION, collection_name), ("index", index_name)],
+            [(Resource.DATABASE, db_name), (Resource.COLLECTION, collection_name)],
             func() : ZT.Result<?ZT.IndexStats, Text> {
                 let collection_res = get_collection(db_name, collection_name);
                 let #ok(collection) = collection_res else return Utils.send_error(collection_res);
@@ -947,7 +964,7 @@ shared ({ caller = owner }) persistent actor class CanisterDB() = this_canister 
             canister_rbac,
             caller,
             Permissions.DB_MANAGE,
-            [(Resource.DATABASE, db_name), (Resource.COLLECTION, collection_name), ("index", index_name)],
+            [(Resource.DATABASE, db_name), (Resource.COLLECTION, collection_name)],
             func() : (ZT.Result<(), Text>) {
                 let #ok(collection) = get_collection(db_name, collection_name) else return Utils.send_error(get_collection(db_name, collection_name));
 
@@ -1047,6 +1064,20 @@ shared ({ caller = owner }) persistent actor class CanisterDB() = this_canister 
                 let #ok(collection) = get_collection(db_name, collection_name) else return Utils.send_error(get_collection(db_name, collection_name));
 
                 StableCollection.populate_indexes_in_batch(collection, batch_id, null);
+            },
+        );
+    };
+
+    public shared ({ caller }) func zendb_v1_collection_create_text_index(db_name : Text, collection_name : Text, index_name : Text, fields : [Text]) : async ZT.Result<(), Text> {
+        CanisterRBAC.allowWithResult(
+            canister_rbac,
+            caller,
+            Permissions.DB_MANAGE,
+            [(Resource.DATABASE, db_name), (Resource.COLLECTION, collection_name)],
+            func() : (ZT.Result<(), Text>) {
+                let #ok(collection) = get_collection(db_name, collection_name) else return Utils.send_error(get_collection(db_name, collection_name));
+
+                StableCollection.create_text_index(collection, index_name, fields, #basic);
             },
         );
     };

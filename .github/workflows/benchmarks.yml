@@ -25,6 +25,9 @@ jobs:
               run: dfx cache install
 
             - uses: ZenVoich/setup-mops@v1
+            
+            - name: Install moc toolchain
+              run: mops toolchain init
 
             - name: Create benchmark-results branch if it doesn't exist
               uses: peterjgrainger/action-create-branch@v2.2.0

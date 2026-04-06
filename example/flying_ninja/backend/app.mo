@@ -1,6 +1,6 @@
-import Array "mo:base@0.16.0/Array";
-import Int "mo:base@0.16.0/Int";
-import Random "mo:base@0.16.0/Random";
+import Array "mo:base@0.16/Array";
+import Int "mo:base@0.16/Int";
+import Random "mo:base@0.16/Random";
 
 import ZenDB "mo:zendb";
 

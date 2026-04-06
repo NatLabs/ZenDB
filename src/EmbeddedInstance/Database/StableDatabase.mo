@@ -1,29 +1,29 @@
 import Prim "mo:prim";
 
-import Principal "mo:base@0.16.0/Principal";
-import Array "mo:base@0.16.0/Array";
-import Debug "mo:base@0.16.0/Debug";
-import Text "mo:base@0.16.0/Text";
-import Char "mo:base@0.16.0/Char";
-import Nat32 "mo:base@0.16.0/Nat32";
-import Result "mo:base@0.16.0/Result";
-import Order "mo:base@0.16.0/Order";
-import Iter "mo:base@0.16.0/Iter";
-import Buffer "mo:base@0.16.0/Buffer";
-import Nat "mo:base@0.16.0/Nat";
-import Option "mo:base@0.16.0/Option";
-import Hash "mo:base@0.16.0/Hash";
-import Float "mo:base@0.16.0/Float";
-import Int "mo:base@0.16.0/Int";
+import Principal "mo:core@2.4/Principal";
+import Array "mo:core@2.4/Array";
+import Debug "mo:core@2.4/Debug";
+import Text "mo:core@2.4/Text";
+import Char "mo:core@2.4/Char";
+import Nat32 "mo:core@2.4/Nat32";
+import Result "mo:core@2.4/Result";
+import Order "mo:core@2.4/Order";
+import Iter "mo:core@2.4/Iter";
+import Buffer "mo:base@0.16/Buffer";
+import Nat "mo:core@2.4/Nat";
+import Option "mo:core@2.4/Option";
+import Hash "mo:base@0.16/Hash";
+import Float "mo:core@2.4/Float";
+import Int "mo:core@2.4/Int";
 
-import Map "mo:map@9.0.1/Map";
-import Set "mo:map@9.0.1/Set";
-import Itertools "mo:itertools@0.2.2/Iter";
-import RevIter "mo:itertools@0.2.2/RevIter";
+import Map "mo:map@9.0/Map";
+import Set "mo:map@9.0/Set";
+import Itertools "mo:itertools@0.2/Iter";
+import RevIter "mo:itertools@0.2/RevIter";
 import Ids "../Ids";
-import Candid "mo:serde@3.4.0/Candid";
+import Candid "mo:serde@3.5/Candid";
 
-import Vector "mo:vector@0.4.2";
+import Vector "mo:vector@0.4";
 
 import Collection "../Collection";
 import StableCollection "../Collection/StableCollection";
@@ -146,7 +146,11 @@ module {
                             #stableMemory(memory_btree);
                         };
                         case (null) {
-                            BTree.newStableMemory();
+                            if (Option.get(db.is_compression_enabled, true)) {
+                                BTree.newStableMemory();
+                            } else {
+                                BTree.newStableMemoryUncompressed();
+                            };
                         };
                     };
                 };
@@ -173,6 +177,7 @@ module {
             logger = db.logger;
             memory_type = db.memory_type;
             is_running_locally = db.is_running_locally;
+            is_compression_enabled = db.is_compression_enabled;
         };
 
         let unique_constraints_buffer = Buffer.Buffer<([Text], T.CompositeIndex)>(8);

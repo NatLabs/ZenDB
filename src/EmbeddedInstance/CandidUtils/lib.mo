@@ -1,35 +1,35 @@
-import Debug "mo:base@0.16.0/Debug";
-import Array "mo:base@0.16.0/Array";
-import Text "mo:base@0.16.0/Text";
-import Nat32 "mo:base@0.16.0/Nat32";
-import Result "mo:base@0.16.0/Result";
-import Order "mo:base@0.16.0/Order";
-import Iter "mo:base@0.16.0/Iter";
-import Buffer "mo:base@0.16.0/Buffer";
-import Nat "mo:base@0.16.0/Nat";
-import Option "mo:base@0.16.0/Option";
-import Hash "mo:base@0.16.0/Hash";
-import Float "mo:base@0.16.0/Float";
-import Int "mo:base@0.16.0/Int";
-import Int32 "mo:base@0.16.0/Int32";
-import Blob "mo:base@0.16.0/Blob";
-import Nat64 "mo:base@0.16.0/Nat64";
-import Int16 "mo:base@0.16.0/Int16";
-import Int64 "mo:base@0.16.0/Int64";
-import Int8 "mo:base@0.16.0/Int8";
-import Nat16 "mo:base@0.16.0/Nat16";
-import Nat8 "mo:base@0.16.0/Nat8";
-import Char "mo:base@0.16.0/Char";
-import Principal "mo:base@0.16.0/Principal";
-import Bool "mo:base@0.16.0/Bool";
+import Debug "mo:core@2.4/Debug";
+import Array "mo:core@2.4/Array";
+import Text "mo:core@2.4/Text";
+import Nat32 "mo:core@2.4/Nat32";
+import Result "mo:core@2.4/Result";
+import Order "mo:core@2.4/Order";
+import Iter "mo:core@2.4/Iter";
+import Buffer "mo:base@0.16/Buffer";
+import Nat "mo:core@2.4/Nat";
+import Option "mo:core@2.4/Option";
+import Float "mo:core@2.4/Float";
+import Int "mo:core@2.4/Int";
+import Int32 "mo:core@2.4/Int32";
+import Blob "mo:core@2.4/Blob";
+import Nat64 "mo:core@2.4/Nat64";
+import Int16 "mo:core@2.4/Int16";
+import Int64 "mo:core@2.4/Int64";
+import Int8 "mo:core@2.4/Int8";
+import Nat16 "mo:core@2.4/Nat16";
+import Nat8 "mo:core@2.4/Nat8";
+import Char "mo:core@2.4/Char";
+import Principal "mo:core@2.4/Principal";
+import Bool "mo:core@2.4/Bool";
 
-import Itertools "mo:itertools@0.2.2/Iter";
-import { sort_candid_type } "mo:serde@3.4.0/Candid/Blob/CandidUtils";
+import Itertools "mo:itertools@0.2/Iter";
+import { sort_candid_type } "mo:serde@3.5/Candid/Blob/CandidUtils";
 
 import CastModule "Cast";
 import OpsModule "Ops";
 
 import T "../Types";
+import Runtime "mo:core@2.4/Runtime";
 
 module {
     // public let {
@@ -47,20 +47,20 @@ module {
     public func getNextValue(value : T.CandidQuery) : T.CandidQuery {
         switch (value) {
             case (#Nat(n)) #Nat(n + 1);
-            case (#Nat8(n)) if (n == Nat8.maximumValue) #Maximum else #Nat8(n + 1);
-            case (#Nat16(n)) if (n == Nat16.maximumValue) #Maximum else #Nat16(n + 1);
-            case (#Nat32(n)) if (n == Nat32.maximumValue) #Maximum else #Nat32(n + 1);
-            case (#Nat64(n)) if (n == Nat64.maximumValue) #Maximum else #Nat64(n + 1);
+            case (#Nat8(n)) if (n == Nat8.maxValue) #Maximum else #Nat8(n + 1);
+            case (#Nat16(n)) if (n == Nat16.maxValue) #Maximum else #Nat16(n + 1);
+            case (#Nat32(n)) if (n == Nat32.maxValue) #Maximum else #Nat32(n + 1);
+            case (#Nat64(n)) if (n == Nat64.maxValue) #Maximum else #Nat64(n + 1);
             case (#Int(n)) #Int(n + 1);
-            case (#Int8(n)) if (n == Int8.maximumValue) #Maximum else #Int8(n + 1);
-            case (#Int16(n)) if (n == Int16.maximumValue) #Maximum else #Int16(n + 1);
-            case (#Int32(n)) if (n == Int32.maximumValue) #Maximum else #Int32(n + 1);
-            case (#Int64(n)) if (n == Int64.maximumValue) #Maximum else #Int64(n + 1);
+            case (#Int8(n)) if (n == Int8.maxValue) #Maximum else #Int8(n + 1);
+            case (#Int16(n)) if (n == Int16.maxValue) #Maximum else #Int16(n + 1);
+            case (#Int32(n)) if (n == Int32.maxValue) #Maximum else #Int32(n + 1);
+            case (#Int64(n)) if (n == Int64.maxValue) #Maximum else #Int64(n + 1);
             case (#Float(n)) #Float(n + 1e-30);
             case (#Text(t)) #Text(t # Text.fromChar(Char.fromNat32(0 : Nat32)));
             case (#Blob(b)) #Blob(
                 Blob.fromArray(
-                    Array.append(
+                    Array.concat(
                         Blob.toArray(b),
                         [0 : Nat8],
                     )
@@ -69,7 +69,7 @@ module {
             case (#Principal(p)) #Principal(
                 Principal.fromBlob(
                     Blob.fromArray(
-                        Array.append(
+                        Array.concat(
                             Blob.toArray(Principal.toBlob(p)),
                             [0 : Nat8],
                         )
@@ -82,7 +82,7 @@ module {
             case (#Empty) #Maximum;
             case (#Maximum) #Maximum;
             case (#Minimum) #Minimum;
-            case (candid_value) Debug.trap("getNextValue(): Does not support this type: " # debug_show (candid_value))
+            case (candid_value) Runtime.trap("getNextValue(): Does not support this type: " # debug_show (candid_value))
 
         };
 
@@ -97,7 +97,7 @@ module {
 
         if (last_byte == 0) {
             return Blob.fromArray(
-                Array.subArray<Nat8>(
+                Array.sliceToArray<Nat8>(
                     bytes,
                     0,
                     bytes.size() - 1,
@@ -107,8 +107,8 @@ module {
 
         let predecessor_byte = last_byte - 1;
 
-        let new_bytes = Array.append<Nat8>(
-            Array.subArray<Nat8>(
+        let new_bytes = Array.concat<Nat8>(
+            Array.sliceToArray<Nat8>(
                 bytes,
                 0,
                 bytes.size() - 1,
@@ -128,10 +128,10 @@ module {
             case (#Nat32(n)) if (n == 0) #Minimum else #Nat32(n - 1);
             case (#Nat64(n)) if (n == 0) #Minimum else #Nat64(n - 1);
             case (#Int(n)) #Int(n - 1);
-            case (#Int8(n)) if (n == Int8.minimumValue) #Minimum else #Int8(n - 1);
-            case (#Int16(n)) if (n == Int16.minimumValue) #Minimum else #Int16(n - 1);
-            case (#Int32(n)) if (n == Int32.minimumValue) #Minimum else #Int32(n - 1);
-            case (#Int64(n)) if (n == Int64.minimumValue) #Minimum else #Int64(n - 1);
+            case (#Int8(n)) if (n == Int8.minValue) #Minimum else #Int8(n - 1);
+            case (#Int16(n)) if (n == Int16.minValue) #Minimum else #Int16(n - 1);
+            case (#Int32(n)) if (n == Int32.minValue) #Minimum else #Int32(n - 1);
+            case (#Int64(n)) if (n == Int64.minValue) #Minimum else #Int64(n - 1);
             case (#Float(n)) #Float(n - 1e-30);
             case (#Text(t)) if (t == "") #Minimum else {
 
@@ -139,7 +139,7 @@ module {
                 let opt_text = Text.decodeUtf8(blob);
                 switch (opt_text) {
                     case (?new_text) #Text(new_text);
-                    case (null) Debug.trap("getPrevValue(): Failed to decode text from blob: " # debug_show (blob));
+                    case (null) Runtime.trap("getPrevValue(): Failed to decode text from blob: " # debug_show (blob));
                 };
             };
             case (#Blob(b)) if (b.size() == 0) #Minimum else {
@@ -160,7 +160,7 @@ module {
             case (#Empty) #Minimum;
             case (#Maximum) #Maximum;
             case (#Minimum) #Minimum;
-            case (_) Debug.trap("getPrevValue(): Does not support this type: " # debug_show (value));
+            case (_) Runtime.trap("getPrevValue(): Does not support this type: " # debug_show (value));
 
         };
 
@@ -200,7 +200,7 @@ module {
                 field_name,
                 fromCandidQuery(field_value),
             );
-            case (_candid_value) Debug.trap("fromCandidQuery(): Does not support this type: " # debug_show (_candid_value));
+            case (_candid_value) Runtime.trap("fromCandidQuery(): Does not support this type: " # debug_show (_candid_value));
         };
     };
 
@@ -223,7 +223,7 @@ module {
             case (#Bool(b)) #Bool(b);
             case (#Null) #Null;
             case (#Empty) #Empty;
-            case (_candid_value) Debug.trap("toCandidQuery(): Does not support this type: " # debug_show (_candid_value));
+            case (_candid_value) Runtime.trap("toCandidQuery(): Does not support this type: " # debug_show (_candid_value));
         };
     };
 
@@ -296,20 +296,20 @@ module {
             case (#Variant(schema), #Variant(a), #Variant(b)) {
 
                 let ?i = Array.indexOf<(Text, Any)>(
-                    a,
                     schema,
                     func((name, _) : (Text, Any), (name2, _) : (Text, Any)) : Bool {
                         name == name2;
                     },
-                ) else Debug.trap("compare: variant not found in schema");
+                    a,
+                ) else Runtime.trap("compare: variant not found in schema");
 
                 let ?j = Array.indexOf<(Text, Any)>(
-                    b,
                     schema,
                     func((name, _) : (Text, Any), (name2, _) : (Text, Any)) : Bool {
                         name == name2;
                     },
-                ) else Debug.trap("compare: variant not found in schema");
+                    b,
+                ) else Runtime.trap("compare: variant not found in schema");
 
                 let res = Nat.compare(i, j);
 
@@ -327,7 +327,7 @@ module {
             //     if (len_cmp != #equal) return len_cmp;
 
             //     let min_len = Nat.min(a.size(), b.size());
-            //     for (i in Iter.range(0, min_len - 1)) {
+            //     for (i in Nat.rangeInclusive(0, min_len - 1)) {
             //         let cmp_result = compare(a[i], b[i]);
             //         if (cmp_result != #equal) return cmp_result;
             //     };
@@ -336,7 +336,7 @@ module {
 
             case (schema, a, b) {
                 // Debug.print(debug_show (a, b));
-                Debug.trap("compare: unexpected candid type " # debug_show { schema; a; b });
+                Runtime.trap("compare: unexpected candid type " # debug_show { schema; a; b });
             };
         };
     };
@@ -387,20 +387,20 @@ module {
             case (#Variant(schema), #Variant(a), #Variant(b)) {
 
                 let ?i = Array.indexOf<(Text, Any)>(
-                    a,
                     schema,
                     func((name, _) : (Text, Any), (name2, _) : (Text, Any)) : Bool {
                         name == name2;
                     },
-                ) else Debug.trap("compare: variant not found in schema");
+                    a,
+                ) else Runtime.trap("compare: variant not found in schema");
 
                 let ?j = Array.indexOf<(Text, Any)>(
-                    b,
                     schema,
                     func((name, _) : (Text, Any), (name2, _) : (Text, Any)) : Bool {
                         name == name2;
                     },
-                ) else Debug.trap("compare: variant not found in schema");
+                    b,
+                ) else Runtime.trap("compare: variant not found in schema");
 
                 let res = Nat.compare(i, j);
 
@@ -418,7 +418,7 @@ module {
             //     if (len_cmp != #equal) return len_cmp;
 
             //     let min_len = Nat.min(a.size(), b.size());
-            //     for (i in Iter.range(0, min_len - 1)) {
+            //     for (i in Nat.rangeInclusive(0, min_len - 1)) {
             //         let cmp_result = compare(a[i], b[i]);
             //         if (cmp_result != #equal) return cmp_result;
             //     };
@@ -427,7 +427,7 @@ module {
 
             case (schema, a, b) {
                 // Debug.print(debug_show (a, b));
-                Debug.trap("compare: unexpected candid type " # debug_show { schema; a; b });
+                Runtime.trap("compare: unexpected candid type " # debug_show { schema; a; b });
             };
         };
     };

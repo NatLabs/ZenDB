@@ -1,8 +1,8 @@
-import Debug "mo:base@0.16.0/Debug";
-import Array "mo:base@0.16.0/Array";
-import Iter "mo:base@0.16.0/Iter";
-import Order "mo:base@0.16.0/Order";
-import Nat "mo:base@0.16.0/Nat";
+import Debug "mo:core@2.4/Debug";
+import Array "mo:core@2.4/Array";
+import Iter "mo:core@2.4/Iter";
+import Order "mo:core@2.4/Order";
+import Nat "mo:core@2.4/Nat";
 
 import { test; suite } "mo:test";
 

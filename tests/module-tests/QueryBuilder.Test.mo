@@ -1,7 +1,7 @@
-import Debug "mo:base@0.16.0/Debug";
-import Text "mo:base@0.16.0/Text";
-import Array "mo:base@0.16.0/Array";
-import Char "mo:base@0.16.0/Char";
+import Debug "mo:core@2.4/Debug";
+import Text "mo:core@2.4/Text";
+import Array "mo:core@2.4/Array";
+import Char "mo:core@2.4/Char";
 
 import { test; suite } "mo:test";
 

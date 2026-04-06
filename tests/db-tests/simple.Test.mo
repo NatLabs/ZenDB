@@ -1,15 +1,16 @@
 // @testmode wasi
-import Debug "mo:base@0.16.0/Debug";
-import Iter "mo:base@0.16.0/Iter";
-import Text "mo:base@0.16.0/Text";
-import Char "mo:base@0.16.0/Char";
-import Buffer "mo:base@0.16.0/Buffer";
+import Debug "mo:core@2.4/Debug";
+import Iter "mo:core@2.4/Iter";
+import Text "mo:core@2.4/Text";
+import Char "mo:core@2.4/Char";
+import Buffer "mo:base@0.16/Buffer";
+import Nat "mo:core@2.4/Nat";
 
 import { test; suite } "mo:test";
-import Candid "mo:serde@3.4.0/Candid";
+import Candid "mo:serde@3.5/Candid";
 import Fuzz "mo:fuzz";
 import Itertools "mo:itertools@0.2.2/Iter";
-import Map "mo:map@9.0.1/Map";
+import Map "mo:map@9.0/Map";
 
 import ZenDB "../../src/EmbeddedInstance";
 import ZenDBSuite "../test-utils/TestFramework";
@@ -61,7 +62,7 @@ ZenDBSuite.newSuite(
 
         let inputs = Map.new<ZenDB.Types.DocumentId, User>();
 
-        for (i in Iter.range(1, 10)) {
+        for (i in Nat.rangeInclusive(1, 10)) {
             let user = {
                 name = "nam-do-san";
                 age = i;
@@ -73,7 +74,7 @@ ZenDBSuite.newSuite(
             ignore Map.put(inputs, Map.bhash, id, user);
         };
 
-        for (i in Iter.range(1, 10)) {
+        for (i in Nat.rangeInclusive(1, 10)) {
             let user = {
                 name = "claude";
                 age = i;

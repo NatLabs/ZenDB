@@ -1,15 +1,15 @@
-import Array "mo:base@0.16.0/Array";
-import Debug "mo:base@0.16.0/Debug";
-import Nat "mo:base@0.16.0/Nat";
-import Buffer "mo:base@0.16.0/Buffer";
-import Text "mo:base@0.16.0/Text";
-import Iter "mo:base@0.16.0/Iter";
+import Array "mo:core@2.4/Array";
+import Debug "mo:core@2.4/Debug";
+import Nat "mo:core@2.4/Nat";
+import Buffer "mo:base@0.16/Buffer";
+import Text "mo:core@2.4/Text";
+import Iter "mo:core@2.4/Iter";
 
-import Map "mo:map@9.0.1/Map";
+import Map "mo:map@9.0/Map";
 import T "../Types";
 import C "../Constants";
 
-import Itertools "mo:itertools@0.2.2/Iter";
+import Itertools "mo:itertools@0.2/Iter";
 
 module {
 
@@ -137,7 +137,7 @@ module {
 
                     // if (Text.isNumeric(next_suffix_path))
 
-                    field_path := Text.join(".", Itertools.prepend(field_with_array_type, paths_within_suffix));
+                    field_path := Text.join(Itertools.prepend(field_with_array_type, paths_within_suffix), ".");
 
                     switch (Map.get<Text, T.CandidType>(schema_map.map, T.thash, field_path)) {
                         case (?#Array(inner_type)) return ?inner_type;
@@ -165,7 +165,7 @@ module {
             return ?("", fields[0]);
         };
 
-        let parent_field_name = Text.join(".", Itertools.take(fields.vals(), fields.size() - 1));
+        let parent_field_name = Text.join(Itertools.take(fields.vals(), fields.size() - 1), ".");
         let last_field_name = fields[fields.size() - 1];
 
         ?(parent_field_name, last_field_name);

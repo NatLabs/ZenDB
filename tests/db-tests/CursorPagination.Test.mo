@@ -1,12 +1,13 @@
 // @testmode wasi
-import Debug "mo:base@0.16.0/Debug";
-import Iter "mo:base@0.16.0/Iter";
-import Array "mo:base@0.16.0/Array";
-import Buffer "mo:base@0.16.0/Buffer";
-import Blob "mo:base@0.16.0/Blob";
+import Debug "mo:core@2.4/Debug";
+import Iter "mo:core@2.4/Iter";
+import Array "mo:core@2.4/Array";
+import Buffer "mo:base@0.16/Buffer";
+import Blob "mo:core@2.4/Blob";
+import Nat "mo:core@2.4/Nat";
 
 import { test; suite } "mo:test";
-import Map "mo:map@9.0.1/Map";
+import Map "mo:map@9.0/Map";
 
 import ZenDB "../../src/EmbeddedInstance";
 import ZenDBSuite "../test-utils/TestFramework";
@@ -43,7 +44,7 @@ ZenDBSuite.newSuite(
         let inputs = Map.new<ZenDB.Types.DocumentId, User>();
 
         // Insert 100 documents with varying data for pagination testing
-        for (i in Iter.range(1, 100)) {
+        for (i in Nat.rangeInclusive(1, 100)) {
             let user = {
                 name = "user_" # debug_show i;
                 age = i;
@@ -111,7 +112,7 @@ ZenDBSuite.newSuite(
             Debug.print("Skip pages: " # debug_show skip_pages.size());
             Debug.print("Cursor pages: " # debug_show cursor_pages.size());
 
-            for (i in Iter.range(0, skip_pages.size() - 1)) {
+            for (i in Nat.range(0, skip_pages.size())) {
                 Debug.print("\n=== Page " # debug_show (i + 1) # " ===");
 
                 Debug.print("Skip page entries:");

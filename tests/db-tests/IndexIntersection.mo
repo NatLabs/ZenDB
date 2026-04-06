@@ -1,15 +1,16 @@
 // @testmode wasi
-import Debug "mo:base@0.16.0/Debug";
-import Buffer "mo:base@0.16.0/Buffer";
-import Iter "mo:base@0.16.0/Iter";
-import Array "mo:base@0.16.0/Array";
-import Text "mo:base@0.16.0/Text";
-import Principal "mo:base@0.16.0/Principal";
-import Blob "mo:base@0.16.0/Blob";
+import Debug "mo:core@2.4/Debug";
+import Buffer "mo:base@0.16/Buffer";
+import Iter "mo:core@2.4/Iter";
+import Array "mo:core@2.4/Array";
+import Text "mo:core@2.4/Text";
+import Principal "mo:core@2.4/Principal";
+import Blob "mo:core@2.4/Blob";
+import Runtime "mo:core@2.4/Runtime";
 
 import { test; suite } "mo:test";
-import Map "mo:map@9.0.1/Map";
-import Set "mo:map@9.0.1/Set";
+import Map "mo:map@9.0/Map";
+import Set "mo:map@9.0/Set";
 
 import ZenDB "../../src/EmbeddedInstance";
 import Index "../../src/EmbeddedInstance/Collection/Index";
@@ -52,7 +53,7 @@ suite(
                 let versioned_sstore = ZenDB.newStableStore(canister_id, null);
                 let zendb = ZenDB.launchDefaultDB(versioned_sstore);
 
-                let #ok(collection) = zendb.createCollection("transactions", schema, candify, null) else Debug.trap("Failed to create collection");
+                let #ok(collection) = zendb.createCollection("transactions", schema, candify, null) else Runtime.trap("Failed to create collection");
 
                 // Create indexes:
                 // 1. (sender, token, timestamp) - will be the best index
@@ -66,7 +67,7 @@ suite(
                         ("timestamp", #Ascending),
                     ],
                     null,
-                ) else Debug.trap("Failed to create index 1");
+                ) else Runtime.trap("Failed to create index 1");
 
                 let #ok(_) = collection.createIndex(
                     "idx_sender_token_amount",
@@ -76,7 +77,7 @@ suite(
                         ("amount", #Ascending),
                     ],
                     null,
-                ) else Debug.trap("Failed to create index 2");
+                ) else Runtime.trap("Failed to create index 2");
 
                 let #ok(_) = collection.createIndex(
                     "idx_token_amount",
@@ -85,10 +86,10 @@ suite(
                         ("amount", #Ascending),
                     ],
                     null,
-                ) else Debug.trap("Failed to create index 3");
+                ) else Runtime.trap("Failed to create index 3");
 
                 // Insert some test data
-                for (i in Iter.range(0, 99)) {
+                for (i in Nat.rangeInclusive(0, 99)) {
                     let tx : Transaction = {
                         token = if (i % 2 == 0) "ICP" else "BTC";
                         sender = "user_" # debug_show (i % 10);
@@ -125,7 +126,7 @@ suite(
                 Debug.print("=== Test: basic swap scenario ===");
                 Debug.print("Number of indexes found: " # debug_show (result_indexes.size()));
 
-                for (i in Iter.range(0, result_indexes.size() - 1)) {
+                for (i in Nat.rangeInclusive(0, result_indexes.size() - 1)) {
                     let idx = result_indexes[i];
                     Debug.print("\nIndex " # debug_show (i) # ":");
                     Debug.print("  Name: " # idx.index.name);
@@ -163,7 +164,7 @@ suite(
                 let versioned_sstore = ZenDB.newStableStore(canister_id, null);
                 let zendb = ZenDB.launchDefaultDB(versioned_sstore);
 
-                let #ok(collection) = zendb.createCollection("transactions", schema, candify, null) else Debug.trap("Failed to create collection");
+                let #ok(collection) = zendb.createCollection("transactions", schema, candify, null) else Runtime.trap("Failed to create collection");
 
                 // Create a perfect index that covers everything
                 let #ok(_) = collection.createIndex(
@@ -175,10 +176,10 @@ suite(
                         ("timestamp", #Ascending),
                     ],
                     null,
-                ) else Debug.trap("Failed to create index");
+                ) else Runtime.trap("Failed to create index");
 
                 // Insert some test data
-                for (i in Iter.range(0, 49)) {
+                for (i in Nat.rangeInclusive(0, 49)) {
                     let tx : Transaction = {
                         token = if (i % 2 == 0) "ICP" else "BTC";
                         sender = "user_" # debug_show (i % 5);
@@ -208,7 +209,7 @@ suite(
                 Debug.print("\n=== Test: no additional indexes needed ===");
                 Debug.print("Number of indexes (should be 1): " # debug_show (result_indexes.size()));
 
-                for (i in Iter.range(0, result_indexes.size() - 1)) {
+                for (i in Nat.rangeInclusive(0, result_indexes.size() - 1)) {
                     let idx = result_indexes[i];
                     Debug.print("\nIndex " # debug_show (i) # ":");
                     Debug.print("  Name: " # idx.index.name);
@@ -233,7 +234,7 @@ suite(
                 let versioned_sstore = ZenDB.newStableStore(canister_id, null);
                 let zendb = ZenDB.launchDefaultDB(versioned_sstore);
 
-                let #ok(collection) = zendb.createCollection("transactions", schema, candify, null) else Debug.trap("Failed to create collection");
+                let #ok(collection) = zendb.createCollection("transactions", schema, candify, null) else Runtime.trap("Failed to create collection");
 
                 // Create several partial indexes
                 let #ok(_) = collection.createIndex(
@@ -243,28 +244,28 @@ suite(
                         ("sender", #Ascending),
                     ],
                     null,
-                ) else Debug.trap("Failed to create index 1");
+                ) else Runtime.trap("Failed to create index 1");
 
                 let #ok(_) = collection.createIndex(
                     "idx_amount",
                     [("amount", #Ascending)],
                     null,
-                ) else Debug.trap("Failed to create index 2");
+                ) else Runtime.trap("Failed to create index 2");
 
                 let #ok(_) = collection.createIndex(
                     "idx_timestamp",
                     [("timestamp", #Ascending)],
                     null,
-                ) else Debug.trap("Failed to create index 3");
+                ) else Runtime.trap("Failed to create index 3");
 
                 let #ok(_) = collection.createIndex(
                     "idx_fee",
                     [("fee", #Ascending)],
                     null,
-                ) else Debug.trap("Failed to create index 4");
+                ) else Runtime.trap("Failed to create index 4");
 
                 // Insert small amount of data
-                for (i in Iter.range(0, 19)) {
+                for (i in Nat.rangeInclusive(0, 19)) {
                     let tx : Transaction = {
                         token = "ICP";
                         sender = "user_" # debug_show (i);
@@ -296,7 +297,7 @@ suite(
                 Debug.print("Number of indexes found: " # debug_show (result_indexes.size()));
                 Debug.print("Indexes: " # debug_show (Array.map(result_indexes, func(idx : T.BestIndexResult) : Text { idx.index.name })));
 
-                for (i in Iter.range(0, result_indexes.size() - 1)) {
+                for (i in Nat.rangeInclusive(0, result_indexes.size() - 1)) {
                     let idx = result_indexes[i];
                     Debug.print("\nIndex " # debug_show (i) # ":");
                     Debug.print("  Name: " # idx.index.name);
@@ -324,23 +325,23 @@ suite(
                 let versioned_sstore = ZenDB.newStableStore(canister_id, null);
                 let zendb = ZenDB.launchDefaultDB(versioned_sstore);
 
-                let #ok(collection) = zendb.createCollection("transactions", schema, candify, null) else Debug.trap("Failed to create collection");
+                let #ok(collection) = zendb.createCollection("transactions", schema, candify, null) else Runtime.trap("Failed to create collection");
 
                 // Create indexes
                 let #ok(_) = collection.createIndex(
                     "idx_token",
                     [("token", #Ascending)],
                     null,
-                ) else Debug.trap("Failed to create index");
+                ) else Runtime.trap("Failed to create index");
 
                 let #ok(_) = collection.createIndex(
                     "idx_sender",
                     [("sender", #Ascending)],
                     null,
-                ) else Debug.trap("Failed to create index");
+                ) else Runtime.trap("Failed to create index");
 
                 // Insert large amount of data to potentially exceed limits
-                for (i in Iter.range(0, 999)) {
+                for (i in Nat.rangeInclusive(0, 999)) {
                     let tx : Transaction = {
                         token = "ICP";
                         sender = "user_" # debug_show (i);

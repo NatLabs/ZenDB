@@ -6,7 +6,7 @@ import StableMemory_Txs_Sorted_Bench "../bench/stable-memory.txs.sorted.bench";
 import { test; suite } "mo:test/async";
 import Bench "mo:bench";
 
-import Itertools "mo:itertools@0.2.2/Iter";
+import Itertools "mo:itertools@0.2/Iter";
 
 persistent actor {
 

@@ -1,38 +1,52 @@
 {
-    "version": 1,
-    "canisters": {
-        "stress-test": {
-            "type": "motoko",
-            "main": "./tests/Stress.Test.mo",
-            "args": "--max-stable-pages 6553600"
-        },
-        "cluster-tests": {
-            "type": "motoko",
-            "main": "./tests/cluster-tests/ClusterManager.Test.mo",
-            "args": "--max-stable-pages 6553600"
-        },
-        "zendb-canister": {
-            "type": "motoko",
-            "main": "src/RemoteInstance/CanisterDB/lib.mo",
-            "declarations": {
-                "node_compatibility": true
-            },
-            "metadata": [{ "name": "candid:service"  }],
-            "args": "--legacy-persistence --max-stable-pages 6553600 --force-gc --generational-gc",
-            "optimize": "O3",
-            "shrink": true
-        }
-    },
-    "defaults": {
-        "build": {
-            "packtool": "mops sources",
-            "args": ""
-        }
-    },
-    "networks": {
-        "local": {
-            "bind": "127.0.0.1:4943",
-            "type": "ephemeral"
-        }
-    }
+	"version": 1,
+	"canisters": {
+		"stress-test": {
+			"type": "motoko",
+			"main": "./tests/Stress.Test.mo",
+			"args": "--max-stable-pages 6553600"
+		},
+		"zendb-canister": {
+			"type": "motoko",
+			"main": "src/RemoteInstance/CanisterDB/lib.mo",
+			"declarations": {
+				"node_compatibility": true
+			},
+			"metadata": [
+				{
+					"name": "candid:service"
+				}
+			],
+			"args": "--legacy-persistence --max-stable-pages 6553600 --generational-gc",
+			"optimize": "O3",
+			"shrink": true
+		},
+		"zendb-canister-eop": {
+			"type": "motoko",
+			"main": "src/RemoteInstance/CanisterDB/lib.mo",
+			"declarations": {
+				"node_compatibility": true
+			},
+			"metadata": [
+				{
+					"name": "candid:service"
+				}
+			],
+			"args": "--enhanced-orthogonal-persistence --max-stable-pages 6553600",
+			"optimize": "O3",
+			"shrink": true
+		}
+	},
+	"defaults": {
+		"build": {
+			"packtool": "mops sources",
+			"args": ""
+		}
+	},
+	"networks": {
+		"local": {
+			"bind": "127.0.0.1:4943",
+			"type": "ephemeral"
+		}
+	}
 }

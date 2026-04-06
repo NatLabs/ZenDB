@@ -1,31 +1,32 @@
-import Array "mo:base@0.16.0/Array";
-import Debug "mo:base@0.16.0/Debug";
-import Text "mo:base@0.16.0/Text";
-import Nat32 "mo:base@0.16.0/Nat32";
-import Result "mo:base@0.16.0/Result";
-import Order "mo:base@0.16.0/Order";
-import Iter "mo:base@0.16.0/Iter";
-import Buffer "mo:base@0.16.0/Buffer";
-import Nat "mo:base@0.16.0/Nat";
-import Option "mo:base@0.16.0/Option";
-import Hash "mo:base@0.16.0/Hash";
-import Float "mo:base@0.16.0/Float";
-import Int "mo:base@0.16.0/Int";
-import Int32 "mo:base@0.16.0/Int32";
-import Blob "mo:base@0.16.0/Blob";
-import Nat64 "mo:base@0.16.0/Nat64";
-import Int16 "mo:base@0.16.0/Int16";
-import Int64 "mo:base@0.16.0/Int64";
-import Int8 "mo:base@0.16.0/Int8";
-import Nat16 "mo:base@0.16.0/Nat16";
-import Nat8 "mo:base@0.16.0/Nat8";
-import Func "mo:base@0.16.0/Func";
-import Char "mo:base@0.16.0/Char";
+import Array "mo:core@2.4/Array";
+import Debug "mo:core@2.4/Debug";
+import Text "mo:core@2.4/Text";
+import Nat32 "mo:core@2.4/Nat32";
+import Result "mo:core@2.4/Result";
+import Order "mo:core@2.4/Order";
+import Iter "mo:core@2.4/Iter";
+import Buffer "mo:base@0.16/Buffer";
+import Nat "mo:core@2.4/Nat";
+import Option "mo:core@2.4/Option";
+import Hash "mo:base@0.16/Hash";
+import Float "mo:core@2.4/Float";
+import Int "mo:core@2.4/Int";
+import Int32 "mo:core@2.4/Int32";
+import Blob "mo:core@2.4/Blob";
+import Nat64 "mo:core@2.4/Nat64";
+import Int16 "mo:core@2.4/Int16";
+import Int64 "mo:core@2.4/Int64";
+import Int8 "mo:core@2.4/Int8";
+import Nat16 "mo:core@2.4/Nat16";
+import Nat8 "mo:core@2.4/Nat8";
+import Func "mo:core@2.4/Func";
+import Char "mo:core@2.4/Char";
 
-import Itertools "mo:itertools@0.2.2/Iter";
+import Itertools "mo:itertools@0.2/Iter";
 
 import T "../Types";
 import Utils "../Utils";
+import Runtime "mo:core@2.4/Runtime";
 
 /// Handles numeric update operations to candid values
 ///
@@ -57,9 +58,9 @@ module CandidOps {
             case (#Int16(int16)) Float.fromInt(Int16.toInt(int16));
             case (#Int32(int32)) Float.fromInt(Int32.toInt(int32));
             case (#Int64(int64)) Float.fromInt(Int64.toInt(int64));
-            case (#Text(text)) Debug.trap("Can't convert text to float");
-            case (#Bool(bool)) Debug.trap("Can't convert bool to float");
-            case (compound_candid) Debug.trap("Can't convert compound candid '" # debug_show compound_candid # "' to float");
+            case (#Text(text)) Runtime.trap("Can't convert text to float");
+            case (#Bool(bool)) Runtime.trap("Can't convert bool to float");
+            case (compound_candid) Runtime.trap("Can't convert compound candid '" # debug_show compound_candid # "' to float");
         };
     };
 
@@ -70,7 +71,7 @@ module CandidOps {
             case (#Int(_)) #Int(Float.toInt(float));
             case (#Float(_)) #Float(float);
             case (#Option(opt)) #Option(from_float(opt, float));
-            case (#Null) Debug.trap("Can't convert null to float. Need to pass in the candid type as well");
+            case (#Null) Runtime.trap("Can't convert null to float. Need to pass in the candid type as well");
             case (#Nat8(nat8)) #Nat8(Nat8.fromNat(Int.abs(Float.toInt(float))));
             case (#Nat16(nat16)) #Nat16(Nat16.fromNat(Int.abs(Float.toInt(float))));
             case (#Nat32(nat32)) #Nat32(Nat32.fromNat(Int.abs(Float.toInt(float))));
@@ -79,9 +80,9 @@ module CandidOps {
             case (#Int16(int16)) #Int16(Int16.fromInt(Float.toInt(float)));
             case (#Int32(int32)) #Int32(Int32.fromInt(Float.toInt(float)));
             case (#Int64(int64)) #Int64(Int64.fromInt(Float.toInt(float)));
-            case (#Text(text)) Debug.trap("Can't convert float to text");
-            case (#Bool(bool)) Debug.trap("Can't convert float to bool");
-            case (compound_candid) Debug.trap("Can't convert from float to compound type '" # debug_show compound_candid # "'");
+            case (#Text(text)) Runtime.trap("Can't convert float to text");
+            case (#Bool(bool)) Runtime.trap("Can't convert float to bool");
+            case (compound_candid) Runtime.trap("Can't convert from float to compound type '" # debug_show compound_candid # "'");
         };
 
     };
@@ -269,7 +270,7 @@ module CandidOps {
     public func lowercase(self : Candid) : T.Result<Candid, Text> {
         switch (self) {
             case (#Text(text)) {
-                let lower = Text.toLowercase(text);
+                let lower = Text.toLower(text);
                 #ok(#Text(lower));
             };
             case (other) {
@@ -282,7 +283,7 @@ module CandidOps {
     public func uppercase(self : Candid) : T.Result<Candid, Text> {
         switch (self) {
             case (#Text(text)) {
-                let upper = Text.toUppercase(text);
+                let upper = Text.toUpper(text);
                 #ok(#Text(upper));
             };
             case (other) {
@@ -340,19 +341,20 @@ module CandidOps {
                     func(_ : Nat) : Char {
                         switch (chars_iter.next()) {
                             case (?char) char;
-                            case (none) Debug.trap("Unexpected end of chars iterator");
+                            case (none) Runtime.trap("Unexpected end of chars iterator");
                         };
                     },
                 );
 
-                let sub_chars = Iter.map(Array.slice(chars, start, end), Text.fromChar);
-                let sub_text = Text.join("", sub_chars);
+                let sub_chars = Array.sliceToArray(chars, start, end).vals();
+                let sub_chars_mapped = Iter.map(sub_chars, Text.fromChar);
+                let sub_text = Text.join(sub_chars_mapped, "");
 
                 #ok(#Text(sub_text));
             };
             case (#Blob(blob)) {
                 let bytes = Blob.toArray(blob);
-                let sub_bytes_iter = Array.slice(bytes, start, end);
+                let sub_bytes_iter = Array.sliceToArray(bytes, start, end).vals();
                 let sub_bytes_array = Iter.toArray(sub_bytes_iter);
                 let sub_blob = Blob.fromArray(sub_bytes_array);
                 #ok(#Blob(sub_blob));
@@ -414,7 +416,7 @@ module CandidOps {
             case (#Array(array)) array.size();
             case (#Option(inner)) size(inner);
             case (#Null) 0;
-            case (other) Debug.trap("Cannot get size of " # debug_show (self));
+            case (other) Runtime.trap("Cannot get size of " # debug_show (self));
         };
     };
 
@@ -463,7 +465,7 @@ module CandidOps {
             let ?res = Itertools.reduce(
                 values,
                 func(acc : Candid, curr : Candid) : Candid {
-                    let #ok(concatenated) = CandidOps.concat(acc, curr) else Debug.trap("Failed to concatenate " # debug_show (acc, curr) # " in #concat");
+                    let #ok(concatenated) = CandidOps.concat(acc, curr) else Runtime.trap("Failed to concatenate " # debug_show (acc, curr) # " in #concat");
                     concatenated;
                 },
             ) else return #err("Failed to reduce values in #concat");

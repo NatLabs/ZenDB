@@ -1,9 +1,9 @@
-import Debug "mo:base/Debug";
-import Nat "mo:base/Nat";
-import Int "mo:base/Int";
-import Array "mo:base/Array";
-import Iter "mo:base/Iter";
-import Order "mo:base/Order";
+import Nat "mo:core@2.4/Nat";
+import Int "mo:core@2.4/Int";
+import Array "mo:core@2.4/Array";
+import Iter "mo:core@2.4/Iter";
+import Order "mo:core@2.4/Order";
+import Runtime "mo:core@2.4/Runtime";
 
 import MinHeap "../../src/EmbeddedInstance/MinHeap";
 import { test; suite } "mo:test";
@@ -86,7 +86,7 @@ suite(
                     func(i) {
                         switch (MinHeap.removeMin(heap, Nat.compare)) {
                             case (?val) val;
-                            case null Debug.trap("Expected value");
+                            case null Runtime.trap("Expected value");
                         };
                     },
                 );
@@ -140,7 +140,7 @@ suite(
                     func(i) {
                         switch (MinHeap.removeMin(heap, Nat.compare)) {
                             case (?val) val;
-                            case null Debug.trap("Expected value");
+                            case null Runtime.trap("Expected value");
                         };
                     },
                 );
@@ -194,7 +194,7 @@ suite(
                     func(i) {
                         switch (MinHeap.removeMin(heap, Nat.compare)) {
                             case (?val) val;
-                            case null Debug.trap("Expected value");
+                            case null Runtime.trap("Expected value");
                         };
                     },
                 );
@@ -220,7 +220,7 @@ suite(
                     func(i) {
                         switch (MinHeap.removeMin(heap, Nat.compare)) {
                             case (?val) val;
-                            case null Debug.trap("Expected value");
+                            case null Runtime.trap("Expected value");
                         };
                     },
                 );
@@ -246,7 +246,7 @@ suite(
                     func(i) {
                         switch (MinHeap.removeMin(heap, Nat.compare)) {
                             case (?val) val;
-                            case null Debug.trap("Expected value");
+                            case null Runtime.trap("Expected value");
                         };
                     },
                 );
@@ -272,7 +272,7 @@ suite(
                     func(i) {
                         switch (MinHeap.removeMin(heap, Int.compare)) {
                             case (?val) val;
-                            case null Debug.trap("Expected value");
+                            case null Runtime.trap("Expected value");
                         };
                     },
                 );
@@ -308,7 +308,7 @@ suite(
                     func(i) {
                         switch (MinHeap.removeMin(heap, maxCompare)) {
                             case (?val) val;
-                            case null Debug.trap("Expected value");
+                            case null Runtime.trap("Expected value");
                         };
                     },
                 );
@@ -324,7 +324,7 @@ suite(
 
                 // Add enough elements to trigger multiple resizes
                 // Initial size is 0, first resize to 4, then 8, 16, etc.
-                for (i in Iter.range(0, 20)) {
+                for (i in Nat.rangeInclusive(0, 20)) {
                     MinHeap.put(heap, i, Nat.compare);
                 };
 
@@ -332,7 +332,7 @@ suite(
                 assert MinHeap.peekMin(heap) == ?0;
 
                 // Verify all elements are present
-                for (i in Iter.range(0, 20)) {
+                for (i in Nat.rangeInclusive(0, 20)) {
                     let min = MinHeap.removeMin(heap, Nat.compare);
                     assert min == ?i;
                 };
@@ -388,7 +388,7 @@ suite(
                     func(i) {
                         switch (MinHeap.removeMin(heap1, Nat.compare)) {
                             case (?val) val;
-                            case null Debug.trap("Expected value");
+                            case null Runtime.trap("Expected value");
                         };
                     },
                 );
@@ -398,7 +398,7 @@ suite(
                     func(i) {
                         switch (MinHeap.removeMin(heap2, Nat.compare)) {
                             case (?val) val;
-                            case null Debug.trap("Expected value");
+                            case null Runtime.trap("Expected value");
                         };
                     },
                 );

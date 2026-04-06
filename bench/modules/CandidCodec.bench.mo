@@ -1,13 +1,14 @@
-import Debug "mo:base/Debug";
-import Nat "mo:base/Nat";
-import Array "mo:base/Array";
-import Blob "mo:base/Blob";
+import Debug "mo:core@2.4/Debug";
+import Nat "mo:core@2.4/Nat";
+import Array "mo:core@2.4/Array";
+import Blob "mo:core@2.4/Blob";
 
 import Bench "mo:bench";
 import Fuzz "mo:fuzz";
-import Candid "mo:serde@3.4.0/Candid";
+import Candid "mo:serde@3.5/Candid";
 
 import T "../../src/EmbeddedInstance/Types";
+import Runtime "mo:core@2.4/Runtime";
 
 module {
     type Schema = T.Schema;
@@ -69,7 +70,7 @@ module {
             func(doc) : Blob {
                 switch (Candid.TypedSerializer.encode(simple_serializer, [doc])) {
                     case (#ok(blob)) blob;
-                    case (#err(msg)) Debug.trap("Failed to encode: " # msg);
+                    case (#err(msg)) Runtime.trap("Failed to encode: " # msg);
                 };
             },
         );
@@ -126,7 +127,7 @@ module {
             func(doc) : Blob {
                 switch (Candid.TypedSerializer.encode(medium_serializer, [doc])) {
                     case (#ok(blob)) blob;
-                    case (#err(msg)) Debug.trap("Failed to encode: " # msg);
+                    case (#err(msg)) Runtime.trap("Failed to encode: " # msg);
                 };
             },
         );
@@ -213,7 +214,7 @@ module {
             func(doc) : Blob {
                 switch (Candid.TypedSerializer.encode(complex_serializer, [doc])) {
                     case (#ok(blob)) blob;
-                    case (#err(msg)) Debug.trap("Failed to encode: " # msg);
+                    case (#err(msg)) Runtime.trap("Failed to encode: " # msg);
                 };
             },
         );
@@ -246,7 +247,7 @@ module {
             func(doc) : Blob {
                 switch (Candid.TypedSerializer.encode(nested_serializer, [doc])) {
                     case (#ok(blob)) blob;
-                    case (#err(msg)) Debug.trap("Failed to encode: " # msg);
+                    case (#err(msg)) Runtime.trap("Failed to encode: " # msg);
                 };
             },
         );
@@ -281,7 +282,7 @@ module {
             func(doc) : Blob {
                 switch (Candid.TypedSerializer.encode(array_serializer, [doc])) {
                     case (#ok(blob)) blob;
-                    case (#err(msg)) Debug.trap("Failed to encode: " # msg);
+                    case (#err(msg)) Runtime.trap("Failed to encode: " # msg);
                 };
             },
         );
@@ -408,7 +409,7 @@ module {
             func(doc) : Blob {
                 switch (Candid.TypedSerializer.encode(large_serializer, [doc])) {
                     case (#ok(blob)) blob;
-                    case (#err(msg)) Debug.trap("Failed to encode: " # msg);
+                    case (#err(msg)) Runtime.trap("Failed to encode: " # msg);
                 };
             },
         );

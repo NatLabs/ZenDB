@@ -1,16 +1,17 @@
-import Iter "mo:base@0.16.0/Iter";
-import Debug "mo:base@0.16.0/Debug";
-import Prelude "mo:base@0.16.0/Prelude";
-import Text "mo:base@0.16.0/Text";
-import Char "mo:base@0.16.0/Char";
-import Buffer "mo:base@0.16.0/Buffer";
+import Iter "mo:core@2.4/Iter";
+import Debug "mo:core@2.4/Debug";
+
+import Text "mo:core@2.4/Text";
+import Char "mo:core@2.4/Char";
+import Buffer "mo:base@0.16/Buffer";
 
 import Bench "mo:bench";
 import Fuzz "mo:fuzz";
-import Candid "mo:serde@3.4.0/Candid";
-import Itertools "mo:itertools@0.2.2/Iter";
+import Candid "mo:serde@3.5/Candid";
+import Itertools "mo:itertools@0.2/Iter";
 
 import ZenDB "../src";
+import Runtime "mo:core@2.4/Runtime";
 
 module {
     public func init() : Bench.Bench {
@@ -261,7 +262,7 @@ module {
                 };
 
                 case (_) {
-                    Debug.trap("Should be unreachable:\n row = \"" # debug_show row # "\" and col = \"" # debug_show col # "\"");
+                    Runtime.trap("Should be unreachable:\n row = \"" # debug_show row # "\" and col = \"" # debug_show col # "\"");
                 };
             }
         );

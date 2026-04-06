@@ -1,6 +1,6 @@
-import Map "mo:map@9.0.1/Map";
-import Vector "mo:vector@0.4.2";
-import CanisterRBAC "mo:canister-rbac@0.1.0";
+import Map "mo:map@9.0/Map";
+import Vector "mo:vector@0.4";
+import CanisterRBAC "mo:canister-rbac@0.1";
 
 import ZenDB_types "../EmbeddedInstance/Types";
 

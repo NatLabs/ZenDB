@@ -1,6 +1,6 @@
-import Map "mo:map@9.0.1/Map";
-import Iter "mo:base@0.16.0/Iter";
-import Candid "mo:serde@3.4.0/Candid";
+import Map "mo:map@9.0/Map";
+import Iter "mo:core@2.4/Iter";
+import Candid "mo:serde@3.5/Candid";
 
 import V0_2_1 "../v0.2.1/types";
 import V0_2_2 "./types";

@@ -1,21 +1,22 @@
-import Array "mo:base@0.16.0/Array";
-import Debug "mo:base@0.16.0/Debug";
-import Option "mo:base@0.16.0/Option";
-import Iter "mo:base@0.16.0/Iter";
-import Text "mo:base@0.16.0/Text";
-import Result "mo:base@0.16.0/Result";
-import Nat "mo:base@0.16.0/Nat";
+import Array "mo:core@2.4/Array";
+import Debug "mo:core@2.4/Debug";
+import Option "mo:core@2.4/Option";
+import Iter "mo:core@2.4/Iter";
+import Text "mo:core@2.4/Text";
+import Result "mo:core@2.4/Result";
+import Nat "mo:core@2.4/Nat";
 
-import Map "mo:map@9.0.1/Map";
-import Set "mo:map@9.0.1/Set";
-import Candid "mo:serde@3.4.0/Candid";
-import Itertools "mo:itertools@0.2.2/Iter";
+import Map "mo:map@9.0/Map";
+import Set "mo:map@9.0/Set";
+import Candid "mo:serde@3.5/Candid";
+import Itertools "mo:itertools@0.2/Iter";
 
 import T "Types";
 import C "Constants";
 import Schema "Collection/Schema";
 import SchemaMap "Collection/SchemaMap";
 import CandidUtils "CandidUtils";
+import Runtime "mo:core@2.4/Runtime";
 
 module CandidMap {
 
@@ -85,7 +86,7 @@ module CandidMap {
 
     public func new(schema_map : T.SchemaMap, document_id : T.DocumentId, candid : T.Candid) : CandidMap {
 
-        let ?types = SchemaMap.get(schema_map, "") else Debug.trap("CandidMap only accepts #Record types");
+        let ?types = SchemaMap.get(schema_map, "") else Runtime.trap("CandidMap only accepts #Record types");
         let map = Map.new<Text, NestedCandid>();
 
         // Debug.print("CandidMap.new(): " # debug_show (types, candid));
@@ -161,7 +162,7 @@ module CandidMap {
                             func(variant_type : (Text, T.CandidType)) : Bool {
                                 variant.0 == variant_type.0;
                             },
-                        ) else Debug.trap("CandidMap: Could not find variant type for tag '" # variant.0 # "' in " # debug_show (variant_types));
+                        ) else Runtime.trap("CandidMap: Could not find variant type for tag '" # variant.0 # "' in " # debug_show (variant_types));
 
                         // Debug.print(debug_show ({ variant; variant_types }));
 
@@ -186,7 +187,7 @@ module CandidMap {
                     };
                     case (#Tuple(tuple_types), #Tuple(tuple_values)) {
                         if (tuple_types.size() != tuple_values.size()) {
-                            Debug.trap("CandidMap: Tuple types and values should have the same size");
+                            Runtime.trap("CandidMap: Tuple types and values should have the same size");
                         };
 
                         let nested_map = Map.new<Text, NestedCandid>();
@@ -292,7 +293,7 @@ module CandidMap {
         let { candid_map } = candid_map_state;
 
         if (key == C.DOCUMENT_ID) {
-            let ?#Candid(#Blob, #Blob(document_id)) = Map.get(candid_map, Map.thash, C.DOCUMENT_ID) else Debug.trap("CandidMap: Could not find candid id");
+            let ?#Candid(#Blob, #Blob(document_id)) = Map.get(candid_map, Map.thash, C.DOCUMENT_ID) else Runtime.trap("CandidMap: Could not find candid id");
             return ?#Blob(document_id); // exclude wrap_option for document_id
         };
 
@@ -339,13 +340,13 @@ module CandidMap {
                     case (?#Candid(#Variant(_), #Text(tag))) {
                         return ?wrap_option(types, #Text(tag));
                     };
-                    case (_) Debug.trap("CandidMap.get(): Recieved unexpected #CandidMap");
+                    case (_) Runtime.trap("CandidMap.get(): Recieved unexpected #CandidMap");
                 };
             };
             case (#Candid((candid_type, candid))) {
                 switch (candid_type, candid) {
                     case ((#Record(_) or #Map(_) or #Variant(_) or #Option(#Record(_)) or #Option(#Map(_)) or #Option(#Variant(_)) or #Tuple(_) or #Array(_), #Record(_) or #Map(_) or #Variant(_) or #Option(#Record(_)) or #Option(#Map(_)) or #Option(#Variant(_)))) {
-                        Debug.trap("CandidMap.get(): Should have cached the nested map");
+                        Runtime.trap("CandidMap.get(): Should have cached the nested map");
                     };
                     case (_, #Null) return ?wrap_option(types, #Null);
                     case (_) {
@@ -440,15 +441,15 @@ module CandidMap {
 
                         // Debug.print("updating variant from " # prev_tag # " to " # debug_show (new_value));
 
-                        let #Variant(curr_tag, new_candid) = new_value else Debug.trap("Expected a variant type");
-                        let #Variant(variant_types) = types else Debug.trap("Expected a variant type");
+                        let #Variant(curr_tag, new_candid) = new_value else Runtime.trap("Expected a variant type");
+                        let #Variant(variant_types) = types else Runtime.trap("Expected a variant type");
 
                         let ?(_, variant_type) = Itertools.find(
                             variant_types.vals(),
                             func(variant_type : (Text, T.Schema)) : Bool {
                                 variant_type.0 == curr_tag;
                             },
-                        ) else Debug.trap("Expected a variant type");
+                        ) else Runtime.trap("Expected a variant type");
 
                         ignore Map.remove(nested_map, Map.thash, prev_tag);
                         ignore Map.put(nested_map, Map.thash, curr_tag, #Candid(variant_type, new_candid));
@@ -471,10 +472,10 @@ module CandidMap {
                     };
                     case (?#Candid(#Tuple(_), #Nat(tuple_size))) {
 
-                        let #Tuple(new_values) = new_value else Debug.trap("Expected a tuple type");
+                        let #Tuple(new_values) = new_value else Runtime.trap("Expected a tuple type");
 
                         if (new_values.size() != tuple_size) {
-                            Debug.trap("set(): Tuple size mismatch");
+                            Runtime.trap("set(): Tuple size mismatch");
                         };
 
                         for ((i, new_value) in Itertools.enumerate(new_values.vals())) {
@@ -498,7 +499,7 @@ module CandidMap {
                     };
                     case (?#Candid(#Array(array_type), #Nat(prev_size))) {
 
-                        let #Array(new_values) = new_value else Debug.trap("Expected an array type");
+                        let #Array(new_values) = new_value else Runtime.trap("Expected an array type");
 
                         for ((i, new_value) in Itertools.enumerate(new_values.vals())) {
                             let key = Nat.toText(i);
@@ -538,7 +539,7 @@ module CandidMap {
 
     /// Assumes the new candid has the same schema as the original candid
     public func reload({ candid_map } : CandidMap, schema_map : T.SchemaMap, new_id : T.DocumentId, new_candid : Candid) {
-        let ?(types) = SchemaMap.get(schema_map, "") else Debug.trap("CandidMap only accepts #Record types");
+        let ?(types) = SchemaMap.get(schema_map, "") else Runtime.trap("CandidMap only accepts #Record types");
 
         Map.clear(candid_map);
         ignore Map.put(candid_map, Map.thash, "", #Candid(types, new_candid));
@@ -556,7 +557,7 @@ module CandidMap {
         //         let candid_type = types[i].1;
         //         let candid_value = var_fields[i].1;
 
-        //         let ?nested_candid = Map.get(map, Map.thash, field) else return Debug.trap("CandidMap: Extra field not present in the original candid during reload");
+        //         let ?nested_candid = Map.get(map, Map.thash, field) else return Runtime.trap("CandidMap: Extra field not present in the original candid during reload");
 
         //         switch (nested_candid) {
         //             case (#CandidMap(nested_map)) {
@@ -572,7 +573,7 @@ module CandidMap {
         //                         reload_record_into_map(nested_map, variant_types, [variant]);
         //                     };
         //                     case (_) {
-        //                         Debug.trap("CandidMap: Expected #Record, #Map or #Variant type in reload");
+        //                         Runtime.trap("CandidMap: Expected #Record, #Map or #Variant type in reload");
         //                     };
         //                 };
         //             };
@@ -593,7 +594,7 @@ module CandidMap {
 
     public func clone(candid_map : CandidMap, schema_map : T.SchemaMap) : CandidMap {
         let extracted_candid = extract_candid(candid_map);
-        let ?(#Candid(#Blob, #Blob(document_id))) = Map.get(candid_map.candid_map, Map.thash, C.DOCUMENT_ID) else Debug.trap("CandidMap.clone(): Could not find candid id");
+        let ?(#Candid(#Blob, #Blob(document_id))) = Map.get(candid_map.candid_map, Map.thash, C.DOCUMENT_ID) else Runtime.trap("CandidMap.clone(): Could not find candid id");
         let cloned = CandidMap.new(schema_map, document_id, extracted_candid);
 
         cloned;
@@ -619,7 +620,7 @@ module CandidMap {
                         func(i : Nat) : Candid {
                             let index = Nat.toText(i);
 
-                            let ?candid = Map.get(map, Map.thash, index) else Debug.trap("extract_candid_helper: Could not find value for tuple index '" # index # "'");
+                            let ?candid = Map.get(map, Map.thash, index) else Runtime.trap("extract_candid_helper: Could not find value for tuple index '" # index # "'");
 
                             switch (candid) {
                                 case (#Candid((candid_type, candid))) {
@@ -642,7 +643,7 @@ module CandidMap {
                         func(i : Nat) : Candid {
                             let index = Nat.toText(i);
 
-                            let ?candid = Map.get(map, Map.thash, index) else Debug.trap("extract_candid_helper: Could not find value for array index '" # index # "'");
+                            let ?candid = Map.get(map, Map.thash, index) else Runtime.trap("extract_candid_helper: Could not find value for array index '" # index # "'");
 
                             switch (candid) {
                                 case (#Candid((candid_type, candid))) {
@@ -668,7 +669,7 @@ module CandidMap {
                         case (#CandidMap(nested_map)) {
                             switch (Map.get(nested_map, Map.thash, IS_COMPOUND_TYPE)) {
                                 case (?#Candid(#Variant(_), #Text(tag))) {
-                                    let ?variant = Map.get(nested_map, Map.thash, tag) else Debug.trap("extract_candid_helper: Could not find value for variant tag '" # tag # "'");
+                                    let ?variant = Map.get(nested_map, Map.thash, tag) else Runtime.trap("extract_candid_helper: Could not find value for variant tag '" # tag # "'");
 
                                     switch (variant) {
                                         case (#Candid((candid_type, candid))) {

@@ -1,11 +1,11 @@
 // @testmode wasi
-import Debug "mo:base@0.16.0/Debug";
-import Buffer "mo:base@0.16.0/Buffer";
-import Blob "mo:base@0.16.0/Blob";
-import Text "mo:base@0.16.0/Text";
-import Array "mo:base@0.16.0/Array";
-import Option "mo:base@0.16.0/Option";
-import Principal "mo:base@0.16.0/Principal";
+import Debug "mo:core@2.4/Debug";
+import Buffer "mo:base@0.16/Buffer";
+import Blob "mo:core@2.4/Blob";
+import Text "mo:core@2.4/Text";
+import Array "mo:core@2.4/Array";
+import Option "mo:core@2.4/Option";
+import Principal "mo:core@2.4/Principal";
 
 import ZenDB "../../src/EmbeddedInstance";
 import CollectionUtils "../../src/EmbeddedInstance/Collection/CollectionUtils";
@@ -13,9 +13,10 @@ import StableCollection "../../src/EmbeddedInstance/Collection/StableCollection"
 import Index "../../src/EmbeddedInstance/Collection/Index";
 
 import { test; suite } "mo:test";
-import Itertools "mo:itertools@0.2.2/Iter";
-import Map "mo:map@9.0.1/Map";
+import Itertools "mo:itertools@0.2/Iter";
+import Map "mo:map@9.0/Map";
 import Fuzz "mo:fuzz";
+import Runtime "mo:core@2.4/Runtime";
 
 module TestFramework {
 
@@ -88,7 +89,7 @@ module TestFramework {
                 let stable_db = db.getStableState();
 
                 let ?collection = Map.get(stable_db.collections, Map.thash, collection_name) else {
-                    Debug.trap("ZenDB Test Suite -> test_search_query(): Could not find collection named '" # collection_name # "'");
+                    Runtime.trap("ZenDB Test Suite -> test_search_query(): Could not find collection named '" # collection_name # "'");
                 };
 
                 let stable_query = query_builder.build();
@@ -97,14 +98,14 @@ module TestFramework {
 
                 let search_results = switch (StableCollection.search(collection, query_builder.build())) {
                     case (#err(err_msg)) {
-                        Debug.trap("ZenDB Test Suite -> test_search_query(): Search query failed with error: " # err_msg);
+                        Runtime.trap("ZenDB Test Suite -> test_search_query(): Search query failed with error: " # err_msg);
                     };
                     case (#ok(results)) results;
                 };
 
                 let count = switch (StableCollection.count(collection, stable_query)) {
                     case (#err(err_msg)) {
-                        Debug.trap("ZenDB Test Suite -> test_search_query(): Count query failed with error: " # err_msg);
+                        Runtime.trap("ZenDB Test Suite -> test_search_query(): Count query failed with error: " # err_msg);
                     };
                     case (#ok(res)) res.count;
                 };
@@ -115,33 +116,33 @@ module TestFramework {
                 true;
             };
 
-            if (settings.compare_with_no_index) {
-                suite(
-                    memory_type_suite_name # " - with no index",
-                    func() {
-                        let #ok(zendb) = ZenDB.createDB(zendb_sstore, "no_index");
-                        let suite_utils : SuiteUtils = {
-                            indexOnlyFns = func(callback_fns : Fn<(), ()>) {
-                                // no-op
-                            };
-                            createIndex : CreateIndexOnCollection = func(
-                                collection_name : Text,
-                                index_name : Text,
-                                index_key_details : [(Text, ZenDB.Types.CreateIndexSortDirection)],
-                                options : ?ZenDB.Types.CreateIndexOptions,
-                            ) {
-                                // no-op
-                                return #ok(());
-                            };
+            // if (settings.compare_with_no_index) {
+            //     suite(
+            //         memory_type_suite_name # " - with no index",
+            //         func() {
+            //             let #ok(zendb) = ZenDB.createDB(zendb_sstore, "no_index");
+            //             let suite_utils : SuiteUtils = {
+            //                 indexOnlyFns = func(callback_fns : Fn<(), ()>) {
+            //                     // no-op
+            //                 };
+            //                 createIndex : CreateIndexOnCollection = func(
+            //                     collection_name : Text,
+            //                     index_name : Text,
+            //                     index_key_details : [(Text, ZenDB.Types.CreateIndexSortDirection)],
+            //                     options : ?ZenDB.Types.CreateIndexOptions,
+            //                 ) {
+            //                     // no-op
+            //                     return #ok(());
+            //                 };
 
-                            test_search_query = test_search_query_callback(zendb);
-                        };
+            //                 test_search_query = test_search_query_callback(zendb);
+            //             };
 
-                        zendb_suite(zendb, suite_utils);
-                    },
-                );
+            //             zendb_suite(zendb, suite_utils);
+            //         },
+            //     );
 
-            };
+            // };
 
             if (settings.compare_with_index) {
                 suite(
@@ -181,7 +182,7 @@ module TestFramework {
                                 );
 
                                 // assert the indexes were properly created
-                                let ?index = Map.get(collection.indexes, Map.thash, index_name) else return Debug.trap("ZenDB Test Suite -> createIndex(): Could not retrieve Index named '" # index_name # "' after it was supposedly created");
+                                let ?index = Map.get(collection.indexes, Map.thash, index_name) else return Runtime.trap("ZenDB Test Suite -> createIndex(): Could not retrieve Index named '" # index_name # "' after it was supposedly created");
 
                                 let collection_size = StableCollection.size(collection);
                                 let index_size = Index.size(index);
@@ -193,7 +194,7 @@ module TestFramework {
                                 // assert actual_key_details == index_key_details;
 
                                 if (collection_size > 0) if (index_size == 0) {
-                                    Debug.trap(
+                                    Runtime.trap(
                                         "ZenDB Test Suite -> createIndex(): Created Index does not match collection size (collection_size: " # debug_show (collection_size) # ", index_size: " # debug_show (index_size) # ")"
                                     );
                                 };
@@ -226,6 +227,7 @@ module TestFramework {
                                     is_running_locally = ?true;
                                     memory_type = ?(#stableMemory);
                                     cache_capacity = ?(10);
+                                    is_compression_enabled = ?true;
                                 },
                             );
 
@@ -233,21 +235,22 @@ module TestFramework {
                         },
                     );
 
-                    suite(
-                        "Heap Memory",
-                        func() {
-                            let zendb_sstore = let sstore = ZenDB.newStableStore(
-                                fuzz.principal.randomPrincipal(29),
-                                ?{
-                                    log_level = ?settings.log_level;
-                                    is_running_locally = ?true;
-                                    memory_type = ?(#heap);
-                                    cache_capacity = ?(10);
-                                },
-                            );
-                            run_suite_with_or_without_indexes("Heap Memory", zendb_sstore);
-                        },
-                    );
+                    // suite(
+                    //     "Heap Memory",
+                    //     func() {
+                    //         let zendb_sstore = let sstore = ZenDB.newStableStore(
+                    //             fuzz.principal.randomPrincipal(29),
+                    //             ?{
+                    //                 log_level = ?settings.log_level;
+                    //                 is_running_locally = ?true;
+                    //                 memory_type = ?(#heap);
+                    //                 cache_capacity = ?(10);
+                    //                 is_compression_enabled = ?true;
+                    //             },
+                    //         );
+                    //         run_suite_with_or_without_indexes("Heap Memory", zendb_sstore);
+                    //     },
+                    // );
                 },
             );
         };

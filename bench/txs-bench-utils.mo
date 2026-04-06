@@ -1,20 +1,20 @@
-import Iter "mo:base@0.16.0/Iter";
-import Array "mo:base@0.16.0/Array";
-import Debug "mo:base@0.16.0/Debug";
-import Prelude "mo:base@0.16.0/Prelude";
-import Text "mo:base@0.16.0/Text";
-import Char "mo:base@0.16.0/Char";
-import Buffer "mo:base@0.16.0/Buffer";
-import Nat "mo:base@0.16.0/Nat";
-import Option "mo:base@0.16.0/Option";
+import Iter "mo:core@2.4/Iter";
+import Array "mo:core@2.4/Array";
+import Debug "mo:core@2.4/Debug";
+import Runtime "mo:core@2.4/Runtime";
+import Text "mo:core@2.4/Text";
+import Char "mo:core@2.4/Char";
+import Buffer "mo:base@0.16/Buffer";
+import Nat "mo:core@2.4/Nat";
+import Option "mo:core@2.4/Option";
 
 import Bench "mo:bench";
 import Fuzz "mo:fuzz";
-import Candid "mo:serde@3.4.0/Candid";
-import Itertools "mo:itertools@0.2.2/Iter";
-import SparseBitMap64 "mo:bit-map@1.1.0/SparseBitMap64";
+import Candid "mo:serde@3.5/Candid";
+import Itertools "mo:itertools@0.2/Iter";
+import SparseBitMap64 "mo:bit-map@1.1/SparseBitMap64";
 
-import ZenDB "../src";
+import ZenDB "../src/EmbeddedInstance";
 import Utils "../src/EmbeddedInstance/Utils";
 
 module TxsBenchUtils {
@@ -220,7 +220,7 @@ module TxsBenchUtils {
         );
 
         let candid_principals = Array.map<Principal, ZenDB.Types.Candid>(
-            Iter.toArray(Array.slice<Principal>(principals, 0, 10)),
+            (Array.sliceToArray<Principal>(principals, 0, 10)),
             func(p : Principal) : ZenDB.Types.Candid = #Principal(p),
         );
 
@@ -240,7 +240,7 @@ module TxsBenchUtils {
         let txs_to_replace = Buffer.Buffer<Tx>(input_limit);
         let tx_ids = Buffer.Buffer<Blob>(input_limit);
 
-        for (i in Iter.range(0, input_limit - 1)) {
+        for (i in Nat.rangeInclusive(0, input_limit - 1)) {
             let tx = TxsBenchUtils.new_tx(fuzz, principals);
             predefined_txs.add(tx);
 
@@ -336,7 +336,7 @@ module TxsBenchUtils {
                                     };
                                 };
                                 case (#err(err_msg)) {
-                                    Debug.trap(err_msg);
+                                    Runtime.trap(err_msg);
                                 };
                             };
                         };
@@ -384,11 +384,11 @@ module TxsBenchUtils {
                                         };
                                     };
                                     case (#err(err_msg)) {
-                                        Debug.trap(err_msg);
+                                        Runtime.trap(err_msg);
                                     };
                                 };
                             };
-                            case (#err(err)) { Debug.trap(err) };
+                            case (#err(err)) { Runtime.trap(err) };
                         };
                     };
 
@@ -652,7 +652,7 @@ module TxsBenchUtils {
                     };
 
                     case (_) {
-                        Debug.trap("Should be unreachable:\n row = zenDB index intersection and col = \"" # debug_show benchmark_name # "\"");
+                        Runtime.trap("Should be unreachable:\n row = zenDB index intersection and col = \"" # debug_show benchmark_name # "\"");
                     };
 
                 };
@@ -986,7 +986,7 @@ module TxsBenchUtils {
                 };
 
                 case (_) {
-                    Debug.trap("Should be unreachable:\n row = \"" # debug_show row # "\" and col = \"" # debug_show col # "\"");
+                    Runtime.trap("Should be unreachable:\n row = \"" # debug_show row # "\" and col = \"" # debug_show col # "\"");
                 };
             };
         };
@@ -1026,25 +1026,25 @@ module TxsBenchUtils {
         func skip_limit_skip_limit_paginated_query(db_query : ZenDB.QueryBuilder, pagination_limit : Nat) : [(Blob, Tx)] {
 
             ignore db_query.Limit(pagination_limit);
-            let #ok(result) = txs.search(db_query) else Prelude.unreachable();
-            let bitmap = SparseBitMap64.fromIter(Iter.map<(Blob, Tx), Nat>(result.documents.vals(), func((id, _) : (Blob, Tx)) : Nat = Utils.nat_from_12_byte_blob(id)));
-            let documents = Buffer.fromArray<(Blob, Tx)>(result.documents);
+            let #ok(result) = txs.search(db_query) else Runtime.unreachable();
+            let bitmap = SparseBitMap64.fromIter(Iter.map<(Blob, Tx, [ZenDB.Types.TextMatch]), Nat>(result.documents.vals(), func((id, _, _) : (Blob, Tx, [ZenDB.Types.TextMatch])) : Nat = Utils.nat_from_12_byte_blob(id)));
+            let documents = Buffer.fromArray<(Blob, Tx)>(Array.map<(Blob, Tx, [ZenDB.Types.TextMatch]), (Blob, Tx)>(result.documents, func((id, tx, _)) = (id, tx)));
             var batch_size = result.documents.size();
 
             label skip_limit_pagination while (batch_size > 0) {
                 ignore db_query.Skip(documents.size()).Limit(pagination_limit);
 
-                let #ok(result) = txs.search(db_query) else Prelude.unreachable();
+                let #ok(result) = txs.search(db_query) else Runtime.unreachable();
                 // Debug.print("matching_txs: " # debug_show result.documents);
 
                 assert result.documents.size() <= pagination_limit;
                 batch_size := result.documents.size();
 
-                for ((id, tx) in result.documents.vals()) {
+                for ((id, tx, _) in result.documents.vals()) {
                     documents.add((id, tx));
 
                     if (SparseBitMap64.get(bitmap, Utils.nat_from_12_byte_blob(id))) {
-                        Debug.trap("Duplicate entry for id " # debug_show id);
+                        Runtime.trap("Duplicate entry for id " # debug_show id);
                     } else {
                         SparseBitMap64.set(bitmap, Utils.nat_from_12_byte_blob(id), true);
                     };
@@ -1092,7 +1092,7 @@ module TxsBenchUtils {
             };
             case ("query() -> principals[0..10] == tx.to.owner (is recipient)") {
                 let candid_principals = Array.map<Principal, ZenDB.Types.Candid>(
-                    Iter.toArray(Array.slice<Principal>(principals, 0, 10)),
+                    (Array.sliceToArray<Principal>(principals, 0, 10)),
                     func(p : Principal) : ZenDB.Types.Candid = #Principal(p),
                 );
 
@@ -1121,7 +1121,7 @@ module TxsBenchUtils {
 
             case ("query() -> all txs involving principals[0..10]") {
                 let candid_principals = Array.map<Principal, ZenDB.Types.Candid>(
-                    Iter.toArray(Array.slice(principals, 0, 10)),
+                    (Array.sliceToArray(principals, 0, 10)),
                     func(p : Principal) : ZenDB.Types.Candid = #Principal(p),
                 );
 
@@ -1164,7 +1164,7 @@ module TxsBenchUtils {
             };
 
             case (_) {
-                Debug.trap("Should be unreachable:\n row = zenDB (skip_limit_pagination iteration_limit = 100, -> array) and col = \"" # debug_show section # "\"");
+                Runtime.trap("Should be unreachable:\n row = zenDB (skip_limit_pagination iteration_limit = 100, -> array) and col = \"" # debug_show section # "\"");
             };
 
         };

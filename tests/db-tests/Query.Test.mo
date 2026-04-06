@@ -1,17 +1,17 @@
 // @testmode wasi
-import Debug "mo:base@0.16.0/Debug";
-import Iter "mo:base@0.16.0/Iter";
-import Text "mo:base@0.16.0/Text";
-import Char "mo:base@0.16.0/Char";
-import Buffer "mo:base@0.16.0/Buffer";
+import Debug "mo:core@2.4/Debug";
+import Iter "mo:core@2.4/Iter";
+import Text "mo:core@2.4/Text";
+import Char "mo:core@2.4/Char";
+import Buffer "mo:base@0.16/Buffer";
 
 import { test; suite } "mo:test";
 
 import Bench "mo:bench";
 import Fuzz "mo:fuzz";
-import Candid "mo:serde@3.4.0/Candid";
-import Record "mo:serde@3.4.0/Candid/Text/Parser/Record";
-import Itertools "mo:itertools@0.2.2/Iter";
+import Candid "mo:serde@3.5/Candid";
+import Record "mo:serde@3.5/Candid/Text/Parser/Record";
+import Itertools "mo:itertools@0.2/Iter";
 import ZenDB "../../src/EmbeddedInstance";
 import ZenDBSuite "../test-utils/TestFramework";
 

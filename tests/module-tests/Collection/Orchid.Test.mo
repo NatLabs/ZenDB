@@ -1,31 +1,32 @@
 // @testmode wasi
-import Array "mo:base@0.16.0/Array";
-import Debug "mo:base@0.16.0/Debug";
-import Buffer "mo:base@0.16.0/Buffer";
-import Blob "mo:base@0.16.0/Blob";
-import Text "mo:base@0.16.0/Text";
-import Char "mo:base@0.16.0/Char";
-import Nat "mo:base@0.16.0/Nat";
-import Nat8 "mo:base@0.16.0/Nat8";
-import Int8 "mo:base@0.16.0/Int8";
-import Iter "mo:base@0.16.0/Iter";
-import Int32 "mo:base@0.16.0/Int32";
-import Int16 "mo:base@0.16.0/Int16";
-import Int64 "mo:base@0.16.0/Int64";
-import Float "mo:base@0.16.0/Float";
-import Nat64 "mo:base@0.16.0/Nat64";
-import Nat16 "mo:base@0.16.0/Nat16";
-import Nat32 "mo:base@0.16.0/Nat32";
-import Int "mo:base@0.16.0/Int";
-import Principal "mo:base@0.16.0/Principal";
-import Bool "mo:base@0.16.0/Bool";
-import Option "mo:base@0.16.0/Option";
+import Array "mo:core@2.4/Array";
+import Debug "mo:core@2.4/Debug";
+import Buffer "mo:base@0.16/Buffer";
+import Blob "mo:core@2.4/Blob";
+import Text "mo:core@2.4/Text";
+import Char "mo:core@2.4/Char";
+import Nat "mo:core@2.4/Nat";
+import Nat8 "mo:core@2.4/Nat8";
+import Int8 "mo:core@2.4/Int8";
+import Iter "mo:core@2.4/Iter";
+import Int32 "mo:core@2.4/Int32";
+import Int16 "mo:core@2.4/Int16";
+import Int64 "mo:core@2.4/Int64";
+import Float "mo:core@2.4/Float";
+import Nat64 "mo:core@2.4/Nat64";
+import Nat16 "mo:core@2.4/Nat16";
+import Nat32 "mo:core@2.4/Nat32";
+import Int "mo:core@2.4/Int";
+import Principal "mo:core@2.4/Principal";
+import Bool "mo:core@2.4/Bool";
+import Option "mo:core@2.4/Option";
+import Runtime "mo:core@2.4/Runtime";
 
 import { test; suite } "mo:test";
 import Itertools "mo:itertools@0.2.2/Iter";
 import PeekableIter "mo:itertools@0.2.2/PeekableIter";
-import BpTree "mo:augmented-btrees@0.7.1/BpTree";
-import Cmp "mo:augmented-btrees@0.7.1/Cmp";
+import BpTree "mo:augmented-btrees@0.9/BpTree";
+import Cmp "mo:augmented-btrees@0.9/Cmp";
 
 import ZenDB "../../../src/EmbeddedInstance";
 import Orchid "../../../src/EmbeddedInstance/Collection/Orchid";
@@ -183,7 +184,7 @@ suite(
                             let candid_values = Orchid.Orchid.blobify.from_blob(b);
                             switch (candid_values[0]) {
                                 case (#Bool(bool)) { bool };
-                                case (other) Debug.trap("error extracting candid value");
+                                case (other) Runtime.trap("error extracting candid value");
                             };
                         },
                     ),
@@ -220,7 +221,7 @@ suite(
                             let candid_values = Orchid.Orchid.blobify.from_blob(b);
                             switch (candid_values[0]) {
                                 case (#Nat(nat)) { nat };
-                                case (other) Debug.trap("error extracting candid value: " # debug_show (other));
+                                case (other) Runtime.trap("error extracting candid value: " # debug_show (other));
                             };
                         },
                     ),
@@ -236,7 +237,7 @@ suite(
                 let sorted_nat8s = BpTree.new<Nat8, Nat>(null);
                 let encoded_nat8s = BpTree.new<Blob, Nat>(null);
 
-                for ((i, n) in Itertools.enumerate(Iter.range(0, 255))) {
+                for ((i, n) in Itertools.enumerate(Nat.rangeInclusive(0, 255))) {
 
                     let n8 = Nat8.fromNat(n);
                     ignore BpTree.insert(sorted_nat8s, Cmp.Nat8, n8, i);
@@ -261,7 +262,7 @@ suite(
                             let candid_values = Orchid.Orchid.blobify.from_blob(b);
                             switch (candid_values[0]) {
                                 case (#Nat8(nat8)) { nat8 };
-                                case (other) Debug.trap("error extracting candid value");
+                                case (other) Runtime.trap("error extracting candid value");
                             };
                         },
                     ),
@@ -297,7 +298,7 @@ suite(
                             let candid_values = Orchid.Orchid.blobify.from_blob(b);
                             switch (candid_values[0]) {
                                 case (#Nat16(nat16)) { nat16 };
-                                case (other) Debug.trap("error extracting candid value");
+                                case (other) Runtime.trap("error extracting candid value");
                             };
                         },
                     ),
@@ -334,7 +335,7 @@ suite(
                             let candid_values = Orchid.Orchid.blobify.from_blob(b);
                             switch (candid_values[0]) {
                                 case (#Nat32(nat32)) { nat32 };
-                                case (other) Debug.trap("error extracting candid value");
+                                case (other) Runtime.trap("error extracting candid value");
                             };
                         },
                     ),
@@ -370,7 +371,7 @@ suite(
                             let candid_values = Orchid.Orchid.blobify.from_blob(b);
                             switch (candid_values[0]) {
                                 case (#Nat64(nat64)) { nat64 };
-                                case (other) Debug.trap("error extracting candid value");
+                                case (other) Runtime.trap("error extracting candid value");
                             };
                         },
                     ),
@@ -385,7 +386,7 @@ suite(
                 let sorted_int8s = BpTree.new<Int8, Nat>(null);
                 let encoded_int8s = BpTree.new<Blob, Nat>(null);
 
-                for ((i, n) in Itertools.enumerate(Iter.range(0, 255))) {
+                for ((i, n) in Itertools.enumerate(Nat.rangeInclusive(0, 255))) {
 
                     let int8 = Int8.fromInt(n - 128);
 
@@ -402,9 +403,9 @@ suite(
                 );
 
                 assert (
-                    Orchid.Orchid.blobify.to_blob([#Int8(Int8.minimumValue)]) < Orchid.Orchid.blobify.to_blob([#Int8(0)])
+                    Orchid.Orchid.blobify.to_blob([#Int8(Int8.minValue)]) < Orchid.Orchid.blobify.to_blob([#Int8(0)])
                 ) and (
-                    Orchid.Orchid.blobify.to_blob([#Int8(0)]) < Orchid.Orchid.blobify.to_blob([#Int8(Int8.maximumValue)])
+                    Orchid.Orchid.blobify.to_blob([#Int8(0)]) < Orchid.Orchid.blobify.to_blob([#Int8(Int8.maxValue)])
                 );
 
                 assert Itertools.equal(
@@ -415,7 +416,7 @@ suite(
                             let candid_values = Orchid.Orchid.blobify.from_blob(b);
                             switch (candid_values[0]) {
                                 case (#Int8(int8)) { int8 };
-                                case (other) Debug.trap("error extracting candid value");
+                                case (other) Runtime.trap("error extracting candid value");
                             };
                         },
                     ),
@@ -444,9 +445,9 @@ suite(
                 );
 
                 assert (
-                    Orchid.Orchid.blobify.to_blob([#Int16(Int16.minimumValue)]) < Orchid.Orchid.blobify.to_blob([#Int16(0)])
+                    Orchid.Orchid.blobify.to_blob([#Int16(Int16.minValue)]) < Orchid.Orchid.blobify.to_blob([#Int16(0)])
                 ) and (
-                    Orchid.Orchid.blobify.to_blob([#Int16(0)]) < Orchid.Orchid.blobify.to_blob([#Int16(Int16.maximumValue)])
+                    Orchid.Orchid.blobify.to_blob([#Int16(0)]) < Orchid.Orchid.blobify.to_blob([#Int16(Int16.maxValue)])
                 );
 
                 assert Itertools.equal(
@@ -457,7 +458,7 @@ suite(
                             let candid_values = Orchid.Orchid.blobify.from_blob(b);
                             switch (candid_values[0]) {
                                 case (#Int16(int16)) { int16 };
-                                case (other) Debug.trap("error extracting candid value");
+                                case (other) Runtime.trap("error extracting candid value");
                             };
                         },
                     ),
@@ -487,9 +488,9 @@ suite(
                 );
 
                 assert (
-                    Orchid.Orchid.blobify.to_blob([#Int32(Int32.minimumValue)]) < Orchid.Orchid.blobify.to_blob([#Int32(0)])
+                    Orchid.Orchid.blobify.to_blob([#Int32(Int32.minValue)]) < Orchid.Orchid.blobify.to_blob([#Int32(0)])
                 ) and (
-                    Orchid.Orchid.blobify.to_blob([#Int32(0)]) < Orchid.Orchid.blobify.to_blob([#Int32(Int32.maximumValue)])
+                    Orchid.Orchid.blobify.to_blob([#Int32(0)]) < Orchid.Orchid.blobify.to_blob([#Int32(Int32.maxValue)])
                 );
 
                 assert Itertools.equal(
@@ -500,7 +501,7 @@ suite(
                             let candid_values = Orchid.Orchid.blobify.from_blob(b);
                             switch (candid_values[0]) {
                                 case (#Int32(int32)) { int32 };
-                                case (other) Debug.trap("error extracting candid value");
+                                case (other) Runtime.trap("error extracting candid value");
                             };
                         },
                     ),
@@ -529,9 +530,9 @@ suite(
                 );
 
                 assert (
-                    Orchid.Orchid.blobify.to_blob([#Int64(Int64.minimumValue)]) < Orchid.Orchid.blobify.to_blob([#Int64(0)])
+                    Orchid.Orchid.blobify.to_blob([#Int64(Int64.minValue)]) < Orchid.Orchid.blobify.to_blob([#Int64(0)])
                 ) and (
-                    Orchid.Orchid.blobify.to_blob([#Int64(0)]) < Orchid.Orchid.blobify.to_blob([#Int64(Int64.maximumValue)])
+                    Orchid.Orchid.blobify.to_blob([#Int64(0)]) < Orchid.Orchid.blobify.to_blob([#Int64(Int64.maxValue)])
                 );
 
                 assert Itertools.equal(
@@ -542,7 +543,7 @@ suite(
                             let candid_values = Orchid.Orchid.blobify.from_blob(b);
                             switch (candid_values[0]) {
                                 case (#Int64(int64)) { int64 };
-                                case (other) Debug.trap("error extracting candid value");
+                                case (other) Runtime.trap("error extracting candid value");
                             };
                         },
                     ),
@@ -599,7 +600,7 @@ suite(
                             let candid_values = Orchid.Orchid.blobify.from_blob(b);
                             switch (candid_values[0]) {
                                 case (#Principal(principal)) { principal };
-                                case (other) Debug.trap("error extracting candid value");
+                                case (other) Runtime.trap("error extracting candid value");
                             };
                         },
                     ),
@@ -635,7 +636,7 @@ suite(
                             let candid_values = Orchid.Orchid.blobify.from_blob(b);
                             switch (candid_values[0]) {
                                 case (#Blob(blob)) { blob };
-                                case (other) Debug.trap("error extracting candid value");
+                                case (other) Runtime.trap("error extracting candid value");
                             };
                         },
                     ),
@@ -671,11 +672,11 @@ suite(
                             let candid_values = Orchid.Orchid.blobify.from_blob(b);
                             switch (candid_values[0]) {
                                 case (#Float(float)) { float };
-                                case (other) Debug.trap("error extracting candid value");
+                                case (other) Runtime.trap("error extracting candid value");
                             };
                         },
                     ),
-                    func(x : Float, y : Float) : Bool = Float.equalWithin(x, y, 0.0001),
+                    func(x : Float, y : Float) : Bool = Float.equal(x, y, 0.0001),
                 );
             },
         );
@@ -733,7 +734,7 @@ suite(
                             let candid_values = Orchid.Orchid.blobify.from_blob(b);
                             switch (candid_values[0]) {
                                 case (#Text(text)) { text };
-                                case (other) Debug.trap("error extracting candid value");
+                                case (other) Runtime.trap("error extracting candid value");
                             };
                         },
                     ),
@@ -843,7 +844,7 @@ func compare_entries<T>(
                 let candid_values = Orchid.Orchid.blobify.from_blob(b);
                 switch (candid_values[0]) {
                     case (#Text(value)) { value };
-                    case (other) Debug.trap("error extracting candid value: " # debug_show (other));
+                    case (other) Runtime.trap("error extracting candid value: " # debug_show (other));
                 };
             },
 

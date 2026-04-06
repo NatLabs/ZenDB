@@ -1,8 +1,8 @@
-import Iter "mo:base@0.16.0/Iter";
-import Array "mo:base@0.16.0/Array";
-import Text "mo:base@0.16.0/Text";
-import Buffer "mo:base@0.16.0/Buffer";
-import Nat "mo:base@0.16.0/Nat";
+import Iter "mo:core@2.4/Iter";
+import Array "mo:core@2.4/Array";
+import Text "mo:core@2.4/Text";
+import Buffer "mo:base@0.16/Buffer";
+import Nat "mo:core@2.4/Nat";
 
 import Bench "mo:bench";
 import Fuzz "mo:fuzz";
@@ -82,7 +82,7 @@ module {
         // Body: random length 25–100 tokens, with common words injected at fixed positions
         let body_len = fuzz.nat.randomRange(25, 100);
         let body_buf = Buffer.Buffer<Text>(body_len);
-        for (j in Iter.range(0, body_len - 1)) {
+        for (j in Nat.rangeInclusive(0, body_len - 1)) {
             let word =
                 if   (j == 10 and i % 5 == 0) { COMMON_WORDS[i / 5 % 3] }
                 else if (j == 20 and i % 5 == 0) { COMMON_WORDS[(i / 5 + 1) % 3] }
@@ -93,7 +93,7 @@ module {
         if (i % 100 == 0) {
             body_buf.add(RARE_WORDS[(i + 1) % 2]);
         };
-        let body = Text.join(" ", body_buf.vals());
+        let body = Text.join(body_buf.vals(), " ");
 
         let category = CATEGORIES[i % CATEGORIES.size()];
 

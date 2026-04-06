@@ -1,9 +1,10 @@
-import Blob "mo:base@0.16.0/Blob";
-import Debug "mo:base@0.16.0/Debug";
+import Blob "mo:core@2.4/Blob";
+import Debug "mo:core@2.4/Debug";
 
 import V0_ "v0*";
 import V1_ "v1*";
 import V2_ "v2*";
+import Runtime "mo:core@2.4/Runtime";
 
 // the versions are seperated into the types and methods directories to prevent circular dependencies
 module {
@@ -30,10 +31,10 @@ module {
     public func upgrade(versions : PrevVersionedStableStore) : VersionedStableStore {
         switch (versions) {
             case (#v0(v0)) {
-                Debug.trap("Cannot upgrade from " # V0_.to_text(v0) # ". This version requires manual data migration to v1.0.0 due to breaking changes (DocumentId: Nat → Blob, BitMap changes). No automatic upgrade path available.");
+                Runtime.trap("Cannot upgrade from " # V0_.to_text(v0) # ". This version requires manual data migration to v1.0.0 due to breaking changes (DocumentId: Nat → Blob, BitMap changes). No automatic upgrade path available.");
             };
             case (#v1(v1)) {
-                Debug.trap("Cannot upgrade from " # V1_.to_text(v1) # ". This version requires manual data migration to v2.0.0 due to breaking changes in index encoding (Orchid: prefix-based → lexicographic escape-based encoding). Indexes must be rebuilt. No automatic upgrade path available.");
+                Runtime.trap("Cannot upgrade from " # V1_.to_text(v1) # ". This version requires manual data migration to v2.0.0 due to breaking changes in index encoding (Orchid: prefix-based → lexicographic escape-based encoding). Indexes must be rebuilt. No automatic upgrade path available.");
             };
             case (#v2(v2)) { #v2(V2_.upgrade(v2)) };
         };
@@ -42,10 +43,10 @@ module {
     public func get_current_state(asset_versions : VersionedStableStore) : V2_.StableStore {
         switch (asset_versions) {
             case (#v0(stable_store)) {
-                Debug.trap("Cannot upgrade from " # V0_.to_text(stable_store) # ". This version requires manual data migration to v1.0.0 due to breaking changes (DocumentId: Nat → Blob, BitMap changes). No automatic upgrade path available.");
+                Runtime.trap("Cannot upgrade from " # V0_.to_text(stable_store) # ". This version requires manual data migration to v1.0.0 due to breaking changes (DocumentId: Nat → Blob, BitMap changes). No automatic upgrade path available.");
             };
             case (#v1(stable_store)) {
-                Debug.trap("Cannot upgrade from " # V1_.to_text(stable_store) # ". This version requires manual data migration to v2.0.0 due to breaking changes in index encoding (Orchid: prefix-based → lexicographic escape-based encoding). Indexes must be rebuilt. No automatic upgrade path available.");
+                Runtime.trap("Cannot upgrade from " # V1_.to_text(stable_store) # ". This version requires manual data migration to v2.0.0 due to breaking changes in index encoding (Orchid: prefix-based → lexicographic escape-based encoding). Indexes must be rebuilt. No automatic upgrade path available.");
             };
             case (#v2(stable_store)) { V2_.get_current_state(stable_store) };
         };

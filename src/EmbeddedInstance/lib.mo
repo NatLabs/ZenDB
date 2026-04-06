@@ -1,35 +1,34 @@
 import Prim "mo:prim";
 
-import Principal "mo:base@0.16.0/Principal";
-import Array "mo:base@0.16.0/Array";
-import Debug "mo:base@0.16.0/Debug";
-import Text "mo:base@0.16.0/Text";
-import Char "mo:base@0.16.0/Char";
-import Nat32 "mo:base@0.16.0/Nat32";
-import Result "mo:base@0.16.0/Result";
-import Order "mo:base@0.16.0/Order";
-import Iter "mo:base@0.16.0/Iter";
-import Buffer "mo:base@0.16.0/Buffer";
-import Nat "mo:base@0.16.0/Nat";
-import Option "mo:base@0.16.0/Option";
-import Hash "mo:base@0.16.0/Hash";
-import Float "mo:base@0.16.0/Float";
-import Int "mo:base@0.16.0/Int";
-import Blob "mo:base@0.16.0/Blob";
+import Principal "mo:core@2.4/Principal";
+import Array "mo:core@2.4/Array";
+import Debug "mo:core@2.4/Debug";
+import Text "mo:core@2.4/Text";
+import Char "mo:core@2.4/Char";
+import Nat32 "mo:core@2.4/Nat32";
+import Result "mo:core@2.4/Result";
+import Order "mo:core@2.4/Order";
+import Iter "mo:core@2.4/Iter";
+import Buffer "mo:base@0.16/Buffer";
+import Nat "mo:core@2.4/Nat";
+import Option "mo:core@2.4/Option";
+import Float "mo:core@2.4/Float";
+import Int "mo:core@2.4/Int";
+import Blob "mo:core@2.4/Blob";
 
-import Map "mo:map@9.0.1/Map";
-import Set "mo:map@9.0.1/Set";
-import Serde "mo:serde@3.4.0";
-import Decoder "mo:serde@3.4.0/Candid/Blob/Decoder";
-import Candid "mo:serde@3.4.0/Candid";
-import Itertools "mo:itertools@0.2.2/Iter";
-import RevIter "mo:itertools@0.2.2/RevIter";
-import Vector "mo:vector@0.4.2";
-import ByteUtils "mo:byte-utils@0.1.1";
+import Map "mo:map@9.0/Map";
+import Set "mo:map@9.0/Set";
+import Serde "mo:serde@3.5";
+import Decoder "mo:serde@3.5/Candid/Blob/Decoder";
+import Candid "mo:serde@3.5/Candid";
+import Itertools "mo:itertools@0.2/Iter";
+import RevIter "mo:itertools@0.2/RevIter";
+import Vector "mo:vector@0.4";
+import ByteUtils "mo:byte-utils@0.2";
 import Ids "Ids";
 
-import TypeUtils "mo:memory-collection@0.3.2/TypeUtils";
-import Int8Cmp "mo:memory-collection@0.3.2/TypeUtils/Int8Cmp";
+import TypeUtils "mo:memory-collection@0.4/TypeUtils";
+import Int8Cmp "mo:memory-collection@0.4/TypeUtils/Int8Cmp";
 
 import Collection "Collection";
 import Database "Database";
@@ -42,6 +41,7 @@ import C "Constants";
 import TwoQueueCache "TwoQueueCache";
 
 import TypeMigrations "TypeMigrations";
+import Runtime "mo:core@2.4/Runtime";
 
 module {
 
@@ -115,6 +115,7 @@ module {
         is_running_locally : ?Bool;
         memory_type : ?T.MemoryType;
         cache_capacity : ?Nat;
+        is_compression_enabled : ?Bool;
     };
 
     public let DefaultMemoryType = #stableMemory;
@@ -126,6 +127,7 @@ module {
         is_running_locally = ?false;
         memory_type = ?(DefaultMemoryType);
         cache_capacity = ?(DefaultCacheCapacity);
+        is_compression_enabled = ?false;
     };
 
     public func newStableStore(canister_id : Principal, opt_settings : ?Settings) : T.VersionedStableStore {
@@ -141,6 +143,7 @@ module {
 
         let is_running_locally = Option.get(settings.is_running_locally, false);
         let log_level = Option.get(settings.log_level, DefaultLogLevel);
+        let is_compression_enabled = settings.is_compression_enabled;
 
         let zendb : T.StableStore = {
             canister_id;
@@ -154,6 +157,7 @@ module {
             freed_btrees = Vector.new<T.MemoryBTree>();
             logger = Logger.init(log_level, is_running_locally);
             is_running_locally;
+            is_compression_enabled;
         };
 
         let default_db : T.StableDatabase = {
@@ -166,6 +170,7 @@ module {
             logger = zendb.logger;
             memory_type = zendb.memory_type;
             is_running_locally = zendb.is_running_locally;
+            is_compression_enabled = zendb.is_compression_enabled;
         };
 
         ignore Map.put(zendb.databases, T.thash, "default", default_db);
@@ -193,7 +198,7 @@ module {
 
     public func launchDefaultDB(versioned_sstore : T.VersionedStableStore) : Database.Database {
         let sstore = TypeMigrations.get_current_state(versioned_sstore);
-        let ?default_db = Map.get<Text, T.StableDatabase>(sstore.databases, T.thash, "default") else Debug.trap("Default database not found");
+        let ?default_db = Map.get<Text, T.StableDatabase>(sstore.databases, T.thash, "default") else Runtime.trap("Default database not found");
         Database.Database(default_db);
     };
 
@@ -216,6 +221,7 @@ module {
             logger = sstore.logger;
             memory_type = sstore.memory_type;
             is_running_locally = sstore.is_running_locally;
+            is_compression_enabled = sstore.is_compression_enabled;
         };
 
         ignore Map.put(sstore.databases, T.thash, db_name, db);

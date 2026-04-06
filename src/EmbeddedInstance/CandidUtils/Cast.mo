@@ -1,26 +1,27 @@
-import Array "mo:base@0.16.0/Array";
-import Debug "mo:base@0.16.0/Debug";
-import Text "mo:base@0.16.0/Text";
-import Nat32 "mo:base@0.16.0/Nat32";
-import Result "mo:base@0.16.0/Result";
-import Buffer "mo:base@0.16.0/Buffer";
-import Nat "mo:base@0.16.0/Nat";
-import Float "mo:base@0.16.0/Float";
-import Int "mo:base@0.16.0/Int";
-import Int32 "mo:base@0.16.0/Int32";
-import Nat64 "mo:base@0.16.0/Nat64";
-import Int16 "mo:base@0.16.0/Int16";
-import Int64 "mo:base@0.16.0/Int64";
-import Int8 "mo:base@0.16.0/Int8";
-import Nat16 "mo:base@0.16.0/Nat16";
-import Nat8 "mo:base@0.16.0/Nat8";
+import Array "mo:core@2.4/Array";
+import Debug "mo:core@2.4/Debug";
+import Text "mo:core@2.4/Text";
+import Nat32 "mo:core@2.4/Nat32";
+import Result "mo:core@2.4/Result";
+import Buffer "mo:base@0.16/Buffer";
+import Nat "mo:core@2.4/Nat";
+import Float "mo:core@2.4/Float";
+import Int "mo:core@2.4/Int";
+import Int32 "mo:core@2.4/Int32";
+import Nat64 "mo:core@2.4/Nat64";
+import Int16 "mo:core@2.4/Int16";
+import Int64 "mo:core@2.4/Int64";
+import Int8 "mo:core@2.4/Int8";
+import Nat16 "mo:core@2.4/Nat16";
+import Nat8 "mo:core@2.4/Nat8";
 // Additional imports for new casting functionality
-import Principal "mo:base@0.16.0/Principal";
-import Bool "mo:base@0.16.0/Bool";
-import Char "mo:base@0.16.0/Char";
+import Principal "mo:core@2.4/Principal";
+import Bool "mo:core@2.4/Bool";
+import Char "mo:core@2.4/Char";
 
 import T "../Types";
 import MergeSort "../MergeSort";
+import Runtime "mo:core@2.4/Runtime";
 
 module Cast {
     type CandidType = T.CandidType;
@@ -47,7 +48,7 @@ module Cast {
             case (#Int32(n)) Int32.toText(n);
             case (#Int64(n)) Int64.toText(n);
             case (#Float(f)) Float.toText(f);
-            case (_) Debug.trap("numeric_to_text: Unsupported numeric type");
+            case (_) Runtime.trap("numeric_to_text: Unsupported numeric type");
         };
     };
 
@@ -68,7 +69,7 @@ module Cast {
             case (#Float(f)) #Bool(f != 0.0);
             // Convert text: "true", "1" = true; "false", "0", "" = false
             case (#Text(t)) {
-                let lower = Text.toLowercase(t);
+                let lower = Text.toLower(t);
                 #Bool(lower == "true" or lower == "1");
             };
             case (unsupported_types) return #err(
@@ -169,7 +170,7 @@ module Cast {
 
     public func cast_to_nat16(candid : Candid) : T.Result<Candid, Text> {
         func int_to_nat16_if_within_bounds(int : Int) : T.Result<Candid, Text> {
-            if (int >= 0 and int <= Nat16.toNat(Nat16.maximumValue)) {
+            if (int >= 0 and int <= Nat16.toNat(Nat16.maxValue)) {
                 #ok(#Nat16(Nat16.fromNat(Int.abs(int))));
             } else {
                 return #err("Cannot convert " # debug_show candid # " with value " # Int.toText(int) # " to #Nat16()");
@@ -199,7 +200,7 @@ module Cast {
 
     public func cast_to_nat32(candid : Candid) : T.Result<Candid, Text> {
         func int_to_nat32_if_within_bounds(int : Int) : T.Result<Candid, Text> {
-            if (int >= 0 and int <= Nat32.toNat(Nat32.maximumValue)) {
+            if (int >= 0 and int <= Nat32.toNat(Nat32.maxValue)) {
                 #ok(#Nat32(Nat32.fromNat(Int.abs(int))));
             } else {
                 return #err("Cannot convert " # debug_show candid # " with value " # Int.toText(int) # " to #Nat32()");
@@ -231,7 +232,7 @@ module Cast {
     public func cast_to_nat64(candid : Candid) : T.Result<Candid, Text> {
 
         func int_to_nat64_if_positive(int : Int) : T.Result<Candid, Text> {
-            if (int >= 0 and int <= Nat64.toNat(Nat64.maximumValue)) {
+            if (int >= 0 and int <= Nat64.toNat(Nat64.maxValue)) {
                 #ok(#Nat64(Nat64.fromNat(Int.abs(int))));
             } else {
                 return #err("Cannot convert " # debug_show candid # " with negative value to #Nat64()");
@@ -294,7 +295,7 @@ module Cast {
     public func cast_to_int16(candid : Candid) : T.Result<Candid, Text> {
 
         func int_to_int16_if_within_bounds(int : Int) : T.Result<Candid, Text> {
-            if (int >= Int16.toInt(Int16.minimumValue) and int <= Int16.toInt(Int16.maximumValue)) {
+            if (int >= Int16.toInt(Int16.minValue) and int <= Int16.toInt(Int16.maxValue)) {
                 #ok(#Int16(Int16.fromInt(int)));
             } else {
                 return #err("Cannot convert " # debug_show candid # " with value " # Int.toText(int) # " to #Int16()");
@@ -326,7 +327,7 @@ module Cast {
     public func cast_to_int32(candid : Candid) : T.Result<Candid, Text> {
 
         func int_to_int32_if_within_bounds(int : Int) : T.Result<Candid, Text> {
-            if (int >= Int32.toInt(Int32.minimumValue) and int <= Int32.toInt(Int32.maximumValue)) {
+            if (int >= Int32.toInt(Int32.minValue) and int <= Int32.toInt(Int32.maxValue)) {
                 #ok(#Int32(Int32.fromInt(int)));
             } else {
                 return #err("Cannot convert " # debug_show candid # " with value " # Int.toText(int) # " to #Int32()");
@@ -358,7 +359,7 @@ module Cast {
     public func cast_to_int64(candid : Candid) : T.Result<Candid, Text> {
 
         func int_to_int64_if_within_bounds(int : Int) : T.Result<Candid, Text> {
-            if (int >= Int64.toInt(Int64.minimumValue) and int <= Int64.toInt(Int64.maximumValue)) {
+            if (int >= Int64.toInt(Int64.minValue) and int <= Int64.toInt(Int64.maxValue)) {
                 #ok(#Int64(Int64.fromInt(int)));
             } else {
                 return #err("Cannot convert " # debug_show candid # " with value " # Int.toText(int) # " to #Int64()");
@@ -611,7 +612,7 @@ module Cast {
                     };
                 };
             };
-            case (t) Debug.trap("need to implement cast for " # debug_show t);
+            case (t) Runtime.trap("need to implement cast for " # debug_show t);
         };
 
     };

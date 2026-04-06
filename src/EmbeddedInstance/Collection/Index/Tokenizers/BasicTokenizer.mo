@@ -1,17 +1,18 @@
-import Array "mo:base/Array";
+import Array "mo:core@2.4/Array";
 import Buffer "mo:base/Buffer";
-import Char "mo:base/Char";
-import Debug "mo:base/Debug";
+import Char "mo:core@2.4/Char";
+import Debug "mo:core@2.4/Debug";
 
-import Text "mo:base/Text";
-import Nat "mo:base/Nat";
-import Int "mo:base/Int";
+import Text "mo:core@2.4/Text";
+import Nat "mo:core@2.4/Nat";
+import Int "mo:core@2.4/Int";
 
-import Map "mo:map/Map";
-import Itertools "mo:itertools/Iter";
-import BufferDeque "mo:buffer-deque/BufferDeque";
+import Map "mo:map@9.0/Map";
+import Itertools "mo:itertools@0.2/Iter";
+import BufferDeque "mo:buffer-deque@0.1/BufferDeque";
 
 import T "../../../Types";
+import Runtime "mo:core@2.4/Runtime";
 
 module BasicTokenizer {
 
@@ -36,7 +37,7 @@ module BasicTokenizer {
     public type Token = T.Token;
 
     public func tokenize(raw_text : Text) : [Token] {
-        let lowercase_text = Text.toLowercase(raw_text);
+        let lowercase_text = Text.toLower(raw_text);
 
         var counter : Int = -1;
         let token_positions = BufferDeque.BufferDeque<(Nat, Nat)>((lowercase_text.size() / 5) + 8);
@@ -72,7 +73,7 @@ module BasicTokenizer {
             if (token != "") {
                 let positions = map_entry(token_map, Map.thash, token, Buffer.Buffer<(Nat, Nat)>(8));
                 let ?token_position = token_positions.popFront() else {
-                    Debug.trap("Unexpected end of token positions while tokenizing");
+                    Runtime.trap("Unexpected end of token positions while tokenizing");
                 };
 
                 // Debug.print(debug_show (token_position));
@@ -87,7 +88,7 @@ module BasicTokenizer {
 
                 let entry = switch (Map.popFront(token_map, Map.thash)) {
                     case (?entry) entry;
-                    case (null) Debug.trap("Unexpected end of map while tokenizing");
+                    case (null) Runtime.trap("Unexpected end of map while tokenizing");
                 };
 
                 (entry.0, Buffer.toArray(entry.1));

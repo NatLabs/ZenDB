@@ -1,7 +1,7 @@
-import Map "mo:map@9.0.1/Map";
-import Set "mo:map@9.0.1/Set";
-import Iter "mo:base@0.16.0/Iter";
-import Array "mo:base@0.16.0/Array";
+import Map "mo:map@9.0/Map";
+import Set "mo:map@9.0/Set";
+import Iter "mo:core@2.4/Iter";
+import Array "mo:core@2.4/Array";
 
 import V0_2_3 "../v0.2.3/types";
 import V0_2_4 "types";

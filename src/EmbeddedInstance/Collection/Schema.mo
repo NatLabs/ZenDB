@@ -1,35 +1,36 @@
-import Result "mo:base@0.16.0/Result";
-import Order "mo:base@0.16.0/Order";
-import Principal "mo:base@0.16.0/Principal";
-import Array "mo:base@0.16.0/Array";
-import Debug "mo:base@0.16.0/Debug";
-import Text "mo:base@0.16.0/Text";
-import Char "mo:base@0.16.0/Char";
-import Nat32 "mo:base@0.16.0/Nat32";
-import Iter "mo:base@0.16.0/Iter";
-import Buffer "mo:base@0.16.0/Buffer";
-import Nat "mo:base@0.16.0/Nat";
-import Option "mo:base@0.16.0/Option";
-import Hash "mo:base@0.16.0/Hash";
-import Float "mo:base@0.16.0/Float";
-import Int "mo:base@0.16.0/Int";
-import Int32 "mo:base@0.16.0/Int32";
-import Blob "mo:base@0.16.0/Blob";
-import Nat64 "mo:base@0.16.0/Nat64";
-import Int16 "mo:base@0.16.0/Int16";
-import Int64 "mo:base@0.16.0/Int64";
-import Int8 "mo:base@0.16.0/Int8";
-import Nat16 "mo:base@0.16.0/Nat16";
-import Nat8 "mo:base@0.16.0/Nat8";
+import Result "mo:core@2.4/Result";
+import Order "mo:core@2.4/Order";
+import Principal "mo:core@2.4/Principal";
+import Array "mo:core@2.4/Array";
+import Debug "mo:core@2.4/Debug";
+import Text "mo:core@2.4/Text";
+import Char "mo:core@2.4/Char";
+import Nat32 "mo:core@2.4/Nat32";
+import Iter "mo:core@2.4/Iter";
+import Buffer "mo:base@0.16/Buffer";
+import Nat "mo:core@2.4/Nat";
+import Option "mo:core@2.4/Option";
+import Hash "mo:base@0.16/Hash";
+import Float "mo:core@2.4/Float";
+import Int "mo:core@2.4/Int";
+import Int32 "mo:core@2.4/Int32";
+import Blob "mo:core@2.4/Blob";
+import Nat64 "mo:core@2.4/Nat64";
+import Int16 "mo:core@2.4/Int16";
+import Int64 "mo:core@2.4/Int64";
+import Int8 "mo:core@2.4/Int8";
+import Nat16 "mo:core@2.4/Nat16";
+import Nat8 "mo:core@2.4/Nat8";
 
-import Int8Cmp "mo:memory-collection@0.3.2/TypeUtils/Int8Cmp";
+import Int8Cmp "mo:memory-collection@0.4/TypeUtils/Int8Cmp";
 
-import Itertools "mo:itertools@0.2.2/Iter";
-import { sort_candid_type } "mo:serde@3.4.0/Candid/Blob/CandidUtils";
+import Itertools "mo:itertools@0.2/Iter";
+import { sort_candid_type } "mo:serde@3.5/Candid/Blob/CandidUtils";
 
 import T "../Types";
 import Utils "../Utils";
 import MergeSort "../MergeSort";
+import Runtime "mo:core@2.4/Runtime";
 
 module {
 
@@ -41,7 +42,7 @@ module {
 
     func send_error<A, B, C>(res : T.Result<A, B>) : T.Result<C, B> {
         switch (res) {
-            case (#ok(_)) Debug.trap("send_error: unexpected error type");
+            case (#ok(_)) Runtime.trap("send_error: unexpected error type");
             case (#err(err)) return #err(err);
         };
     };
@@ -87,8 +88,8 @@ module {
                 let sorted_fields_new = MergeSort.sort(
                     fields_new,
                     func(a : (Text, Schema), b : (Text, Schema)) : Order {
-                        let ?i = Array.indexOf<(Text, Schema)>(a, fields_curr, func(a : (Text, Schema), b : (Text, Schema)) : Bool { a.0 == b.0 }) else return #greater;
-                        let ?j = Array.indexOf(b, fields_curr, func(a : (Text, Schema), b : (Text, Schema)) : Bool { a.0 == b.0 }) else return #less;
+                        let ?i = Array.indexOf<(Text, Schema)>(fields_curr, func(a : (Text, Schema), b : (Text, Schema)) : Bool { a.0 == b.0 }, a) else return #greater;
+                        let ?j = Array.indexOf(fields_curr, func(a : (Text, Schema), b : (Text, Schema)) : Bool { a.0 == b.0 }, b) else return #less;
 
                         Nat.compare(i, j);
                     },
@@ -304,20 +305,20 @@ module {
             case (#Variant(schema), #Variant(a), #Variant(b)) {
 
                 let ?i = Array.indexOf<(Text, Any)>(
-                    a,
                     schema,
                     func((name, _) : (Text, Any), (name2, _) : (Text, Any)) : Bool {
                         name == name2;
                     },
-                ) else Debug.trap("cmp_candid: variant not found in schema");
+                    a,
+                ) else Runtime.trap("cmp_candid: variant not found in schema");
 
                 let ?j = Array.indexOf<(Text, Any)>(
-                    b,
                     schema,
                     func((name, _) : (Text, Any), (name2, _) : (Text, Any)) : Bool {
                         name == name2;
                     },
-                ) else Debug.trap("cmp_candid: variant not found in schema");
+                    b,
+                ) else Runtime.trap("cmp_candid: variant not found in schema");
 
                 let res = Int8Cmp.Nat(i, j);
 
@@ -335,7 +336,7 @@ module {
             //     if (len_cmp != 0) return len_cmp;
 
             //     let min_len = Nat.min(a.size(), b.size());
-            //     for (i in Iter.range(0, min_len - 1)) {
+            //     for (i in Nat.rangeInclusive(0, min_len - 1)) {
             //         let cmp_result = cmp_candid(a[i], b[i]);
             //         if (cmp_result != 0) return cmp_result;
             //     };
@@ -344,7 +345,7 @@ module {
 
             case (schema, a, b) {
                 // Debug.print(debug_show (a, b));
-                Debug.trap("cmp_candid: unexpected candid type " # debug_show { schema; a; b });
+                Runtime.trap("cmp_candid: unexpected candid type " # debug_show { schema; a; b });
             };
         };
     };
@@ -395,20 +396,20 @@ module {
             case (#Variant(schema), #Variant(a), #Variant(b)) {
 
                 let ?i = Array.indexOf<(Text, Any)>(
-                    a,
                     schema,
                     func((name, _) : (Text, Any), (name2, _) : (Text, Any)) : Bool {
                         name == name2;
                     },
-                ) else Debug.trap("cmp_candid: variant not found in schema");
+                    a,
+                ) else Runtime.trap("cmp_candid: variant not found in schema");
 
                 let ?j = Array.indexOf<(Text, Any)>(
-                    b,
                     schema,
                     func((name, _) : (Text, Any), (name2, _) : (Text, Any)) : Bool {
                         name == name2;
                     },
-                ) else Debug.trap("cmp_candid: variant not found in schema");
+                    b,
+                ) else Runtime.trap("cmp_candid: variant not found in schema");
 
                 let res = Int8Cmp.Nat(i, j);
 
@@ -426,7 +427,7 @@ module {
             //     if (len_cmp != 0) return len_cmp;
 
             //     let min_len = Nat.min(a.size(), b.size());
-            //     for (i in Iter.range(0, min_len - 1)) {
+            //     for (i in Nat.rangeInclusive(0, min_len - 1)) {
             //         let cmp_result = cmp_candid(a[i], b[i]);
             //         if (cmp_result != 0) return cmp_result;
             //     };
@@ -435,7 +436,7 @@ module {
 
             case (schema, a, b) {
                 // Debug.print(debug_show (a, b));
-                Debug.trap("cmp_candid: unexpected candid type " # debug_show { schema; a; b });
+                Runtime.trap("cmp_candid: unexpected candid type " # debug_show { schema; a; b });
             };
         };
     };

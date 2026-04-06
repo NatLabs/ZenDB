@@ -1,32 +1,39 @@
-import Debug "mo:base@0.16.0/Debug";
-import Option "mo:base@0.16.0/Option";
+import Debug "mo:core@2.4/Debug";
+import Option "mo:core@2.4/Option";
 
-import BpTree "mo:augmented-btrees@0.7.1/BpTree";
-import BpTreeTypes "mo:augmented-btrees@0.7.1/BpTree/Types";
-import BpTreeMethods "mo:augmented-btrees@0.7.1/BpTree/Methods";
-import MemoryBTree "mo:memory-collection@0.3.2/MemoryBTree/Stable";
-import RevIter "mo:itertools@0.2.2/RevIter";
+import BpTree "mo:augmented-btrees@0.9/BpTree";
+import BpTreeTypes "mo:augmented-btrees@0.9/BpTree/Types";
+import BpTreeMethods "mo:augmented-btrees@0.9/BpTree/Methods";
+import MemoryBTree "mo:memory-collection@0.4/MemoryBTree/Stable";
+import RevIter "mo:itertools@0.2/RevIter";
 
 import T "Types";
-import C "Constants"
+import C "Constants";
+import Runtime "mo:core@2.4/Runtime";
 
 /// BTree api wrapper around the stable memory and heap btree implementations.
 module BTree {
 
     public func newStableMemory<K, V>() : T.BTree<K, V> {
-        #stableMemory(MemoryBTree.new(?C.STABLE_MEMORY_BTREE_ORDER));
+        #stableMemory(MemoryBTree.newWithOptions({
+            MemoryBTree.defaultOptions with 
+            node_capacity = ?(C.STABLE_MEMORY_BTREE_ORDER);
+            is_prefix_compression_enabled = ?true;
+            merge_threshold = ?0.25
+        }));
+    };
+
+    public func newStableMemoryUncompressed<K, V>() : T.BTree<K, V> {
+        #stableMemory(MemoryBTree.newWithOptions({
+            MemoryBTree.defaultOptions with 
+            node_capacity = ?(C.STABLE_MEMORY_BTREE_ORDER);
+            is_prefix_compression_enabled = ?false;
+            merge_threshold = ?0.25
+        }));
     };
 
     public func newHeap<K, V>() : T.BTree<K, V> {
         #heap(BpTree.new<Blob, V>(?C.HEAP_BTREE_ORDER));
-    };
-
-    public func new<K, V>(is_stable_memory : Bool) : T.BTree<K, V> {
-        if (is_stable_memory) {
-            newStableMemory();
-        } else {
-            newHeap();
-        };
     };
 
     public func size<K, V>(btree : T.BTree<K, V>) : Nat {
@@ -38,7 +45,7 @@ module BTree {
                 return BpTree.size(heap_btree);
             };
             case (_) {
-                Debug.trap("Invalid BTree type");
+                Runtime.trap("Invalid BTree type");
             };
         };
     };
@@ -52,7 +59,7 @@ module BTree {
                 BpTree.clear(heap_btree);
             };
             case (_) {
-                Debug.trap("Invalid BTree type");
+                Runtime.trap("Invalid BTree type");
             };
         };
     };
@@ -66,7 +73,7 @@ module BTree {
                 return BpTree.get(heap_btree, heap_btree_utils.cmp, heap_btree_utils.blobify.to_blob(key));
             };
             case (_) {
-                Debug.trap("Invalid BTree type");
+                Runtime.trap("Invalid BTree type");
             };
         };
     };
@@ -80,7 +87,7 @@ module BTree {
                 return BpTree.insert(heap_btree, heap_btree_utils.cmp, heap_btree_utils.blobify.to_blob(key), value);
             };
             case (_) {
-                Debug.trap("Invalid BTree type");
+                Runtime.trap("Invalid BTree type");
             };
         };
     };
@@ -94,7 +101,7 @@ module BTree {
                 return BpTree.remove(heap_btree, heap_btree_utils.cmp, heap_btree_utils.blobify.to_blob(key));
             };
             case (_) {
-                Debug.trap("Invalid BTree type");
+                Runtime.trap("Invalid BTree type");
             };
         };
     };
@@ -124,7 +131,7 @@ module BTree {
                 );
             };
             case (_) {
-                Debug.trap("Invalid BTree type");
+                Runtime.trap("Invalid BTree type");
             };
         };
     };
@@ -148,7 +155,7 @@ module BTree {
                 );
             };
             case (_) {
-                Debug.trap("Invalid BTree type");
+                Runtime.trap("Invalid BTree type");
             };
         };
     };
@@ -172,7 +179,7 @@ module BTree {
                 );
             };
             case (_) {
-                Debug.trap("Invalid BTree type");
+                Runtime.trap("Invalid BTree type");
             };
         };
     };
@@ -192,7 +199,7 @@ module BTree {
                 );
             };
             case (_) {
-                Debug.trap("Invalid BTree type");
+                Runtime.trap("Invalid BTree type");
             };
         };
     };
@@ -206,7 +213,7 @@ module BTree {
                 return BpTree.vals(heap_btree);
             };
             case (_) {
-                Debug.trap("Invalid BTree type");
+                Runtime.trap("Invalid BTree type");
             };
         };
     };
@@ -227,7 +234,7 @@ module BTree {
 
             };
             case (_) {
-                Debug.trap("Invalid BTree type");
+                Runtime.trap("Invalid BTree type");
             };
         };
     };
@@ -248,7 +255,7 @@ module BTree {
 
             };
             case (_) {
-                Debug.trap("Invalid BTree type");
+                Runtime.trap("Invalid BTree type");
             };
         };
     };
@@ -269,7 +276,7 @@ module BTree {
 
             };
             case (_) {
-                Debug.trap("Invalid BTree type");
+                Runtime.trap("Invalid BTree type");
             };
         };
     };
@@ -283,7 +290,7 @@ module BTree {
                 return BpTree.rangeVals(heap_btree, start, end);
             };
             case (_) {
-                Debug.trap("Invalid BTree type");
+                Runtime.trap("Invalid BTree type");
             };
         };
     };
@@ -297,7 +304,7 @@ module BTree {
                 return BpTree.getExpectedIndex<Blob, V>(heap_btree, heap_btree_utils.cmp, heap_btree_utils.blobify.to_blob(key));
             };
             case (_) {
-                Debug.trap("Invalid BTree type");
+                Runtime.trap("Invalid BTree type");
             };
         };
     };
@@ -317,7 +324,7 @@ module BTree {
                 };
             };
             case (_) {
-                Debug.trap("Invalid BTree type");
+                Runtime.trap("Invalid BTree type");
             };
         };
     };
@@ -337,7 +344,7 @@ module BTree {
                 };
             };
             case (_) {
-                Debug.trap("Invalid BTree type");
+                Runtime.trap("Invalid BTree type");
             };
         };
     };
@@ -373,7 +380,7 @@ module BTree {
         if (start_rank > end_rank) {
             // the data is sorted in reverse order
             // (end_rank, start_rank);
-            Debug.trap("Invalid scan interval: start_rank > end_rank");
+            Runtime.trap("Invalid scan interval: start_rank > end_rank");
         } else {
             (start_rank, end_rank);
         };
@@ -424,7 +431,7 @@ module BTree {
                 bptree_scan_interval<K, V>(heap_btree, heap_btree_utils, start_key, end_key);
             };
             case (_) {
-                Debug.trap("Invalid BTree type");
+                Runtime.trap("Invalid BTree type");
             };
         };
     };

@@ -1,17 +1,17 @@
-import Debug "mo:base/Debug";
-import Nat "mo:base/Nat";
-import Nat64 "mo:base/Nat64";
-import Array "mo:base/Array";
-import Blob "mo:base/Blob";
-import Iter "mo:base/Iter";
-import Principal "mo:base/Principal";
+import Debug "mo:core@2.4/Debug";
+import Nat "mo:core@2.4/Nat";
+import Nat64 "mo:core@2.4/Nat64";
+import Array "mo:core@2.4/Array";
+import Blob "mo:core@2.4/Blob";
+import Iter "mo:core@2.4/Iter";
+import Principal "mo:core@2.4/Principal";
 
 import Bench "mo:bench";
 import Fuzz "mo:fuzz";
-import Map "mo:map@9.0.1/Map";
-import Set "mo:map@9.0.1/Set";
-import Vector "mo:vector@0.4.2";
-import Candid "mo:serde@3.4.0/Candid";
+import Map "mo:map@9.0/Map";
+import Set "mo:map@9.0/Set";
+import Vector "mo:vector@0.4";
+import Candid "mo:serde@3.5/Candid";
 
 import Index "../../src/EmbeddedInstance/Collection/Index";
 import CompositeIndex "../../src/EmbeddedInstance/Collection/Index/CompositeIndex";
@@ -21,7 +21,7 @@ import BTree "../../src/EmbeddedInstance/BTree";
 import DocumentStore "../../src/EmbeddedInstance/Collection/DocumentStore";
 import CandidMap "../../src/EmbeddedInstance/CandidMap";
 import SchemaMap "../../src/EmbeddedInstance/Collection/SchemaMap";
-import ByteUtils "mo:byte-utils@0.1.1";
+import ByteUtils "mo:byte-utils@0.2";
 import Logger "../../src/EmbeddedInstance/Logger";
 import Ids "../../src/EmbeddedInstance/Ids";
 import TwoQueueCache "../../src/EmbeddedInstance/TwoQueueCache";
@@ -55,13 +55,13 @@ module {
             "Stable Memory - Composite (Nat+Text)",
         ]);
 
-        let limit = 10_000;
+        let limit = 1_000;
 
         // Helper to create document ID
         func makeDocId(n : Nat) : Blob {
             let instance_id = Blob.fromArray([0, 0, 0, 1]);
             let id_bytes = ByteUtils.BigEndian.fromNat64(Nat64.fromNat(n));
-            Blob.fromArray(Array.append(Blob.toArray(instance_id), id_bytes));
+            Blob.fromArray(Array.concat(Blob.toArray(instance_id), id_bytes));
         };
 
         // Helper to create mock collection
@@ -99,6 +99,7 @@ module {
                 logger = Logger.init(#Warn, false);
                 memory_type;
                 is_running_locally = false;
+                is_compression_enabled = null;
             };
         };
 
@@ -199,21 +200,21 @@ module {
                     case ("Heap - Nat index", "insertWithCandidMap() - 1 field") {
                         let collection = makeMockCollection(#heap);
                         let idx = createNatIndex(collection, "age");
-                        for (i in Iter.range(0, limit - 1)) {
+                        for (i in Nat.rangeInclusive(0, limit - 1)) {
                             ignore CompositeIndex.insertWithCandidMap(collection, idx, doc_ids[i], candid_maps[i]);
                         };
                     };
                     case ("Heap - Nat index", "insertWithCandidMap() - 3 fields") {
                         let collection = makeMockCollection(#heap);
                         let idx = createComposite3Index(collection);
-                        for (i in Iter.range(0, limit - 1)) {
+                        for (i in Nat.rangeInclusive(0, limit - 1)) {
                             ignore CompositeIndex.insertWithCandidMap(collection, idx, doc_ids[i], candid_maps[i]);
                         };
                     };
                     case ("Heap - Nat index", "insertWithCandidMap() - 5 fields") {
                         let collection = makeMockCollection(#heap);
                         let idx = createComposite5Index(collection);
-                        for (i in Iter.range(0, limit - 1)) {
+                        for (i in Nat.rangeInclusive(0, limit - 1)) {
                             ignore CompositeIndex.insertWithCandidMap(collection, idx, doc_ids[i], candid_maps[i]);
                         };
                     };
@@ -221,11 +222,11 @@ module {
                         let collection = makeMockCollection(#heap);
                         let idx = createNatIndex(collection, "age");
                         // Pre-populate
-                        for (i in Iter.range(0, limit - 1)) {
+                        for (i in Nat.rangeInclusive(0, limit - 1)) {
                             ignore CompositeIndex.insertWithCandidMap(collection, idx, doc_ids[i], candid_maps[i]);
                         };
                         // Benchmark remove
-                        for (i in Iter.range(0, limit - 1)) {
+                        for (i in Nat.rangeInclusive(0, limit - 1)) {
                             ignore CompositeIndex.removeWithCandidMap(collection, idx, doc_ids[i], candid_maps[i]);
                         };
                     };
@@ -233,11 +234,11 @@ module {
                         let collection = makeMockCollection(#heap);
                         let idx = createComposite3Index(collection);
                         // Pre-populate
-                        for (i in Iter.range(0, limit - 1)) {
+                        for (i in Nat.rangeInclusive(0, limit - 1)) {
                             ignore CompositeIndex.insertWithCandidMap(collection, idx, doc_ids[i], candid_maps[i]);
                         };
                         // Benchmark remove
-                        for (i in Iter.range(0, limit - 1)) {
+                        for (i in Nat.rangeInclusive(0, limit - 1)) {
                             ignore CompositeIndex.removeWithCandidMap(collection, idx, doc_ids[i], candid_maps[i]);
                         };
                     };
@@ -245,41 +246,41 @@ module {
                     case ("Heap - Text index", "insertWithCandidMap() - 1 field") {
                         let collection = makeMockCollection(#heap);
                         let idx = createTextIndex(collection, "name");
-                        for (i in Iter.range(0, limit - 1)) {
+                        for (i in Nat.rangeInclusive(0, limit - 1)) {
                             ignore CompositeIndex.insertWithCandidMap(collection, idx, doc_ids[i], candid_maps[i]);
                         };
                     };
                     case ("Heap - Text index", "insertWithCandidMap() - 3 fields") {
                         let collection = makeMockCollection(#heap);
                         let idx = createComposite3Index(collection);
-                        for (i in Iter.range(0, limit - 1)) {
+                        for (i in Nat.rangeInclusive(0, limit - 1)) {
                             ignore CompositeIndex.insertWithCandidMap(collection, idx, doc_ids[i], candid_maps[i]);
                         };
                     };
                     case ("Heap - Text index", "insertWithCandidMap() - 5 fields") {
                         let collection = makeMockCollection(#heap);
                         let idx = createComposite5Index(collection);
-                        for (i in Iter.range(0, limit - 1)) {
+                        for (i in Nat.rangeInclusive(0, limit - 1)) {
                             ignore CompositeIndex.insertWithCandidMap(collection, idx, doc_ids[i], candid_maps[i]);
                         };
                     };
                     case ("Heap - Text index", "removeWithCandidMap() - 1 field") {
                         let collection = makeMockCollection(#heap);
                         let idx = createTextIndex(collection, "name");
-                        for (i in Iter.range(0, limit - 1)) {
+                        for (i in Nat.rangeInclusive(0, limit - 1)) {
                             ignore CompositeIndex.insertWithCandidMap(collection, idx, doc_ids[i], candid_maps[i]);
                         };
-                        for (i in Iter.range(0, limit - 1)) {
+                        for (i in Nat.rangeInclusive(0, limit - 1)) {
                             ignore CompositeIndex.removeWithCandidMap(collection, idx, doc_ids[i], candid_maps[i]);
                         };
                     };
                     case ("Heap - Text index", "removeWithCandidMap() - 3 fields") {
                         let collection = makeMockCollection(#heap);
                         let idx = createComposite3Index(collection);
-                        for (i in Iter.range(0, limit - 1)) {
+                        for (i in Nat.rangeInclusive(0, limit - 1)) {
                             ignore CompositeIndex.insertWithCandidMap(collection, idx, doc_ids[i], candid_maps[i]);
                         };
-                        for (i in Iter.range(0, limit - 1)) {
+                        for (i in Nat.rangeInclusive(0, limit - 1)) {
                             ignore CompositeIndex.removeWithCandidMap(collection, idx, doc_ids[i], candid_maps[i]);
                         };
                     };
@@ -287,41 +288,41 @@ module {
                     case ("Heap - Composite (Nat+Text)", "insertWithCandidMap() - 1 field") {
                         let collection = makeMockCollection(#heap);
                         let idx = createNatIndex(collection, "age");
-                        for (i in Iter.range(0, limit - 1)) {
+                        for (i in Nat.rangeInclusive(0, limit - 1)) {
                             ignore CompositeIndex.insertWithCandidMap(collection, idx, doc_ids[i], candid_maps[i]);
                         };
                     };
                     case ("Heap - Composite (Nat+Text)", "insertWithCandidMap() - 3 fields") {
                         let collection = makeMockCollection(#heap);
                         let idx = createComposite2Index(collection);
-                        for (i in Iter.range(0, limit - 1)) {
+                        for (i in Nat.rangeInclusive(0, limit - 1)) {
                             ignore CompositeIndex.insertWithCandidMap(collection, idx, doc_ids[i], candid_maps[i]);
                         };
                     };
                     case ("Heap - Composite (Nat+Text)", "insertWithCandidMap() - 5 fields") {
                         let collection = makeMockCollection(#heap);
                         let idx = createComposite5Index(collection);
-                        for (i in Iter.range(0, limit - 1)) {
+                        for (i in Nat.rangeInclusive(0, limit - 1)) {
                             ignore CompositeIndex.insertWithCandidMap(collection, idx, doc_ids[i], candid_maps[i]);
                         };
                     };
                     case ("Heap - Composite (Nat+Text)", "removeWithCandidMap() - 1 field") {
                         let collection = makeMockCollection(#heap);
                         let idx = createNatIndex(collection, "age");
-                        for (i in Iter.range(0, limit - 1)) {
+                        for (i in Nat.rangeInclusive(0, limit - 1)) {
                             ignore CompositeIndex.insertWithCandidMap(collection, idx, doc_ids[i], candid_maps[i]);
                         };
-                        for (i in Iter.range(0, limit - 1)) {
+                        for (i in Nat.rangeInclusive(0, limit - 1)) {
                             ignore CompositeIndex.removeWithCandidMap(collection, idx, doc_ids[i], candid_maps[i]);
                         };
                     };
                     case ("Heap - Composite (Nat+Text)", "removeWithCandidMap() - 3 fields") {
                         let collection = makeMockCollection(#heap);
                         let idx = createComposite2Index(collection);
-                        for (i in Iter.range(0, limit - 1)) {
+                        for (i in Nat.rangeInclusive(0, limit - 1)) {
                             ignore CompositeIndex.insertWithCandidMap(collection, idx, doc_ids[i], candid_maps[i]);
                         };
-                        for (i in Iter.range(0, limit - 1)) {
+                        for (i in Nat.rangeInclusive(0, limit - 1)) {
                             ignore CompositeIndex.removeWithCandidMap(collection, idx, doc_ids[i], candid_maps[i]);
                         };
                     };
@@ -329,41 +330,41 @@ module {
                     case ("Heap - Composite (Nat+Text+Bool)", "insertWithCandidMap() - 1 field") {
                         let collection = makeMockCollection(#heap);
                         let idx = createNatIndex(collection, "age");
-                        for (i in Iter.range(0, limit - 1)) {
+                        for (i in Nat.rangeInclusive(0, limit - 1)) {
                             ignore CompositeIndex.insertWithCandidMap(collection, idx, doc_ids[i], candid_maps[i]);
                         };
                     };
                     case ("Heap - Composite (Nat+Text+Bool)", "insertWithCandidMap() - 3 fields") {
                         let collection = makeMockCollection(#heap);
                         let idx = createComposite3Index(collection);
-                        for (i in Iter.range(0, limit - 1)) {
+                        for (i in Nat.rangeInclusive(0, limit - 1)) {
                             ignore CompositeIndex.insertWithCandidMap(collection, idx, doc_ids[i], candid_maps[i]);
                         };
                     };
                     case ("Heap - Composite (Nat+Text+Bool)", "insertWithCandidMap() - 5 fields") {
                         let collection = makeMockCollection(#heap);
                         let idx = createComposite5Index(collection);
-                        for (i in Iter.range(0, limit - 1)) {
+                        for (i in Nat.rangeInclusive(0, limit - 1)) {
                             ignore CompositeIndex.insertWithCandidMap(collection, idx, doc_ids[i], candid_maps[i]);
                         };
                     };
                     case ("Heap - Composite (Nat+Text+Bool)", "removeWithCandidMap() - 1 field") {
                         let collection = makeMockCollection(#heap);
                         let idx = createNatIndex(collection, "age");
-                        for (i in Iter.range(0, limit - 1)) {
+                        for (i in Nat.rangeInclusive(0, limit - 1)) {
                             ignore CompositeIndex.insertWithCandidMap(collection, idx, doc_ids[i], candid_maps[i]);
                         };
-                        for (i in Iter.range(0, limit - 1)) {
+                        for (i in Nat.rangeInclusive(0, limit - 1)) {
                             ignore CompositeIndex.removeWithCandidMap(collection, idx, doc_ids[i], candid_maps[i]);
                         };
                     };
                     case ("Heap - Composite (Nat+Text+Bool)", "removeWithCandidMap() - 3 fields") {
                         let collection = makeMockCollection(#heap);
                         let idx = createComposite3Index(collection);
-                        for (i in Iter.range(0, limit - 1)) {
+                        for (i in Nat.rangeInclusive(0, limit - 1)) {
                             ignore CompositeIndex.insertWithCandidMap(collection, idx, doc_ids[i], candid_maps[i]);
                         };
-                        for (i in Iter.range(0, limit - 1)) {
+                        for (i in Nat.rangeInclusive(0, limit - 1)) {
                             ignore CompositeIndex.removeWithCandidMap(collection, idx, doc_ids[i], candid_maps[i]);
                         };
                     };
@@ -371,41 +372,41 @@ module {
                     case ("Stable Memory - Nat index", "insertWithCandidMap() - 1 field") {
                         let collection = makeMockCollection(#stableMemory);
                         let idx = createNatIndex(collection, "age");
-                        for (i in Iter.range(0, limit - 1)) {
+                        for (i in Nat.rangeInclusive(0, limit - 1)) {
                             ignore CompositeIndex.insertWithCandidMap(collection, idx, doc_ids[i], candid_maps[i]);
                         };
                     };
                     case ("Stable Memory - Nat index", "insertWithCandidMap() - 3 fields") {
                         let collection = makeMockCollection(#stableMemory);
                         let idx = createComposite3Index(collection);
-                        for (i in Iter.range(0, limit - 1)) {
+                        for (i in Nat.rangeInclusive(0, limit - 1)) {
                             ignore CompositeIndex.insertWithCandidMap(collection, idx, doc_ids[i], candid_maps[i]);
                         };
                     };
                     case ("Stable Memory - Nat index", "insertWithCandidMap() - 5 fields") {
                         let collection = makeMockCollection(#stableMemory);
                         let idx = createComposite5Index(collection);
-                        for (i in Iter.range(0, limit - 1)) {
+                        for (i in Nat.rangeInclusive(0, limit - 1)) {
                             ignore CompositeIndex.insertWithCandidMap(collection, idx, doc_ids[i], candid_maps[i]);
                         };
                     };
                     case ("Stable Memory - Nat index", "removeWithCandidMap() - 1 field") {
                         let collection = makeMockCollection(#stableMemory);
                         let idx = createNatIndex(collection, "age");
-                        for (i in Iter.range(0, limit - 1)) {
+                        for (i in Nat.rangeInclusive(0, limit - 1)) {
                             ignore CompositeIndex.insertWithCandidMap(collection, idx, doc_ids[i], candid_maps[i]);
                         };
-                        for (i in Iter.range(0, limit - 1)) {
+                        for (i in Nat.rangeInclusive(0, limit - 1)) {
                             ignore CompositeIndex.removeWithCandidMap(collection, idx, doc_ids[i], candid_maps[i]);
                         };
                     };
                     case ("Stable Memory - Nat index", "removeWithCandidMap() - 3 fields") {
                         let collection = makeMockCollection(#stableMemory);
                         let idx = createComposite3Index(collection);
-                        for (i in Iter.range(0, limit - 1)) {
+                        for (i in Nat.rangeInclusive(0, limit - 1)) {
                             ignore CompositeIndex.insertWithCandidMap(collection, idx, doc_ids[i], candid_maps[i]);
                         };
-                        for (i in Iter.range(0, limit - 1)) {
+                        for (i in Nat.rangeInclusive(0, limit - 1)) {
                             ignore CompositeIndex.removeWithCandidMap(collection, idx, doc_ids[i], candid_maps[i]);
                         };
                     };
@@ -413,41 +414,41 @@ module {
                     case ("Stable Memory - Text index", "insertWithCandidMap() - 1 field") {
                         let collection = makeMockCollection(#stableMemory);
                         let idx = createTextIndex(collection, "name");
-                        for (i in Iter.range(0, limit - 1)) {
+                        for (i in Nat.rangeInclusive(0, limit - 1)) {
                             ignore CompositeIndex.insertWithCandidMap(collection, idx, doc_ids[i], candid_maps[i]);
                         };
                     };
                     case ("Stable Memory - Text index", "insertWithCandidMap() - 3 fields") {
                         let collection = makeMockCollection(#stableMemory);
                         let idx = createComposite3Index(collection);
-                        for (i in Iter.range(0, limit - 1)) {
+                        for (i in Nat.rangeInclusive(0, limit - 1)) {
                             ignore CompositeIndex.insertWithCandidMap(collection, idx, doc_ids[i], candid_maps[i]);
                         };
                     };
                     case ("Stable Memory - Text index", "insertWithCandidMap() - 5 fields") {
                         let collection = makeMockCollection(#stableMemory);
                         let idx = createComposite5Index(collection);
-                        for (i in Iter.range(0, limit - 1)) {
+                        for (i in Nat.rangeInclusive(0, limit - 1)) {
                             ignore CompositeIndex.insertWithCandidMap(collection, idx, doc_ids[i], candid_maps[i]);
                         };
                     };
                     case ("Stable Memory - Text index", "removeWithCandidMap() - 1 field") {
                         let collection = makeMockCollection(#stableMemory);
                         let idx = createTextIndex(collection, "name");
-                        for (i in Iter.range(0, limit - 1)) {
+                        for (i in Nat.rangeInclusive(0, limit - 1)) {
                             ignore CompositeIndex.insertWithCandidMap(collection, idx, doc_ids[i], candid_maps[i]);
                         };
-                        for (i in Iter.range(0, limit - 1)) {
+                        for (i in Nat.rangeInclusive(0, limit - 1)) {
                             ignore CompositeIndex.removeWithCandidMap(collection, idx, doc_ids[i], candid_maps[i]);
                         };
                     };
                     case ("Stable Memory - Text index", "removeWithCandidMap() - 3 fields") {
                         let collection = makeMockCollection(#stableMemory);
                         let idx = createComposite3Index(collection);
-                        for (i in Iter.range(0, limit - 1)) {
+                        for (i in Nat.rangeInclusive(0, limit - 1)) {
                             ignore CompositeIndex.insertWithCandidMap(collection, idx, doc_ids[i], candid_maps[i]);
                         };
-                        for (i in Iter.range(0, limit - 1)) {
+                        for (i in Nat.rangeInclusive(0, limit - 1)) {
                             ignore CompositeIndex.removeWithCandidMap(collection, idx, doc_ids[i], candid_maps[i]);
                         };
                     };
@@ -455,41 +456,41 @@ module {
                     case ("Stable Memory - Composite (Nat+Text)", "insertWithCandidMap() - 1 field") {
                         let collection = makeMockCollection(#stableMemory);
                         let idx = createNatIndex(collection, "age");
-                        for (i in Iter.range(0, limit - 1)) {
+                        for (i in Nat.rangeInclusive(0, limit - 1)) {
                             ignore CompositeIndex.insertWithCandidMap(collection, idx, doc_ids[i], candid_maps[i]);
                         };
                     };
                     case ("Stable Memory - Composite (Nat+Text)", "insertWithCandidMap() - 3 fields") {
                         let collection = makeMockCollection(#stableMemory);
                         let idx = createComposite2Index(collection);
-                        for (i in Iter.range(0, limit - 1)) {
+                        for (i in Nat.rangeInclusive(0, limit - 1)) {
                             ignore CompositeIndex.insertWithCandidMap(collection, idx, doc_ids[i], candid_maps[i]);
                         };
                     };
                     case ("Stable Memory - Composite (Nat+Text)", "insertWithCandidMap() - 5 fields") {
                         let collection = makeMockCollection(#stableMemory);
                         let idx = createComposite5Index(collection);
-                        for (i in Iter.range(0, limit - 1)) {
+                        for (i in Nat.rangeInclusive(0, limit - 1)) {
                             ignore CompositeIndex.insertWithCandidMap(collection, idx, doc_ids[i], candid_maps[i]);
                         };
                     };
                     case ("Stable Memory - Composite (Nat+Text)", "removeWithCandidMap() - 1 field") {
                         let collection = makeMockCollection(#stableMemory);
                         let idx = createNatIndex(collection, "age");
-                        for (i in Iter.range(0, limit - 1)) {
+                        for (i in Nat.rangeInclusive(0, limit - 1)) {
                             ignore CompositeIndex.insertWithCandidMap(collection, idx, doc_ids[i], candid_maps[i]);
                         };
-                        for (i in Iter.range(0, limit - 1)) {
+                        for (i in Nat.rangeInclusive(0, limit - 1)) {
                             ignore CompositeIndex.removeWithCandidMap(collection, idx, doc_ids[i], candid_maps[i]);
                         };
                     };
                     case ("Stable Memory - Composite (Nat+Text)", "removeWithCandidMap() - 3 fields") {
                         let collection = makeMockCollection(#stableMemory);
                         let idx = createComposite2Index(collection);
-                        for (i in Iter.range(0, limit - 1)) {
+                        for (i in Nat.rangeInclusive(0, limit - 1)) {
                             ignore CompositeIndex.insertWithCandidMap(collection, idx, doc_ids[i], candid_maps[i]);
                         };
-                        for (i in Iter.range(0, limit - 1)) {
+                        for (i in Nat.rangeInclusive(0, limit - 1)) {
                             ignore CompositeIndex.removeWithCandidMap(collection, idx, doc_ids[i], candid_maps[i]);
                         };
                     };

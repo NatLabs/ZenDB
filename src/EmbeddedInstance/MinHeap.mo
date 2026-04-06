@@ -1,9 +1,11 @@
-import Array "mo:base@0.16.0/Array";
-import Order "mo:base@0.16.0/Order";
-import Debug "mo:base@0.16.0/Debug";
-import Int "mo:base@0.16.0/Int";
-import Iter "mo:base@0.16.0/Iter";
-import Option "mo:base@0.16.0/Option";
+import Array "mo:core@2.4/Array";
+import VarArray "mo:core@2.4/VarArray";
+import Order "mo:core@2.4/Order";
+import Debug "mo:core@2.4/Debug";
+import Int "mo:core@2.4/Int";
+import Iter "mo:core@2.4/Iter";
+import Option "mo:core@2.4/Option";
+import Runtime "mo:core@2.4/Runtime";
 
 module {
     type Order = Order.Order;
@@ -25,7 +27,7 @@ module {
     /// Create a min heap with initial capacity
     public func newWithCapacity<A>(capacity : Nat) : MinHeap<A> {
         {
-            var data = Array.init<?A>(capacity, null);
+            var data = VarArray.repeat<?A>(null, capacity);
             var count = 0;
         };
     };
@@ -40,7 +42,7 @@ module {
     /// Build a heap from an array of elements in O(n) time
     public func heapify<A>(heap : MinHeap<A>, elements : [A], compare : (A, A) -> Order) {
         let len = elements.size();
-        heap.data := Array.init<?A>(len, null);
+        heap.data := VarArray.repeat<?A>(null, len);
         heap.count := 0;
 
         // Add all elements
@@ -85,7 +87,7 @@ module {
                 heap.data.size() * 2;
             };
 
-            let newData = Array.tabulateVar<?A>(
+            let newData = VarArray.tabulate<?A>(
                 newSize,
                 func(i : Nat) : ?A {
                     if (i < heap.data.size()) {
@@ -141,7 +143,7 @@ module {
                 switch (opt) {
                     case (?val) { val };
                     case (_) {
-                        Debug.trap("MinHeap.unsortedVals: Unexpected null value");
+                        Runtime.trap("MinHeap.unsortedVals: Unexpected null value");
                     };
                 };
             },

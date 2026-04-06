@@ -50,10 +50,12 @@ jobs:
             - name: Start local replica
               run: dfx start --background
 
-            - name: Build canister WASM
+            - name: Build canister WASMs
               run: |
-                  dfx canister create zendb-canister
-                  dfx build zendb-canister
+                  for canister in zendb-canister zendb-canister-eop; do
+                    dfx canister create $canister
+                    dfx build $canister
+                  done
 
             - name: Stop local replica
               run: dfx stop
@@ -69,17 +71,16 @@ jobs:
               if: steps.cache-ic-wasm.outputs.cache-hit != 'true'
               run: cargo install ic-wasm
 
-            - name: Optimize WASM
+            - name: Optimize WASMs
               run: |
-                  WASM_IN=.dfx/local/canisters/zendb-canister/zendb-canister.wasm
-                  WASM_OUT=zendb-canister.wasm
-
-                  ic-wasm $WASM_IN -o $WASM_OUT optimize O3
-                  ic-wasm $WASM_OUT -o $WASM_OUT shrink
-                  gzip -k $WASM_OUT
-
-            - name: Copy candid interface
-              run: cp .dfx/local/canisters/zendb-canister/zendb-canister.did zendb-canister.did
+                  for canister in zendb-canister zendb-canister-eop; do
+                    IN=.dfx/local/canisters/$canister/$canister.wasm
+                    OUT=$canister.wasm
+                    ic-wasm $IN -o $OUT optimize O3
+                    ic-wasm $OUT -o $OUT shrink
+                    gzip -k $OUT
+                    cp .dfx/local/canisters/$canister/$canister.did $canister.did
+                  done
 
             - name: Extract version from tag
               id: version
@@ -118,4 +119,7 @@ jobs:
                       zendb-canister.wasm
                       zendb-canister.wasm.gz
                       zendb-canister.did
+                      zendb-canister-eop.wasm
+                      zendb-canister-eop.wasm.gz
+                      zendb-canister-eop.did
                   token: ${{ secrets.GITHUB_TOKEN }}

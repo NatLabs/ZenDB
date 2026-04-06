@@ -1,12 +1,12 @@
-import Region "mo:base@0.16.0/Region";
-import Debug "mo:base@0.16.0/Debug";
-import Nat64 "mo:base@0.16.0/Nat64";
-import Buffer "mo:base@0.16.0/Buffer";
+import Region "mo:core@2.4/Region";
+import Debug "mo:core@2.4/Debug";
+import Nat64 "mo:core@2.4/Nat64";
+import Buffer "mo:base@0.16/Buffer";
 
 import { test; suite } "mo:test";
-import Itertools "mo:itertools@0.2.2/Iter";
+import Itertools "mo:itertools@0.2/Iter";
 import Fuzz "mo:fuzz";
-import Map "mo:map@9.0.1/Map";
+import Map "mo:map@9.0/Map";
 
 import ZenDB "../src";
 

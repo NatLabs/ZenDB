@@ -1,8 +1,9 @@
-import Debug "mo:base@0.16.0/Debug";
-import Array "mo:base@0.16.0/Array";
-import Nat "mo:base@0.16.0/Nat";
+import Debug "mo:core@2.4/Debug";
+import Array "mo:core@2.4/Array";
+import VarArray "mo:core@2.4/VarArray";
+import Nat "mo:core@2.4/Nat";
 
-import Itertools "mo:itertools@0.2.2/Iter";
+import Itertools "mo:itertools@0.2/Iter";
 
 import T "../Types";
 import CandidUtils "../CandidUtils";
@@ -27,7 +28,7 @@ module {
             nested_operations : [T.FieldUpdateOperations],
             operation_handler : (T.Iter<T.Candid>) -> T.Result<T.Candid, Text>,
         ) : T.Result<T.Candid, Text> {
-            let candid_values = Array.init<T.Candid>(nested_operations.size(), #Null);
+            let candid_values = VarArray.repeat<T.Candid>(#Null, nested_operations.size());
 
             for ((i, nested_op) in Itertools.enumerate(nested_operations.vals())) {
 

@@ -1,12 +1,13 @@
 import Prim "mo:prim";
-import Debug "mo:base@0.16.0/Debug";
-import Nat "mo:base@0.16.0/Nat";
-import Array "mo:base@0.16.0/Array";
-import Order "mo:base@0.16.0/Order";
-import Option "mo:base@0.16.0/Option";
-import ExperimentalInternetComputer "mo:base@0.16.0/ExperimentalInternetComputer";
+import Debug "mo:core@2.4/Debug";
+import Nat "mo:core@2.4/Nat";
+import Array "mo:core@2.4/Array";
+import Order "mo:core@2.4/Order";
+import Option "mo:core@2.4/Option";
+import ExperimentalInternetComputer "mo:core@2.4/InternetComputer";
 
 import T "Types";
+import Runtime "mo:core@2.4/Runtime";
 
 module Logger {
 
@@ -23,12 +24,12 @@ module Logger {
 
         func getLogLevelPriority(log_level : LogLevel) : Nat {
             let ?index = Array.indexOf(
-                log_level,
                 log_level_order,
                 func(l1 : LogLevel, l2 : LogLevel) : Bool {
                     return debug_show (l1) == debug_show (l2);
                 },
-            ) else Debug.trap("Logger error: logLevel " # debug_show (log_level) # " not found");
+                log_level,
+            ) else Runtime.trap("Logger error: logLevel " # debug_show (log_level) # " not found");
 
             index;
         };
@@ -82,7 +83,7 @@ module Logger {
                 Debug.print("[ERROR]: " # msg);
             };
             case (#Trap) {
-                Debug.trap(msg);
+                Runtime.trap(msg);
             };
         };
 
@@ -109,7 +110,7 @@ module Logger {
     };
 
     public func trap(msg : Text) : None {
-        Debug.trap(msg);
+        Runtime.trap(msg);
     };
 
     public func print(msg : Text) {
@@ -135,7 +136,7 @@ module Logger {
                 Debug.print("[ERROR]: " # msgFn());
             };
             case (#Trap) {
-                Debug.trap(msgFn());
+                Runtime.trap(msgFn());
             };
         };
 
@@ -226,7 +227,7 @@ module Logger {
         };
 
         public func trap(msg : Text) : None {
-            Debug.trap(namespace # ": " # msg);
+            Runtime.trap(namespace # ": " # msg);
         };
 
         /// Create a sub-namespaced logger by appending to the current namespace
@@ -309,7 +310,7 @@ module Logger {
         };
 
         public func trap(msg : Text) : None {
-            Debug.trap(formatMsg(msg));
+            Runtime.trap(formatMsg(msg));
         };
 
         public func end() {

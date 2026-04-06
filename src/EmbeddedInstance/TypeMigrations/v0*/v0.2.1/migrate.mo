@@ -1,5 +1,5 @@
-import Map "mo:map@9.0.1/Map";
-import Iter "mo:base@0.16.0/Iter";
+import Map "mo:map@9.0/Map";
+import Iter "mo:core@2.4/Iter";
 
 import V0_2_0 "../v0.2.0/types";
 import V0_2_1 "./types";
