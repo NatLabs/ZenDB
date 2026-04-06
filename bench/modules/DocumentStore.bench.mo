@@ -28,9 +28,9 @@ module {
         bench.description("Measuring DocumentStore (BTree) performance during insert operations");
 
         bench.cols([
-            "put() - heap",
-            "get() - heap",
-            "remove() - heap",
+            // "put() - heap",
+            // "get() - heap",
+            // "remove() - heap",
             "put() - stable memory",
             "get() - stable memory",
             "remove() - stable memory",

@@ -111,7 +111,7 @@ module {
         bench.description("Benchmarking createTextIndex, insert, and search operators with 1 000 articles (body: 25–100 tokens, vocab: 80 words)");
 
         bench.cols([
-            "#heap  with text index",
+            // "#heap  with text index",
             "#stableMemory  with text index",
         ]);
 
@@ -119,7 +119,6 @@ module {
             // --- Setup cost ---
             "insert 1k articles (no text index yet)",
             "createTextIndex() on populated collection (backfill)",
-            "clear + re-insert 1k articles (text index live)",
 
             // --- Search operators ---
             "search(): #word — rare word  (~10 docs)",
@@ -133,7 +132,7 @@ module {
             "search(): #word + .And() category filter",
         ]);
 
-        let limit = 1_000;
+        let limit = 100;
 
         let fuzz = Fuzz.fromSeed(0xc0ffee);
 
@@ -178,13 +177,6 @@ module {
                     ignore col_obj.createTextIndex(
                         "articles_text", ["title", "body"]
                     );
-                };
-
-                case ("clear + re-insert 1k articles (text index live)") {
-                    ignore col_obj.clear();
-                    for (a in predefined.vals()) {
-                        ignore col_obj.insert(a);
-                    };
                 };
 
                 // ---- Search rows ----------------------------------------

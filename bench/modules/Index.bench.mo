@@ -46,10 +46,10 @@ module {
         ]);
 
         bench.rows([
-            "Heap - Nat index",
-            "Heap - Text index",
-            "Heap - Composite (Nat+Text)",
-            "Heap - Composite (Nat+Text+Bool)",
+            // "Heap - Nat index",
+            // "Heap - Text index",
+            // "Heap - Composite (Nat+Text)",
+            // "Heap - Composite (Nat+Text+Bool)",
             "Stable Memory - Nat index",
             "Stable Memory - Text index",
             "Stable Memory - Composite (Nat+Text)",

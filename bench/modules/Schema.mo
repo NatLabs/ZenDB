@@ -6,6 +6,7 @@ import Bench "mo:bench";
 import Fuzz "mo:fuzz";
 
 import Schema "../../src/EmbeddedInstance/Collection/Schema";
+import SchemaMap "../../src/EmbeddedInstance/Collection/SchemaMap";
 import T "../../src/EmbeddedInstance/Types";
 
 module {
@@ -22,6 +23,7 @@ module {
         bench.cols([
             "validate() - valid",
             "validate() - invalid",
+            "SchemaMap.new()",
         ]);
 
         bench.rows([
@@ -502,6 +504,23 @@ module {
                     case ("Mixed Types Record", "validate() - invalid") {
                         for (doc in mixed_invalid_docs.vals()) {
                             ignore Schema.validate(mixed_schema, doc);
+                        };
+                    };
+                    // SchemaMap.new() benchmarks
+                    case (_, "SchemaMap.new()") {
+                        let schema = switch (row) {
+                            case ("Simple Record (5 fields)") simple_schema;
+                            case ("Medium Record (15 fields)") medium_schema;
+                            case ("Complex Record (30 fields)") complex_schema;
+                            case ("Nested Record (3 levels)") nested_schema;
+                            case ("Array Fields") array_schema;
+                            case ("Variant Fields") variant_schema;
+                            case ("Optional Fields") optional_schema;
+                            case ("Mixed Types Record") mixed_schema;
+                            case (_) simple_schema;
+                        };
+                        for (_ in Nat.range(0, limit)) {
+                            ignore SchemaMap.new(schema);
                         };
                     };
                     case (_) {};

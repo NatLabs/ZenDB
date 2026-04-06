@@ -217,7 +217,7 @@ module TestFramework {
                 test_name,
                 func() {
                     suite(
-                        "Stable Memory",
+                        "Stable Memory" ,
                         func() {
 
                             let zendb_sstore = let sstore = ZenDB.newStableStore(
