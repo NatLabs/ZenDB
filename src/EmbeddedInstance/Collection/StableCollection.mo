@@ -674,17 +674,18 @@ module StableCollection {
         let log = Logger.NamespacedLogger(collection.logger, LOGGER_NAMESPACE).subnamespace("create_text_index");
 
         // Reject if a text index already exists on this collection
-        if (Map.has(collection.indexes, Map.thash, TextIndex.KEY)) {
+        if (Option.isSome(collection.text_index_name.value)) {
             return #err("A text index already exists on this collection");
         };
 
         let text_index = TextIndex.new(
             collection,
-            TextIndex.KEY,
+            index_name,
             fields,
             tokenizer,
         );
-        ignore Map.put(collection.indexes, Map.thash, TextIndex.KEY, #text_index(text_index));
+        ignore Map.put(collection.indexes, Map.thash, index_name, #text_index(text_index));
+        collection.text_index_name.value := ?index_name;
 
         // Backfill any documents that were inserted before this text index was created,
         // mirroring what internal_populate_indexes does for composite indexes.
@@ -702,6 +703,24 @@ module StableCollection {
 
         log.lazyInfo(func() = "Successfully created text index: " # index_name # " (backfilled " # debug_show backfill_count # " documents)");
 
+        #ok();
+    };
+
+    public func delete_text_index(
+        collection : T.StableCollection,
+    ) : T.Result<(), Text> {
+        let ?text_index_name = collection.text_index_name.value else return #err("No text index exists on this collection");
+
+        switch (Map.get(collection.indexes, Map.thash, text_index_name)) {
+            case (?#text_index(text_index)) {
+                TextIndex.clear(collection, text_index);
+            };
+            case (_) {};
+        };
+
+        ignore Map.remove(collection.indexes, Map.thash, text_index_name);
+        ignore Set.remove(collection.hidden_indexes, Set.thash, text_index_name);
+        collection.text_index_name.value := null;
         #ok();
     };
 
@@ -799,6 +818,13 @@ module StableCollection {
                 };
             };
 
+            switch (index) {
+                case (#text_index(_)) {
+                    return #err("Index '" # index_name # "' is a text index. Use deleteTextIndex() to delete it");
+                };
+                case (_) {};
+            };
+
             let composite_index = switch (index) {
                 case (#text_index(text_index)) {
                     text_index.internal_index;
@@ -829,6 +855,7 @@ module StableCollection {
             };
 
             ignore Map.remove(collection.indexes, Map.thash, index_name);
+            ignore Set.remove(collection.hidden_indexes, Set.thash, index_name);
         };
 
         log.lazyInfo(func() = "Successfully deleted " # debug_show index_names.size() # " indexes");
@@ -1449,11 +1476,12 @@ module StableCollection {
         let log = Logger.NamespacedLogger(collection.logger, LOGGER_NAMESPACE).subnamespace("evaluate_query");
         log.lazyDebug(func() = "Evaluating query with operations: " # debug_show (stable_query.query_operations));
 
-        let query_operations = stable_query.query_operations;
-        let sort_by = stable_query.sort_by;
-        let pagination = stable_query.pagination;
+        let resolved_query = Query.resolveQuery(stable_query);
+        let query_operations = resolved_query.query_operations;
+        let sort_by = resolved_query.sort_by;
+        let pagination = resolved_query.pagination;
 
-        switch (Query.validateQuery(collection, stable_query.query_operations)) {
+        switch (Query.validateQuery(collection, resolved_query)) {
             case (#err(err)) {
                 return #err("Invalid Query: " # err);
             };
@@ -1486,7 +1514,10 @@ module StableCollection {
             case (null) func(_ : (T.DocumentId, ?[(Text, T.Candid)]), _ : (T.DocumentId, ?[(Text, T.Candid)])) : T.Order = #equal;
         };
 
-        let eval = QueryExecution.generate_document_ids_for_query_plan(collection, query_plan, sort_by, sort_documents_by_field_cmp, text_search_matches_cache);
+        let eval = switch (QueryExecution.generate_document_ids_for_query_plan(collection, query_plan, sort_by, sort_documents_by_field_cmp, text_search_matches_cache)) {
+            case (#err(e)) return #err("Failed to evaluate query plan: " # e);
+            case (#ok(r)) r;
+        };
         var iter = paginate(collection, eval, Option.get(pagination.skip, 0), pagination.limit);
 
         ignore do ? {
@@ -1718,7 +1749,10 @@ module StableCollection {
             case (#ok(r)) r;
         };
 
-        let count = switch (QueryExecution.get_unique_document_ids_from_query_plan(collection, Map.new(), query_plan)) {
+        let count = switch (switch (QueryExecution.get_unique_document_ids_from_query_plan(collection, Map.new(), query_plan)) {
+            case (#err(e)) return #err("Failed to evaluate query plan: " # e);
+            case (#ok(r)) r;
+        }) {
             case (#Empty) 0;
             case (#BitMap(bitmap)) SparseBitMap64.size(bitmap);
             case (#Ids(iter)) Iter.size(iter);
@@ -1758,7 +1792,10 @@ module StableCollection {
 
         let sort_documents_by_field_cmp = func(_ : (T.DocumentId, ?[(Text, T.Candid)]), _ : (T.DocumentId, ?[(Text, T.Candid)])) : T.Order = #equal;
 
-        let eval = QueryExecution.generate_document_ids_for_query_plan(collection, query_plan, null, sort_documents_by_field_cmp, Map.new());
+        let eval = switch (QueryExecution.generate_document_ids_for_query_plan(collection, query_plan, null, sort_documents_by_field_cmp, Map.new())) {
+            case (#err(e)) return #err("Failed to evaluate query plan: " # e);
+            case (#ok(r)) r;
+        };
 
         let greater_than_0 = switch (eval) {
             case (#Empty) false;

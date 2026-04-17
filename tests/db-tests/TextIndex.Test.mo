@@ -91,6 +91,7 @@
 // ===========================================================================
 
 import Array "mo:core@2.4/Array";
+import Text "mo:core@2.4/Text";
 
 import ZenDB "../../src/EmbeddedInstance";
 
@@ -997,6 +998,41 @@ ZenDBSuite.newSuite(
         //   )
         //   // → [Isabella Chen, Charlotte Williams]  (ranked by relevance)
         //
+
+        // ===========================================================================
+        // Hide / Unhide / Delete — hidden_indexes set membership
+        // ===========================================================================
+        // These tests verify the lifecycle of the hidden_indexes set directly.
+        // They do NOT exercise query exclusion (that would require index population).
+
+        test("hideIndexes - index name is added to hidden_indexes set", func() {
+            assert (not people.isIndexHidden("people_text"));
+            let #ok(_) = people.hideIndexes(["people_text"]) else return assert false;
+            assert people.isIndexHidden("people_text");
+            // cleanup for subsequent tests
+            ignore people.unhideIndexes(["people_text"]);
+        });
+
+        test("unhideIndexes - index name is removed from hidden_indexes set", func() {
+            ignore people.hideIndexes(["people_text"]);
+            assert people.isIndexHidden("people_text");
+            let #ok(_) = people.unhideIndexes(["people_text"]) else return assert false;
+            assert (not people.isIndexHidden("people_text"));
+        });
+
+        test("deleteTextIndex - index name is removed from hidden_indexes set when hidden", func() {
+            ignore people.hideIndexes(["people_text"]);
+            assert people.isIndexHidden("people_text");
+            let #ok(_) = people.deleteTextIndex() else return assert false;
+            assert (not people.isIndexHidden("people_text"));
+            // restore the text index for any remaining tests
+            ignore people.createTextIndex("people_text", ["name", "description"]);
+        });
+
+        test("deleteIndex - rejects text indexes with a clear error", func() {
+            let #err(msg) = people.deleteIndex("people_text") else return assert false;
+            assert Text.contains(msg, #text("Use deleteTextIndex"));
+        });
 
     },
 );

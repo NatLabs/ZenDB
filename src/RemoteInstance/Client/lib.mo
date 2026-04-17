@@ -31,10 +31,10 @@ module Client {
             await canister_db.zendb_v1_list_database_names();
         };
 
-        /// Rename a database
-        public func renameDB(old_name : Text, new_name : Text) : async* (ZT.Result<(), Text>) {
-            await canister_db.zendb_v1_rename_database(old_name, new_name);
-        };
+        // /// Rename a database
+        // public func renameDB(old_name : Text, new_name : Text) : async* (ZT.Result<(), Text>) {
+        //     await canister_db.zendb_v1_rename_database(old_name, new_name);
+        // };
 
         /// Delete a database
         public func deleteDB(db_name : Text) : async* (ZT.Result<(), Text>) {
@@ -60,6 +60,11 @@ module Client {
         /// Get instance statistics
         public func stats() : async* ZT.InstanceStats {
             await canister_db.zendb_v1_stats();
+        };
+
+        /// Update the log level of the ZenDB instance
+        public func updateLogLevel(log_level : ZT.LogLevel) : async* ZT.Result<(), Text> {
+            await canister_db.update_log_level(log_level);
         };
 
         // ─── Grant ───────────────────────────────────────────────────────────

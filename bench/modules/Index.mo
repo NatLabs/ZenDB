@@ -87,6 +87,7 @@ module {
                 indexes_in_batch_operations = Map.new<Text, T.Index>();
                 populate_index_batches = Map.new<Nat, T.BatchPopulateIndex>();
                 hidden_indexes = Set.new<Text>();
+                text_index_name = { var value = null };
                 candid_serializer = Candid.TypedSerializer.new(
                     [schema],
                     ?{ Candid.defaultOptions with types = ?[schema] },

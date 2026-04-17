@@ -159,6 +159,10 @@ module {
             await canister_db.zendb_v1_collection_create_text_index(db_name, collection_name, index_name, fields);
         };
 
+        public func deleteTextIndex() : async* (ZT.Result<(), Text>) {
+            await canister_db.zendb_v1_collection_delete_text_index(db_name, collection_name);
+        };
+
         public func batchCreateIndexes(index_configs : [ZT.CreateIndexParams]) : async* (ZT.Result<Nat, Text>) {
             await canister_db.zendb_v1_collection_batch_create_indexes(db_name, collection_name, index_configs);
         };

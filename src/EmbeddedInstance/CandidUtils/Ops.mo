@@ -260,6 +260,9 @@ module CandidOps {
                 let trimmed = Text.trim(text, #text(toTrim));
                 #ok(#Text(trimmed));
             };
+            case (#Null) #ok(#Null);
+            case (#Option(#Null)) #ok(#Null);
+            case (#Option(inner)) trim(inner, toTrim);
             case (other) {
                 return #err("Cannot complete #trim operation on " # debug_show (self) # ". Only text is supported");
             };
@@ -273,6 +276,9 @@ module CandidOps {
                 let lower = Text.toLower(text);
                 #ok(#Text(lower));
             };
+            case (#Null) #ok(#Null);
+            case (#Option(#Null)) #ok(#Null);
+            case (#Option(inner)) lowercase(inner);
             case (other) {
                 return #err("Cannot complete #lowercase operation on " # debug_show (self) # ". Only text is supported");
             };
@@ -286,6 +292,9 @@ module CandidOps {
                 let upper = Text.toUpper(text);
                 #ok(#Text(upper));
             };
+            case (#Null) #ok(#Null);
+            case (#Option(#Null)) #ok(#Null);
+            case (#Option(inner)) uppercase(inner);
             case (other) {
                 return #err("Cannot complete #uppercase operation on " # debug_show (self) # ". Only text is supported");
             };
@@ -299,6 +308,9 @@ module CandidOps {
                 let trimmed = Text.trimStart(text, #text(toTrim));
                 #ok(#Text(trimmed));
             };
+            case (#Null) #ok(#Null);
+            case (#Option(#Null)) #ok(#Null);
+            case (#Option(inner)) trim_start(inner, toTrim);
             case (other) {
                 return #err("Cannot complete #trim_start operation on " # debug_show (self) # ". Only text is supported");
             };
@@ -312,6 +324,9 @@ module CandidOps {
                 let trimmed = Text.trimEnd(text, #text(toTrim));
                 #ok(#Text(trimmed));
             };
+            case (#Null) #ok(#Null);
+            case (#Option(#Null)) #ok(#Null);
+            case (#Option(inner)) trim_end(inner, toTrim);
             case (other) {
                 return #err("Cannot complete #trim_end operation on " # debug_show (self) # ". Only text is supported");
             };
@@ -325,6 +340,9 @@ module CandidOps {
                 let replaced = Text.replace(text, #text(toReplace), replacement);
                 #ok(#Text(replaced));
             };
+            case (#Null) #ok(#Null);
+            case (#Option(#Null)) #ok(#Null);
+            case (#Option(inner)) replaceSubText(inner, toReplace, replacement);
             case (other) {
                 return #err("Cannot complete #replaceSubTexts operation on " # debug_show (self) # ". Only text is supported");
             };
@@ -334,6 +352,9 @@ module CandidOps {
 
     public func slice(self : Candid, start : Nat, end : Nat) : T.Result<Candid, Text> {
         switch (self) {
+            case (#Null) return #ok(#Null);
+            case (#Option(#Null)) return #ok(#Null);
+            case (#Option(inner)) return slice(inner, start, end);
             case (#Text(text)) {
                 let chars_iter = text.chars();
                 let chars = Array.tabulate(
@@ -372,6 +393,12 @@ module CandidOps {
                 let concatenated = text # other_text;
                 #ok(#Text(concatenated));
             };
+            case (#Null, _) #ok(#Null);
+            case (_, #Null) #ok(#Null);
+            case (#Option(#Null), _) #ok(#Null);
+            case (_, #Option(#Null)) #ok(#Null);
+            case (#Option(inner), other_val) concat(inner, other_val);
+            case (self_val, #Option(inner)) concat(self_val, inner);
             case (other) {
                 return #err("Cannot complete #concat operation on " # debug_show (self, other) # ". Only text is supported");
             };
@@ -381,6 +408,9 @@ module CandidOps {
 
     public func concatBytes(self : Candid, bytes : Blob) : T.Result<Candid, Text> {
         switch (self) {
+            case (#Null) #ok(#Null);
+            case (#Option(#Null)) #ok(#Null);
+            case (#Option(inner)) concatBytes(inner, bytes);
             case (#Blob(blob)) {
                 let concatenated = Utils.concat_blob(blob, bytes);
                 #ok(#Blob(concatenated));

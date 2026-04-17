@@ -178,6 +178,7 @@ module {
             memory_type = db.memory_type;
             is_running_locally = db.is_running_locally;
             is_compression_enabled = db.is_compression_enabled;
+            text_index_name = { var value = null };
         };
 
         let unique_constraints_buffer = Buffer.Buffer<([Text], T.CompositeIndex)>(8);

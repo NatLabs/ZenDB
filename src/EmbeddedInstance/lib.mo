@@ -127,7 +127,7 @@ module {
         is_running_locally = ?false;
         memory_type = ?(DefaultMemoryType);
         cache_capacity = ?(DefaultCacheCapacity);
-        is_compression_enabled = ?false;
+        is_compression_enabled = ?true;
     };
 
     public func newStableStore(canister_id : Principal, opt_settings : ?Settings) : T.VersionedStableStore {

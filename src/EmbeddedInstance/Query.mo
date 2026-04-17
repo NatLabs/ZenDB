@@ -77,167 +77,8 @@ module {
             _is_and := new_is_and;
         };
 
-        func handle_not(key : Text, not_op : ZqlOperators) : ZenQueryLang {
-            switch (not_op) {
-                case (#eq(value)) {
-                    // #not_(#eq(x)) -> #Or([#lt(x), #gt(x)])
-                    #Or([#Operation(key, #lt(value)), #Operation(key, #gt(value))]);
-                };
-                case (#lt(value)) {
-                    // #not_(#lt(x)) -> #gte(x)
-                    #Operation(key, #gte(value));
-                };
-                case (#gt(value)) {
-                    // #not_(#gt(x) )-> #lte(x)
-                    #Operation(key, #lte(value));
-                };
-                case (#lte(value)) {
-                    // #not_(#lte(x)) -> #gt(x)
-                    #Operation(key, #gt(value));
-                };
-                case (#gte(value)) {
-                    // #not_(#gte(x)) -> #lt(x)
-                    #Operation(key, #lt(value));
-                };
-                case (#between(min, max)) {
-                    // #not_(#between(min, max))
-                    // -> #not_(#And([#gte(min), #lte(max)]))
-                    // -> #Or([#lt(min), #gt(max)])
-                    #Or([#Operation(key, #lt(min)), #Operation(key, #gt(max))]);
-                };
-                case (#betweenExclusive(min, max)) {
-                    // #not_(#betweenExclusive(min, max))
-                    // -> #not_(#And([#gt(min), #lt(max)]))
-                    // -> #Or([#lte(min), #gte(max)])
-                    #Or([#Operation(key, #lte(min)), #Operation(key, #gte(max))]);
-                };
-                case (#betweenLeftOpen(min, max)) {
-                    // #not_(#betweenLeftOpen(min, max))
-                    // -> #not_(#And([#gt(min), #lte(max)]))
-                    // -> #Or([#lte(min), #gt(max)])
-                    #Or([#Operation(key, #lte(min)), #Operation(key, #gt(max))]);
-                };
-                case (#betweenRightOpen(min, max)) {
-                    // #not_(#betweenRightOpen(min, max))
-                    // -> #not_(#And([#gte(min), #lt(max)]))
-                    // -> #Or([#lt(min), #gte(max)])
-                    #Or([#Operation(key, #lt(min)), #Operation(key, #gte(max))]);
-                };
-                case (#exists) {
-                    // #not_(#exists)
-                    // buffer.add(#Operation(key, #eq(#Null)));
-                    Runtime.trap("QueryBuilder: #not_(#exists) is not supported");
-                };
-                case (#startsWith(prefix)) {
-                    let prefix_lower_bound = prefix;
-                    let res = CandidUtils.Ops.concatBytes(prefix, "\FF");
-                    switch (res) {
-                        case (#err(msg)) {
-                            Runtime.trap("QueryBuilder: Failed to create upper bound for #startsWith. " # msg);
-                        };
-                        case (#ok(prefix_upper_bound)) {
-                            // #not_(#startsWith(prefix))
-                            // -> #not_(#between(prefix_lower_bound, prefix_upper_bound))
-                            // -> #Or([#lt(prefix_lower_bound), #gt(prefix_upper_bound)])
-                            #Or([#Operation(key, #lt(prefix_lower_bound)), #Operation(key, #gt(prefix_upper_bound))]);
-                        };
-                    };
-
-                };
-                case (#anyOf(values)) {
-                    // #not_(#anyOf([y, z, x]))
-                    //
-                    // If the values were sorted, we would need only find the gaps between them
-                    // Sort the values: [y, z, x] -> [x, y, z]
-                    // Then express as: #Or([
-                    //  #lt(x),                           // values before first
-                    //  #betweenExclusive(x, y),          // values between first and second
-                    //  #betweenExclusive(y, z),          // values between second and third
-                    //  #gt(z)                            // values after last
-                    // ])
-
-                    let sorted_values = Array.sort(
-                        values,
-                        func(a : T.Candid, b : T.Candid) : T.Order {
-                            CandidUtils.compare(#Empty, a, b);
-                        },
-                    );
-
-                    let conditions = Array.tabulate(
-                        sorted_values.size() + 1,
-                        func(i : Nat) : ZenQueryLang {
-                            if (i == 0) {
-                                #Operation(key, #lt(sorted_values[0]));
-                            } else if (i == sorted_values.size()) {
-                                #Operation(key, #gt(sorted_values[sorted_values.size() - 1]));
-                            } else {
-                                reduce_op(key, #betweenExclusive(sorted_values[i - 1], sorted_values[i]));
-                            };
-                        },
-                    );
-
-                    #Or(conditions);
-
-                };
-                case (#not_(nested_op)) {
-                    // #not_(#not_(x)) -> x
-                    #Operation(key, nested_op);
-                };
-                case (#text(text_op)) {
-                    // #not_(#text(op)) — keep as-is; QueryPlan will produce a negated TextScan
-                    #Operation(key, #not_(#text(text_op)));
-                };
-            };
-        };
-
         func reduce_op(key : Text, op : ZqlOperators) : ZenQueryLang {
-            switch (op) {
-                // aliases
-                case (#anyOf(values)) {
-                    // #anyOf([x, y, z]) -> #Or([#eq(x), #eq(y), #eq(z)])
-                    #Or(
-                        Array.map(
-                            values,
-                            func(value : T.Candid) : ZenQueryLang {
-                                #Operation(key, #eq(value));
-                            },
-                        )
-                    );
-
-                };
-                case (#not_(not_op)) {
-                    handle_not(key, not_op);
-                };
-                case (#between(min, max)) {
-                    // #between(min, max) -> #And([#gte(min), #lte(max)])
-                    #And([#Operation(key, #gte(min)), #Operation(key, #lte(max))]);
-                };
-                case (#betweenExclusive(min, max)) {
-                    // #betweenExclusive(min, max) -> #And([#gt(min), #lt(max)])
-                    #And([#Operation(key, #gt(min)), #Operation(key, #lt(max))]);
-                };
-                case (#betweenLeftOpen(min, max)) {
-                    // #betweenLeftOpen(min, max) -> #And([#gt(min), #lte(max)])
-                    #And([#Operation(key, #gt(min)), #Operation(key, #lte(max))]);
-                };
-                case (#betweenRightOpen(min, max)) {
-                    // #betweenRightOpen(min, max) -> #And([#gte(min), #lt(max)])
-                    #And([#Operation(key, #gte(min)), #Operation(key, #lt(max))]);
-                };
-                case (#startsWith(prefix)) {
-                    let prefix_lower_bound = prefix;
-                    let #ok(prefix_upper_bound) = CandidUtils.Ops.concatBytes(prefix, "\FF") else {
-                        Runtime.trap("QueryBuilder: Failed to create upper bound for #startsWith");
-                    };
-
-                    reduce_op(key, #between(prefix_lower_bound, prefix_upper_bound));
-
-                };
-                // core operations
-                case (_) {
-                    #Operation(key, op);
-                };
-            };
+            reduce_operation(key, op);
         };
 
         func handle_op(key : Text, op : ZqlOperators) {
@@ -406,48 +247,250 @@ module {
 
     };
 
-    // validate that all the query fields are defined in the schema
-    public func validateQuery(collection : T.StableCollection, zendb_query : T.ZenQueryLang) : T.Result<(), Text> {
+    // Module-level operator resolution — shared by QueryBuilder and resolveQuery.
+    // Expands compound/alias operators (#between, #startsWith, #anyOf, #not_, etc.)
+    // into their core forms (#gte, #lte, #gt, #lt, #eq, #And, #Or).
+    func handle_not_op(key : Text, not_op : ZqlOperators) : ZenQueryLang {
+        switch (not_op) {
+            case (#eq(value)) {
+                // #not_(#eq(x)) -> #Or([#lt(x), #gt(x)])
+                #Or([#Operation(key, #lt(value)), #Operation(key, #gt(value))]);
+            };
+            case (#lt(value)) {
+                // #not_(#lt(x)) -> #gte(x)
+                #Operation(key, #gte(value));
+            };
+            case (#gt(value)) {
+                // #not_(#gt(x)) -> #lte(x)
+                #Operation(key, #lte(value));
+            };
+            case (#lte(value)) {
+                // #not_(#lte(x)) -> #gt(x)
+                #Operation(key, #gt(value));
+            };
+            case (#gte(value)) {
+                // #not_(#gte(x)) -> #lt(x)
+                #Operation(key, #lt(value));
+            };
+            case (#between(min, max)) {
+                // #not_(#between(min, max))
+                // -> #not_(#And([#gte(min), #lte(max)]))
+                // -> #Or([#lt(min), #gt(max)])
+                #Or([#Operation(key, #lt(min)), #Operation(key, #gt(max))]);
+            };
+            case (#betweenExclusive(min, max)) {
+                // #not_(#betweenExclusive(min, max))
+                // -> #not_(#And([#gt(min), #lt(max)]))
+                // -> #Or([#lte(min), #gte(max)])
+                #Or([#Operation(key, #lte(min)), #Operation(key, #gte(max))]);
+            };
+            case (#betweenLeftOpen(min, max)) {
+                // #not_(#betweenLeftOpen(min, max))
+                // -> #not_(#And([#gt(min), #lte(max)]))
+                // -> #Or([#lte(min), #gt(max)])
+                #Or([#Operation(key, #lte(min)), #Operation(key, #gt(max))]);
+            };
+            case (#betweenRightOpen(min, max)) {
+                // #not_(#betweenRightOpen(min, max))
+                // -> #not_(#And([#gte(min), #lt(max)]))
+                // -> #Or([#lt(min), #gte(max)])
+                #Or([#Operation(key, #lt(min)), #Operation(key, #gte(max))]);
+            };
+            case (#exists) {
+                // #not_(#exists)
+                Runtime.trap("QueryBuilder: #not_(#exists) is not supported");
+            };
+            case (#startsWith(prefix)) {
+                let prefix_lower_bound = prefix;
+                let res = CandidUtils.Ops.concatBytes(prefix, "\FF");
+                switch (res) {
+                    case (#err(msg)) {
+                        Runtime.trap("QueryBuilder: Failed to create upper bound for #startsWith. " # msg);
+                    };
+                    case (#ok(prefix_upper_bound)) {
+                        // #not_(#startsWith(prefix))
+                        // -> #not_(#between(prefix_lower_bound, prefix_upper_bound))
+                        // -> #Or([#lt(prefix_lower_bound), #gt(prefix_upper_bound)])
+                        #Or([#Operation(key, #lt(prefix_lower_bound)), #Operation(key, #gt(prefix_upper_bound))]);
+                    };
+                };
+            };
+            case (#anyOf(values)) {
+                // #not_(#anyOf([y, z, x]))
+                //
+                // Sort the values: [y, z, x] -> [x, y, z]
+                // Then express as: #Or([
+                //  #lt(x),                           // values before first
+                //  #betweenExclusive(x, y),          // values between first and second
+                //  #betweenExclusive(y, z),          // values between second and third
+                //  #gt(z)                            // values after last
+                // ])
+                let sorted_values = Array.sort(
+                    values,
+                    func(a : T.Candid, b : T.Candid) : T.Order {
+                        CandidUtils.compare(#Empty, a, b);
+                    },
+                );
 
+                let conditions = Array.tabulate(
+                    sorted_values.size() + 1,
+                    func(i : Nat) : ZenQueryLang {
+                        if (i == 0) {
+                            #Operation(key, #lt(sorted_values[0]));
+                        } else if (i == sorted_values.size()) {
+                            #Operation(key, #gt(sorted_values[sorted_values.size() - 1]));
+                        } else {
+                            reduce_operation(key, #betweenExclusive(sorted_values[i - 1], sorted_values[i]));
+                        };
+                    },
+                );
+
+                #Or(conditions);
+            };
+            case (#not_(nested_op)) {
+                // #not_(#not_(x)) -> x
+                #Operation(key, nested_op);
+            };
+            case (#text(text_op)) {
+                // #not_(#text(op)) — keep as-is; QueryPlan will produce a negated TextScan
+                #Operation(key, #not_(#text(text_op)));
+            };
+        };
+    };
+
+    func reduce_operation(key : Text, op : ZqlOperators) : ZenQueryLang {
+        switch (op) {
+            // aliases
+            case (#anyOf(values)) {
+                // #anyOf([x, y, z]) -> #Or([#eq(x), #eq(y), #eq(z)])
+                #Or(
+                    Array.map(
+                        values,
+                        func(value : T.Candid) : ZenQueryLang {
+                            #Operation(key, #eq(value));
+                        },
+                    )
+                );
+            };
+            case (#not_(not_op)) {
+                handle_not_op(key, not_op);
+            };
+            case (#between(min, max)) {
+                // #between(min, max) -> #And([#gte(min), #lte(max)])
+                #And([#Operation(key, #gte(min)), #Operation(key, #lte(max))]);
+            };
+            case (#betweenExclusive(min, max)) {
+                // #betweenExclusive(min, max) -> #And([#gt(min), #lt(max)])
+                #And([#Operation(key, #gt(min)), #Operation(key, #lt(max))]);
+            };
+            case (#betweenLeftOpen(min, max)) {
+                // #betweenLeftOpen(min, max) -> #And([#gt(min), #lte(max)])
+                #And([#Operation(key, #gt(min)), #Operation(key, #lte(max))]);
+            };
+            case (#betweenRightOpen(min, max)) {
+                // #betweenRightOpen(min, max) -> #And([#gte(min), #lt(max)])
+                #And([#Operation(key, #gte(min)), #Operation(key, #lt(max))]);
+            };
+            case (#startsWith(prefix)) {
+                let prefix_lower_bound = prefix;
+                let #ok(prefix_upper_bound) = CandidUtils.Ops.concatBytes(prefix, "\FF") else {
+                    Runtime.trap("QueryBuilder: Failed to create upper bound for #startsWith");
+                };
+                reduce_operation(key, #between(prefix_lower_bound, prefix_upper_bound));
+            };
+            // core operations
+            case (_) {
+                #Operation(key, op);
+            };
+        };
+    };
+
+    // Resolves all compound/alias operators in a ZenQueryLang tree into their core forms.
+    // This is equivalent to the expansion QueryBuilder performs internally, but applied
+    // to a raw ZenQueryLang value (e.g. one injected directly via CanisterDB or CLI).
+    func resolveQueryOps(zendb_query : ZenQueryLang) : ZenQueryLang {
         switch (zendb_query) {
-            case (#Operation(field, _op)) {
-                // Debug.print(debug_show (Set.toArray(collection.schema_keys_set)));
+            case (#Operation(key, op)) reduce_operation(key, op);
+            case (#And(exprs)) #And(Array.map(exprs, resolveQueryOps));
+            case (#Or(exprs)) #Or(Array.map(exprs, resolveQueryOps));
+        };
+    };
 
+    public func resolveQuery(stable_query : T.StableQuery) : T.StableQuery {
+        { stable_query with query_operations = resolveQueryOps(stable_query.query_operations) };
+    };
+
+    // validate that all the query fields are defined in the schema
+    public func validateQuery(collection : T.StableCollection, stable_query : T.StableQuery) : T.Result<(), Text> {
+
+        func validateQueryOps(zendb_query : T.ZenQueryLang) : T.Result<(), Text> {
+            switch (zendb_query) {
+                case (#Operation(field, _op)) {
+                    // Debug.print(debug_show (Set.toArray(collection.schema_keys_set)));
+
+                    if (
+                        field != "" and
+                        Option.isNull(Nat.fromText(field)) and
+                        not Set.has(collection.schema_keys_set, Map.thash, field) and
+                        field != C.DOCUMENT_ID
+                    ) {
+
+                        if (Text.contains(field, #text("."))) {
+                            for (key in Text.split(field, #text("."))) {
+                                if (Option.isNull(Nat.fromText(key)) and not Set.has(collection.schema_keys_set, Map.thash, key)) {
+                                    return #err("Field '" # key # "' not found in schema when validating query");
+                                };
+                            };
+                        } else {
+                            return #err("Field '" # field # "' not found in schema when validating query");
+                        };
+                    };
+                };
+                case (#And(buffer)) {
+                    for (expr in buffer.vals()) {
+                        switch (validateQueryOps(expr)) {
+                            case (#err(err)) return #err(err);
+                            case (#ok(_)) ();
+                        };
+                    };
+
+                };
+                case (#Or(buffer)) {
+                    for (expr in buffer.vals()) {
+                        switch (validateQueryOps(expr)) {
+                            case (#err(err)) return #err(err);
+                            case (#ok(_)) ();
+                        };
+                    };
+                };
+            };
+
+            #ok();
+        };
+
+        switch (validateQueryOps(stable_query.query_operations)) {
+            case (#err(err)) return #err(err);
+            case (#ok(_)) ();
+        };
+
+        switch (stable_query.sort_by) {
+            case (?(sort_field, _)) {
                 if (
-                    field != "" and
-                    Option.isNull(Nat.fromText(field)) and
-                    not Set.has(collection.schema_keys_set, Map.thash, field) and
-                    field != C.DOCUMENT_ID
+                    sort_field != C.DOCUMENT_ID and
+                    not Set.has(collection.schema_keys_set, Map.thash, sort_field)
                 ) {
-
-                    if (Text.contains(field, #text("."))) {
-                        for (key in Text.split(field, #text("."))) {
+                    if (Text.contains(sort_field, #text("."))) {
+                        for (key in Text.split(sort_field, #text("."))) {
                             if (Option.isNull(Nat.fromText(key)) and not Set.has(collection.schema_keys_set, Map.thash, key)) {
-                                return #err("Field '" # key # "' not found in schema when validating query");
+                                return #err("Sort field '" # sort_field # "' not found in schema");
                             };
                         };
                     } else {
-                        return #err("Field '" # field # "' not found in schema when validating query");
+                        return #err("Sort field '" # sort_field # "' not found in schema");
                     };
                 };
             };
-            case (#And(buffer)) {
-                for (expr in buffer.vals()) {
-                    switch (validateQuery(collection, expr)) {
-                        case (#err(err)) return #err(err);
-                        case (#ok(_)) ();
-                    };
-                };
-
-            };
-            case (#Or(buffer)) {
-                for (expr in buffer.vals()) {
-                    switch (validateQuery(collection, expr)) {
-                        case (#err(err)) return #err(err);
-                        case (#ok(_)) ();
-                    };
-                };
-            };
+            case (null) ();
         };
 
         #ok();

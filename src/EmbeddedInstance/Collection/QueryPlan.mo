@@ -155,17 +155,27 @@ module {
                                 case (#not_(inner)) (inner, true);
                                 case (op) (op, false);
                             };
-                            let ?#text_index(ti) = Map.get(collection.indexes, thash, TextIndex.KEY) else
+                            let ?text_index_name = collection.text_index_name.value else
                                 return #err("No text index found on collection for field '" # field # "'");
-                            let ?_ = TextIndex.verifyIndexedField(ti, field) else
+                            if (Set.has(collection.hidden_indexes, Set.thash, text_index_name)) {
+                                return #err("Text index '" # text_index_name # "' is hidden");
+                            };
+                            let ?#text_index(text_index) = Map.get(collection.indexes, thash, text_index_name) else
+                                return #err("No text index found on collection for field '" # field # "'");
+                            let ?_ = TextIndex.verifyIndexedField(text_index, field) else
                                 return #err("Text index does not cover field '" # field # "'");
                             text_scans.add(#TextScan({ field; text_op = actual_text_op; negated }));
                         };
                         case (#not_(#text(text_op))) {
                             // #not_(#text(op)) — negated text scan
-                            let ?#text_index(ti) = Map.get(collection.indexes, thash, TextIndex.KEY) else
+                            let ?text_index_name = collection.text_index_name.value else
                                 return #err("No text index found on collection for field '" # field # "'");
-                            let ?_ = TextIndex.verifyIndexedField(ti, field) else
+                            if (Set.has(collection.hidden_indexes, Set.thash, text_index_name)) {
+                                return #err("Text index '" # text_index_name # "' is hidden");
+                            };
+                            let ?#text_index(text_index) = Map.get(collection.indexes, thash, text_index_name) else
+                                return #err("No text index found on collection for field '" # field # "'");
+                            let ?_ = TextIndex.verifyIndexedField(text_index, field) else
                                 return #err("Text index does not cover field '" # field # "'");
                             text_scans.add(#TextScan({ field; text_op; negated = true }));
                         };
@@ -490,17 +500,27 @@ module {
                                 case (#not_(inner)) (inner, true);
                                 case (op) (op, false);
                             };
-                            let ?#text_index(ti) = Map.get(collection.indexes, thash, TextIndex.KEY) else
+                            let ?text_index_name = collection.text_index_name.value else
                                 return #err("No text index found on collection for field '" # field # "'");
-                            let ?_ = TextIndex.verifyIndexedField(ti, field) else
+                            if (Set.has(collection.hidden_indexes, Set.thash, text_index_name)) {
+                                return #err("Text index '" # text_index_name # "' is hidden");
+                            };
+                            let ?#text_index(text_index) = Map.get(collection.indexes, thash, text_index_name) else
+                                return #err("No text index found on collection for field '" # field # "'");
+                            let ?_ = TextIndex.verifyIndexedField(text_index, field) else
                                 return #err("Text index does not cover field '" # field # "'");
                             scans.add(#TextScan({ field; text_op = actual_text_op; negated }));
                             continue resolving_or_operations;
                         };
                         case (#not_(#text(text_op))) {
-                            let ?#text_index(ti) = Map.get(collection.indexes, thash, TextIndex.KEY) else
+                            let ?text_index_name = collection.text_index_name.value else
                                 return #err("No text index found on collection for field '" # field # "'");
-                            let ?_ = TextIndex.verifyIndexedField(ti, field) else
+                            if (Set.has(collection.hidden_indexes, Set.thash, text_index_name)) {
+                                return #err("Text index '" # text_index_name # "' is hidden");
+                            };
+                            let ?#text_index(text_index) = Map.get(collection.indexes, thash, text_index_name) else
+                                return #err("No text index found on collection for field '" # field # "'");
+                            let ?_ = TextIndex.verifyIndexedField(text_index, field) else
                                 return #err("Text index does not cover field '" # field # "'");
                             scans.add(#TextScan({ field; text_op; negated = true }));
                             continue resolving_or_operations;
@@ -678,11 +698,16 @@ module {
                     false,
                 );
             };
-            case (_) {
-                log.lazyError(
-                    func() = "Unsupported query type: " # debug_show db_query
+            case (#Operation(_, _)) {
+                log.lazyDebug(func() = "Processing top-level simple operation query");
+
+                from_and_operation(
+                    collection,
+                    [db_query],
+                    sort_column,
+                    opt_last_pagination_document,
+                    false,
                 );
-                Runtime.trap("createQueryPlan(): Unsupported query type");
             };
         }) {
             case (#err(e)) return #err(e);

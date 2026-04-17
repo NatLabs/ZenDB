@@ -156,6 +156,7 @@ module {
             let memory = BTree.getMemoryStats(collection.documents);
             return {
                 name = C.DOCUMENT_ID;
+                index_type = #composite_index;
                 fields = [(C.DOCUMENT_ID, #Ascending)];
                 entries = entries;
                 memory;
@@ -368,7 +369,7 @@ module {
 
         switch (index) {
             case (#text_index(text_index)) {
-                return CompositeIndex.stats(text_index.internal_index, entries, hidden);
+                return TextIndex.stats(text_index, entries, hidden);
             };
             case (#composite_index(composite_index)) {
                 return CompositeIndex.stats(composite_index, entries, hidden);

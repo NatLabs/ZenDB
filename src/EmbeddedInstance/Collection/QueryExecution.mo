@@ -89,11 +89,16 @@ module {
         text_op : T.TextOperators,
         negated : Bool,
         text_search_matches_cache : Map<Blob, Map<Nat64, T.TextMatch>>,
-    ) : EvalResult {
-        let ?#text_index(text_index) = Map.get(collection.indexes, Map.thash, TextIndex.KEY) else
-            Runtime.trap("TextScan: no text index on collection");
+    ) : Result<EvalResult, Text> {
+        let ?text_index_name = collection.text_index_name.value else
+            return #err("TextScan: no text index on collection");
+        if (Set.has(collection.hidden_indexes, Set.thash, text_index_name)) {
+            return #err("TextScan: text index '" # text_index_name # "' is hidden");
+        };
+        let ?#text_index(text_index) = Map.get(collection.indexes, Map.thash, text_index_name) else
+            return #err("TextScan: no text index on collection");
         let ?(_, field_idx) = TextIndex.verifyIndexedField(text_index, field) else
-            Runtime.trap("TextScan: text index does not cover field '" # field # "'");
+            return #err("TextScan: text index does not cover field '" # field # "'");
 
         let field_idx_n8 = Nat8.fromNat(field_idx);
 
@@ -277,7 +282,7 @@ module {
         // Fast path: non-negated #word returns a lazy iterator without any bitmap allocation.
         if (not negated) {
             switch (text_op) {
-                case (#word(w)) return #Ids(scan_word_iter(w));
+                case (#word(w)) return #ok(#Ids(scan_word_iter(w)));
                 case _ {};
             };
         };
@@ -299,20 +304,20 @@ module {
             };
             case (#anyOf(words)) {
                 // OR semantics: union of per-word bitmaps.
-                if (words.size() == 0) return #Empty;
+                if (words.size() == 0) return #ok(#Empty);
                 SparseBitMap64.multiUnion(Iter.map(words.vals(), scan_word))
             };
             case (#allOf(words)) {
                 // AND semantics: intersection of per-word bitmaps.
-                if (words.size() == 0) return #Empty;
+                if (words.size() == 0) return #ok(#Empty);
                 let bufs = Buffer.Buffer<T.SparseBitMap64>(words.size());
                 for (w in words.vals()) { bufs.add(scan_word(w)) };
                 SparseBitMap64.multiIntersect(bufs.vals())
             };
-            case (_) Runtime.trap("TextScan: unsupported text operator");
+            case (_) return #err("TextScan: unsupported text operator");
         };
 
-        if (not negated) return #BitMap(positive_bitmap);
+        if (not negated) return #ok(#BitMap(positive_bitmap));
 
         // Build `around_bitmap` via targeted BTree scans instead of a full index scan.
         //
@@ -421,10 +426,10 @@ module {
                 de_morgan
             };
 
-            case (_) Runtime.trap("TextScan: unsupported text operator for negation");
+            case (_) return #err("TextScan: unsupported text operator for negation");
         };
         SparseBitMap64.differenceInPlace(around_bitmap, positive_bitmap);
-        #BitMap(around_bitmap)
+        #ok(#BitMap(around_bitmap))
     };
 
     // avoids sorting
@@ -433,7 +438,7 @@ module {
         // only accepts bitmaps directly created from an index scan
         bitmap_cache : Map<Text, T.SparseBitMap64>,
         query_plan : T.QueryPlan,
-    ) : EvalResult {
+    ) : Result<EvalResult, Text> {
         let log = Logger.NamespacedLogger(collection.logger, LOGGER_NAMESPACE).subnamespace("get_unique_document_ids_from_query_plan");
 
         log.lazyDebug(
@@ -459,13 +464,13 @@ module {
                             func() = "Direct interval access on index '"
                             # index_name # "', interval: " # debug_show interval
                         );
-                        return #Interval(index_name, [interval], index_scan_details.sorted_in_reverse);
+                        return #ok(#Interval(index_name, [interval], index_scan_details.sorted_in_reverse));
                     };
                 };
                 case (#FullScan({ filter_bounds; requires_additional_filtering; requires_additional_sorting })) {
                     if (not requires_additional_filtering and not requires_additional_sorting) {
                         log.lazyDebug(func() = "Full scan with no filtering or sorting");
-                        return #Interval(C.DOCUMENT_ID, [(0, DocumentStore.size(collection))], false);
+                        return #ok(#Interval(C.DOCUMENT_ID, [(0, DocumentStore.size(collection))], false));
                     };
                 };
             };
@@ -594,12 +599,13 @@ module {
                         func() = "Processing text scan on field '" # field # "'"
                     );
                     switch (eval_text_scan(collection, field, text_op, negated, Map.new())) {
-                        case (#BitMap(bm)) bitmaps.add(bm);
-                        case (#Ids(iter)) bitmaps.add(
+                        case (#err(e)) return #err(e);
+                        case (#ok(#BitMap(bm))) bitmaps.add(bm);
+                        case (#ok(#Ids(iter))) bitmaps.add(
                             SparseBitMap64.fromIter(Iter.map(iter, func((id, _) : (T.DocumentId, ?[(Text, T.Candid)])) : Nat { Utils.convert_last_8_bytes_to_nat(id) }))
                         );
-                        case (#Empty) { if (query_plan.is_and_operation) return #Empty };
-                        case (#Interval(name, ivs, rev)) add_interval(intervals_by_index, name, ivs[0], rev);
+                        case (#ok(#Empty)) { if (query_plan.is_and_operation) return #ok(#Empty) };
+                        case (#ok(#Interval(name, ivs, rev))) add_interval(intervals_by_index, name, ivs[0], rev);
                     };
 
                     continue evaluating_query_plan;
@@ -619,14 +625,17 @@ module {
 
         for (or_operation_subplan in query_plan.subplans.vals()) {
             log.lazyDebug(func() = "Recursively processing subplan");
-            let eval_result = get_unique_document_ids_from_query_plan(collection, bitmap_cache, or_operation_subplan);
+            let eval_result = switch (get_unique_document_ids_from_query_plan(collection, bitmap_cache, or_operation_subplan)) {
+                case (#err(e)) return #err(e);
+                case (#ok(r)) r;
+            };
 
             switch (eval_result) {
                 case (#Empty) {
                     log.lazyDebug(func() = "Subplan returned empty result");
                     if (query_plan.is_and_operation) {
                         log.lazyDebug(func() = "Early return with empty result due to AND with empty set");
-                        return #Empty;
+                        return #ok(#Empty);
                     };
                 };
                 case (#Ids(document_ids_iter)) {
@@ -836,7 +845,7 @@ module {
             };
         };
 
-        result;
+        #ok(result);
     };
 
     public func add_interval(intervals_by_index : Map<Text, IndexDetails>, index_name : Text, interval : T.Interval, is_reversed : Bool) {
@@ -1257,7 +1266,7 @@ module {
         opt_last_pagination_document_id : ?T.DocumentId,
         sort_documents_by_field_cmp : ((T.DocumentId, ?[(Text, T.Candid)]), (T.DocumentId, ?[(Text, T.Candid)])) -> Order,
         text_search_matches_cache : Map<Blob, Map<Nat64, T.TextMatch>>,
-    ) : EvalResult {
+    ) : Result<EvalResult, Text> {
         let log = Logger.NamespacedLogger(collection.logger, LOGGER_NAMESPACE).subnamespace("generate_document_ids_for_and_operation");
 
         assert query_plan.is_and_operation;
@@ -1279,7 +1288,7 @@ module {
                             func() = "Simple index scan on '" # index_name # "', returning interval directly: " #
                             debug_show interval # ", reversed=" # debug_show sorted_in_reverse
                         );
-                        return #Interval(index_name, [interval], sorted_in_reverse);
+                        return #ok(#Interval(index_name, [interval], sorted_in_reverse));
                     };
                 };
                 case (#FullScan({ requires_additional_sorting; requires_additional_filtering })) {
@@ -1289,7 +1298,7 @@ module {
                             func() = "Simple full scan, returning full document range: [0, " #
                             Nat.toText(size) # ")"
                         );
-                        return #Interval(C.DOCUMENT_ID, [(0, size)], false);
+                        return #ok(#Interval(C.DOCUMENT_ID, [(0, size)], false));
                     };
 
                 };
@@ -1460,12 +1469,13 @@ module {
                     func() = "Materializing bitmap for text scan on field '" # field # "'"
                 );
                 switch (eval_text_scan(collection, field, text_op, negated, text_search_matches_cache)) {
-                    case (#BitMap(bm)) bitmaps.add(bm);
-                    case (#Ids(iter)) bitmaps.add(
+                    case (#err(e)) return #err(e);
+                    case (#ok(#BitMap(bm))) bitmaps.add(bm);
+                    case (#ok(#Ids(iter))) bitmaps.add(
                         SparseBitMap64.fromIter(Iter.map(iter, func((id, _) : (T.DocumentId, ?[(Text, T.Candid)])) : Nat { Utils.convert_last_8_bytes_to_nat(id) }))
                     );
-                    case (#Empty) { if (query_plan.is_and_operation) return #Empty };
-                    case (#Interval(_, _, _)) Runtime.trap("QueryExecution: text scan cannot return Interval");
+                    case (#ok(#Empty)) { if (query_plan.is_and_operation) return #ok(#Empty) };
+                    case (#ok(#Interval(_, _, _))) return #err("QueryExecution: text scan cannot return Interval");
                 };
             };
         };
@@ -1476,12 +1486,15 @@ module {
 
         for (or_operation_subplan in query_plan.subplans.vals()) {
             log.lazyDebug(func() = "Evaluating OR subplan");
-            let eval_result = generate_document_ids_for_or_operation(collection, or_operation_subplan, opt_sort_column, opt_last_pagination_document_id, sort_documents_by_field_cmp, text_search_matches_cache);
+            let eval_result = switch (generate_document_ids_for_or_operation(collection, or_operation_subplan, opt_sort_column, opt_last_pagination_document_id, sort_documents_by_field_cmp, text_search_matches_cache)) {
+                case (#err(e)) return #err(e);
+                case (#ok(r)) r;
+            };
 
             switch (eval_result) {
                 case (#Empty) {
                     log.lazyDebug(func() = "OR subplan returned empty, short-circuiting AND operation");
-                    return #Empty; // return early if we encounter an empty set
+                    return #ok(#Empty); // return early if we encounter an empty set
                 };
                 case (#Ids(iter)) {
                     if (requires_sorting) {
@@ -1569,7 +1582,7 @@ module {
                 #Empty;
             };
 
-            return merged_results;
+            return #ok(merged_results);
 
         };
 
@@ -1599,7 +1612,7 @@ module {
 
                 if (arr.size() == 0) {
                     log.lazyDebug(func() = "No documents found in interval, returning empty");
-                    return #Empty;
+                    return #ok(#Empty);
                 };
 
                 log.lazyDebug(func() = "Sorting " # Nat.toText(arr.size()) # " documents");
@@ -1709,11 +1722,11 @@ module {
 
                 let arr = Iter.toArray(filtered_ids);
 
-                if (arr.size() == 0) return #Empty;
+                if (arr.size() == 0) return #ok(#Empty);
 
                 let sorted = MergeSort.sort(arr, sort_documents_by_field_cmp);
 
-                return #Ids(sorted.vals());
+                return #ok(#Ids(sorted.vals()));
 
             };
 
@@ -1724,7 +1737,7 @@ module {
 
         if (iterators.size() == 1) {
             assert bitmaps.size() == 0;
-            return #Ids(iterators.get(0));
+            return #ok(#Ids(iterators.get(0)));
         };
 
         if (iterators.size() > 1) {
@@ -1746,19 +1759,19 @@ module {
 
             let merged_iterator = Utils.kmerge_and(iters, sort_documents_by_field_cmp);
 
-            return #Ids(merged_iterator);
+            return #ok(#Ids(merged_iterator));
 
         };
 
         if (bitmaps.size() == 0) {
-            return #Empty;
+            return #ok(#Empty);
         };
 
         let bitmap = if (bitmaps.size() == 1) {
             bitmaps.get(0);
         } else { SparseBitMap64.multiIntersect(bitmaps.vals()) };
 
-        #BitMap(bitmap);
+        #ok(#BitMap(bitmap));
 
     };
 
@@ -1769,7 +1782,7 @@ module {
         opt_last_pagination_document_id : ?T.DocumentId,
         sort_documents_by_field_cmp : ((T.DocumentId, ?[(Text, T.Candid)]), (T.DocumentId, ?[(Text, T.Candid)])) -> Order,
         text_search_matches_cache : Map<Blob, Map<Nat64, T.TextMatch>>,
-    ) : EvalResult {
+    ) : Result<EvalResult, Text> {
         let log = Logger.NamespacedLogger(collection.logger, LOGGER_NAMESPACE).subnamespace("generate_document_ids_for_or_operation");
         assert not query_plan.is_and_operation;
         let requires_sorting = Option.isSome(opt_sort_column);
@@ -1803,19 +1816,23 @@ module {
             };
             case (#TextScan({ field; text_op; negated })) {
                 switch (eval_text_scan(collection, field, text_op, negated, text_search_matches_cache)) {
-                    case (#BitMap(bm)) bitmaps.add(bm);
-                    case (#Ids(iter)) bitmaps.add(
+                    case (#err(e)) return #err(e);
+                    case (#ok(#BitMap(bm))) bitmaps.add(bm);
+                    case (#ok(#Ids(iter))) bitmaps.add(
                         SparseBitMap64.fromIter(Iter.map(iter, func((id, _) : (T.DocumentId, ?[(Text, T.Candid)])) : Nat { Utils.convert_last_8_bytes_to_nat(id) }))
                     );
-                    case (#Empty) {};
-                    case (#Interval(_, _, _)) Runtime.trap("QueryExecution: text scan cannot return Interval");
+                    case (#ok(#Empty)) {};
+                    case (#ok(#Interval(_, _, _))) return #err("QueryExecution: text scan cannot return Interval");
                 };
             };
         };
 
         for (and_operation_subplan in query_plan.subplans.vals()) {
 
-            let eval_result = generate_document_ids_for_and_operation(collection, and_operation_subplan, opt_sort_column, opt_last_pagination_document_id, sort_documents_by_field_cmp, text_search_matches_cache);
+            let eval_result = switch (generate_document_ids_for_and_operation(collection, and_operation_subplan, opt_sort_column, opt_last_pagination_document_id, sort_documents_by_field_cmp, text_search_matches_cache)) {
+                case (#err(e)) return #err(e);
+                case (#ok(r)) r;
+            };
 
             switch (eval_result) {
                 case (#Empty) {}; // do nothing if empty set
@@ -1897,7 +1914,7 @@ module {
             iterators.size() == 0 and
             Map.size(intervals_by_index) <= 1
         ) {
-            if (Map.size(intervals_by_index) == 0) return #Empty;
+            if (Map.size(intervals_by_index) == 0) return #ok(#Empty);
 
             let ?(index_name, interval_details) = Map.entries(intervals_by_index).next() else {
                 log.trap("QueryExecution.generate_document_ids_for_or_operation: No elements in map when size is greater than 0");
@@ -1915,7 +1932,7 @@ module {
                 };
 
                 let last_pagination_document_rank = switch (opt_last_pagination_document_id) {
-                    case (null) return #Interval(index_name, intervals, is_reversed);
+                    case (null) return #ok(#Interval(index_name, intervals, is_reversed));
                     case (?last_id) {
 
                         let last_pagination_document : T.CandidMap = CollectionUtils.get_and_cache_candid_map(
@@ -1987,9 +2004,9 @@ module {
 
                 if (filtered_intervals.size() == 0) {
                     log.lazyDebug(func() = "No intervals remaining after pagination filtering");
-                    return #Empty;
+                    return #ok(#Empty);
                 } else {
-                    return #Interval(index_name, Buffer.toArray(filtered_intervals), is_reversed);
+                    return #ok(#Interval(index_name, Buffer.toArray(filtered_intervals), is_reversed));
                 };
 
             };
@@ -2130,7 +2147,7 @@ module {
 
             if (iterators.size() == 0) {
                 log.lazyDebug(func() = "No iterators available, returning empty");
-                return #Empty;
+                return #ok(#Empty);
             };
 
             log.lazyDebug(
@@ -2138,7 +2155,7 @@ module {
             );
             var merged_iterators = Utils.kmerge_or<(T.DocumentId, ?[(Text, T.Candid)])>(Buffer.toArray(iterators), sort_documents_by_field_cmp);
 
-            return #Ids(merged_iterators);
+            return #ok(#Ids(merged_iterators));
 
         };
 
@@ -2146,14 +2163,14 @@ module {
 
         if (bitmaps.size() == 0) {
             log.lazyDebug(func() = "No bitmaps to merge, returning empty");
-            #Empty;
+            #ok(#Empty);
         } else {
             log.lazyDebug(
                 func() = "Performing union on " # Nat.toText(bitmaps.size()) # " bitmaps"
             );
             let bitmap = SparseBitMap64.multiUnion(bitmaps.vals());
             log.lazyDebug(func() = "Union completed, resulting bitmap has " # Nat.toText(SparseBitMap64.size(bitmap)) # " documents");
-            #BitMap(bitmap);
+            #ok(#BitMap(bitmap));
         };
 
     };
@@ -2164,17 +2181,20 @@ module {
         opt_sort_column : ?(Text, T.SortDirection),
         sort_documents_by_field_cmp : ((T.DocumentId, ?[(Text, T.Candid)]), (T.DocumentId, ?[(Text, T.Candid)])) -> Order,
         text_search_matches_cache : Map<Blob, Map<Nat64, T.TextMatch>>,
-    ) : EvalResult {
+    ) : Result<EvalResult, Text> {
 
         let log = Logger.NamespacedLogger(collection.logger, LOGGER_NAMESPACE).subnamespace("generate_document_ids_for_query_plan");
 
         log.lazyInfo(func() = "Generating document IDs for query plan");
         log.logDebug("QueryExecution.generate_document_ids_for_query_plan(): Query plan: " # debug_show query_plan);
 
-        let result = if (query_plan.is_and_operation) {
+        let result = switch (if (query_plan.is_and_operation) {
             generate_document_ids_for_and_operation(collection, query_plan, opt_sort_column, opt_last_pagination_document_id, sort_documents_by_field_cmp, text_search_matches_cache);
         } else {
             generate_document_ids_for_or_operation(collection, query_plan, opt_sort_column, opt_last_pagination_document_id, sort_documents_by_field_cmp, text_search_matches_cache);
+        }) {
+            case (#err(e)) return #err(e);
+            case (#ok(r)) r;
         };
 
         let elapsed = 0;
@@ -2215,6 +2235,6 @@ module {
             };
         };
 
-        result;
+        #ok(result);
     };
 };

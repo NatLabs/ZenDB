@@ -165,6 +165,12 @@ module T {
         tokenizer : Tokenizer; // the tokenizer used for this index
     };
 
+    /// Mutable record field holding the optional name of the collection's text index.
+    /// Using a box (rather than a plain `?Text`) lets `create_text_index` and
+    /// `delete_text_index` mutate the value without having to rebuild the
+    /// whole `StableCollection` record.
+    public type TextIndexNameRef = { var value : ?Text };
+
     public type Index = {
         #text_index : T.TextIndex;
         #composite_index : T.CompositeIndex;
@@ -242,6 +248,10 @@ module T {
         memory_type : MemoryType;
         is_running_locally : Bool;
         is_compression_enabled : ?Bool;
+
+        /// The name of the text index on this collection, if one exists.
+        /// Used to look up the text index in `collection.indexes` by its user-given name.
+        text_index_name : TextIndexNameRef;
     };
 
     type NestedCandid = {
@@ -529,9 +539,17 @@ module T {
 
     public type MemoryBTreeStats = MemoryBTree.MemoryBTreeStats;
 
+    public type IndexType = {
+        #composite_index;
+        #text_index;
+    };
+
     public type IndexStats = {
         /// The name of the index
         name : Text;
+
+        /// The type of index
+        index_type : IndexType;
 
         /// Composite index fields selected for the index
         fields : [(Text, SortDirection)];

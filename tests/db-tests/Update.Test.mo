@@ -948,3 +948,206 @@ ZenDBSuite.newSuite(
 
     },
 );
+
+// ─── Option-wrapped field update tests ───────────────────────────────────────
+
+type OptionDoc = {
+    name : ?Text;
+    score : ?Nat;
+};
+
+let OptionDocSchema : ZenDB.Types.Schema = #Record([
+    ("name", #Option(#Text)),
+    ("score", #Option(#Nat)),
+]);
+
+let option_doc_candid : ZenDB.Types.Candify<OptionDoc> = {
+    from_blob = func(blob : Blob) : ?OptionDoc { from_candid (blob) };
+    to_blob = func(c : OptionDoc) : Blob { to_candid (c) };
+};
+
+ZenDBSuite.newSuite(
+    "Option-wrapped Field Update Tests",
+    ?ZenDBSuite.withAndWithoutIndex,
+
+    func option_field_tests(zendb : ZenDB.Database, _suite_utils : ZenDBSuite.SuiteUtils) {
+        let #ok(col) = zendb.createCollection<OptionDoc>("option_data", OptionDocSchema, option_doc_candid, null) else return assert false;
+
+        var with_values : OptionDoc = { name = ?"  hello world  "; score = ?100 };
+        let with_nulls : OptionDoc = { name = null; score = null };
+
+        let #ok(with_values_id) = col.insert(with_values) else return assert false;
+        let #ok(with_nulls_id) = col.insert(with_nulls) else return assert false;
+
+        suite(
+            "Text ops on ?Text fields",
+            func() {
+
+                test(
+                    "#trim on non-null ?Text trims whitespace",
+                    func() {
+                        let #ok(_) = col.updateById(with_values_id, [("name", #trim(#currValue, " "))]) else return assert false;
+                        assert col.get(with_values_id) == ?{ name = ?"hello world"; score = ?100 };
+                        with_values := { name = ?"hello world"; score = ?100 };
+                    },
+                );
+
+                test(
+                    "#trim on null ?Text leaves field null",
+                    func() {
+                        let #ok(_) = col.updateById(with_nulls_id, [("name", #trim(#currValue, " "))]) else return assert false;
+                        assert col.get(with_nulls_id) == ?{ name = null; score = null };
+                    },
+                );
+
+                test(
+                    "#uppercase then #lowercase on non-null ?Text",
+                    func() {
+                        let #ok(_) = col.updateById(with_values_id, [("name", #uppercase(#currValue))]) else return assert false;
+                        assert col.get(with_values_id) == ?{ name = ?"HELLO WORLD"; score = ?100 };
+
+                        let #ok(_) = col.updateById(with_values_id, [("name", #lowercase(#currValue))]) else return assert false;
+                        assert col.get(with_values_id) == ?{ name = ?"hello world"; score = ?100 };
+                    },
+                );
+
+                test(
+                    "#uppercase on null ?Text leaves field null",
+                    func() {
+                        let #ok(_) = col.updateById(with_nulls_id, [("name", #uppercase(#currValue))]) else return assert false;
+                        assert col.get(with_nulls_id) == ?{ name = null; score = null };
+                    },
+                );
+
+                test(
+                    "#lowercase on null ?Text leaves field null",
+                    func() {
+                        let #ok(_) = col.updateById(with_nulls_id, [("name", #lowercase(#currValue))]) else return assert false;
+                        assert col.get(with_nulls_id) == ?{ name = null; score = null };
+                    },
+                );
+
+                test(
+                    "#replaceSubText on non-null ?Text replaces substring",
+                    func() {
+                        let #ok(_) = col.updateById(with_values_id, [("name", #replaceSubText(#currValue, "world", "motoko"))]) else return assert false;
+                        assert col.get(with_values_id) == ?{ name = ?"hello motoko"; score = ?100 };
+                        with_values := { name = ?"hello motoko"; score = ?100 };
+                    },
+                );
+
+                test(
+                    "#replaceSubText on null ?Text leaves field null",
+                    func() {
+                        let #ok(_) = col.updateById(with_nulls_id, [("name", #replaceSubText(#currValue, "world", "motoko"))]) else return assert false;
+                        assert col.get(with_nulls_id) == ?{ name = null; score = null };
+                    },
+                );
+
+                test(
+                    "#slice on non-null ?Text extracts substring",
+                    func() {
+                        let #ok(_) = col.updateById(with_values_id, [("name", #slice(#currValue, 6, 12))]) else return assert false;
+                        assert col.get(with_values_id) == ?{ name = ?"motoko"; score = ?100 };
+                        with_values := { name = ?"motoko"; score = ?100 };
+                    },
+                );
+
+                test(
+                    "#slice on null ?Text leaves field null",
+                    func() {
+                        let #ok(_) = col.updateById(with_nulls_id, [("name", #slice(#currValue, 0, 5))]) else return assert false;
+                        assert col.get(with_nulls_id) == ?{ name = null; score = null };
+                    },
+                );
+
+                test(
+                    "#concat on non-null ?Text appends suffix",
+                    func() {
+                        let #ok(_) = col.updateById(with_values_id, [("name", #concat(#currValue, #Text("!")))]) else return assert false;
+                        assert col.get(with_values_id) == ?{ name = ?"motoko!"; score = ?100 };
+                        with_values := { name = ?"motoko!"; score = ?100 };
+                    },
+                );
+
+                test(
+                    "#concat on null ?Text leaves field null",
+                    func() {
+                        let #ok(_) = col.updateById(with_nulls_id, [("name", #concat(#currValue, #Text("!")))]) else return assert false;
+                        assert col.get(with_nulls_id) == ?{ name = null; score = null };
+                    },
+                );
+
+                test(
+                    "#concatAll on non-null ?Text concatenates all parts",
+                    func() {
+                        // with_values.name is currently ?"motoko!"
+                        let #ok(_) = col.updateById(
+                            with_values_id,
+                            [("name", #concatAll([#Text("hello "), #currValue, #Text("!")]))],
+                        ) else return assert false;
+                        assert col.get(with_values_id) == ?{ name = ?"hello motoko!!"; score = ?100 };
+                        // reset
+                        let #ok(_) = col.replace(with_values_id, with_values) else return assert false;
+                    },
+                );
+
+            },
+        );
+
+        suite(
+            "Numeric ops on ?Nat fields",
+            func() {
+
+                test(
+                    "#add on non-null ?Nat produces correct sum",
+                    func() {
+                        let #ok(_) = col.updateById(with_values_id, [("score", #add(#currValue, #Nat(50)))]) else return assert false;
+                        assert col.get(with_values_id) == ?{ name = ?"motoko!"; score = ?150 };
+                        with_values := { name = ?"motoko!"; score = ?150 };
+                    },
+                );
+
+                test(
+                    "#sub on non-null ?Nat produces correct difference",
+                    func() {
+                        let #ok(_) = col.updateById(with_values_id, [("score", #sub(#currValue, #Nat(50)))]) else return assert false;
+                        assert col.get(with_values_id) == ?{ name = ?"motoko!"; score = ?100 };
+                        with_values := { name = ?"motoko!"; score = ?100 };
+                    },
+                );
+
+                test(
+                    "#mul on non-null ?Nat produces correct product",
+                    func() {
+                        let #ok(_) = col.updateById(with_values_id, [("score", #mul(#currValue, #Nat(3)))]) else return assert false;
+                        assert col.get(with_values_id) == ?{ name = ?"motoko!"; score = ?300 };
+                        with_values := { name = ?"motoko!"; score = ?300 };
+                    },
+                );
+
+                test(
+                    "#div on non-null ?Nat produces correct quotient",
+                    func() {
+                        let #ok(_) = col.updateById(with_values_id, [("score", #div(#currValue, #Nat(3)))]) else return assert false;
+                        assert col.get(with_values_id) == ?{ name = ?"motoko!"; score = ?100 };
+                        with_values := { name = ?"motoko!"; score = ?100 };
+                    },
+                );
+
+                test(
+                    "#add on null ?Nat treats null as 0",
+                    func() {
+                        // null + 42 = 42 (null is treated as 0 in arithmetic ops)
+                        let #ok(_) = col.updateById(with_nulls_id, [("score", #add(#currValue, #Nat(42)))]) else return assert false;
+                        assert col.get(with_nulls_id) == ?{ name = null; score = ?42 };
+                        // reset
+                        let #ok(_) = col.replace(with_nulls_id, with_nulls) else return assert false;
+                    },
+                );
+
+            },
+        );
+
+    },
+);

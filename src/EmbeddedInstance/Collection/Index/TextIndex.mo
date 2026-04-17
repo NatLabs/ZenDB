@@ -25,12 +25,11 @@ import CollectionUtils "../CollectionUtils";
 import Tokenizer "Tokenizers";
 import CompositeIndex "CompositeIndex";
 import Runtime "mo:core@2.4/Runtime";
+import BTree "../../BTree";
 
 module TextIndex {
 
-    /// Internal key used to store the text index in `collection.indexes`.
-    /// The leading/trailing colons make it impossible to collide with user-defined names.
-    public let KEY = ":text_index:";
+
 
     public func new(
         collection : T.StableCollection,
@@ -289,6 +288,35 @@ module TextIndex {
             i += 1;
         };
         null
+    };
+
+    /// Returns `IndexStats` for a text index.  The `fields` entry lists the
+    /// user-visible field names (mapped to `#Ascending` as a placeholder
+    /// direction, since sort order is not meaningful for text indexes).
+    public func stats(
+        text_index : T.TextIndex,
+        collection_entries : Nat,
+        hidden : Bool,
+    ) : T.IndexStats {
+        let internal = text_index.internal_index;
+        let memory = BTree.getMemoryStats(internal.data);
+        let index_entries = CompositeIndex.size(internal);
+        {
+            name = internal.name;
+            fields = Array.map<Text, (Text, T.SortDirection)>(
+                text_index.fields,
+                func(f : Text) : (Text, T.SortDirection) { (f, #Ascending) },
+            );
+            entries = index_entries;
+            memory;
+            index_type = #text_index;
+            is_unique = internal.is_unique;
+            used_internally = internal.used_internally;
+            hidden;
+            avg_index_key_size = if (collection_entries == 0) 0 else (memory.keyBytes / collection_entries);
+            total_index_key_size = memory.keyBytes;
+            total_index_data_bytes = memory.dataBytes;
+        };
     };
 
 };

@@ -678,6 +678,7 @@ module CompositeIndex {
             fields = index.key_details;
             entries = index_entries;
             memory;
+            index_type = #composite_index;
             is_unique = index.is_unique;
             used_internally = index.used_internally;
             hidden;

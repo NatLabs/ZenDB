@@ -113,9 +113,9 @@ shared ({ caller = owner }) persistent actor class CanisterDB() = this_canister 
     ZenDB.setIsRunLocally(zendb_instance, false);
     ZenDB.updateCacheCapacity(zendb_instance, 1_000_000);
 
-     public shared query func zendb_v1_api_version() : async Text {
+    public shared query func zendb_v1_api_version() : async Text {
           "0.2.0";
-     };
+    };
 
      /// Returns the version of the embedded ZenDB engine running inside this canister.
      /// Useful for determining whether an upgrade will trigger a data migration as
@@ -257,7 +257,7 @@ shared ({ caller = owner }) persistent actor class CanisterDB() = this_canister 
      };
 
      public shared ({caller}) func revoke_collection_access(target: Principal, role: Text, db_name: Text, collection_name: Text) : async (ZT.Result<(), Text>) {
-          await* _revoke_user_access_to(caller, target, role, [(Resource.COLLECTION, collection_name)])
+          await* _revoke_user_access_to(caller, target, role, [(Resource.DATABASE, db_name), (Resource.COLLECTION, collection_name)])
      };
 
      public shared ({caller}) func revoke_global_access(target: Principal, role: Text) : async (ZT.Result<(), Text>) {
@@ -321,6 +321,24 @@ shared ({ caller = owner }) persistent actor class CanisterDB() = this_canister 
         };
      };
 
+    /// ::: ZenDB Settings API :::
+    public shared ({caller}) func update_log_level(log_level: ZenDB.Types.LogLevel) : async (ZT.Result<(), Text>) {
+        CanisterRBAC.allowWithResult(
+            canister_rbac,
+            caller,
+            Permissions.DB_MANAGE,
+            [],
+            func() : ZT.Result<(), Text> {
+                ZenDB.setLogLevel(zendb_instance, log_level);
+                #ok(())
+            },
+        );
+    };
+
+
+
+    /// ::: ZenDB Database API :::
+
      public shared query ({ caller }) func zendb_v1_list_database_names() : async (ZT.Result<[Text], Text>) {
           CanisterRBAC.allow(
                canister_rbac,
@@ -349,19 +367,19 @@ shared ({ caller = owner }) persistent actor class CanisterDB() = this_canister 
         extract_ok(res)
     };
 
-    public shared ({ caller }) func zendb_v1_rename_database(old_name : Text, new_name : Text) : async (ZT.Result<(), Text>) {
-        CanisterRBAC.allowWithResult(
-            canister_rbac,
-            caller,
-            Permissions.DB_MANAGE,
-            [(Resource.DATABASE, old_name)],
-            func() : (ZT.Result<(), Text>) {
-                 // ! users who had access to the database with the previous name will lose access after this rename
-                 // ! you need a way to a Resource name so that you can update the RBAC permissions accordingly
-                ZenDB.renameDB(zendb_instance, old_name, new_name);
-            },
-        );
-    };
+    // public shared ({ caller }) func zendb_v1_rename_database(old_name : Text, new_name : Text) : async (ZT.Result<(), Text>) {
+    //     CanisterRBAC.allowWithResult(
+    //         canister_rbac,
+    //         caller,
+    //         Permissions.DB_MANAGE,
+    //         [(Resource.DATABASE, old_name)],
+    //         func() : (ZT.Result<(), Text>) {
+    //              // ! users who had access to the database with the previous name will lose access after this rename
+    //              // ! you need a way to a Resource name so that you can update the RBAC permissions accordingly
+    //             ZenDB.renameDB(zendb_instance, old_name, new_name);
+    //         },
+    //     );
+    // };
 
     public shared ({ caller }) func zendb_v1_create_database(db_name : Text) : async (ZT.Result<(), Text>) {
         CanisterRBAC.allowWithResult(
@@ -1078,6 +1096,20 @@ shared ({ caller = owner }) persistent actor class CanisterDB() = this_canister 
                 let #ok(collection) = get_collection(db_name, collection_name) else return Utils.send_error(get_collection(db_name, collection_name));
 
                 StableCollection.create_text_index(collection, index_name, fields, #basic);
+            },
+        );
+    };
+
+    public shared ({ caller }) func zendb_v1_collection_delete_text_index(db_name : Text, collection_name : Text) : async ZT.Result<(), Text> {
+        CanisterRBAC.allowWithResult(
+            canister_rbac,
+            caller,
+            Permissions.DB_MANAGE,
+            [(Resource.DATABASE, db_name), (Resource.COLLECTION, collection_name)],
+            func() : (ZT.Result<(), Text>) {
+                let #ok(collection) = get_collection(db_name, collection_name) else return Utils.send_error(get_collection(db_name, collection_name));
+
+                StableCollection.delete_text_index(collection);
             },
         );
     };

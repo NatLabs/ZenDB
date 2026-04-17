@@ -132,7 +132,7 @@ module {
             "search(): #word + .And() category filter",
         ]);
 
-        let limit = 100;
+        let limit = 300;
 
         let fuzz = Fuzz.fromSeed(0xc0ffee);
 

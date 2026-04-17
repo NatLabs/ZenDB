@@ -490,6 +490,11 @@ module {
             );
         };
 
+        /// Returns true if the given index name is currently in the hidden set.
+        public func isIndexHidden(index_name : Text) : Bool {
+            Set.has(collection.hidden_indexes, Set.thash, index_name);
+        };
+
         // /// Clears an index from the collection that is not used internally.
         // public func clearIndex(name : Text) : T.Result<(), Text> {
         //     handleResult(
@@ -503,6 +508,13 @@ module {
             handleResult(
                 StableCollection.create_text_index(collection, index_name, fields, #basic),
                 "Failed to create text index",
+            );
+        };
+
+        public func deleteTextIndex() : T.Result<(), Text> {
+            handleResult(
+                StableCollection.delete_text_index(collection),
+                "Failed to delete text index",
             );
         };
 

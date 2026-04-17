@@ -162,6 +162,8 @@ module T {
         tokenizer : Tokenizer; // the tokenizer used for this index
     };
 
+    public type TextIndexNameRef = { var value : ?Text };
+
     public type Index = {
         #text_index : T.TextIndex;
         #composite_index : T.CompositeIndex;
@@ -239,6 +241,9 @@ module T {
         memory_type : MemoryType;
         is_running_locally : Bool;
         is_compression_enabled : ?Bool;
+
+        /// The name of the text index on this collection, if one exists.
+        text_index_name : TextIndexNameRef;
     };
 
     type NestedCandid = {
@@ -485,9 +490,17 @@ module T {
 
     public type MemoryBTreeStats = MemoryBTree.MemoryBTreeStats;
 
+    public type IndexType = {
+        #composite_index;
+        #text_index;
+    };
+
     public type IndexStats = {
         /// The name of the index
         name : Text;
+
+        /// The type of index
+        index_type : IndexType;
 
         /// Composite index fields selected for the index
         fields : [(Text, SortDirection)];
