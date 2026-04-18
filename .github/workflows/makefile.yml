@@ -15,16 +15,14 @@ jobs:
         name: Build and test
         steps:
             - uses: actions/checkout@v4
-
-            - name: Install dfx
-              uses: dfinity/setup-dfx@main
-            - name: Confirm successful installation
-              run: dfx --version
-
-            - name: Install dfx cache
-              run: dfx cache install
-
+            - uses: dfinity/setup-dfx@main
             - uses: ZenVoich/setup-mops@v1
+              with:
+                  mops-version: 2.8.1
+                  identity-pem: ${{ secrets.MOPS_IDENTITY_PEM }}
+
+            - name: Install dependencies
+              run: mops install --lock ignore
 
             # - name: Detect warnings
             #   run: make check
