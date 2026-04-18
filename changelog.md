@@ -9,7 +9,7 @@ All notable changes to ZenDB stable types will be documented in this file.
 #### Critical Index Encoding Changes
 - **Orchid (Composite Index Encoder)**: Complete rewrite to lexicographic escape-based encoding
   - Variable-length types (Text, Blob, Principal) now use escape-based encoding instead of size prefixes
-  - Enables tail compression in B+Tree for improved memory efficiency
+  - Enables prefix compression in B+Tree for improved memory efficiency
   - **Impact**: All existing indexes are incompatible and must be rebuilt
 
 #### Technical Improvements
