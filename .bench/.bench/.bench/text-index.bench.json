@@ -1,0 +1,175 @@
+{
+  "version": 1,
+  "moc": "1.4.1",
+  "replica": "dfx",
+  "replicaVersion": "0.31.0",
+  "gc": "generational",
+  "forceGc": true,
+  "results": [
+    [
+      "insert 1k articles (no text index yet):#stableMemory  with text index",
+      {
+        "rts_stable_memory_size": 0,
+        "stable_memory_size": 0,
+        "instructions": 105438074,
+        "rts_memory_size": 0,
+        "rts_total_allocation": 7518612,
+        "rts_collector_instructions": -29081,
+        "rts_mutator_instructions": -10410,
+        "rts_logical_stable_memory_size": 0,
+        "rts_heap_size": 284,
+        "rts_reclaimed": 7518328
+      }
+    ],
+    [
+      "createTextIndex() on populated collection (backfill):#stableMemory  with text index",
+      {
+        "rts_stable_memory_size": 512,
+        "stable_memory_size": 33554432,
+        "instructions": 6716855478,
+        "rts_memory_size": 389480448,
+        "rts_total_allocation": 385278276,
+        "rts_collector_instructions": -7875,
+        "rts_mutator_instructions": -8133,
+        "rts_logical_stable_memory_size": 512,
+        "rts_heap_size": 121076,
+        "rts_reclaimed": 385157200
+      }
+    ],
+    [
+      "search(): #word — rare word  (~10 docs):#stableMemory  with text index",
+      {
+        "rts_stable_memory_size": 0,
+        "stable_memory_size": 0,
+        "instructions": 1093274,
+        "rts_memory_size": 0,
+        "rts_total_allocation": 89956,
+        "rts_collector_instructions": -7875,
+        "rts_mutator_instructions": -8133,
+        "rts_logical_stable_memory_size": 0,
+        "rts_heap_size": 272,
+        "rts_reclaimed": 89684
+      }
+    ],
+    [
+      "search(): #word — common word (~200 docs):#stableMemory  with text index",
+      {
+        "rts_stable_memory_size": 0,
+        "stable_memory_size": 0,
+        "instructions": 8532994,
+        "rts_memory_size": 0,
+        "rts_total_allocation": 675648,
+        "rts_collector_instructions": -7875,
+        "rts_mutator_instructions": -8133,
+        "rts_logical_stable_memory_size": 0,
+        "rts_heap_size": 272,
+        "rts_reclaimed": 675376
+      }
+    ],
+    [
+      "search(): #startsWith — partial prefix:#stableMemory  with text index",
+      {
+        "rts_stable_memory_size": 0,
+        "stable_memory_size": 0,
+        "instructions": 8900557,
+        "rts_memory_size": 0,
+        "rts_total_allocation": 695884,
+        "rts_collector_instructions": -7875,
+        "rts_mutator_instructions": -8133,
+        "rts_logical_stable_memory_size": 0,
+        "rts_heap_size": 272,
+        "rts_reclaimed": 695612
+      }
+    ],
+    [
+      "search(): #phrase — 2-word sequence:#stableMemory  with text index",
+      {
+        "rts_stable_memory_size": 0,
+        "stable_memory_size": 0,
+        "instructions": 4394069,
+        "rts_memory_size": 0,
+        "rts_total_allocation": 219772,
+        "rts_collector_instructions": -7875,
+        "rts_mutator_instructions": -8133,
+        "rts_logical_stable_memory_size": 0,
+        "rts_heap_size": 272,
+        "rts_reclaimed": 219500
+      }
+    ],
+    [
+      "search(): #anyOf — 3 common words (union):#stableMemory  with text index",
+      {
+        "rts_stable_memory_size": 0,
+        "stable_memory_size": 0,
+        "instructions": 16198242,
+        "rts_memory_size": 0,
+        "rts_total_allocation": 1207000,
+        "rts_collector_instructions": -7875,
+        "rts_mutator_instructions": -8133,
+        "rts_logical_stable_memory_size": 0,
+        "rts_heap_size": 272,
+        "rts_reclaimed": 1206728
+      }
+    ],
+    [
+      "search(): #allOf — 2 common words (intersect):#stableMemory  with text index",
+      {
+        "rts_stable_memory_size": 0,
+        "stable_memory_size": 0,
+        "instructions": 8066038,
+        "rts_memory_size": 0,
+        "rts_total_allocation": 598440,
+        "rts_collector_instructions": -7875,
+        "rts_mutator_instructions": -8133,
+        "rts_logical_stable_memory_size": 0,
+        "rts_heap_size": 272,
+        "rts_reclaimed": 598168
+      }
+    ],
+    [
+      "search(): #not_(#word) — bracket complement scan:#stableMemory  with text index",
+      {
+        "rts_stable_memory_size": 0,
+        "stable_memory_size": 0,
+        "instructions": 877030037,
+        "rts_memory_size": 0,
+        "rts_total_allocation": 75425356,
+        "rts_collector_instructions": -7875,
+        "rts_mutator_instructions": -8133,
+        "rts_logical_stable_memory_size": 0,
+        "rts_heap_size": 272,
+        "rts_reclaimed": 75425084
+      }
+    ],
+    [
+      "search(): #not_(#phrase) — De Morgan complement scan:#stableMemory  with text index",
+      {
+        "rts_stable_memory_size": 0,
+        "stable_memory_size": 0,
+        "instructions": 1721760274,
+        "rts_memory_size": 0,
+        "rts_total_allocation": 148244564,
+        "rts_collector_instructions": -7875,
+        "rts_mutator_instructions": -8133,
+        "rts_logical_stable_memory_size": 0,
+        "rts_heap_size": 308,
+        "rts_reclaimed": 148244256
+      }
+    ],
+    [
+      "search(): #word + .And() category filter:#stableMemory  with text index",
+      {
+        "rts_stable_memory_size": 0,
+        "stable_memory_size": 0,
+        "instructions": 86962967,
+        "rts_memory_size": 0,
+        "rts_total_allocation": 6401760,
+        "rts_collector_instructions": -7875,
+        "rts_mutator_instructions": -8133,
+        "rts_logical_stable_memory_size": 0,
+        "rts_heap_size": 272,
+        "rts_reclaimed": 6401488
+      }
+    ]
+  ]
+}
