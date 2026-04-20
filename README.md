@@ -5,8 +5,7 @@
 [![Motoko](https://img.shields.io/badge/Language-Motoko-orange)](https://github.com/dfinity/motoko)
 
 
-**ZenDB** is  an embedded document database for Motoko that leverages stable memory to store and query large datasets efficiently. It provides a familiar document-oriented API, similar to MongoDB, allowing developers to store nested records, create collections, define indexes and perform complex queries on their data.
-
+**ZenDB** is a document database for Motoko that leverages stable memory to store and query large datasets efficiently. It provides a familiar document-oriented API, similar to MongoDB, allowing developers to store nested records, create collections, define indexes and perform complex queries on their data.
 
 ### Key Features
 - **Indexes**: Support for multi-field indexes to speed up complex queries
@@ -25,120 +24,143 @@
 
 ### Installation
 
-- Requires `moc` version `0.14.13` or higher to run.
-- Install with mops: `mops toolchain use moc 0.14.13`.
+#### Setup the CLI & Create a remote canister
 
-```bash
-mops add zendb
-```
+- Install the [ZenDB CLI](https://www.npmjs.com/package/zendb-cli)
+  ```bash
+  npm install -g zendb-cli
+  ```
 
-### Canister Configuration
-Canisters have a limit of how much stable memory they can use. This limit can be set in the `dfx.json` file in the root of your project. By default, the limit is set to 4GB, but for larger datasets, you can increase it up to 500GB.
-This measurement is in pages, where each page is 64KiB. For a 200GB limit, the limit would be `200 * (1024 * 1024) / 64 = 3276800` pages.
+- Setup the user identity by importing from dfx.
+  ```bash
+  zendb user import --data "$(dfx identity export <identity-name>)" --mode keyring
+  ```
 
-In addition to setting the stable memory limit, it's recommended to use legacy persistence instead of EOP to limit heap allocations. I found that legacy persistence uses 2x less heap allocations and costs 4x less cycles to run for stable memory heavy applications.
+- create a canister 
 
-```json
-  "canisters": {
-    "stress-test" : {
-      "type": "motoko",
-      "main": "main.mo",
-      "args": "--max-stable-pages 3276800 --legacy-persistence --force-gc --generational-gc",
-      "optimize": "O3"
-    }
-  },
-```
+  ```bash
+  zendb canister create dev --ic --release latest
+
+  # requires dfx running via `dfx start`
+  zendb canister create local-dev --local --release latest 
+  ```
+
+- create a database and collection 
+  ```bash
+  zendb db create myapp --canister dev
+  zendb collection create users --canister dev --db myapp \
+    --schema 'record {id: nat; name: text; email: text; profile: record {age: opt nat; location: text; interests: vec text}; created_at: int; updated_at: int;}'
+  ```
+
+  <details>
+    <summary>Equivalent Motoko type for the collection schema</summary>
+
+    ```motoko
+    type User = {
+      id: Nat;
+      name: Text;
+      email: Text;
+      profile: {
+        age: ?Nat;
+        location: Text;
+        interests: [Text];
+        bio: Text;
+      };
+      created_at: Int;
+      updated_at: Int;
+    };
+    ```
+  </details>
+
+#### Connect to the remote canister from your motoko code
+- Install the ZenDB motoko package
+
+  ```bash
+  mops add zendb
+  ```
+
+- Get the remote canister id 
+  ```bash
+  zendb canister list
+  ```
+
+- Connect to the database in your motoko code. The candify function handles the conversion between your motoko type and the candid blob format used by ZenDB, allowing you to work with native motoko types without needing to manually serialize/deserialize them.
+
+  ```motoko
+  import ZenDB "mo:zendb";
+
+  let zendbClient = ZenDB.Client("<canister-id>");
+  let myappDB = zendbClient.getDB("myapp");
+
+  let candify : ZenDB.Types.Candify<User> = {
+    from_blob = func(blob : Blob) : ?User = from_candid(blob);
+    to_blob = func(value : User) : Blob = to_candid(value);
+  };
+
+  let users = myappDB.getCollection("users", candify);
+  ```
 
 ### Basic Usage
 
-#### 1. Initialize the Database
+#### Insert a document
 
-```motoko
-import Principal "mo:base/Principal";
-import ZenDB "mo:zendb";
+- Each document returns a unique DocumentId that can be used to retrieve or update the document later.
+  ```motoko
 
-actor class Canister() = canister_reference {
-
-  let canister_id = Principal.fromActor(canister_reference);
-  stable var zendb = ZenDB.newStableStore(canister_id, null);
-  let db = ZenDB.launchDefaultDB(zendb);
-
-}
-```
-
-#### 2. Define the Collection's Schema
-
-```motoko
-// motoko type
-type User = {
-  id: Nat;
-  name: Text;
-  email: Text;
-  profile: {
-    age: ?Nat;
-    location: Text;
-    interests: [Text];
+  let alice : User = {
+    id = 1;
+    name = "Alice";
+    email = "alice@example.com";
+    profile = {
+      age = ?35;
+      location = "San Francisco";
+      interests = ["hiking", "photography"];
+      bio = "Software engineer and avid traveler.";
+    };
+    created_at = Time.now();
+    updated_at = Time.now();
   };
-  created_at: Int;
-  updated_at: Int;
-};
 
-// corresponding schema type
-let UsersSchema : ZenDB.Types.Schema = #Record([
-  ("id", #Nat),
-  ("name", #Text),
-  ("email", #Text),
-  ("profile", #Record([
-    ("age", #Option(#Nat)),
-    ("location", #Text),
-    ("interests", #Array(#Text)),
-  ])),
-  ("created_at", #Int),
-  ("updated_at", #Int)
-]);
+  let #ok(aliceId) = users.insert(alice);
+  assert (await users.get(aliceId)) == ?alice;
+  ```
 
-// serializer - boilerplate to convert between Motoko types and Candid blobs
-let candify_users : ZenDB.Types.Candify<User> = {
-  to_blob = func(user: User) : Blob { to_candid(user) };
-  from_blob = func(blob: Blob) : ?User { from_candid(blob) };
-};
-```
+#### Creating Indexes
 
-#### 3. Create a Collection & Indexes
+- Composite Indexes
 
-```motoko
-// Create collection
-let #ok(users) = db.createCollection("users", UsersSchema, candify_users, null);
+  ```motoko
+  // Create composite indexes for your query patterns
+  let #ok(_) = users.createIndex("name_idx", [("name", #Ascending)], null);
 
-// Create optimal indexes for your query patterns
-let #ok(_) = users.createIndex("name_idx", [("name", #Ascending)], null);
+  let #ok(_) = users.createIndex(
+    "location_created_at_idx", 
+    [
+      ("profile.location", #Ascending), 
+      ("created_at", #Descending)
+    ],
+    null
+  );
+  ```
 
-let #ok(_) = users.createIndex(
-  "location_created_at_idx", 
-  [
-    ("profile.location", #Ascending), 
-    ("created_at", #Descending)
-  ],
-  null
-);
-```
+- Text Index 
 
-#### 4. Insert & Query Data
+  ```motoko
+
+  let #ok(_) = users.createTextIndex("text_idx", ["name", "email", "bio"]);
+
+  ```
+
+- via the cli
+  ```bash
+  zendb index create name_idx --canister dev --db myapp --collection users --fields "name"
+  zendb index create location_created_at_idx --canister dev --db myapp --collection users --fields "profile.location:asc" "created_at:desc"
+  zendb index create-text text_idx --canister dev --db myapp --collection users --fields name,email,bio
+  ```
+
+#### Search For Documents
 
 ```motoko
-// Insert a document
-let user : User = {
-  id = 1;
-  name = "Alice";
-  email = "alice@example.com";
-  profile = {
-    age = ?35;
-    location = "San Francisco";
-    interests = ["coding", "hiking", "photography"];
-  };
-  created_at = Time.now();
-  updated_at = Time.now();
-};
 
 let #ok(userId) = users.insert(user);
 
@@ -147,59 +169,72 @@ let #ok(queryResults) = users.search(
   ZenDB.QueryBuilder()
     .Where("profile.location", #eq(#Text("San Francisco")))
     .And("profile.age", #gte(#Nat(30)))
-    .SortBy("created_at", #Descending)
-    .Limit(10)
 );
 
 // Search returns a SearchResult with documents and instruction count
 assert queryResults.documents == [(userId, user)];
 ```
 
-#### 5. Field Updates & Transformations
-
 ```motoko
-// Update specific fields in a document
-let #ok(_) = users.updateById(
-  userId,
-  [
-    ("profile.location", #Text("New York")),
-    ("profile.interests", #Array([#Text("coding"), #Text("reading")]))
-  ]
+
+let #ok(queryResults2) = users.search(
+  ZenDB.QueryBuilder()
+    .Where("bio", #text(#startsWith("travel")))
 );
 
-let ?updatedUser1 = users.get(userId);
-
-assert updatedUser1.profile.location == "New York";
-assert updatedUser1.profile.interests == ["coding", "reading"];
-
-// Update multiple fields referencing the current value of a field
-let currTime = Time.now();
-let #ok(_) = users.update(
-  ZenDB.QueryBuilder().Where("email", #eq(#Text(""))),
-  [
-    ("name", #uppercase(#currValue)),
-    ("age", #add(#currValue, #Nat(1))),
-    ("updated_at", #Int(currTime)),
-    ("email", #lowercase(
-      #concatAll([
-        #concat(#get("name"), #Text("-in-")),
-        #replaceSubText(#get("profile.location"), " ", "-"),
-        #Text("@example.com")
-      ])
-    ))
-  ]
-);
-
-let updatedUser2 = users.get(userId);
-
-assert updatedUser2.name == "ALICE";
-assert updatedUser2.age == ?36;
-assert updatedUser2.updated_at == currTime;
-assert updatedUser2.email == "alice-in-san-francisco@example.com";
+Debug.print(debug_show(queryResults2.documents)); // Should include Alice
 
 ```
 
-#### 6. Statistics & Monitoring
+#### Field Updates & Transformations
+
+- Update specific fields in a document
+  ```motoko
+  let #ok(_) = users.updateById(
+    userId,
+    [
+      ("profile.location", #Text("New York")),
+      ("profile.interests", #Array([#Text("coding"), #Text("reading")]))
+    ]
+  );
+
+  let ?updatedUser1 = users.get(userId);
+
+  assert updatedUser1.profile.location == "New York";
+  assert updatedUser1.profile.interests == ["coding", "reading"];
+
+  ```
+
+- Update multiple fields referencing the current value of a field
+  
+  ```motoko
+  let currTime = Time.now();
+  let #ok(_) = users.update(
+    ZenDB.QueryBuilder().Where("email", #eq(#Text(""))),
+    [
+      ("name", #uppercase(#currValue)),
+      ("age", #add(#currValue, #Nat(1))),
+      ("updated_at", #Int(currTime)),
+      ("email", #lowercase(
+        #concatAll([
+          #concat(#get("name"), #Text("-in-")),
+          #replaceSubText(#get("profile.location"), " ", "-"),
+          #Text("@example.com")
+        ])
+      ))
+    ]
+  );
+
+  let updatedUser2 = users.get(userId);
+
+  assert updatedUser2.name == "ALICE";
+  assert updatedUser2.age == ?36;
+  assert updatedUser2.updated_at == currTime;
+  assert updatedUser2.email == "alice-in-san-francisco@example.com";
+
+  ```
+
+#### Statistics & Monitoring
 
 Monitor your collections to understand performance characteristics:
 
@@ -242,7 +277,7 @@ let #ok(search_result2) = users.search(
 The repository includes several examples demonstrating ZenDB's capabilities:
 
 - [**Simple Notes Dapp**](./example/notes/lib.mo#L9): Example Notes app, with simple CRUD operations
-- [**ICP Txs explorer**](./example/react-project/backend/Backend.mo): ZenDB test app that indexes ICP transactions
+- [**ICP Txs explorer**](https://2yfll-4qaaa-aaaap-anvaq-cai.icp0.io/): ZenDB test app that indexes ICP transactions
   - https://2yfll-4qaaa-aaaap-anvaq-cai.icp0.io/
 - [**Flying Ninja**](./example/flying_ninja/backend/app.mo): Dapp from the [dfinity/examples](https://github.com/dfinity/examples/tree/master/motoko) repo ported to use ZenDB.
 
@@ -260,6 +295,11 @@ For more detailed examples and advanced usage, see the [**Complete Documentation
 - **Indexing**: B-Tree indexes, composite indexes, Orchid encoding
 - **Performance**: Query optimization, index selection strategies
 - **Monitoring**: Collection statistics, memory usage
+
+Related tools and client libraries:
+
+- **ZenDB CLI**: https://www.npmjs.com/package/zendb-cli
+- **ZenDB TypeScript Client**: https://www.npmjs.com/package/zendb-client
 
 The documentation includes detailed examples, performance optimization tips, and best practices to help you get the most out of ZenDB.
 
@@ -324,8 +364,6 @@ This allows you to monitor query performance and access both the results and exe
 
 - Limited array support - Can store arrays in collections, but cannot create indexes on array fields or perform operations on specific array elements. In addition, indexes cannot be created on fields nested within an `#Array`.
 
-- No support for text-based full-text search or pattern matching within indexes
-
 - Complex queries with many OR conditions may have suboptimal performance
 
 - The query planner may not always select the optimal index for complex queries. It is recommended to analyze query performance and adjust indexes accordingly.
@@ -345,15 +383,14 @@ This allows you to monitor query performance and access both the results and exe
 - [x] Multi-field compound indexes
 - [x] Powerful query language with logical operators
 - [x] Schema validation and Schema constraints
+- [x] Full Text search capabilities by implementing an inverted text index
+- [x] Dedicated database canister for use by clients in other languages
+- [x] Database management tools to handle collection creation, index management, and data migrations
 - [ ] Fully support Array fields and operations on them
 - [ ] Multi-key array indexes - for indexing fields within arrays
 - [ ] Backward compatible schema upgrades and versioning
 - [ ] Aggregation functions (min, max, sum, avg, etc.)
 - [ ] Support for migrations
-- [ ] Full Text search capabilities by implementing an inverted text index
-- [ ] Data Certification of all documents, using the [ic-certification](https://mops.one/ic-certification) motoko library
-- [ ] Dedicated database canister for use by clients in other languages (e.g. JavaScript, Rust)
-- [ ] Database management tools to handle collection creation, index management, and data migrations
 - [ ] Periodic backups to external canisters
 - [ ] Database canister monitoring and analytics tools
 
