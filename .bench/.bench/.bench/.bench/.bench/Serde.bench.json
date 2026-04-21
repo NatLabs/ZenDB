@@ -1,0 +1,190 @@
+{
+  "version": 1,
+  "moc": "1.4.1",
+  "replica": "dfx",
+  "replicaVersion": "0.31.0",
+  "gc": "generational",
+  "forceGc": true,
+  "results": [
+    [
+      "Simple Record (5 fields):encode()",
+      {
+        "rts_stable_memory_size": 0,
+        "stable_memory_size": 0,
+        "instructions": 67225987,
+        "rts_memory_size": 0,
+        "rts_total_allocation": 4087480,
+        "rts_collector_instructions": -29081,
+        "rts_mutator_instructions": -10416,
+        "rts_logical_stable_memory_size": 0,
+        "rts_heap_size": 272,
+        "rts_reclaimed": 4087208
+      }
+    ],
+    [
+      "Simple Record (5 fields):decode()",
+      {
+        "rts_stable_memory_size": 0,
+        "stable_memory_size": 0,
+        "instructions": 38241681,
+        "rts_memory_size": 0,
+        "rts_total_allocation": 1785016,
+        "rts_collector_instructions": -7875,
+        "rts_mutator_instructions": -8139,
+        "rts_logical_stable_memory_size": 0,
+        "rts_heap_size": 272,
+        "rts_reclaimed": 1784744
+      }
+    ],
+    [
+      "Medium Record (15 fields):encode()",
+      {
+        "rts_stable_memory_size": 0,
+        "stable_memory_size": 0,
+        "instructions": 215836075,
+        "rts_memory_size": 0,
+        "rts_total_allocation": 6915480,
+        "rts_collector_instructions": -7875,
+        "rts_mutator_instructions": -8139,
+        "rts_logical_stable_memory_size": 0,
+        "rts_heap_size": 272,
+        "rts_reclaimed": 6915208
+      }
+    ],
+    [
+      "Medium Record (15 fields):decode()",
+      {
+        "rts_stable_memory_size": 0,
+        "stable_memory_size": 0,
+        "instructions": 97548366,
+        "rts_memory_size": 0,
+        "rts_total_allocation": 4365016,
+        "rts_collector_instructions": -7875,
+        "rts_mutator_instructions": -8139,
+        "rts_logical_stable_memory_size": 0,
+        "rts_heap_size": 272,
+        "rts_reclaimed": 4364744
+      }
+    ],
+    [
+      "Complex Record (30 fields):encode()",
+      {
+        "rts_stable_memory_size": 0,
+        "stable_memory_size": 0,
+        "instructions": 281136433,
+        "rts_memory_size": 0,
+        "rts_total_allocation": 10747800,
+        "rts_collector_instructions": -7875,
+        "rts_mutator_instructions": -8139,
+        "rts_logical_stable_memory_size": 0,
+        "rts_heap_size": 272,
+        "rts_reclaimed": 10747528
+      }
+    ],
+    [
+      "Complex Record (30 fields):decode()",
+      {
+        "rts_stable_memory_size": 0,
+        "stable_memory_size": 0,
+        "instructions": 205975131,
+        "rts_memory_size": 0,
+        "rts_total_allocation": 9053016,
+        "rts_collector_instructions": -7875,
+        "rts_mutator_instructions": -8139,
+        "rts_logical_stable_memory_size": 0,
+        "rts_heap_size": 272,
+        "rts_reclaimed": 9052744
+      }
+    ],
+    [
+      "Nested Record (3 levels):encode()",
+      {
+        "rts_stable_memory_size": 0,
+        "stable_memory_size": 0,
+        "instructions": 94061447,
+        "rts_memory_size": 0,
+        "rts_total_allocation": 5191992,
+        "rts_collector_instructions": -7875,
+        "rts_mutator_instructions": -8139,
+        "rts_logical_stable_memory_size": 0,
+        "rts_heap_size": 272,
+        "rts_reclaimed": 5191720
+      }
+    ],
+    [
+      "Nested Record (3 levels):decode()",
+      {
+        "rts_stable_memory_size": 0,
+        "stable_memory_size": 0,
+        "instructions": 45755469,
+        "rts_memory_size": 0,
+        "rts_total_allocation": 2565016,
+        "rts_collector_instructions": -7875,
+        "rts_mutator_instructions": -8139,
+        "rts_logical_stable_memory_size": 0,
+        "rts_heap_size": 272,
+        "rts_reclaimed": 2564744
+      }
+    ],
+    [
+      "Array Fields (10 items):encode()",
+      {
+        "rts_stable_memory_size": 0,
+        "stable_memory_size": 0,
+        "instructions": 273378212,
+        "rts_memory_size": 0,
+        "rts_total_allocation": 10811992,
+        "rts_collector_instructions": -7875,
+        "rts_mutator_instructions": -8139,
+        "rts_logical_stable_memory_size": 0,
+        "rts_heap_size": 272,
+        "rts_reclaimed": 10811720
+      }
+    ],
+    [
+      "Array Fields (10 items):decode()",
+      {
+        "rts_stable_memory_size": 0,
+        "stable_memory_size": 0,
+        "instructions": 275217949,
+        "rts_memory_size": 0,
+        "rts_total_allocation": 9509016,
+        "rts_collector_instructions": -7875,
+        "rts_mutator_instructions": -8139,
+        "rts_logical_stable_memory_size": 0,
+        "rts_heap_size": 272,
+        "rts_reclaimed": 9508744
+      }
+    ],
+    [
+      "Large Record (50 fields):encode()",
+      {
+        "rts_stable_memory_size": 0,
+        "stable_memory_size": 0,
+        "instructions": 469188535,
+        "rts_memory_size": 0,
+        "rts_total_allocation": 16886168,
+        "rts_collector_instructions": -7875,
+        "rts_mutator_instructions": -8139,
+        "rts_logical_stable_memory_size": 0,
+        "rts_heap_size": 272,
+        "rts_reclaimed": 16885896
+      }
+    ],
+    [
+      "Large Record (50 fields):decode()",
+      {
+        "rts_stable_memory_size": 0,
+        "stable_memory_size": 0,
+        "instructions": 352830035,
+        "rts_memory_size": 0,
+        "rts_total_allocation": 15117016,
+        "rts_collector_instructions": -7875,
+        "rts_mutator_instructions": -8139,
+        "rts_logical_stable_memory_size": 0,
+        "rts_heap_size": 272,
+        "rts_reclaimed": 15116744
+      }
+    ]
+  ]
+}
