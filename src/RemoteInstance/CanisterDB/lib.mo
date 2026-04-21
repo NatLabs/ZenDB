@@ -24,27 +24,36 @@ import Utils "../../EmbeddedInstance/Utils";
 import TypeMigrations "../../EmbeddedInstance/TypeMigrations";
 import Query "../../EmbeddedInstance/Query";
 import Runtime "mo:core@2.4/Runtime";
+import Upgrade "./upgrade";
 
 (
     with migration = func({
         zendb_instance : ZenDB.Types.PrevVersionedStableStore;
+        canister_rbac : CanisterRBAC.Types.VersionedStableStore;
+        Roles: Upgrade.Roles_v0_2_0;
+        Permissions: Upgrade.Permissions_v0_2_0;
+        Resource: Upgrade.Resource_v0_2_0;
     }) : ({
         zendb_instance : ZenDB.Types.VersionedStableStore;
+        canister_rbac : CanisterRBAC.Types.VersionedStableStore;
     }) {
+        Upgrade.applyAll({ canister_rbac; Roles; Permissions; Resource; });
+
         return {
             zendb_instance = ZenDB.upgrade(zendb_instance);
+            canister_rbac;
         };
     }
 )
 
 shared ({ caller = owner }) persistent actor class CanisterDB() = this_canister {
 
-     let Resource = {
-          DATABASE = "database";
-          COLLECTION = "collection";
-     };
+    transient let Resource = {
+        DATABASE = "database";
+        COLLECTION = "collection";
+    };
 
-    let Permissions = {
+    transient let Permissions = {
         DB_READ = "db:read";
         DB_WRITE = "db:write";
         DB_MANAGE = "db:manage";
@@ -53,11 +62,11 @@ shared ({ caller = owner }) persistent actor class CanisterDB() = this_canister 
         ACCESS_CONTROL_MANAGE = "access-control:manage";
     };
 
-    let Roles = {
+    transient let Roles = {
         ADMIN = "admin";
         OBSERVER = "observer";
-        EDITOR = "editor";
-        VIEWER = "viewer";
+        WRITER = "writer";
+        READER = "reader";
     };
 
     transient let default_roles = [
@@ -73,19 +82,19 @@ shared ({ caller = owner }) persistent actor class CanisterDB() = this_canister 
             permissions = [Permissions.ACCESS_CONTROL_READ];
         },
         {
-            name = Roles.EDITOR;
+            name = Roles.WRITER;
             permissions = [Permissions.DB_WRITE, Permissions.DB_READ];
         },
         {
-            name = Roles.VIEWER;
+            name = Roles.READER;
             permissions = [Permissions.DB_READ];
         },
     ];
 
     var canister_rbac = CanisterRBAC.initRoles(default_roles);
 
-    transient let canister_id = Principal.fromActor(this_canister);
-    transient let canister_id_as_blob = Principal.toBlob(canister_id);
+    let canister_id = Principal.fromActor(this_canister);
+    let canister_id_as_blob = Principal.toBlob(canister_id);
 
     Result.assertOk(
         CanisterRBAC.grantUserRole(canister_rbac, owner, Roles.ADMIN, [])
@@ -114,7 +123,7 @@ shared ({ caller = owner }) persistent actor class CanisterDB() = this_canister 
     ZenDB.updateCacheCapacity(zendb_instance, 1_000_000);
 
     public shared query func zendb_v1_api_version() : async Text {
-          "0.2.0";
+        Upgrade.CURRENT_API_VERSION 
     };
 
      /// Returns the version of the embedded ZenDB engine running inside this canister.
