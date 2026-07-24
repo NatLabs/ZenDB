@@ -19,6 +19,12 @@
 
 **Important Note**: Currently, no automatic indexes are created for your data. You'll need to create your own indexes when defining your collection and schema. If no indexes exist that can satisfy a query, ZenDB will run a full collection scan, which is likely to hit the instruction limit for a dataset with as little as ten thousand records.
 
+### Migrating large databases
+
+For migrations that cannot complete during a single canister upgrade, use `ZenDB.Migration` to build a durable bridge release. Its stable state machine performs bounded copy and verification steps, atomically cuts reads and writes over to the new generation, then incrementally deletes and seals the old generation. Every step has a monotonic step number, so retrying a request after an uncertain response is safe.
+
+Keep the returned state in your actor's stable state, make the copy/remove callbacks idempotent, and do not `await` inside any callback. A failing callback traps the update, rolling back both the data writes and cursor movement. Only install a final Wasm that drops the old stable fields after `seal` has succeeded and `requireSealed` passes.
+
 
 ## Getting Started
 
