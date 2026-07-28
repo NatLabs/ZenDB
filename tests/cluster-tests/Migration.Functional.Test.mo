@@ -32,9 +32,9 @@ persistent actor {
                 let hasGrace = await app.hasActiveUser("Grace Hopper");
                 let hasEdsger = await app.hasActiveUser("Edsger Dijkstra");
                 let oldGenerationSize = await app.oldGenerationSize();
-                test(
+                await test(
                     "moves a stable generation through copy, verify, cutover, cleanup, and seal",
-                    func() {
+                    func() : async () {
                         assert finished.phase == #sealed;
                         assert writesAreFrozen;
                         assert finished.activeGeneration == 2;
