@@ -46,11 +46,13 @@ persistent actor class MigrationExample() = this_app {
         ("displayName", #Text),
     ]);
 
-    let legacyCandify : ZenDB.Types.Candify<LegacyUser> = {
+    // Codec closures are re-created on each install/upgrade; functions cannot
+    // be part of the persistent actor's stable state.
+    transient let legacyCandify : ZenDB.Types.Candify<LegacyUser> = {
         from_blob = func(blob : Blob) : ?LegacyUser { from_candid (blob) };
         to_blob = func(user : LegacyUser) : Blob { to_candid (user) };
     };
-    let v2Candify : ZenDB.Types.Candify<UserV2> = {
+    transient let v2Candify : ZenDB.Types.Candify<UserV2> = {
         from_blob = func(blob : Blob) : ?UserV2 { from_candid (blob) };
         to_blob = func(user : UserV2) : Blob { to_candid (user) };
     };
