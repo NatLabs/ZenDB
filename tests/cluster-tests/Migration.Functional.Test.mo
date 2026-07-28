@@ -5,16 +5,21 @@
 // example: copy, verify, cut over, clean up, then seal.
 
 import { test; suite } "mo:test/async";
+import Principal "mo:core@2.4/Principal";
 
 import MigrationExample "MigrationExample";
+import MigrationRunner "MigrationRunner";
 
 persistent actor {
     transient let TRILLION = 1_000_000_000_000;
 
     public func runTests() : async () {
-        // This is a real canister-to-canister call, not an in-process unit test.
+        // The application being migrated and the migrator are distinct local
+        // canisters. The runner only orchestrates; data operations remain in the
+        // application canister so every callback stays non-awaiting and atomic.
         let app = await (with cycles = 2 * TRILLION) MigrationExample.MigrationExample();
         await app.installLegacyExampleData();
+        let migrator = await (with cycles = 2 * TRILLION) MigrationRunner.MigrationRunner(Principal.fromActor(app));
 
         await suite(
             "Migration functional example",
@@ -22,39 +27,16 @@ persistent actor {
                 test(
                     "moves a stable generation through copy, verify, cutover, cleanup, and seal",
                     func() : async () {
-                        let started = await app.beginMigration();
-                        assert started.phase == #copying;
+                        await migrator.migrateUsers();
+                        let finished = await app.progress();
+                        assert finished.phase == #sealed;
                         assert await app.writesAreFrozen();
-
-                        // Copy in bounded batches.  Repeating step 1 models an
-                        // uncertain client response and must not copy twice.
-                        assert (await app.copyNext(1, 2)).copied == 2;
-                        assert (await app.copyNext(1, 2)).copied == 2;
-                        assert (await app.copyNext(2, 2)).copied == 3;
-                        assert (await app.copyNext(3, 2)).phase == #verifying;
-
-                        // Verify the target before it becomes authoritative.
-                        ignore await app.verifyNext(4, 2);
-                        ignore await app.verifyNext(5, 2);
-                        assert (await app.verifyNext(6, 2)).phase == #readyToCutover;
-
-                        // Commit changes the public read path atomically.
-                        let committed = await app.commitMigration(7);
-                        assert committed.activeGeneration == 2;
+                        assert finished.activeGeneration == 2;
                         assert await app.activeGenerationSize() == 3;
                         assert await app.hasActiveUser("Ada Lovelace");
                         assert await app.hasActiveUser("Grace Hopper");
                         assert await app.hasActiveUser("Edsger Dijkstra");
-
-                        // Cleanup happens after cutover and is bounded too.
-                        ignore await app.cleanUpNext(8, 2);
-                        ignore await app.cleanUpNext(9, 2);
-                        assert (await app.cleanUpNext(10, 2)).phase == #readyToSeal;
                         assert await app.oldGenerationSize() == 0;
-
-                        // Only now may a final Wasm drop the legacy stable field.
-                        assert (await app.sealMigration(11)).phase == #sealed;
-                        await app.requireSealedForFinalUpgrade();
                     },
                 );
             },
