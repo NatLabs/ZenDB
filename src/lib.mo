@@ -38,6 +38,7 @@ module {
     public type Quintuple<A, B, C, D, E> = EmbeddedInstance.Quintuple<A, B, C, D, E>;
     public type Settings = EmbeddedInstance.Settings;
     public let Migration = EmbeddedInstance.Migration;
+    public let MigrationTemplates = EmbeddedInstance.MigrationTemplates;
     public type QueryBuilder = EmbeddedInstance.QueryBuilder;
 
     public let {

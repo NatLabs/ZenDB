@@ -6,6 +6,7 @@ import Runtime "mo:core@2.4/Runtime";
 
 import ZenDB "../../src/EmbeddedInstance";
 import Migration "../../src/EmbeddedInstance/Migration";
+import MigrationTemplates "../../src/EmbeddedInstance/MigrationTemplates";
 
 persistent actor class MigrationExample() = this_app {
     type LegacyUser = {
@@ -74,24 +75,8 @@ persistent actor class MigrationExample() = this_app {
         Migration.Controller<Nat, (Blob, LegacyUser)>(migrationState)
     };
 
-    // `cursor` is the index of the last id in the stable snapshot. Each item is
-    // fetched from the real legacy table immediately before it is copied.
     func nextLegacyUsers(cursor : ?Nat, limit : Nat) : [(Nat, (Blob, LegacyUser))] {
-        let start = switch (cursor) { case null 0; case (?index) index + 1 };
-        let source = legacyUsers();
-        var batch : [(Nat, (Blob, LegacyUser))] = [];
-        var index = start;
-        while (index < legacyIds.size() and batch.size() < limit) {
-            let id = legacyIds[index];
-            switch (source.get(id)) {
-                case (?user) batch := batch # [(index, (id, user))];
-                // An id may already be gone after a retry of cleanup; skipping it
-                // is safe because the snapshot cursor still advances past it.
-                case null {};
-            };
-            index += 1;
-        };
-        batch;
+        MigrationTemplates.nextFromSnapshot(legacyUsers(), legacyIds, cursor, limit);
     };
 
     func toV2((legacyId, user) : (Blob, LegacyUser)) : UserV2 {
@@ -99,40 +84,20 @@ persistent actor class MigrationExample() = this_app {
     };
 
     func upsertV2(item : (Blob, LegacyUser)) : Migration.Result<()> {
-        let target = usersV2();
-        let converted = toV2(item);
-        let #ok(matches) = target.search(
-            ZenDB.QueryBuilder().Where("legacyId", #eq(#Blob(converted.legacyId)))
-        ) else return #err("could not look up the copied user");
-
-        if (matches.documents.size() == 0) {
-            switch (target.insert(converted)) {
-                case (#ok(_)) #ok();
-                case (#err(message)) #err(message);
-            };
-        } else if (matches.documents.size() == 1 and matches.documents[0].1 == converted) {
-            #ok();
-        } else {
-            #err("users_v2 has conflicting rows for a legacy id");
-        };
+        MigrationTemplates.copyBySourceId(usersV2(), "legacyId", item, toV2);
     };
 
     func copiedCorrectly(item : (Blob, LegacyUser)) : Bool {
-        let converted = toV2(item);
-        switch (usersV2().search(
-            ZenDB.QueryBuilder().Where("legacyId", #eq(#Blob(converted.legacyId)))
-        )) {
-            case (#ok(matches)) matches.documents.size() == 1 and matches.documents[0].1 == converted;
-            case (#err(_)) false;
-        };
+        MigrationTemplates.verifyBySourceId(
+            usersV2(),
+            "legacyId",
+            item,
+            func(source, target) : Bool { target == toV2(source) },
+        );
     };
 
-    func removeLegacyUser((id, _) : (Blob, LegacyUser)) : Migration.Result<()> {
-        switch (legacyUsers().deleteById(id)) {
-            case (#ok(_)) #ok();
-            // The callback is idempotent: an already absent old row is cleaned.
-            case (#err(_)) #ok();
-        };
+    func removeLegacyUser(item : (Blob, LegacyUser)) : Migration.Result<()> {
+        MigrationTemplates.removeSource(legacyUsers(), item);
     };
 
     /// Represents the pre-migration release: it creates and fills a real ZenDB
@@ -154,19 +119,13 @@ persistent actor class MigrationExample() = this_app {
     /// both collections until `commitMigration` has completed.
     public func beginMigration() : async Migration.Progress {
         let source = legacyUsers();
-        switch (db().getCollection<UserV2>("users_v2", v2Candify)) {
-            case (#ok(_)) {};
-            case (#err(_)) {
-                let #ok(_) = db().createCollection<UserV2>("users_v2", v2Schema, v2Candify, ?{
-                    schema_constraints = [#Unique(["legacyId"])];
-                }) else Runtime.trap("Could not create the users_v2 collection");
-            };
-        };
-
-        legacyIds := [];
-        for ((id, _) in source.entries()) legacyIds := legacyIds # [id];
+        let #ok(started) = MigrationTemplates.begin(
+            controller(), source, legacyIds, db(), "users_v2", v2Schema, v2Candify,
+            ?{ schema_constraints = [#Unique(["legacyId"])] }, "users-v2", 2,
+        ) else Runtime.trap("Could not prepare the users_v2 collection");
+        legacyIds := started.sourceIds;
         writesFrozen := true;
-        controller().begin("users-v2", 2);
+        started.progress;
     };
 
     /// Each operation runs one bounded, retry-safe migration step.
