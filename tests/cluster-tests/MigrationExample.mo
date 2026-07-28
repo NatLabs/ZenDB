@@ -99,7 +99,7 @@ persistent actor class MigrationExample() = this_app {
     };
 
     func removeLegacyUser(item : (Blob, LegacyUser)) : Migration.Result<()> {
-        MigrationTemplates.removeSource(legacyUsers(), item);
+        MigrationTemplates.removeSource(controller(), legacyUsers(), item);
     };
 
     /// Represents the pre-migration release: it creates and fills a real ZenDB

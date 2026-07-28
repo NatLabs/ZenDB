@@ -120,6 +120,16 @@ module {
 
         public func getProgress() : Progress { progress() };
 
+        /// Allows cleanup callbacks to prove that cutover has completed.
+        ///
+        /// Keep this check in the controller rather than duplicating phase
+        /// checks in application endpoints: an endpoint that accidentally
+        /// exposes a source-removal callback must not be able to delete old
+        /// data while the migration is still copying or verifying it.
+        public func requireCleaning() {
+            requirePhase(#cleaning);
+        };
+
         /// Copies at most `limit` source items. `copy` must be idempotent
         /// (normally an upsert with the source document id).
         public func copyStep(

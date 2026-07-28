@@ -116,12 +116,16 @@ module {
         };
     };
 
-    /// Deleting an absent source row is considered successful, so this callback
-    /// remains idempotent when cleanup is retried after an uncertain response.
-    public func removeSource<Record>(
+    /// Deletes an absent source row successfully, making cleanup retries
+    /// idempotent. The controller check is required even when this function is
+    /// called from an application-facing endpoint: source data must not be
+    /// removed before copy, verification, and cutover have completed.
+    public func removeSource<Cursor, Record>(
+        controller : Migration.Controller<Cursor, Item<Record>>,
         source : Collection.Collection<Record>,
         item : Item<Record>,
     ) : Result<()> {
+        controller.requireCleaning();
         switch (source.deleteById(item.0)) {
             case (#ok(_)) #ok();
             case (#err(_)) #ok();
