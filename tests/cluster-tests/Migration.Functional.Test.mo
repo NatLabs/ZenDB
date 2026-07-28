@@ -24,19 +24,25 @@ persistent actor {
         await suite(
             "Migration functional example",
             func() : async () {
+                await migrator.migrateUsers();
+                let finished = await app.progress();
+                let writesAreFrozen = await app.writesAreFrozen();
+                let activeGenerationSize = await app.activeGenerationSize();
+                let hasAda = await app.hasActiveUser("Ada Lovelace");
+                let hasGrace = await app.hasActiveUser("Grace Hopper");
+                let hasEdsger = await app.hasActiveUser("Edsger Dijkstra");
+                let oldGenerationSize = await app.oldGenerationSize();
                 test(
                     "moves a stable generation through copy, verify, cutover, cleanup, and seal",
-                    func() : async () {
-                        await migrator.migrateUsers();
-                        let finished = await app.progress();
+                    func() {
                         assert finished.phase == #sealed;
-                        assert await app.writesAreFrozen();
+                        assert writesAreFrozen;
                         assert finished.activeGeneration == 2;
-                        assert await app.activeGenerationSize() == 3;
-                        assert await app.hasActiveUser("Ada Lovelace");
-                        assert await app.hasActiveUser("Grace Hopper");
-                        assert await app.hasActiveUser("Edsger Dijkstra");
-                        assert await app.oldGenerationSize() == 0;
+                        assert activeGenerationSize == 3;
+                        assert hasAda;
+                        assert hasGrace;
+                        assert hasEdsger;
+                        assert oldGenerationSize == 0;
                     },
                 );
             },
