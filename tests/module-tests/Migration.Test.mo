@@ -1,4 +1,5 @@
 import { test; suite } "mo:test";
+import Array "mo:core@2.4/Array";
 import Migration "../../src/EmbeddedInstance/Migration";
 
 suite(
@@ -18,13 +19,13 @@ suite(
                     var result : [(Nat, Nat)] = [];
                     var index = start;
                     while (index < source.size() and result.size() < limit) {
-                        result := result # [(index, source[index])];
+                        result := Array.concat(result, [(index, source[index])]);
                         index += 1;
                     };
                     result;
                 };
                 let copy = func(value : Nat) : Migration.Result<()> {
-                    copied := copied # [value];
+                    copied := Array.concat(copied, [value]);
                     #ok();
                 };
 
@@ -45,7 +46,7 @@ suite(
 
                 var removed : [Nat] = [];
                 let remove = func(value : Nat) : Migration.Result<()> {
-                    removed := removed # [value];
+                    removed := Array.concat(removed, [value]);
                     #ok();
                 };
                 ignore controller.cleanupStep(8, 2, next, remove);

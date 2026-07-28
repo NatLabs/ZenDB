@@ -6,6 +6,7 @@
 /// idempotent target insertion, verification, and source cleanup.
 
 import Collection "Collection";
+import Array "mo:core@2.4/Array";
 import Database "Database";
 import Migration "Migration";
 import Query "Query";
@@ -19,7 +20,7 @@ module {
     /// state; it is the deterministic source for the Nat cursor used below.
     public func snapshotIds<Record>(source : Collection.Collection<Record>) : [T.DocumentId] {
         var ids : [T.DocumentId] = [];
-        for ((id, _) in source.entries()) ids := ids # [id];
+        for ((id, _) in source.entries()) ids := Array.concat(ids, [id]);
         ids;
     };
 
@@ -37,7 +38,7 @@ module {
         while (index < sourceIds.size() and batch.size() < limit) {
             let id = sourceIds[index];
             switch (source.get(id)) {
-                case (?record) batch := batch # [(index, (id, record))];
+                case (?record) batch := Array.concat(batch, [(index, (id, record))]);
                 case null {};
             };
             index += 1;
