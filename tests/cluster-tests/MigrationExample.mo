@@ -30,11 +30,9 @@ persistent actor class MigrationExample() = this_app {
         is_compression_enabled = null;
     });
 
-    // The migration state and the source-id snapshot must survive every bridge
-    // release upgrade. The snapshot gives each batch a deterministic cursor even
-    // while cleanup removes documents from the legacy ZenDB collection.
-    var migrationState = Migration.newState<Nat>(1);
-    var legacyIds : [Blob] = [];
+    // This cursor survives bridge-release upgrades and resumes each bounded
+    // B-tree scan without materializing every legacy id in stable actor state.
+    var migrationState = Migration.newState<Blob>(1);
     var writesFrozen = false;
 
     let legacySchema : ZenDB.Types.Schema = #Record([
@@ -73,12 +71,12 @@ persistent actor class MigrationExample() = this_app {
         collection;
     };
 
-    func controller() : Migration.Controller<Nat, (Blob, LegacyUser)> {
-        Migration.Controller<Nat, (Blob, LegacyUser)>(migrationState)
+    func controller() : Migration.Controller<Blob, (Blob, LegacyUser)> {
+        Migration.Controller<Blob, (Blob, LegacyUser)>(migrationState)
     };
 
-    func nextLegacyUsers(cursor : ?Nat, limit : Nat) : [(Nat, (Blob, LegacyUser))] {
-        MigrationTemplates.nextFromSnapshot(legacyUsers(), legacyIds, cursor, limit);
+    func nextLegacyUsers(cursor : ?Blob, limit : Nat) : [(Blob, (Blob, LegacyUser))] {
+        MigrationTemplates.nextFromCursor(legacyUsers(), cursor, limit);
     };
 
     func toV2((legacyId, user) : (Blob, LegacyUser)) : UserV2 {
@@ -120,14 +118,12 @@ persistent actor class MigrationExample() = this_app {
     /// Start a bridge release. Freeze old writes here, or dual-write them to
     /// both collections until `commitMigration` has completed.
     public func beginMigration() : async Migration.Progress {
-        let source = legacyUsers();
-        let #ok(started) = MigrationTemplates.begin(
-            controller(), source, legacyIds, db(), "users_v2", v2Schema, v2Candify,
+        let #ok(progress) = MigrationTemplates.begin(
+            controller(), db(), "users_v2", v2Schema, v2Candify,
             ?{ schema_constraints = [#Unique(["legacyId"])] }, "users-v2", 2,
         ) else Runtime.trap("Could not prepare the users_v2 collection");
-        legacyIds := started.sourceIds;
         writesFrozen := true;
-        started.progress;
+        progress;
     };
 
     /// Each operation runs one bounded, retry-safe migration step.

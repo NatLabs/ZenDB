@@ -95,6 +95,10 @@ module {
             if (limit == 0) Runtime.trap("Migration batch limit must be positive");
         };
 
+        func requireBoundedBatch(batchSize : Nat, limit : Nat) {
+            if (batchSize > limit) Runtime.trap("Migration next callback returned more items than the requested batch limit");
+        };
+
         /// Starts a new migration. Repeating a successfully started migration
         /// with the same id is safe; a different plan is rejected.
         public func begin(migrationId : Text, targetGeneration : Nat) : Progress {
@@ -143,6 +147,7 @@ module {
             requirePositiveLimit(limit);
 
             let batch = next(state.copyCursor, limit);
+            requireBoundedBatch(batch.size(), limit);
             if (batch.size() == 0) {
                 state.phase := #verifying;
             } else {
@@ -173,6 +178,7 @@ module {
             requirePositiveLimit(limit);
 
             let batch = next(state.verifyCursor, limit);
+            requireBoundedBatch(batch.size(), limit);
             if (batch.size() == 0) {
                 state.phase := #readyToCutover;
             } else {
@@ -211,6 +217,7 @@ module {
             requirePositiveLimit(limit);
 
             let batch = next(state.cleanupCursor, limit);
+            requireBoundedBatch(batch.size(), limit);
             if (batch.size() == 0) {
                 state.phase := #readyToSeal;
             } else {

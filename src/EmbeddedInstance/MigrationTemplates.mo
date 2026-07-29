@@ -2,11 +2,11 @@
 ///
 /// These helpers deliberately leave the record conversion and target's source-id
 /// field to the application. They cover the mechanical parts that must be
-/// consistent in every bridge release: stable source snapshots, bounded reads,
-/// idempotent target insertion, verification, and source cleanup.
+/// consistent in every bridge release: bounded stable scans, idempotent target
+/// insertion, verification, and source cleanup.
 
 import Collection "Collection";
-import Array "mo:core@2.4/Array";
+import Buffer "mo:base@0.16/Buffer";
 import Database "Database";
 import Migration "Migration";
 import Query "Query";
@@ -16,43 +16,38 @@ module {
     public type Result<A> = { #ok : A; #err : Text };
     public type Item<Record> = (T.DocumentId, Record);
 
-    /// Capture the source ids before copying. Keep this array in stable actor
-    /// state; it is the deterministic source for the Nat cursor used below.
-    public func snapshotIds<Record>(source : Collection.Collection<Record>) : [T.DocumentId] {
-        var ids : [T.DocumentId] = [];
-        for ((id, _) in source.entries()) ids := Array.concat(ids, [id]);
-        ids;
-    };
-
-    /// Returns at most `limit` source documents after `cursor`. Missing ids are
-    /// skipped, which makes the same callback suitable for cleanup retries.
-    public func nextFromSnapshot<Record>(
+    /// Returns at most `limit` source documents strictly after `cursor` in
+    /// document-id order. The scan seeks through ZenDB's B-tree; it neither
+    /// materializes the source ids nor rescans an already migrated prefix.
+    ///
+    /// Freeze source writes before the first call. During cleanup, the prior
+    /// cursor has been deleted, so the inclusive B-tree scan naturally resumes
+    /// at the following id.
+    public func nextFromCursor<Record>(
         source : Collection.Collection<Record>,
-        sourceIds : [T.DocumentId],
-        cursor : ?Nat,
+        cursor : ?T.DocumentId,
         limit : Nat,
-    ) : [(Nat, Item<Record>)] {
-        let start = switch (cursor) { case null 0; case (?index) index + 1 };
-        var batch : [(Nat, Item<Record>)] = [];
-        var index = start;
-        while (index < sourceIds.size() and batch.size() < limit) {
-            let id = sourceIds[index];
-            switch (source.get(id)) {
-                case (?record) batch := Array.concat(batch, [(index, (id, record))]);
-                case null {};
+    ) : [(T.DocumentId, Item<Record>)] {
+        if (limit == 0) return [];
+        let batch = Buffer.Buffer<(T.DocumentId, Item<Record>)>(0);
+        label collect for ((id, record) in source.scan(cursor, null)) {
+            // B-tree scans include the lower bound. Skip it while the prior
+            // row still exists (copy and verification); it no longer exists
+            // after cleanup, so the first result is already strictly newer.
+            if (switch (cursor) { case (?last) id == last; case null false }) {
+                continue collect;
             };
-            index += 1;
+            batch.add((id, (id, record)));
+            if (batch.size() == limit) break collect;
         };
-        batch;
+        Buffer.toArray(batch);
     };
 
-    /// Creates the target table if needed and begins the controller. On the
-    /// first call it snapshots source ids; retries retain `existingSourceIds`.
-    /// Store that array in stable state with the controller.
+    /// Creates the target table if needed and begins the controller. This does
+    /// no source scan, so starting a migration stays bounded even for very
+    /// large collections. Freeze writes in the same update that calls `begin`.
     public func begin<Source, Target>(
-        controller : Migration.Controller<Nat, Item<Source>>,
-        source : Collection.Collection<Source>,
-        existingSourceIds : [T.DocumentId],
+        controller : Migration.Controller<T.DocumentId, Item<Source>>,
         database : Database.Database,
         targetName : Text,
         targetSchema : T.Schema,
@@ -60,7 +55,7 @@ module {
         targetOptions : ?T.CreateCollectionOptions,
         migrationId : Text,
         targetGeneration : Nat,
-    ) : Result<{ progress : Migration.Progress; sourceIds : [T.DocumentId] }> {
+    ) : Result<Migration.Progress> {
         switch (database.getCollection<Target>(targetName, targetCandify)) {
             case (#ok(_)) {};
             case (#err(_)) {
@@ -71,11 +66,7 @@ module {
             };
         };
 
-        let sourceIds = switch (controller.getProgress().phase) {
-            case (#idle) snapshotIds(source);
-            case (_) existingSourceIds;
-        };
-        #ok({ progress = controller.begin(migrationId, targetGeneration); sourceIds });
+        #ok(controller.begin(migrationId, targetGeneration));
     };
 
     /// Inserts a transformed source item once. The target must have a field that
@@ -126,9 +117,17 @@ module {
         item : Item<Record>,
     ) : Result<()> {
         controller.requireCleaning();
+        // A missing row means a previously committed cleanup request is being
+        // retried. Do not swallow errors from an attempted delete: it may have
+        // failed while maintaining an index, and accepting it would let the
+        // migration commit a corrupted source collection.
+        switch (source.get(item.0)) {
+            case null return #ok();
+            case (?_) {};
+        };
         switch (source.deleteById(item.0)) {
             case (#ok(_)) #ok();
-            case (#err(_)) #ok();
+            case (#err(message)) #err(message);
         };
     };
 };

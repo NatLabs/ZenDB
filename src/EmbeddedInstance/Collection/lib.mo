@@ -137,6 +137,20 @@ module {
             documents;
         };
 
+        /// Returns documents whose ids lie in the inclusive range from `start`
+        /// through `end`. Either bound may be null. The underlying B-tree seeks
+        /// directly to `start`, so this is suitable for bounded resumable work.
+        public func scan(start : ?T.DocumentId, end : ?T.DocumentId) : Iter<(T.DocumentId, Record)> {
+            let iter = StableCollection.scan(collection, start, end);
+
+            Iter.map<(T.DocumentId, Blob), (T.DocumentId, Record)>(
+                iter,
+                func((id, candid_blob) : (T.DocumentId, Blob)) {
+                    (id, blobify.from_blob(candid_blob));
+                },
+            );
+        };
+
         /// Insert a document that matches the collection's schema.
         /// If the document passes the schema validation and schema constraints, it will be inserted into the collection and a unique id will be assigned to it and returned.
         ///
