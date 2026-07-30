@@ -135,6 +135,15 @@ module StableCollection {
         );
     };
 
+    public func scan(collection : T.StableCollection, start : ?T.DocumentId, end : ?T.DocumentId) : T.Iter<(T.DocumentId, Blob)> {
+        Iter.map<(T.DocumentId, T.CandidBlob), (T.DocumentId, Blob)>(
+            DocumentStore.scan(collection, start, end),
+            func((id, partial_candid_blob) : (T.DocumentId, T.CandidBlob)) : (T.DocumentId, Blob) {
+                (id, CollectionUtils.appendTypeHeaderToCandidBlob(collection, partial_candid_blob));
+            },
+        );
+    };
+
     public func keys(collection : T.StableCollection) : T.Iter<T.DocumentId> {
         DocumentStore.keys(collection);
     };

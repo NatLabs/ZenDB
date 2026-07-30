@@ -19,6 +19,14 @@
 
 **Important Note**: Currently, no automatic indexes are created for your data. You'll need to create your own indexes when defining your collection and schema. If no indexes exist that can satisfy a query, ZenDB will run a full collection scan, which is likely to hit the instruction limit for a dataset with as little as ten thousand records.
 
+### Migrating large databases
+
+For migrations that cannot complete during a single canister upgrade, use `ZenDB.Migration` to build a durable bridge release. Its stable state machine performs bounded copy and verification steps, atomically cuts reads and writes over to the new generation, then incrementally deletes and seals the old generation. Every step has a monotonic step number, so retrying a request after an uncertain response is safe.
+
+Keep the `Migration.State` returned by `Migration.newState` in your actor's stable state, make the copy/remove callbacks idempotent, and do not `await` inside any callback. Before cutover, freeze application writes to both generations (or dual-write them correctly), give the source-id field a single-field `#Unique` constraint, use a new target collection name, and use `MigrationTemplates.commit` to reject missing or unrelated target rows. Target writes may resume after the atomic cutover.
+
+A failing callback traps the update, rolling back both the data writes and cursor movement. Every update endpoint that begins, advances, commits, cleans, or seals a migration must authenticate an administrator or dedicated migration canister—step numbers are retry tokens, not authorization. Treat the migration id as the version of the record transform; `MigrationTemplates.begin` additionally binds retries to the original target name, schema, and collection options. Only install a final Wasm that drops the old stable fields after `seal` has succeeded and `requireSealed` passes.
+
 
 ## Getting Started
 
@@ -368,7 +376,7 @@ This allows you to monitor query performance and access both the results and exe
 
 - The query planner may not always select the optimal index for complex queries. It is recommended to analyze query performance and adjust indexes accordingly.
 
-- Schema updates and migrations not yet supported. As a result, changing the schema of an existing collection requires creating a new collection and migrating the data manually.
+- In-place schema changes are not supported. Use a new collection and the resumable two-generation migration API described above.
 
 - Using Limit/Skip Pagination can be inefficient and may hit the instruction limits if the result set is too large. It is recommended to create indexes that fully cover your queries where possible, to avoid this limitation.
 
@@ -390,7 +398,7 @@ This allows you to monitor query performance and access both the results and exe
 - [ ] Multi-key array indexes - for indexing fields within arrays
 - [ ] Backward compatible schema upgrades and versioning
 - [ ] Aggregation functions (min, max, sum, avg, etc.)
-- [ ] Support for migrations
+- [x] Resumable application-level collection migrations
 - [ ] Periodic backups to external canisters
 - [ ] Database canister monitoring and analytics tools
 

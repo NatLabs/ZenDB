@@ -41,12 +41,16 @@ import C "Constants";
 import TwoQueueCache "TwoQueueCache";
 
 import TypeMigrations "TypeMigrations";
+import MigrationController "Migration";
+import MigrationTemplate "MigrationTemplates";
 import Runtime "mo:core@2.4/Runtime";
 
 module {
 
     public let Types = T;
     public let Constants = C;
+    public let Migration = MigrationController;
+    public let MigrationTemplates = MigrationTemplate;
 
     public type Collection<T> = Collection.Collection<T>;
     public type Database = Database.Database;
