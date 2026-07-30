@@ -2,6 +2,16 @@
 
 All notable changes to ZenDB stable types will be documented in this file.
 
+## Unreleased
+
+### Added
+
+- Resumable two-generation migrations with bounded copy, verification, cutover,
+  cleanup, and sealing steps.
+- Inclusive document-ID collection scans for durable migration cursors.
+- Migration templates that require a unique legacy-ID field and a fresh target
+  collection.
+
 ## [2.0.0] - 2026-03-07
 
 ### Breaking Changes from v1.0.0

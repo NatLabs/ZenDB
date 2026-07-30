@@ -16,6 +16,32 @@ module {
     public type Result<A> = { #ok : A; #err : Text };
     public type Item<Record> = (T.DocumentId, Record);
 
+    func hasUniqueSourceId<Record>(
+        target : Collection.Collection<Record>,
+        sourceIdField : Text,
+    ) : Bool {
+        for ((fields, _) in target._get_stable_state().unique_constraints.vals()) {
+            if (fields.size() == 1 and fields[0] == sourceIdField) return true;
+        };
+        false;
+    };
+
+    func collectionExists(database : Database.Database, name : Text) : Bool {
+        for (collectionName in database.listCollectionNames().vals()) {
+            if (collectionName == name) return true;
+        };
+        false;
+    };
+
+    func planFingerprint(
+        migrationId : Text,
+        targetName : Text,
+        targetSchema : T.Schema,
+        targetOptions : ?T.CreateCollectionOptions,
+    ) : Text {
+        debug_show (migrationId, targetName, targetSchema, targetOptions);
+    };
+
     /// Returns at most `limit` source documents strictly after `cursor` in
     /// document-id order. The scan seeks through ZenDB's B-tree; it neither
     /// materializes the source ids nor rescans an already migrated prefix.
@@ -43,9 +69,11 @@ module {
         Buffer.toArray(batch);
     };
 
-    /// Creates the target table if needed and begins the controller. This does
-    /// no source scan, so starting a migration stays bounded even for very
-    /// large collections. Freeze writes in the same update that calls `begin`.
+    /// Creates a new target table and begins the controller. This does no source
+    /// scan, so starting a migration stays bounded even for very large
+    /// collections. An existing target is rejected on the first call: silently
+    /// adopting one could cut over to unrelated rows or incompatible indexes.
+    /// Freeze source and target writes in the same update that calls `begin`.
     public func begin<Source, Target>(
         controller : Migration.Controller<T.DocumentId, Item<Source>>,
         database : Database.Database,
@@ -56,9 +84,30 @@ module {
         migrationId : Text,
         targetGeneration : Nat,
     ) : Result<Migration.Progress> {
-        switch (database.getCollection<Target>(targetName, targetCandify)) {
-            case (#ok(_)) {};
-            case (#err(_)) {
+        switch (controller.getProgress().phase) {
+            case (#idle) {
+                if (collectionExists(database, targetName)) {
+                    return #err(
+                        "Migration target collection '" # targetName #
+                        "' already exists; use a new empty collection name"
+                    );
+                };
+                switch (database.createCollection<Target>(targetName, targetSchema, targetCandify, targetOptions)) {
+                    case (#ok(_)) {};
+                    case (#err(message)) return #err(message);
+                };
+            };
+            case (_) {
+                // Retrying begin is allowed only for the target created by the
+                // successful first call. Re-run createCollection after proving
+                // it still exists so the database validates the supplied codec
+                // and schema without accidentally recreating a missing target.
+                if (not collectionExists(database, targetName)) {
+                    return #err(
+                        "Migration target collection '" # targetName #
+                        "' is missing after migration began"
+                    );
+                };
                 switch (database.createCollection<Target>(targetName, targetSchema, targetCandify, targetOptions)) {
                     case (#ok(_)) {};
                     case (#err(message)) return #err(message);
@@ -66,17 +115,31 @@ module {
             };
         };
 
-        #ok(controller.begin(migrationId, targetGeneration));
+        #ok(
+            controller.beginWithPlan(
+                migrationId,
+                targetGeneration,
+                planFingerprint(migrationId, targetName, targetSchema, targetOptions),
+            )
+        );
     };
 
     /// Inserts a transformed source item once. The target must have a field that
-    /// stores its old ZenDB document id, preferably protected by `#Unique`.
+    /// stores its old ZenDB document id and a single-field `#Unique` constraint
+    /// on that field. The constraint both guarantees idempotency and keeps each
+    /// lookup bounded.
     public func copyBySourceId<Source, Target>(
         target : Collection.Collection<Target>,
         sourceIdField : Text,
         item : Item<Source>,
         transform : Item<Source> -> Target,
     ) : Result<()> {
+        if (not hasUniqueSourceId(target, sourceIdField)) {
+            return #err(
+                "target field '" # sourceIdField #
+                "' must have a single-field unique constraint"
+            );
+        };
         let sourceId = item.0;
         let #ok(matches) = target.search(
             Query.QueryBuilder().Where(sourceIdField, #eq(#Blob(sourceId)))
@@ -101,10 +164,35 @@ module {
         item : Item<Source>,
         matches : (Item<Source>, Target) -> Bool,
     ) : Bool {
+        if (not hasUniqueSourceId(target, sourceIdField)) return false;
         switch (target.search(Query.QueryBuilder().Where(sourceIdField, #eq(#Blob(item.0))))) {
             case (#ok(result)) result.documents.size() == 1 and matches(item, result.documents[0].1);
             case (#err(_)) false;
         };
+    };
+
+    /// Cuts over a one-source-row-to-one-target-row migration only when the
+    /// target has exactly the number of rows copied and individually verified.
+    /// This rules out unrelated target rows that per-source verification cannot
+    /// see. A retry of an already completed commit remains a no-op even if
+    /// normal target writes have resumed since cutover.
+    public func commit<Cursor, Source, Target>(
+        controller : Migration.Controller<Cursor, Item<Source>>,
+        target : Collection.Collection<Target>,
+        step : Nat,
+        cutover : () -> (),
+    ) : Result<Migration.Progress> {
+        let progress = controller.getProgress();
+        if (step <= progress.lastCompletedStep) {
+            return #ok(controller.commit(step, cutover));
+        };
+        if (target.size() != progress.copied) {
+            return #err(
+                "migration target contains " # debug_show target.size() #
+                " rows, but copy produced " # debug_show progress.copied
+            );
+        };
+        #ok(controller.commit(step, cutover));
     };
 
     /// Deletes an absent source row successfully, making cleanup retries

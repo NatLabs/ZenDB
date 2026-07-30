@@ -8,7 +8,7 @@ import ZenDB "../../src/EmbeddedInstance";
 import Migration "../../src/EmbeddedInstance/Migration";
 import MigrationTemplates "../../src/EmbeddedInstance/MigrationTemplates";
 
-persistent actor class MigrationExample() = this_app {
+shared ({ caller = owner }) persistent actor class MigrationExample() = this_app {
     type LegacyUser = {
         firstName : Text;
         lastName : Text;
@@ -34,6 +34,7 @@ persistent actor class MigrationExample() = this_app {
     // B-tree scan without materializing every legacy id in stable actor state.
     var migrationState = Migration.newState<Blob>(1);
     var writesFrozen = false;
+    var migrationOperator : ?Principal = null;
 
     let legacySchema : ZenDB.Types.Schema = #Record([
         ("firstName", #Text),
@@ -56,6 +57,16 @@ persistent actor class MigrationExample() = this_app {
     };
 
     func db() : ZenDB.Database { ZenDB.launchDefaultDB(zendb) };
+
+    func requireOwner(caller : Principal) {
+        if (caller != owner) Runtime.trap("Only the owner may configure migrations");
+    };
+
+    func requireMigrationOperator(caller : Principal) {
+        if (migrationOperator != ?caller) {
+            Runtime.trap("Caller is not the authorized migration operator");
+        };
+    };
 
     func legacyUsers() : ZenDB.Collection<LegacyUser> {
         let #ok(collection) = db().getCollection<LegacyUser>("users", legacyCandify) else {
@@ -102,7 +113,8 @@ persistent actor class MigrationExample() = this_app {
 
     /// Represents the pre-migration release: it creates and fills a real ZenDB
     /// `users` collection. Production code already has this collection.
-    public func installLegacyExampleData() : async () {
+    public shared ({ caller }) func installLegacyExampleData() : async () {
+        requireOwner(caller);
         let #ok(source) = db().createCollection<LegacyUser>("users", legacySchema, legacyCandify, null) else {
             Runtime.trap("Could not create the legacy users collection");
         };
@@ -115,9 +127,20 @@ persistent actor class MigrationExample() = this_app {
         };
     };
 
+    /// Bind all destructive migration calls to the dedicated orchestrator.
+    /// Production code should use an equally strict authorization policy.
+    public shared ({ caller }) func authorizeMigrationOperator(operator : Principal) : async () {
+        requireOwner(caller);
+        if (migrationState.phase != #idle) {
+            Runtime.trap("The migration operator cannot change after migration begins");
+        };
+        migrationOperator := ?operator;
+    };
+
     /// Start a bridge release. Freeze old writes here, or dual-write them to
     /// both collections until `commitMigration` has completed.
-    public func beginMigration() : async Migration.Progress {
+    public shared ({ caller }) func beginMigration() : async Migration.Progress {
+        requireMigrationOperator(caller);
         let #ok(progress) = MigrationTemplates.begin(
             controller(), db(), "users_v2", v2Schema, v2Candify,
             ?{ schema_constraints = [#Unique(["legacyId"])] }, "users-v2", 2,
@@ -127,30 +150,42 @@ persistent actor class MigrationExample() = this_app {
     };
 
     /// Each operation runs one bounded, retry-safe migration step.
-    public func copyNext(step : Nat, limit : Nat) : async Migration.Progress {
+    public shared ({ caller }) func copyNext(step : Nat, limit : Nat) : async Migration.Progress {
+        requireMigrationOperator(caller);
         controller().copyStep(step, limit, nextLegacyUsers, upsertV2);
     };
 
-    public func verifyNext(step : Nat, limit : Nat) : async Migration.Progress {
+    public shared ({ caller }) func verifyNext(step : Nat, limit : Nat) : async Migration.Progress {
+        requireMigrationOperator(caller);
         controller().verifyStep(step, limit, nextLegacyUsers, copiedCorrectly);
     };
 
     /// This update atomically makes the `users_v2` ZenDB table authoritative.
-    public func commitMigration(step : Nat) : async Migration.Progress {
-        controller().commit(step, func() {});
+    public shared ({ caller }) func commitMigration(step : Nat) : async Migration.Progress {
+        requireMigrationOperator(caller);
+        let #ok(progress) = MigrationTemplates.commit(
+            controller(),
+            usersV2(),
+            step,
+            func() {},
+        ) else Runtime.trap("The migration target is not complete");
+        progress;
     };
 
-    public func cleanUpNext(step : Nat, limit : Nat) : async Migration.Progress {
+    public shared ({ caller }) func cleanUpNext(step : Nat, limit : Nat) : async Migration.Progress {
+        requireMigrationOperator(caller);
         controller().cleanupStep(step, limit, nextLegacyUsers, removeLegacyUser);
     };
 
-    public func sealMigration(step : Nat) : async Migration.Progress {
+    public shared ({ caller }) func sealMigration(step : Nat) : async Migration.Progress {
+        requireMigrationOperator(caller);
         controller().seal(step, func() : Bool { legacyUsers().isEmpty() });
     };
 
     /// A final Wasm that removes the old stable field should guard itself with
     /// this check before relying on the legacy collection no longer existing.
-    public func requireSealedForFinalUpgrade() : async () {
+    public shared ({ caller }) func requireSealedForFinalUpgrade() : async () {
+        requireMigrationOperator(caller);
         controller().requireSealed();
     };
 

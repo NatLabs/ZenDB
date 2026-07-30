@@ -22,6 +22,7 @@ module {
     /// uncertain response and it becomes a no-op.
     public type State<Cursor> = {
         var migrationId : Text;
+        var planFingerprint : Text;
         var phase : Phase;
         var activeGeneration : Nat;
         var targetGeneration : Nat;
@@ -49,6 +50,7 @@ module {
 
     public func newState<Cursor>(activeGeneration : Nat) : State<Cursor> = {
         var migrationId = "";
+        var planFingerprint = "";
         var phase = #idle;
         var activeGeneration;
         var targetGeneration = activeGeneration;
@@ -99,17 +101,28 @@ module {
             if (batchSize > limit) Runtime.trap("Migration next callback returned more items than the requested batch limit");
         };
 
-        /// Starts a new migration. Repeating a successfully started migration
-        /// with the same id is safe; a different plan is rejected.
-        public func begin(migrationId : Text, targetGeneration : Nat) : Progress {
+        /// Starts a new migration with an explicit fingerprint for every
+        /// behavior-affecting part of its plan. Repeating the same plan is safe;
+        /// reusing an id for a different plan is rejected.
+        public func beginWithPlan(
+            migrationId : Text,
+            targetGeneration : Nat,
+            planFingerprint : Text,
+        ) : Progress {
             if (state.phase != #idle) {
-                if (state.migrationId == migrationId and state.targetGeneration == targetGeneration) return progress();
+                if (
+                    state.migrationId == migrationId and
+                    state.targetGeneration == targetGeneration and
+                    state.planFingerprint == planFingerprint
+                ) return progress();
                 Runtime.trap("A migration is already active or sealed");
             };
             if (migrationId == "") Runtime.trap("Migration id must not be empty");
+            if (planFingerprint == "") Runtime.trap("Migration plan fingerprint must not be empty");
             if (targetGeneration <= state.activeGeneration) Runtime.trap("Target generation must be newer than the active generation");
 
             state.migrationId := migrationId;
+            state.planFingerprint := planFingerprint;
             state.targetGeneration := targetGeneration;
             state.copyCursor := null;
             state.verifyCursor := null;
@@ -120,6 +133,13 @@ module {
             state.lastCompletedStep := 0;
             state.phase := #copying;
             progress();
+        };
+
+        /// Starts a generic migration whose id also identifies its complete
+        /// plan. Use `beginWithPlan` when a higher-level helper can derive a
+        /// stronger fingerprint from structured plan inputs.
+        public func begin(migrationId : Text, targetGeneration : Nat) : Progress {
+            beginWithPlan(migrationId, targetGeneration, migrationId);
         };
 
         public func getProgress() : Progress { progress() };
@@ -180,6 +200,12 @@ module {
             let batch = next(state.verifyCursor, limit);
             requireBoundedBatch(batch.size(), limit);
             if (batch.size() == 0) {
+                if (state.verified != state.copied) {
+                    Runtime.trap(
+                        "Migration verification covered " # debug_show state.verified #
+                        " items, but copy covered " # debug_show state.copied
+                    );
+                };
                 state.phase := #readyToCutover;
             } else {
                 for ((_, item) in batch.vals()) {

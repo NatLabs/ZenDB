@@ -2,19 +2,32 @@
 // every bounded step executes inside MigrationExample, where its stable state
 // and the table writes can commit atomically in one update message.
 
-import MigrationExample "MigrationExample";
+import Migration "../../src/EmbeddedInstance/Migration";
 import Principal "mo:core@2.4/Principal";
+import Runtime "mo:core@2.4/Runtime";
 
-persistent actor class MigrationRunner(appId : Principal) {
+shared ({ caller = owner }) persistent actor class MigrationRunner(appId : Principal) {
+    type MigrationApp = actor {
+        beginMigration : shared () -> async Migration.Progress;
+        copyNext : shared (Nat, Nat) -> async Migration.Progress;
+        verifyNext : shared (Nat, Nat) -> async Migration.Progress;
+        commitMigration : shared Nat -> async Migration.Progress;
+        cleanUpNext : shared (Nat, Nat) -> async Migration.Progress;
+        sealMigration : shared Nat -> async Migration.Progress;
+        requireSealedForFinalUpgrade : shared () -> async ();
+    };
+
     // Persisting a principal keeps the migrator's target available after its
     // own upgrade; the actor reference can then be reconstructed cheaply.
     var appId_ = appId;
-    transient let app : MigrationExample.MigrationExample = actor (Principal.toText(appId_));
+    transient let app : MigrationApp = actor (Principal.toText(appId_));
 
     /// A production migrator would persist its own job queue and call one of
     /// these steps per timer/heartbeat. Keeping the calls explicit here makes
     /// the complete bridge-release protocol easy to follow.
-    public func migrateUsers() : async () {
+    public shared ({ caller }) func migrateUsers() : async () {
+        if (caller != owner) Runtime.trap("Only the owner may start the migration");
+        ignore await app.beginMigration();
         ignore await app.beginMigration();
 
         // Retrying this update is intentional: Migration.Controller makes the
